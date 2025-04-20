@@ -1,9 +1,10 @@
 import logging
 import uvicorn
 import os
+import sys
 
 from app.database.session import SessionLocal
-from app.db.init_db import init_db
+from app.core.init_db import init_db
 from app.core.config import settings
 
 # Настройка логгера
@@ -15,10 +16,25 @@ def main() -> None:
     Запуск приложения с настройками из конфига
     """
     try:
+        # Переходим в корневую директорию проекта
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(backend_dir)
+        os.chdir(project_root)
+        logger.info(f"Изменена рабочая директория на: {os.getcwd()}")
+        
+        # Проверяем наличие директории data
+        if not os.path.exists("data"):
+            os.makedirs("data")
+            logger.info("Создана директория data")
+        
         # Проверяем наличие файла main.py
-        if not os.path.exists("main.py"):
-            logger.error("Файл main.py не найден в текущей директории")
+        if not os.path.exists(os.path.join(backend_dir, "main.py")):
+            logger.error("Файл main.py не найден в директории backend")
             raise FileNotFoundError("main.py не найден")
+        
+        # Переходим обратно в директорию backend для запуска сервера
+        os.chdir(backend_dir)
+        logger.info(f"Изменена рабочая директория для запуска сервера: {os.getcwd()}")
             
         # Инициализируем базу данных
         logger.info("Инициализация базы данных...")

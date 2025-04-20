@@ -7,17 +7,11 @@ def add_missing_columns():
     """
     # Текущий каталог скрипта
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Путь к базе данных - ищем во всей директории
-    db_path = None
+    # Путь к базе данных - ищем в директории data
+    db_path = os.path.join(current_dir, "data", "restaurant.db")
     
-    # Ищем файл БД в текущем каталоге и подкаталогах
-    for root, dirs, files in os.walk(current_dir):
-        if 'restaurant.db' in files:
-            db_path = os.path.join(root, 'restaurant.db')
-            break
-    
-    if not db_path:
-        print(f"Ошибка: база данных restaurant.db не найдена в каталоге {current_dir} и его подкаталогах")
+    if not os.path.exists(db_path):
+        print(f"Ошибка: база данных restaurant.db не найдена в каталоге {os.path.join(current_dir, 'data')}")
         return
     
     print(f"Найдена база данных: {db_path}")

@@ -8,9 +8,24 @@
 restaurant_app/
 ├── backend/           # Бэкенд на FastAPI
 │   ├── app/           # Основной код приложения
+│   │   ├── api/       # API-эндпоинты
+│   │   ├── core/      # Конфигурация и инициализация
+│   │   ├── crud/      # CRUD-операции
+│   │   ├── database/  # Подключение к БД
+│   │   ├── models/    # SQLAlchemy модели
+│   │   ├── schemas/   # Pydantic схемы
+│   │   ├── services/  # Бизнес-логика
+│   │   └── utils/     # Вспомогательные функции
 │   ├── main.py        # Точка входа FastAPI
+│   ├── run.py         # Запуск приложения
 │   └── requirements.txt # Зависимости бэкенда
 ├── data/              # Данные (SQLite база данных)
+├── frontend/          # Фронтенд на Next.js
+│   ├── components/    # React компоненты
+│   ├── pages/         # Next.js страницы
+│   ├── styles/        # CSS и стили
+│   ├── public/        # Статические файлы
+│   └── package.json   # Зависимости фронтенда
 ├── docker/            # Dockerfile для сервисов
 └── docker-compose.yml # Конфигурация Docker Compose
 ```
