@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #e53e3e;
+  --primary-dark: #c53030;
+  --primary-light: #fc8181;
+  --secondary: #4a5568;
+  --secondary-dark: #2d3748;
+  --secondary-light: #a0aec0;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  body {
+    @apply text-gray-800 font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium leading-tight;
+  }
+
+  input, select, textarea {
+    @apply text-base;
+    font-size: 16px !important; /* Предотвращает автоматическое масштабирование на iOS */
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors touch-manipulation;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-dark active:bg-primary-dark;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary-dark active:bg-secondary-dark;
+  }
+  
+  .btn-outline {
+    @apply border border-current bg-transparent hover:bg-gray-50 active:bg-gray-100;
+  }
+  
+  .btn-outline-primary {
+    @apply text-primary border-primary hover:bg-primary hover:text-white active:bg-primary-dark;
+  }
+  
+  .input {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+  
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  /* Мобильные оптимизации */
+  .mobile-optimized {
+    @apply touch-manipulation select-none;
+  }
+
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+
+  .mobile-flex {
+    @apply flex flex-col sm:flex-row gap-4;
+  }
+
+  .mobile-text {
+    @apply text-base sm:text-lg;
+  }
+
+  .mobile-padding {
+    @apply p-4 sm:p-6;
+  }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.5s ease forwards;
+}
+
+/* Медиа-запросы для мобильных устройств */
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+
+  .mobile-stack {
+    @apply flex-col;
+  }
+
+  .mobile-full-width {
+    @apply w-full;
+  }
+
+  .mobile-text-center {
+    @apply text-center;
+  }
+
+  .mobile-hidden {
+    @apply hidden;
+  }
+}
+
+/* Оптимизация для тач-устройств */
+@media (hover: none) {
+  .touch-optimized {
+    @apply cursor-default;
+  }
+
+  .touch-optimized:hover {
+    @apply no-underline;
+  }
+} 

@@ -1,0 +1,161 @@
+{
+  "restaurant_name": "Ресторан \"Godordom\"",
+  "email": "info@restaurant.com",
+  "phone": "+7 (999) 123-45-66",
+  "address": "г. Петропавловск, ул. Жукова, д. 7",
+  "website": "https://restaurant.com",
+  "working_hours": {
+    "0": {
+      "0": "1",
+      "open": "09:00",
+      "close": "21:00"
+    },
+    "1": "0",
+    "2": ":",
+    "3": "0",
+    "4": "0",
+    "5": " ",
+    "6": "-",
+    "7": " ",
+    "8": "2",
+    "9": "2",
+    "10": ":",
+    "11": "0",
+    "12": "0",
+    "monday": {
+      "open": "09:00",
+      "close": "23:00"
+    },
+    "tuesday": {
+      "open": "09:00",
+      "close": "23:00"
+    },
+    "wednesday": {
+      "open": "09:00",
+      "close": "23:00"
+    },
+    "thursday": {
+      "open": "09:00",
+      "close": "23:00"
+    },
+    "friday": {
+      "open": "09:00",
+      "close": "23:00"
+    },
+    "saturday": {
+      "open": "09:00",
+      "close": "22:00"
+    },
+    "sunday": {
+      "open": "09:00",
+      "close": "22:00"
+    }
+  },
+  "currency": "KZT",
+  "tax_percentage": 20,
+  "service_charge_percentage": 10,
+  "min_order_amount": 1000,
+  "delivery_fee": 300,
+  "free_delivery_threshold": 3000,
+  "tables_layout": [
+    {
+      "id": 1,
+      "name": "Стол 1",
+      "capacity": 2,
+      "is_active": true,
+      "position_x": 100,
+      "position_y": 100
+    },
+    {
+      "id": 2,
+      "name": "Стол 2",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 250,
+      "position_y": 100
+    },
+    {
+      "id": 3,
+      "name": "Стол 3",
+      "capacity": 6,
+      "is_active": true,
+      "position_x": 400,
+      "position_y": 100
+    },
+    {
+      "id": 4,
+      "name": "Стол 4",
+      "capacity": 2,
+      "is_active": true,
+      "position_x": 100,
+      "position_y": 250
+    },
+    {
+      "id": 5,
+      "name": "Стол 5",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 250,
+      "position_y": 250
+    },
+    {
+      "id": 6,
+      "name": "Стол 6",
+      "capacity": 8,
+      "is_active": true,
+      "position_x": 400,
+      "position_y": 250
+    }
+  ],
+  "updated_at": "2025-04-15T13:16:29.678Z",
+  "smtp_user": "admin1@example.com",
+  "smtp_password": "admin123",
+  "tables": [
+    {
+      "name": "Стол 1",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 200,
+      "position_y": 50,
+      "status": "available",
+      "id": 1
+    },
+    {
+      "name": "Стол 2",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 100,
+      "position_y": 100,
+      "status": "available",
+      "id": 2
+    },
+    {
+      "name": "Стол 3",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 200,
+      "position_y": 100,
+      "status": "available",
+      "id": 3
+    },
+    {
+      "name": "Стол 4",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 100,
+      "position_y": 50,
+      "status": "available",
+      "id": 4
+    },
+    {
+      "name": "VIP",
+      "capacity": 4,
+      "is_active": true,
+      "position_x": 300,
+      "position_y": 50,
+      "status": "available",
+      "id": 5
+    }
+  ],
+  "currency_symbol": "₸"
+}

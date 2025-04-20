@@ -1,0 +1,31 @@
+from typing import Any
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from restaurant_app.schemas import OrderCreate, OrderOut
+from restaurant_app.services import create_order
+from restaurant_app.models import User
+from restaurant_app.database import get_db
+from restaurant_app.utils import get_current_user
+
+router = APIRouter()
+
+@router.post("/", response_model=OrderOut)
+def create_order(
+    order_in: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Создание нового заказа.
+    """
+    # Создаем заказ
+    try:
+        order = create_order(db, current_user.id, order_in)
+        return order
+    except Exception as e:
+        # Логгируем ошибку и возвращаем описательный ответ
+        print(f"Ошибка при создании заказа: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ошибка при создании заказа: {str(e)}"
+        ) 
