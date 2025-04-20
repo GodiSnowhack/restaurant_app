@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import useCartStore from '../lib/cart-store';
 import useAuthStore from '../lib/auth-store';
 import useReservationsStore from '../lib/reservations-store';
+import AuthModal from '../components/AuthModal';
 import { 
   TrashIcon, 
   PlusIcon, 
@@ -27,6 +28,7 @@ const CartPage: NextPage = () => {
   const [showReservationCodeInput, setShowReservationCodeInput] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [isReservationCodeValid, setIsReservationCodeValid] = useState<boolean | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // При загрузке проверяем код бронирования, если он есть
   useEffect(() => {
@@ -58,6 +60,15 @@ const CartPage: NextPage = () => {
     }
   };
 
+  // Обработчик нажатия на кнопку оформления заказа для неавторизованных пользователей
+  const handleCheckoutClick = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+    } else {
+      window.location.href = '/checkout';
+    }
+  };
+
   if (items.length === 0) {
     return (
       <Layout title="Корзина">
@@ -79,16 +90,23 @@ const CartPage: NextPage = () => {
                 <ArrowLeftIcon className="h-5 w-5 mr-2" />
                 Продолжить покупки
               </Link>
-              <Link 
-                href="/checkout" 
+              <button 
+                onClick={handleCheckoutClick}
                 className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-primary-dark shadow-sm"
               >
                 Оформить заказ
                 <ArrowRightIcon className="h-5 w-5 ml-2" />
-              </Link>
+              </button>
             </div>
           </div>
         </div>
+        
+        {/* Модальное окно авторизации */}
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+          actionType="checkout" 
+        />
       </Layout>
     );
   }
@@ -273,25 +291,24 @@ const CartPage: NextPage = () => {
                   Оформить заказ
                 </Link>
               ) : (
-                <div className="mt-4">
-                  <Link 
-                    href="/auth/login" 
-                    className="w-full btn btn-primary block text-center mb-3"
-                  >
-                    Войти для оформления
-                  </Link>
-                  <Link 
-                    href="/auth/register" 
-                    className="w-full btn btn-outline-primary block text-center"
-                  >
-                    Зарегистрироваться
-                  </Link>
-                </div>
+                <button 
+                  onClick={handleCheckoutClick}
+                  className="w-full btn btn-primary block text-center mt-4"
+                >
+                  Оформить заказ
+                </button>
               )}
             </div>
           </div>
         </div>
       </div>
+      
+      {/* Модальное окно авторизации */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        actionType="checkout" 
+      />
     </Layout>
   );
 };

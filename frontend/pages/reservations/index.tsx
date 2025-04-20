@@ -8,6 +8,7 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import useReservationsStore from '../../lib/reservations-store';
 import useSettingsStore from '../../lib/settings-store';
+import AuthModal from '../../components/AuthModal';
 import { Reservation } from '../../types';
 import { 
   CalendarIcon, 
@@ -55,53 +56,76 @@ const ReservationsPage: NextPage = () => {
     phone: '',
     email: ''
   });
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-
-    const fetchReservations = async () => {
-      try {
-        // Загружаем бронирования через стор
-        await getReservations();
-        // Устанавливаем имя, телефон и email из профиля пользователя
-        setFormData(prev => ({
-          ...prev,
-          name: user?.full_name || '',
-          phone: user?.phone || '',
-          email: user?.email || ''
-        }));
-        
-        setGuestInfo({
-          name: user?.full_name || '',
-          phone: user?.phone || '',
-          email: user?.email || ''
-        });
-        
-        setSuccessMessage('');
-        setError('');
-      } catch (error: any) {
-        console.error('Ошибка при загрузке бронирований:', error);
-        
-        // Обрабатываем специфичную ошибку авторизации
-        if (error.message === 'Пользователь не авторизован') {
-          setError('Для просмотра бронирований необходимо авторизоваться. Перенаправление на страницу входа...');
-          setTimeout(() => {
-            router.push('/auth/login');
-          }, 2000);
-        } else {
-          setError(`Не удалось загрузить список бронирований: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-        }
-      }
-    };
-
-    fetchReservations();
-    
     // Загружаем настройки ресторана, включая данные о столах
     loadSettings();
-  }, [isAuthenticated, router, getReservations, user, loadSettings]);
+    
+    // Если пользователь авторизован, загружаем его бронирования и данные профиля
+    if (isAuthenticated) {
+      const fetchReservations = async () => {
+        try {
+          // Загружаем бронирования через стор
+          await getReservations();
+          // Устанавливаем имя, телефон и email из профиля пользователя
+          setFormData(prev => ({
+            ...prev,
+            name: user?.full_name || '',
+            phone: user?.phone || '',
+            email: user?.email || ''
+          }));
+          
+          setGuestInfo({
+            name: user?.full_name || '',
+            phone: user?.phone || '',
+            email: user?.email || ''
+          });
+          
+          setSuccessMessage('');
+          setError('');
+        } catch (error: any) {
+          console.error('Ошибка при загрузке бронирований:', error);
+          setError(`Не удалось загрузить список бронирований: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+        }
+      };
+
+      fetchReservations();
+    }
+  }, [isAuthenticated, getReservations, user, loadSettings]);
+
+  // Функция для проверки, может ли пользователь сделать новую бронь
+  const canCreateNewReservation = () => {
+    if (!isAuthenticated || !user || !reservations.length) return true;
+    
+    // Проверяем наличие неподтвержденных броней (со статусом 'pending')
+    const pendingReservations = reservations.filter(res => res.status === 'pending');
+    if (pendingReservations.length > 0) {
+      return false;
+    }
+    
+    // Проверяем время последней попытки бронирования
+    // Сортируем бронирования по убыванию даты создания и берем самое новое
+    const sortedReservations = [...reservations].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    if (sortedReservations.length > 0) {
+      const lastReservation = sortedReservations[0];
+      const lastReservationTime = new Date(lastReservation.created_at || 0);
+      const currentTime = new Date();
+      
+      // Проверяем, прошло ли 10 минут (600000 миллисекунд) с момента последней брони
+      const timeDifference = currentTime.getTime() - lastReservationTime.getTime();
+      if (timeDifference < 600000) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -132,6 +156,26 @@ const ReservationsPage: NextPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Проверяем авторизацию пользователя
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    // Проверяем ограничения на создание брони
+    if (!canCreateNewReservation()) {
+      // Определяем тип ограничения и выводим соответствующее сообщение
+      const pendingReservations = reservations.filter(res => res.status === 'pending');
+      if (pendingReservations.length > 0) {
+        setError('У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором прежде чем создавать новую.');
+        return;
+      } else {
+        // Если нет ожидающих броней, значит не прошло 10 минут
+        setError('Вы не можете создать новую бронь. Пожалуйста, подождите 10 минут с момента последней попытки бронирования.');
+        return;
+      }
+    }
     
     if (!validateForm()) {
       return;
@@ -198,66 +242,7 @@ const ReservationsPage: NextPage = () => {
       setSelectedTable(null);
     } catch (err: any) {
       console.error('Ошибка при создании бронирования:', err);
-      
-      // Детальный вывод ошибки
-      let errorMessage = 'Ошибка при создании бронирования. Пожалуйста, попробуйте еще раз позже.';
-      
-      // Показываем детальные ошибки, если они есть
-      if (err.response) {
-        console.log('Детали ошибки:', err.response);
-        errorMessage = `Ошибка ${err.response.status}: `;
-        
-        // Вывод полной информации об ошибке
-        console.log('Полные данные ошибки:', JSON.stringify(err.response.data, null, 2));
-        
-        if (err.response.data && typeof err.response.data === 'object') {
-          if (err.response.data.detail) {
-            // Обработка массива ошибок валидации (формат FastAPI)
-            if (Array.isArray(err.response.data.detail)) {
-              const validationErrors = err.response.data.detail.map((error: { loc?: string[], msg?: string }) => {
-                if (error.loc && error.msg) {
-                  const field = error.loc.slice(1).join('.') || 'значение';
-                  return `Поле "${field}": ${error.msg}`;
-                }
-                return typeof error === 'string' ? error : JSON.stringify(error);
-              }).join("\n");
-              
-              errorMessage = `Ошибки валидации:\n${validationErrors}`;
-            } else if (typeof err.response.data.detail === 'string') {
-              errorMessage += err.response.data.detail;
-            } else {
-              errorMessage += JSON.stringify(err.response.data.detail);
-            }
-          } else {
-            // Перебираем все поля в объекте ошибки и добавляем их в сообщение
-            const errors = Object.entries(err.response.data)
-              .map(([key, value]) => {
-                // Проверяем, является ли value массивом или объектом
-                let valueStr = '';
-                if (Array.isArray(value)) {
-                  valueStr = value.join(', ');
-                } else if (typeof value === 'object' && value !== null) {
-                  valueStr = JSON.stringify(value);
-                } else {
-                  valueStr = String(value);
-                }
-                return `${key}: ${valueStr}`;
-              })
-              .join('; ');
-            
-            errorMessage += errors || JSON.stringify(err.response.data);
-          }
-        } else if (typeof err.response.data === 'string') {
-          errorMessage += err.response.data;
-        } else {
-          errorMessage += 'Неизвестный формат ошибки';
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      setSuccessMessage('');
+      setError(`Не удалось создать бронирование: ${err.message || 'Неизвестная ошибка'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -398,7 +383,11 @@ const ReservationsPage: NextPage = () => {
           <h1 className="text-3xl font-bold">Бронирование столиков</h1>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="btn btn-primary flex items-center"
+            className={`${
+              !showForm && !canCreateNewReservation() ? 'bg-gray-300 cursor-not-allowed' : showForm ? 'btn btn-secondary' : 'btn btn-primary'
+            } flex items-center`}
+            disabled={!showForm && !canCreateNewReservation()}
+            title={!showForm && !canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
           >
             {showForm ? 'Отменить' : (
               <>
@@ -408,6 +397,22 @@ const ReservationsPage: NextPage = () => {
             )}
           </button>
         </div>
+
+        {!showForm && !canCreateNewReservation() && isAuthenticated && (
+          <div className="rounded-md bg-red-50 p-4 mb-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Ограничение на бронирование</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  {reservations.filter(res => res.status === 'pending').length > 0 
+                    ? 'У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором прежде чем создавать новую.'
+                    : 'Пожалуйста, подождите 10 минут с момента последней попытки бронирования.'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-50 p-4 mb-4">
@@ -728,17 +733,46 @@ const ReservationsPage: NextPage = () => {
             </p>
             <button
               onClick={() => setShowForm(true)}
-              className="btn btn-primary inline-flex items-center"
+              className={`btn ${canCreateNewReservation() ? 'btn-primary' : 'btn-disabled bg-gray-300 cursor-not-allowed'} inline-flex items-center`}
+              disabled={!canCreateNewReservation()}
+              title={!canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
             >
               <PlusCircleIcon className="h-5 w-5 mr-2" />
               Забронировать столик
             </button>
+            {!canCreateNewReservation() && (
+              <div className="mt-4 text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                {reservations.filter(res => res.status === 'pending').length > 0 
+                  ? 'У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором.'
+                  : 'Пожалуйста, подождите 10 минут с момента последней попытки бронирования.'
+                }
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 border-b">
+            <div className="px-6 py-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-semibold">Мои бронирования</h2>
+              <button
+                onClick={() => setShowForm(true)}
+                className={`btn ${canCreateNewReservation() ? 'btn-primary' : 'btn-disabled bg-gray-300 cursor-not-allowed'} inline-flex items-center text-sm py-2`}
+                disabled={!canCreateNewReservation()}
+                title={!canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
+              >
+                <PlusCircleIcon className="h-4 w-4 mr-1" />
+                Новая бронь
+              </button>
             </div>
+
+            {!canCreateNewReservation() && (
+              <div className="px-6 py-3 bg-red-50 text-sm text-red-600 border-b">
+                {reservations.filter(res => res.status === 'pending').length > 0 
+                  ? 'У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором.'
+                  : 'Пожалуйста, подождите 10 минут с момента последней попытки бронирования.'
+                }
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -853,6 +887,12 @@ const ReservationsPage: NextPage = () => {
             <strong>Обратите внимание:</strong> Предзаказ блюд возможен только при подтвержденном бронировании.
           </p>
         </div>
+
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+          actionType="reservation" 
+        />
       </div>
     </Layout>
   );

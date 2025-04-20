@@ -35,17 +35,37 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router]);
 
   useEffect(() => {
-    // Защита роутов для гостей и проверка авторизации
-    const publicRoutes = ['/auth/login', '/auth/register', '/', '/menu', '/menu/[id]', '/reservations'];
+    // Расширяем список публичных маршрутов для гостей
+    const publicRoutes = [
+      '/auth/login', 
+      '/auth/register', 
+      '/', 
+      '/menu', 
+      '/menu/[id]', 
+      '/cart', // Разрешаем неавторизованным пользователям просматривать корзину
+      '/reservations', // Разрешаем неавторизованным пользователям просматривать страницу бронирования
+      '/checkout' // Разрешаем неавторизованным пользователям просматривать страницу оформления заказа
+    ];
+    
+    // Маршруты, требующие авторизации для фактических действий (оформление заказа, бронирование)
+    const actionProtectedRoutes = [
+      '/checkout/confirm', 
+      '/reservations/create', 
+      '/orders/create'
+    ];
+    
     const adminRoutes = ['/admin', '/admin/users', '/admin/orders', '/admin/settings', '/admin/menu', '/admin/reservations'];
-    const userRoutes = ['/profile', '/cart', '/checkout', '/orders', '/reservations/create'];
+    const userRoutes = ['/profile', '/orders']; // Уменьшили список защищенных пользовательских маршрутов
     const chefRoutes = ['/kitchen'];
     
     const path = router.pathname;
 
     if (path !== '/auth/login' && path !== '/auth/register') {
-      // Перенаправляем на авторизацию, если пользователь не авторизован и пытается открыть защищенный роут
-      if (!isAuthenticated && !publicRoutes.includes(path) && !path.startsWith('/menu/')) {
+      // Перенаправляем на авторизацию только если пользователь пытается открыть защищенный роут
+      if (!isAuthenticated && 
+          !publicRoutes.includes(path) && 
+          !path.startsWith('/menu/') && 
+          !actionProtectedRoutes.includes(path)) {
         setPreviousPath(path);
         router.push('/auth/login');
       }
