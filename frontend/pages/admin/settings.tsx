@@ -10,10 +10,12 @@ import {ArrowLeftIcon, ClockIcon, Cog6ToothIcon as CogIcon, PhoneIcon, MapPinIco
 import {CurrencyDollarIcon, GlobeAltIcon, DocumentTextIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
 import {RestaurantTable} from '../../lib/settings-store';
 import FloorPlan from '../../components/FloorPlan';
+import { useTheme } from '@/lib/theme-context';
 
 const AdminSettingsPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { isDark } = useTheme();
   const { settings, isLoading: isLoadingSettings, updateSettings, loadSettings } = useSettingsStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -128,7 +130,7 @@ const AdminSettingsPage: NextPage = () => {
       <Layout title="Настройки | Админ-панель">
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDark ? 'border-primary-400' : 'border-primary'}`}></div>
           </div>
         </div>
       </Layout>
@@ -142,25 +144,25 @@ const AdminSettingsPage: NextPage = () => {
           <div className="flex items-center gap-4">
             <Link 
               href="/admin" 
-              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-primary bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-primary-400 bg-gray-800 hover:bg-gray-700' : 'border-transparent text-primary bg-white hover:bg-gray-50'} text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
             >
               <ArrowLeftIcon className="h-4 w-4 mr-1" />
               Вернуться к панели управления
             </Link>
-            <h1 className="text-3xl font-bold">Настройки</h1>
+            <h1 className={`text-3xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Настройки</h1>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-500">
+            <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               Последнее обновление: {lastUpdateTime}
             </div>
             <button
               onClick={handleForceRefresh}
               disabled={isRefreshing}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-gray-300 bg-gray-800 hover:bg-gray-700' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'} shadow-sm text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
             >
               {isRefreshing ? (
-                <div className="animate-spin mr-1 h-4 w-4 border-2 border-gray-500 border-t-transparent rounded-full"></div>
+                <div className={`animate-spin mr-1 h-4 w-4 border-2 ${isDark ? 'border-gray-500 border-t-gray-800' : 'border-gray-500 border-t-white'} rounded-full`}></div>
               ) : (
                 <RefreshIcon className="h-4 w-4 mr-1" />
               )}
@@ -169,19 +171,19 @@ const AdminSettingsPage: NextPage = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md overflow-hidden`}>
           <div className="flex flex-col md:flex-row">
             {/* Боковая навигация */}
-            <div className="w-full md:w-64 bg-gray-50 p-4">
+            <div className={`w-full md:w-64 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
               <div className="sticky top-4">
-                <h2 className="text-lg font-medium mb-4">Категории настроек</h2>
+                <h2 className={`text-lg font-medium mb-4 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Категории настроек</h2>
                 <nav className="space-y-2">
                   <button
                     onClick={() => setActiveTab('general')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'general' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <CogIcon className="h-5 w-5 mr-2" />
@@ -191,8 +193,8 @@ const AdminSettingsPage: NextPage = () => {
                     onClick={() => setActiveTab('hours')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'hours' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <ClockIcon className="h-5 w-5 mr-2" />
@@ -202,8 +204,8 @@ const AdminSettingsPage: NextPage = () => {
                     onClick={() => setActiveTab('payment')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'payment' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <CurrencyDollarIcon className="h-5 w-5 mr-2" />
@@ -213,8 +215,8 @@ const AdminSettingsPage: NextPage = () => {
                     onClick={() => setActiveTab('notifications')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'notifications' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <MailIcon className="h-5 w-5 mr-2" />
@@ -224,8 +226,8 @@ const AdminSettingsPage: NextPage = () => {
                     onClick={() => setActiveTab('policies')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'policies' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2" />
@@ -235,8 +237,8 @@ const AdminSettingsPage: NextPage = () => {
                     onClick={() => setActiveTab('tables')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'tables' 
-                        ? 'bg-primary text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? isDark ? 'bg-primary-500 text-white' : 'bg-primary text-white'
+                        : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <ViewGridIcon className="h-5 w-5 mr-2" />

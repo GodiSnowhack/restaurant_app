@@ -18,6 +18,25 @@ export interface FinancialMetrics {
   
   // Тренд выручки за период
   revenueTrend: { date: string; value: number }[];
+
+  // Изменение показателей по сравнению с предыдущим периодом (в процентах)
+  revenueChange?: number;
+  profitChange?: number;
+  averageOrderValueChange?: number;
+  orderCountChange?: number;
+
+  // Предыдущие показатели для сравнения
+  previousRevenue?: number;
+  previousProfit?: number;
+  previousAverageOrderValue?: number;
+  previousOrderCount?: number;
+
+  // Количество заказов
+  orderCount?: number;
+  
+  // Данные по месяцам для графиков
+  revenueByMonth?: Record<string, number>;
+  expensesByMonth?: Record<string, number>;
 }
 
 // Метрики по меню
@@ -87,6 +106,24 @@ export interface CustomerMetrics {
   
   // Уровень удовлетворенности клиентов (средний рейтинг)
   customerSatisfaction: number;
+  
+  // Изменения в метриках (в процентах)
+  newCustomersChange?: number;
+  returnRateChange?: number;
+  averageOrderValueChange?: number;
+  
+  // Процент возврата клиентов
+  returnRate?: number;
+  
+  // Демографические данные клиентов
+  customerDemographics?: {
+    age?: Record<string, number>; // Возрастные группы и их процент
+    gender?: Record<string, number>; // Гендерное распределение
+    location?: Record<string, number>; // Распределение по локациям
+  };
+  
+  // Распределение по времени посещений
+  visitTimes?: Record<string, number>;
 }
 
 // Операционные метрики

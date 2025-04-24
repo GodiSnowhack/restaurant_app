@@ -4,6 +4,7 @@ import {InformationCircleIcon} from '@heroicons/react/24/solid';
 // Интерфейс для столов
 export interface RestaurantTable {
   id: number;
+  number: number;
   name: string;
   capacity: number;
   is_active: boolean;
@@ -27,6 +28,7 @@ interface FloorPlanProps {
   maxWidth?: number; // Максимальная ширина зала
   maxHeight?: number; // Максимальная высота зала
   percentMultiplier?: number; // Множитель для процентных координат
+  isDark?: boolean;
 }
 
 const FloorPlan: React.FC<FloorPlanProps> = ({
@@ -42,7 +44,8 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   tableScaleFactor = 1.0, // По умолчанию нет изменения размера
   maxWidth = 600, // Максимальная ширина зала по умолчанию
   maxHeight = 400, // Максимальная высота зала по умолчанию
-  percentMultiplier = 2 // Уменьшенный множитель для процентных координат
+  percentMultiplier = 2, // Уменьшенный множитель для процентных координат
+  isDark = false
 }) => {
   // Функция для получения стиля стола на основе его статуса и доступности
   const getTableStyle = (table: RestaurantTable) => {
@@ -183,28 +186,27 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
       
       {/* Условные обозначения */}
       {showLegend && (
-        <div className="absolute bottom-2 left-2 bg-white bg-opacity-90 p-3 rounded-md text-xs space-y-1.5 shadow-md border border-gray-200 z-10">
-          <div className="font-medium text-gray-700 mb-1">Условные обозначения:</div>
-          <div className="flex items-center">
-            <span className="inline-block w-4 h-4 bg-green-100 mr-2 rounded border border-green-300"></span>
-            <span>Доступно</span>
+        <div className={`
+          absolute left-4 bottom-4 p-3 rounded-lg shadow-md
+          ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}
+        `}>
+          <div className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+            Условные обозначения:
           </div>
-          <div className="flex items-center">
-            <span className="inline-block w-4 h-4 bg-red-100 mr-2 rounded border border-red-300"></span>
-            <span>Занято</span>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded bg-green-200 border border-green-400 mr-2"></div>
+              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Доступно</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded bg-red-200 border border-red-400 mr-2"></div>
+              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Занято</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded bg-yellow-200 border border-yellow-400 mr-2"></div>
+              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Недостаточно мест</span>
+            </div>
           </div>
-          {minGuestCount > 0 && (
-            <div className="flex items-center">
-              <span className="inline-block w-4 h-4 bg-yellow-100 mr-2 rounded border border-yellow-300"></span>
-              <span>Недостаточно мест</span>
-            </div>
-          )}
-          {selectedTableId && (
-            <div className="flex items-center">
-              <span className="inline-block w-4 h-4 bg-blue-500 mr-2 rounded border border-blue-300"></span>
-              <span>Выбранный стол</span>
-            </div>
-          )}
         </div>
       )}
     </div>

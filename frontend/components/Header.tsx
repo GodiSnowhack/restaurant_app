@@ -72,7 +72,7 @@ const Header = () => {
   }
 
   return (
-    <header className="bg-white shadow-md dark:bg-gray-800 dark:text-white">
+    <header className="bg-white shadow-md dark:bg-gray-800 dark:text-white transition-colors duration-300">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-[1400px]">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4 flex-shrink-0">
@@ -98,10 +98,10 @@ const Header = () => {
               <Link
                 key={item.label}
                 href={item.href}
-                className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium ${
+                className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                   router.pathname === item.href
-                    ? 'bg-primary-light text-primary dark:bg-primary/20'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-primary-light text-primary dark:bg-primary/20 dark:text-primary'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-primary'
                 } ${item.label === 'Администрирование' ? 'min-w-[160px] text-center' : ''}`}
               >
                 {item.label}
@@ -111,15 +111,15 @@ const Header = () => {
 
           <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
             {/* Переключатель темы */}
-            <ThemeToggle />
+            <ThemeToggle className="transition-transform duration-200 hover:scale-105" />
 
             <Link 
               href="/cart" 
-              className="relative p-1 text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary"
+              className="relative p-1 text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
             >
               <ShoppingCartIcon className="h-6 w-6" />
               {isMounted && cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-primary text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center transition-all duration-200">
                   {cartCount}
                 </span>
               )}
@@ -129,48 +129,65 @@ const Header = () => {
               <div className="relative" ref={profileDropdownRef}>
                 <button
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className="flex items-center text-sm font-medium text-gray-700 hover:text-primary focus:outline-none dark:text-gray-200"
+                  className="flex items-center text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-800 rounded-full"
                 >
                   <span className="hidden sm:block mr-1">{user?.full_name}</span>
                   <UserCircleIcon className="h-8 w-8 text-gray-400 dark:text-gray-300" />
                 </button>
                 
                 {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50 dark:bg-gray-800 dark:ring-gray-700">
-                    <div className="px-4 py-2 text-xs text-gray-500 border-b dark:text-gray-400 dark:border-gray-700">
-                      Вы вошли как <span className="font-medium">{user?.role}</span>
-                    </div>
-                    
+                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 transition-all duration-200">
+                    {/* Профиль */}
                     <Link
                       href="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
                       onClick={() => setIsProfileDropdownOpen(false)}
                     >
-                      Мой профиль
+                      <UserIcon className="mr-3 h-5 w-5" />
+                      Профиль
                     </Link>
                     
+                    {/* Заказы */}
                     <Link
                       href="/orders"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
                       onClick={() => setIsProfileDropdownOpen(false)}
                     >
+                      <ClipboardIcon className="mr-3 h-5 w-5" />
                       Мои заказы
                     </Link>
                     
-                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                    {/* Бронирования */}
+                    <Link
+                      href="/reservations"
+                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    >
+                      <CalendarIcon className="mr-3 h-5 w-5" />
+                      Бронирования
+                    </Link>
+
+                    {/* Администрирование (если пользователь админ) */}
+                    {user?.is_staff && (
                       <Link
                         href="/admin"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
                         onClick={() => setIsProfileDropdownOpen(false)}
                       >
-                        Админ-панель
+                        <CogIcon className="mr-3 h-5 w-5" />
+                        Администрирование
                       </Link>
                     )}
                     
+                    {/* Разделитель */}
+                    <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+
+                    {/* Выход */}
                     <button
                       onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="flex w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
                     >
+                      <LogoutIcon className="mr-3 h-5 w-5" />
                       Выйти
                     </button>
                   </div>
@@ -179,39 +196,36 @@ const Header = () => {
             ) : (
               <Link
                 href="/auth/login"
-                className="text-sm text-gray-700 hover:text-primary font-medium flex items-center dark:text-gray-200"
+                className="text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
               >
-                <UserCircleIcon className="h-8 w-8 text-gray-400 mr-1 dark:text-gray-300" />
-                <span className="hidden sm:block">Войти</span>
+                Войти
               </Link>
             )}
-            
-            <button
-              type="button"
-              className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none dark:text-gray-400 dark:hover:bg-gray-700"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <span className="sr-only">Открыть меню</span>
-              {isMobileMenuOpen ? (
-                <XIcon className="block h-6 w-6" />
-              ) : (
-                <MenuIcon className="block h-6 w-6" />
-              )}
-            </button>
           </div>
         </div>
         
         {/* Мобильное меню */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="md:hidden p-2 rounded-md text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
+        >
+          {isMobileMenuOpen ? (
+            <XIcon className="h-6 w-6" />
+          ) : (
+            <MenuIcon className="h-6 w-6" />
+          )}
+        </button>
+
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 pt-2 pb-3 space-y-1 dark:border-gray-700">
+          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 pt-2 pb-3 space-y-1">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
                   router.pathname === item.href
-                    ? 'bg-primary-light text-primary dark:bg-primary/20'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-primary-light text-primary dark:bg-primary/20 dark:text-primary'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-primary'
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -220,7 +234,9 @@ const Header = () => {
             ))}
             
             {/* Переключатель темы в мобильном меню */}
-            <ThemeToggle withText={true} className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700" />
+            <div className="px-3 py-2">
+              <ThemeToggle withText={true} className="flex items-center w-full text-gray-600 dark:text-gray-200" />
+            </div>
           </div>
         )}
       </div>

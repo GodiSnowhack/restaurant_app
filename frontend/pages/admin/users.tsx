@@ -6,6 +6,7 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import {ArrowLeftIcon, UserIcon, PhoneIcon, EnvelopeIcon as MailIcon, MagnifyingGlassIcon as SearchIcon, UserPlusIcon as UserAddIcon, PencilIcon, TrashIcon, IdentificationIcon, CheckCircleIcon, Cog6ToothIcon as CogIcon, ClipboardDocumentListIcon as ClipboardListIcon, ShoppingCartIcon} from '@heroicons/react/24/outline';
 import {usersApi} from '../../lib/api';
+import { useTheme } from '@/lib/theme-context';
 
 type Role = 'client' | 'admin' | 'waiter';
 
@@ -46,6 +47,7 @@ const roleIcons = {
 const AdminUsersPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { isDark } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,10 +213,10 @@ const AdminUsersPage: NextPage = () => {
 
   if (isLoading) {
     return (
-      <Layout title="Управление пользователями | Админ-панель">
+      <Layout title="Пользователи | Админ-панель">
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDark ? 'border-primary-400' : 'border-primary'}`}></div>
           </div>
         </div>
       </Layout>
@@ -222,130 +224,137 @@ const AdminUsersPage: NextPage = () => {
   }
 
   return (
-    <Layout title="Управление пользователями | Админ-панель">
+    <Layout title="Пользователи | Админ-панель">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/admin" className="text-gray-600 hover:text-primary mr-4">
-            <ArrowLeftIcon className="h-5 w-5" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/admin" 
+              className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-primary-400 bg-gray-800 hover:bg-gray-700' : 'border-transparent text-primary bg-white hover:bg-gray-50'} text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+            >
+              <ArrowLeftIcon className="h-4 w-4 mr-1" />
+              Вернуться к панели управления
+            </Link>
+            <h1 className={`text-3xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Пользователи</h1>
+          </div>
+
+          <Link
+            href="/admin/users/add"
+            className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+          >
+            <UserAddIcon className="h-4 w-4 mr-2" />
+            Добавить пользователя
           </Link>
-          <h1 className="text-3xl font-bold">Управление пользователями</h1>
         </div>
 
-        {/* Фильтры и поиск */}
-        <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-md">
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleRoleChange('all')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'all' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Все пользователи
-              </button>
-              <button
-                onClick={() => handleRoleChange('admin')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'admin' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Администраторы
-              </button>
-              <button
-                onClick={() => handleRoleChange('client')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'client' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Клиенты
-              </button>
-              <button
-                onClick={() => handleRoleChange('waiter')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'waiter' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Официанты
-              </button>
-            </div>
-
-            <div className="relative">
+        {/* Поиск и фильтрация */}
+        <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md p-4 mb-8`}>
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            {/* Поисковая строка */}
+            <div className="relative w-full md:w-1/2">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <SearchIcon className="h-5 w-5 text-gray-400" />
+                <SearchIcon className={`h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
               </div>
               <input
                 type="text"
-                placeholder="Поиск по имени, email или телефону"
+                placeholder="Поиск пользователей..."
                 value={searchQuery}
                 onChange={handleSearch}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary w-full md:w-80"
+                className={`py-2 pl-10 pr-4 block w-full shadow-sm rounded-md ${isDark 
+                  ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400 focus:border-primary-400 focus:ring-primary-400' 
+                  : 'border-gray-300 focus:ring-primary focus:border-primary'
+                }`}
               />
             </div>
-          </div>
-        </div>
 
-        {/* Кнопка добавления нового пользователя */}
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/admin/users/create')}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
-            <UserAddIcon className="h-5 w-5 mr-2" />
-            Добавить пользователя
-          </button>
-        </div>
-
-        {/* Список пользователей */}
-        {filteredUsers.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="flex justify-center mb-4">
-              <UserIcon className="h-16 w-16 text-gray-400" />
+            {/* Фильтр ролей */}
+            <div className="flex flex-row gap-2">
+              <button
+                onClick={() => handleRoleChange('all')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  showRoleFilter === 'all'
+                    ? isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+                    : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Все
+              </button>
+              <button
+                onClick={() => handleRoleChange('admin')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  showRoleFilter === 'admin'
+                    ? isDark ? 'bg-purple-900/50 text-purple-200' : 'bg-purple-100 text-purple-900'
+                    : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="flex items-center">{roleIcons.admin} Администраторы</span>
+              </button>
+              <button
+                onClick={() => handleRoleChange('waiter')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  showRoleFilter === 'waiter'
+                    ? isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-900'
+                    : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="flex items-center">{roleIcons.waiter} Официанты</span>
+              </button>
+              <button
+                onClick={() => handleRoleChange('client')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  showRoleFilter === 'client'
+                    ? isDark ? 'bg-blue-900/50 text-blue-200' : 'bg-blue-100 text-blue-900'
+                    : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span className="flex items-center">{roleIcons.client} Клиенты</span>
+              </button>
             </div>
-            <h2 className="text-2xl font-medium mb-4">Пользователи не найдены</h2>
-            <p className="text-gray-600 mb-6">
-              По выбранным фильтрам не найдено ни одного пользователя
-            </p>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+        </div>
+
+        {/* Таблица пользователей */}
+        <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md overflow-hidden`}>
+          <div className="overflow-x-auto">
+            <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
+                <tr>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Пользователь
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Контакты
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Роль
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Регистрация
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Статистика
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Статус
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Действия
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
+                {users.length === 0 ? (
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Пользователь
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Дата регистрации
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Последний вход
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Роль
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статистика
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Действия
-                    </th>
+                    <td colSpan={7} className={`px-6 py-4 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Пользователи не найдены
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
+                ) : (
+                  users.map((user) => (
+                    <tr key={user.id} className={user.is_active 
+                      ? isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50' 
+                      : isDark ? 'bg-gray-900/70 text-gray-400' : 'bg-gray-50 text-gray-400'
+                    }>
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
@@ -434,12 +443,12 @@ const AdminUsersPage: NextPage = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
     </Layout>
   );

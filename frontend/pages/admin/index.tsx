@@ -7,10 +7,12 @@ import useAuthStore from '../../lib/auth-store';
 import {ordersApi, menuApi, adminApi, DashboardStats} from '../../lib/api';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
+import { useTheme } from '@/lib/theme-context';
 
 const AdminPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { isDark } = useTheme();
   const [stats, setStats] = useState<DashboardStats>({
     ordersToday: 0,
     ordersTotal: 0,

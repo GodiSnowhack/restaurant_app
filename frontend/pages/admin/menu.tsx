@@ -6,9 +6,10 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import {menuApi} from '../../lib/api';
 import ImageUploader from '../../components/ImageUploader';
-import {ArrowLeftIcon, PlusIcon, TrashIcon, FilterIcon} from '@heroicons/react/24/outline';
+import {ArrowLeftIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon} from '@heroicons/react/24/outline';
 import {PencilIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/solid';
 import {formatPrice} from '../../utils/priceFormatter';
+import { useTheme } from '@/lib/theme-context';
 
 type Dish = {
   id: number;
@@ -40,6 +41,7 @@ type Category = {
 const AdminMenuPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { isDark } = useTheme();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +65,8 @@ const AdminMenuPage: NextPage = () => {
     is_available: true,
     ingredients: ''
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -147,9 +151,17 @@ const AdminMenuPage: NextPage = () => {
     return category ? category.name : 'Без категории';
   };
 
-  const filteredDishes = currentFilter === 'all' 
-    ? dishes 
-    : dishes.filter(dish => dish.category_id === currentFilter);
+  const filteredDishes = searchQuery
+    ? dishes.filter(dish => 
+        dish.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (dish.ingredients && typeof dish.ingredients === 'string' && dish.ingredients.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (dish.description && dish.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : dishes;
+
+  const finalFilteredDishes = categoryFilter 
+    ? filteredDishes.filter(dish => dish.category_id.toString() === categoryFilter)
+    : filteredDishes;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -235,7 +247,7 @@ const AdminMenuPage: NextPage = () => {
       <Layout title="Управление меню | Админ-панель">
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDark ? 'border-primary-400' : 'border-primary'}`}></div>
           </div>
         </div>
       </Layout>
@@ -245,11 +257,83 @@ const AdminMenuPage: NextPage = () => {
   return (
     <Layout title="Управление меню | Админ-панель">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/admin" className="text-gray-600 hover:text-primary mr-4">
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Link>
-          <h1 className="text-3xl font-bold">Управление меню</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link 
+              href="/admin" 
+              className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-primary-400 bg-gray-800 hover:bg-gray-700' : 'border-transparent text-primary bg-white hover:bg-gray-50'} text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+            >
+              <ArrowLeftIcon className="h-4 w-4 mr-1" />
+              Вернуться к панели управления
+            </Link>
+            <h1 className={`text-3xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Управление меню</h1>
+          </div>
+
+          <div className="flex gap-3">
+            <Link
+              href="/admin/menu/categories"
+              className={`inline-flex items-center px-4 py-2 border ${isDark ? 'border-gray-700 bg-gray-800 text-primary-400 hover:bg-gray-700' : 'border-primary bg-white text-primary hover:bg-gray-50'} rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Категории
+            </Link>
+            <Link
+              href="/admin/menu/add"
+              className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Добавить блюдо
+            </Link>
+          </div>
+        </div>
+
+        {/* Поиск и фильтрация */}
+        <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md p-4 mb-8`}>
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            {/* Поисковая строка */}
+            <div className="relative w-full md:w-1/2">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className={`h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+              </div>
+              <input
+                type="text"
+                placeholder="Поиск блюд..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`py-2 pl-10 pr-4 block w-full shadow-sm rounded-md ${isDark 
+                  ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400 focus:border-primary-400 focus:ring-primary-400' 
+                  : 'border-gray-300 focus:ring-primary focus:border-primary'
+                }`}
+              />
+            </div>
+
+            {/* Фильтр категорий */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  categoryFilter === null
+                    ? isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+                    : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Все
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setCategoryFilter(category.id.toString())}
+                  className={`px-3 py-2 text-sm font-medium rounded-md ${
+                    categoryFilter === category.id.toString()
+                      ? isDark ? 'bg-primary-900/50 text-primary-200' : 'bg-primary-100 text-primary-900'
+                      : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Табы */}
@@ -281,80 +365,53 @@ const AdminMenuPage: NextPage = () => {
         {/* Список блюд */}
         {activeTab === 'dishes' && (
           <>
-            {/* Фильтр категорий и кнопка добавления */}
-            <div className="flex flex-wrap items-center justify-between mb-6">
-              <div className="flex flex-wrap gap-2 mb-4 md:mb-0">
-                <button
-                  onClick={() => setCurrentFilter('all')}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    currentFilter === 'all' 
-                      ? 'bg-primary text-white' 
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                  }`}
-                >
-                  Все
-                </button>
-                {categories.map(category => (
-                  <button
-                    key={category.id}
-                    onClick={() => setCurrentFilter(category.id)}
-                    className={`px-3 py-1 rounded-md text-sm ${
-                      currentFilter === category.id 
-                        ? 'bg-primary text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </div>
-              
-              <button
-                onClick={() => setShowDishForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Добавить блюдо
-              </button>
-            </div>
-
             {/* Таблица блюд */}
-            <div className="bg-white shadow-md rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Изображение
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Название
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Категория
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Цена
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Статус
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Действия
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredDishes.length === 0 ? (
+            <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md overflow-hidden`}>
+              {finalFilteredDishes.length === 0 ? (
+                <div className={`p-12 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className="text-lg font-medium mb-2">Блюда не найдены</p>
+                  <p className="mb-6">Попробуйте изменить параметры поиска или добавьте новое блюдо</p>
+                  <Link
+                    href="/admin/menu/add"
+                    className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Добавить блюдо
+                  </Link>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
                       <tr>
-                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                          Нет блюд для отображения
-                        </td>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Изображение
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Название
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Категория
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Цена
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Статус
+                        </th>
+                        <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Действия
+                        </th>
                       </tr>
-                    ) : (
-                      filteredDishes.map((dish) => (
-                        <tr key={dish.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                    </thead>
+                    <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
+                      {finalFilteredDishes.map((dish) => (
+                        <tr key={dish.id} className={
+                          dish.is_available 
+                          ? isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50' 
+                          : isDark ? 'bg-gray-900/70 text-gray-400' : 'bg-gray-50 text-gray-400'
+                        }>
+                          <td className={`px-6 py-4 ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
                             {dish.image_url ? (
                               <img 
                                 src={dish.image_url} 
@@ -367,49 +424,51 @@ const AdminMenuPage: NextPage = () => {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{dish.name}</div>
-                            <div className="text-sm text-gray-500 truncate max-w-xs">{dish.description}</div>
+                          <td className={`px-6 py-4 ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                            <div className={`font-medium ${dish.is_available ? (isDark ? 'text-gray-200' : 'text-gray-900') : (isDark ? 'text-gray-400' : 'text-gray-500')}`}>
+                              {dish.name}
+                            </div>
+                            <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} line-clamp-1`}>
+                              {dish.description}
+                            </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className={`px-6 py-4 ${isDark ? 'text-primary-400' : 'text-primary-700'}`}>
                             {getCategoryName(dish.category_id)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className={`px-6 py-4 ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
                             {formatPrice(dish.price)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               dish.is_available
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
+                                ? isDark ? 'bg-green-900/30 text-green-200' : 'bg-green-100 text-green-800'
+                                : isDark ? 'bg-red-900/30 text-red-200' : 'bg-red-100 text-red-800'
                             }`}>
                               {dish.is_available ? 'Доступно' : 'Недоступно'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-3">
-                              <Link 
-                                href={`/admin/menu/dishes/${dish.id}`}
-                                className="text-indigo-600 hover:text-indigo-900"
-                                title="Редактировать"
+                              <Link
+                                href={`/admin/menu/${dish.id}/edit`}
+                                className={`text-${isDark ? 'primary-400 hover:text-primary-300' : 'primary-600 hover:text-primary-900'}`}
                               >
                                 <PencilIcon className="h-5 w-5" />
                               </Link>
                               <button
                                 onClick={() => handleDeleteDish(dish.id)}
-                                className="text-red-600 hover:text-red-900"
-                                title="Удалить"
+                                className={`text-${isDark ? 'red-400 hover:text-red-300' : 'red-600 hover:text-red-900'}`}
                               >
                                 <TrashIcon className="h-5 w-5" />
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Форма добавления блюда (по клику на кнопку) */}

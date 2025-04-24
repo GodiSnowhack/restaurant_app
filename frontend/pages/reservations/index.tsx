@@ -17,10 +17,12 @@ import {
   PlusCircleIcon,
   CheckCircleIcon,
   XCircleIcon,
-  KeyIcon
+  KeyIcon,
+  ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import FloorPlan, { RestaurantTable } from '../../components/FloorPlan';
+import { useTheme } from '@/lib/theme-context';
 
 // Генерируем время для выбора в выпадающем списке: от 11:00 до 22:00 с шагом 30 минут
 const timeOptions = Array.from({ length: 23 }, (_, i) => {
@@ -30,6 +32,7 @@ const timeOptions = Array.from({ length: 23 }, (_, i) => {
 });
 
 const ReservationsPage: NextPage = () => {
+  const { isDark } = useTheme();
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
   const { createReservation, getReservations, reservations, isLoading } = useReservationsStore();
@@ -380,12 +383,27 @@ const ReservationsPage: NextPage = () => {
     <Layout title="Бронирование столиков">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-[1400px] py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold">Бронирование столиков</h1>
+          <h1 className={`
+            text-2xl sm:text-3xl font-bold
+            ${isDark ? 'text-gray-100' : 'text-gray-900'}
+          `}>
+            Бронирование столиков
+          </h1>
           <button
             onClick={() => setShowForm(!showForm)}
             className={`${
-              !showForm && !canCreateNewReservation() ? 'bg-gray-300 cursor-not-allowed' : showForm ? 'btn btn-secondary' : 'btn btn-primary'
-            } flex items-center whitespace-nowrap px-4 py-2 rounded-md`}
+              !showForm && !canCreateNewReservation() 
+                ? isDark 
+                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gray-300 cursor-not-allowed'
+                : showForm 
+                  ? isDark
+                    ? 'bg-gray-700 text-gray-100 hover:bg-gray-600'
+                    : 'btn btn-secondary'
+                  : isDark
+                    ? 'bg-primary text-white hover:bg-primary-dark'
+                    : 'btn btn-primary'
+            } flex items-center whitespace-nowrap px-4 py-2 rounded-md transition-colors duration-200`}
             disabled={!showForm && !canCreateNewReservation()}
             title={!showForm && !canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
           >
@@ -428,28 +446,43 @@ const ReservationsPage: NextPage = () => {
         )}
 
         {showForm && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Новое бронирование</h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <div className={`
+            mb-8 rounded-lg shadow-md overflow-hidden
+            ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'}
+          `}>
+            <form onSubmit={handleSubmit} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Дата и время */}
                 <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                    Дата
+                  <label htmlFor="date" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
+                    Дата бронирования
                   </label>
                   <input
                     type="date"
                     id="date"
                     name="date"
-                    min={format(new Date(), 'yyyy-MM-dd')}
                     value={formData.date}
                     onChange={handleInputChange}
+                    min={new Date().toISOString().split('T')[0]}
                     required
-                    className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="time" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="time" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
                     Время
                   </label>
                   <select
@@ -458,53 +491,80 @@ const ReservationsPage: NextPage = () => {
                     value={formData.time}
                     onChange={handleInputChange}
                     required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
                   >
+                    <option value="">Выберите время</option>
                     {timeOptions.map((time) => (
-                      <option key={time} value={time}>
-                        {time}
-                      </option>
+                      <option key={time} value={time}>{time}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Количество гостей */}
                 <div>
-                  <label htmlFor="guests" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="guests" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
                     Количество гостей
                   </label>
-                  <select
+                  <input
+                    type="number"
                     id="guests"
                     name="guests"
                     value={formData.guests}
                     onChange={handleInputChange}
+                    min="1"
+                    max="20"
                     required
-                    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                  >
-                    {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
-                      <option key={num} value={num}>
-                        {num} {num === 1 ? 'человек' : num < 5 ? 'человека' : 'человек'}
-                      </option>
-                    ))}
-                  </select>
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
+                  />
                 </div>
-                
+
+                {/* Выбор стола */}
                 <div>
-                  <label htmlFor="tableId" className="block text-sm font-medium text-gray-700 flex items-center justify-between">
-                    <span>Выберите стол</span>
+                  <div className="flex justify-between items-center mb-1">
+                    <label htmlFor="tableId" className={`
+                      block text-sm font-medium
+                      ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                    `}>
+                      Выберите стол
+                    </label>
                     {formData.tableId > 0 && (
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      <span className={`
+                        text-xs px-2 py-1 rounded
+                        ${isDark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-800'}
+                      `}>
                         Стол выбран
                       </span>
                     )}
-                  </label>
-                  <div className="mt-1 flex space-x-2">
+                  </div>
+                  <div className="flex space-x-2">
                     <select
                       id="tableId"
                       name="tableId"
                       value={formData.tableId}
                       onChange={handleInputChange}
                       required
-                      className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                      className={`
+                        block w-full rounded-md shadow-sm sm:text-sm
+                        ${isDark 
+                          ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                          : 'border-gray-300 focus:ring-primary focus:border-primary'
+                        }
+                      `}
                     >
                       <option value={0}>Любой подходящий стол</option>
                       {availableTables.map((table) => (
@@ -516,13 +576,19 @@ const ReservationsPage: NextPage = () => {
                     <button 
                       type="button"
                       onClick={() => setShowFloorPlan(!showFloorPlan)}
-                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md flex items-center justify-center"
+                      className={`
+                        px-3 py-2 rounded-md flex items-center justify-center transition-colors duration-200
+                        ${isDark 
+                          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600' 
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }
+                      `}
                     >
                       {showFloorPlan ? 'Скрыть' : 'Показать'} схему зала
                     </button>
                   </div>
                   {availableTables.length === 0 && formData.guests > 0 && (
-                    <p className="mt-1 text-sm text-red-600">
+                    <p className="mt-1 text-sm text-red-500">
                       Нет доступных столов для выбранного количества гостей. Пожалуйста, выберите другую дату или уменьшите количество гостей.
                     </p>
                   )}
@@ -531,22 +597,37 @@ const ReservationsPage: NextPage = () => {
                 {/* Схема расположения столов в ресторане */}
                 {showFloorPlan && (
                   <div className="md:col-span-2 my-4">
-                    <div className="border border-gray-300 rounded-lg shadow-md p-4 bg-white">
-                      <h3 className="text-lg font-medium mb-2 text-primary flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className={`
+                      border rounded-lg shadow-md p-4
+                      ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-300'}
+                    `}>
+                      <h3 className={`
+                        text-lg font-medium mb-4 flex items-center
+                        ${isDark ? 'text-gray-100' : 'text-gray-900'}
+                      `}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`
+                          h-5 w-5 mr-2
+                          ${isDark ? 'text-primary-400' : 'text-primary'}
+                        `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         Интерактивная схема зала
                       </h3>
                       
-                      <div className="flex justify-center">
+                      <div className={`
+                        flex justify-center rounded-lg overflow-hidden
+                        ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
+                      `}>
                         <FloorPlan 
                           tables={tables}
                           selectedTableId={formData.tableId}
                           onTableSelect={handleTableSelect}
                           minGuestCount={formData.guests}
                           height="h-96"
-                          containerClassName="w-full max-w-4xl mx-auto"
+                          containerClassName={`
+                            w-full max-w-4xl mx-auto p-4
+                            ${isDark ? 'bg-gray-900' : 'bg-white'}
+                          `}
                           showBarCounter={true}
                           showLegend={true}
                           showEntrance={true}
@@ -555,11 +636,21 @@ const ReservationsPage: NextPage = () => {
                           maxWidth={500}
                           maxHeight={350}
                           percentMultiplier={2.5}
+                          isDark={isDark}
                         />
                       </div>
                       
-                      <p className="text-sm text-gray-500 mt-3 bg-gray-50 p-2 rounded border border-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-1 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <p className={`
+                        text-sm mt-4 p-3 rounded-lg border
+                        ${isDark 
+                          ? 'bg-gray-900 border-gray-700 text-gray-300' 
+                          : 'bg-gray-50 border-gray-200 text-gray-500'
+                        }
+                      `}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`
+                          h-5 w-5 inline-block mr-1
+                          ${isDark ? 'text-blue-400' : 'text-blue-500'}
+                        `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         Кликните на доступный стол (зеленый), чтобы выбрать его для бронирования.
@@ -568,8 +659,12 @@ const ReservationsPage: NextPage = () => {
                   </div>
                 )}
 
+                {/* Контактная информация */}
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="name" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
                     Ваше имя
                   </label>
                   <input
@@ -579,12 +674,21 @@ const ReservationsPage: NextPage = () => {
                     value={formData.name}
                     onChange={handleInputChange}
                     required
-                    className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="phone" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
                     Телефон
                   </label>
                   <input
@@ -594,229 +698,202 @@ const ReservationsPage: NextPage = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     required
-                    placeholder="+7 (___) ___-__-__"
-                    className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-
+                {/* Комментарий */}
                 <div className="md:col-span-2">
-                  <label htmlFor="comments" className="block text-sm font-medium text-gray-700">
-                    Комментарий (по желанию)
+                  <label htmlFor="comment" className={`
+                    block text-sm font-medium mb-1
+                    ${isDark ? 'text-gray-300' : 'text-gray-700'}
+                  `}>
+                    Комментарий к бронированию
                   </label>
                   <textarea
-                    id="comments"
-                    name="comments"
-                    rows={3}
+                    id="comment"
+                    name="comment"
                     value={formData.comments}
                     onChange={handleInputChange}
-                    className="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                    placeholder="Укажите дополнительные пожелания, например, особые требования или повод для визита"
+                    rows={3}
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
                   />
                 </div>
-              </div>
 
-              {error && (
-                <div className="rounded-md bg-red-50 p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">Ошибка</h3>
-                      <div className="mt-2 text-sm text-red-700 whitespace-pre-wrap break-words">
-                        <p>{error}</p>
+                {error && (
+                  <div className="md:col-span-2">
+                    <div className={`
+                      p-4 rounded-md
+                      ${isDark ? 'bg-red-900/50 text-red-200' : 'bg-red-50 text-red-800'}
+                    `}>
+                      <div className="flex">
+                        <ExclamationCircleIcon className="h-5 w-5 text-red-400 mr-2" />
+                        <span>{error}</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {successMessage && (
-                <div className="rounded-md bg-green-50 p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-green-800">Успех</h3>
-                      <div className="mt-2 text-sm text-green-700">
-                        <p>{successMessage}</p>
+                {successMessage && (
+                  <div className="md:col-span-2">
+                    <div className={`
+                      p-4 rounded-md
+                      ${isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-50 text-green-800'}
+                    `}>
+                      <div className="flex">
+                        <CheckCircleIcon className="h-5 w-5 text-green-400 mr-2" />
+                        <span>{successMessage}</span>
                       </div>
-                      
-                      {reservationCode && (
-                        <div className="mt-4 p-4 border border-green-300 rounded-md bg-green-50">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <KeyIcon className="h-5 w-5 text-green-600 mr-2" />
-                              <span className="text-sm font-medium text-green-800">Ваш код бронирования:</span>
-                            </div>
-                            <span className="text-lg font-bold tracking-wider text-green-800">{reservationCode}</span>
-                          </div>
-                          <p className="mt-2 text-xs text-green-700">
-                            Запишите или запомните этот код! Он понадобится вам для оформления заказа до посещения ресторана. 
-                            После подтверждения бронирования вы сможете использовать этот код для предзаказа блюд.
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
+                )}
+
+                <div className="md:col-span-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || availableTables.length === 0}
+                    className={`
+                      inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white
+                      transition-all duration-200
+                      ${isSubmitting || availableTables.length === 0
+                        ? isDark ? 'bg-gray-600 cursor-not-allowed' : 'bg-gray-400 cursor-not-allowed'
+                        : isDark
+                          ? 'bg-primary-500 hover:bg-primary-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-primary-400'
+                          : 'bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary'
+                      }
+                    `}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Обработка...
+                      </>
+                    ) : (
+                      'Забронировать'
+                    )}
+                  </button>
                 </div>
-              )}
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    console.log('Текущие данные формы:', formData);
-                    console.log('Данные для отправки:', {
-                      reservation_date: formData.date,
-                      reservation_time: formData.time,
-                      guests_count: formData.guests,
-                      guest_name: guestInfo.name,
-                      guest_phone: guestInfo.phone,
-                      guest_email: guestInfo.email,
-                      table_id: selectedTable || formData.tableId || null,
-                      comments: formData.comments,
-                      user_id: user?.id,
-                      status: 'pending'
-                    });
-                    console.log('Текущие столы:', tables);
-                    console.log('Доступные столы:', availableTables);
-                  }}
-                  className="inline-flex justify-center py-2 px-4 mr-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                >
-                  Отладка
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting || availableTables.length === 0}
-                  className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${
-                    isSubmitting || availableTables.length === 0
-                      ? 'bg-gray-400'
-                      : 'bg-primary hover:bg-primary-dark'
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Обработка...
-                    </>
-                  ) : (
-                    'Забронировать'
-                  )}
-                </button>
               </div>
             </form>
           </div>
         )}
 
         {/* Список моих бронирований */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <h2 className="text-xl font-semibold p-6 bg-gray-50 border-b">Мои бронирования</h2>
+        <div className={`
+          rounded-lg shadow-md overflow-hidden
+          ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'}
+        `}>
+          <h2 className={`
+            text-xl font-semibold p-6 border-b
+            ${isDark ? 'bg-gray-800/50 border-gray-700 text-gray-100' : 'bg-gray-50 border-gray-200 text-gray-900'}
+          `}>
+            Мои бронирования
+          </h2>
           
           {isAuthenticated ? (
             isLoading ? (
               <div className="flex justify-center items-center p-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDark ? 'border-primary-400' : 'border-primary'}`}></div>
               </div>
             ) : reservations.length === 0 ? (
-              <div className="text-center p-12 text-gray-500">
+              <div className={`text-center p-12 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 У вас нет бронирований. Создайте новое бронирование.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                  <thead className={isDark ? 'bg-gray-800/50' : 'bg-gray-50'}>
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={`
+                        px-6 py-3 text-left text-xs font-medium uppercase tracking-wider
+                        ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                      `}>
                         № брони
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={`
+                        px-6 py-3 text-left text-xs font-medium uppercase tracking-wider
+                        ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                      `}>
                         Дата и время
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={`
+                        px-6 py-3 text-left text-xs font-medium uppercase tracking-wider
+                        ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                      `}>
                         Гости
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={`
+                        px-6 py-3 text-left text-xs font-medium uppercase tracking-wider
+                        ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                      `}>
                         Статус
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className={`
+                        px-6 py-3 text-left text-xs font-medium uppercase tracking-wider
+                        ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                      `}>
                         Действия
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className={`
+                    divide-y
+                    ${isDark ? 'divide-gray-700' : 'divide-gray-200'}
+                  `}>
                     {reservations.map((reservation) => (
-                      <tr key={reservation.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">#{reservation.id}</div>
-                          {reservation.reservation_code && (
-                            <div className="text-xs inline-flex items-center px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 mt-1">
-                              <KeyIcon className="h-3 w-3 mr-1" />
-                              <span className="font-mono tracking-wide">{reservation.reservation_code}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {reservation.reservation_date && reservation.reservation_time 
-                              ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
-                              : formatDateTime(reservation.reservation_time)
-                            }
+                      <tr key={reservation.id} className={isDark ? 'bg-gray-800 hover:bg-gray-700/50' : 'bg-white hover:bg-gray-50'}>
+                        <td className={`
+                          px-6 py-4 whitespace-nowrap text-sm font-medium
+                          ${isDark ? 'text-gray-100' : 'text-gray-900'}
+                        `}>
+                          <div className="flex items-center space-x-2">
+                            <KeyIcon className="h-4 w-4 text-primary" />
+                            <span>{reservation.reservation_code}</span>
                           </div>
-                          {reservation.table && (
-                            <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
-                              Стол: {reservation.table.name}
-                            </div>
-                          )}
-                          {!reservation.table && reservation.table_number && (
-                            <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
-                              Столик №{reservation.table_number}
-                            </div>
-                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 font-medium">{reservation.guests_count} {reservation.guests_count === 1 ? 'человек' : reservation.guests_count < 5 ? 'человека' : 'человек'}</div>
-                          {reservation.guest_name && (
-                            <div className="text-xs text-gray-600 mt-1">
-                              {reservation.guest_name}
-                            </div>
-                          )}
-                          {reservation.guest_phone && (
-                            <div className="text-xs text-gray-600">
-                              {reservation.guest_phone}
-                            </div>
-                          )}
+                        <td className={`
+                          px-6 py-4 whitespace-nowrap text-sm
+                          ${isDark ? 'text-gray-300' : 'text-gray-500'}
+                        `}>
+                          {reservation.reservation_date && reservation.reservation_time 
+                            ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
+                            : formatDateTime(reservation.reservation_time)
+                          }
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className={`
+                          px-6 py-4 whitespace-nowrap text-sm
+                          ${isDark ? 'text-gray-300' : 'text-gray-500'}
+                        `}>
+                          {reservation.guests_count} чел.
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {getStatusBadge(reservation.status)}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 truncate max-w-xs">
-                            {reservation.comments || '—'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {reservation.status === 'pending' && (
-                            <button className="text-red-600 hover:text-red-800 mr-4">
-                              Отменить
-                            </button>
-                          )}
-                          <Link 
-                            href={`/reservations/${reservation.id}`} 
-                            className="text-primary hover:text-primary-dark"
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <Link
+                            href={`/reservations/${reservation.id}`}
+                            className={`
+                              inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md
+                              ${isDark 
+                                ? 'text-gray-100 bg-gray-700 hover:bg-gray-600' 
+                                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'}
+                              transition-colors duration-200
+                            `}
                           >
                             Подробнее
                           </Link>
@@ -828,27 +905,35 @@ const ReservationsPage: NextPage = () => {
               </div>
             )
           ) : (
-            <div className="text-center p-12 text-gray-500">
+            <div className={`text-center p-12 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               У вас нет бронирований. Создайте новое бронирование.
             </div>
           )}
         </div>
 
         {/* Информация о кодах бронирования */}
-        <div className="mt-8 bg-blue-50 rounded-lg shadow-md p-6 border border-blue-100">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
-            <KeyIcon className="h-5 w-5 mr-2" />
+        <div className={`
+          mt-8 rounded-lg shadow-md p-6 border
+          ${isDark 
+            ? 'bg-blue-900/20 border-blue-800/50' 
+            : 'bg-blue-50 border-blue-100'}
+        `}>
+          <h2 className={`
+            text-xl font-semibold mb-4 flex items-center
+            ${isDark ? 'text-gray-100' : 'text-blue-800'}
+          `}>
+            <KeyIcon className={`h-5 w-5 mr-2 ${isDark ? 'text-blue-400' : 'text-blue-800'}`} />
             Заказ блюд с бронированием столика
           </h2>
-          <p className="text-blue-700 mb-4">
+          <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
             Вы можете заранее заказать блюда перед посещением ресторана. Для этого:
           </p>
-          <ol className="list-decimal list-inside space-y-2 text-blue-700 ml-4">
+          <ol className={`list-decimal list-inside space-y-2 ml-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
             <li>Создайте бронирование столика и дождитесь его подтверждения</li>
             <li>Используйте полученный код бронирования при оформлении заказа</li>
             <li>Ваш заказ будет приготовлен к указанному в бронировании времени</li>
           </ol>
-          <p className="text-blue-700 mt-4">
+          <p className={`mt-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
             <strong>Обратите внимание:</strong> Предзаказ блюд возможен только при подтвержденном бронировании.
           </p>
         </div>
