@@ -4,24 +4,10 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import {
-  ArrowLeftIcon,
-  UserIcon,
-  PhoneIcon,
-  EnvelopeIcon as MailIcon,
-  MagnifyingGlassIcon as SearchIcon,
-  UserPlusIcon as UserAddIcon,
-  PencilIcon,
-  TrashIcon,
-  IdentificationIcon,
-  CheckCircleIcon,
-  Cog6ToothIcon as CogIcon,
-  ClipboardDocumentListIcon as ClipboardListIcon,
-  ShoppingCartIcon
-} from '@heroicons/react/24/outline';
+import {ArrowLeftIcon, UserIcon, PhoneIcon, EnvelopeIcon as MailIcon, MagnifyingGlassIcon as SearchIcon, UserPlusIcon as UserAddIcon, PencilIcon, TrashIcon, IdentificationIcon, CheckCircleIcon, Cog6ToothIcon as CogIcon, ClipboardDocumentListIcon as ClipboardListIcon, ShoppingCartIcon} from '@heroicons/react/24/outline';
 import {usersApi} from '../../lib/api';
 
-type Role = 'user' | 'admin' | 'waiter' | 'kitchen' | 'supply' | 'guest';
+type Role = 'client' | 'admin' | 'waiter';
 
 type User = {
   id: number;
@@ -39,31 +25,22 @@ type User = {
 // Преобразование ролей для отображения
 const roleDisplayNames = {
   admin: 'Администратор',
-  user: 'Клиент',
-  waiter: 'Официант',
-  kitchen: 'Повар',
-  supply: 'Поставщик',
-  guest: 'Гость'
+  client: 'Клиент',
+  waiter: 'Официант'
 };
 
 // Цвета ролей для отображения
 const roleColors = {
   admin: 'purple',
-  user: 'blue',
-  waiter: 'green',
-  kitchen: 'yellow',
-  supply: 'orange',
-  guest: 'gray'
+  client: 'blue',
+  waiter: 'green'
 };
 
 // Иконки для ролей
 const roleIcons = {
   admin: <IdentificationIcon className="h-3 w-3 mr-1" />,
-  user: <UserIcon className="h-3 w-3 mr-1" />,
-  waiter: <ClipboardListIcon className="h-3 w-3 mr-1" />,
-  kitchen: <CogIcon className="h-3 w-3 mr-1" />,
-  supply: <ShoppingCartIcon className="h-3 w-3 mr-1" />,
-  guest: <UserIcon className="h-3 w-3 mr-1" />
+  client: <UserIcon className="h-3 w-3 mr-1" />,
+  waiter: <ClipboardListIcon className="h-3 w-3 mr-1" />
 };
 
 const AdminUsersPage: NextPage = () => {
@@ -118,7 +95,7 @@ const AdminUsersPage: NextPage = () => {
             full_name: 'Петрова Анна',
             email: 'petrova@example.com',
             phone: '+7 (999) 234-56-78',
-            role: 'user',
+            role: 'client',
             created_at: '2023-02-20T14:20:00',
             last_login: '2023-04-03T19:10:00',
             orders_count: 5,
@@ -142,7 +119,7 @@ const AdminUsersPage: NextPage = () => {
             full_name: 'Козлова Елена',
             email: 'kozlova@example.com',
             phone: '+7 (999) 456-78-90',
-            role: 'kitchen',
+            role: 'admin',
             created_at: '2023-03-15T09:15:00',
             last_login: '2023-04-01T16:20:00',
             orders_count: 3,
@@ -154,7 +131,7 @@ const AdminUsersPage: NextPage = () => {
             full_name: 'Новиков Дмитрий',
             email: 'novikov@example.com',
             phone: '+7 (999) 567-89-01',
-            role: 'supply',
+            role: 'admin',
             created_at: '2023-01-10T08:00:00',
             last_login: '2023-04-04T09:45:00',
             orders_count: 0,
@@ -279,9 +256,9 @@ const AdminUsersPage: NextPage = () => {
                 Администраторы
               </button>
               <button
-                onClick={() => handleRoleChange('user')}
+                onClick={() => handleRoleChange('client')}
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'user' 
+                  showRoleFilter === 'client' 
                     ? 'bg-primary text-white' 
                     : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                 }`}
@@ -297,26 +274,6 @@ const AdminUsersPage: NextPage = () => {
                 }`}
               >
                 Официанты
-              </button>
-              <button
-                onClick={() => handleRoleChange('kitchen')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'kitchen' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Повара
-              </button>
-              <button
-                onClick={() => handleRoleChange('supply')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  showRoleFilter === 'supply' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Поставщики
               </button>
             </div>
 

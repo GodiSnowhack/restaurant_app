@@ -378,14 +378,14 @@ const ReservationsPage: NextPage = () => {
 
   return (
     <Layout title="Бронирование столиков">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Бронирование столиков</h1>
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-[1400px] py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Бронирование столиков</h1>
           <button
             onClick={() => setShowForm(!showForm)}
             className={`${
               !showForm && !canCreateNewReservation() ? 'bg-gray-300 cursor-not-allowed' : showForm ? 'btn btn-secondary' : 'btn btn-primary'
-            } flex items-center`}
+            } flex items-center whitespace-nowrap px-4 py-2 rounded-md`}
             disabled={!showForm && !canCreateNewReservation()}
             title={!showForm && !canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
           >
@@ -722,152 +722,117 @@ const ReservationsPage: NextPage = () => {
           </div>
         )}
 
-        {reservations.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="flex justify-center mb-4">
-              <CalendarIcon className="h-16 w-16 text-gray-400" />
-            </div>
-            <h2 className="text-2xl font-medium mb-4">У вас пока нет бронирований</h2>
-            <p className="text-gray-600 mb-6">
-              Забронируйте столик, чтобы насладиться изысканными блюдами в атмосфере уюта и комфорта
-            </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className={`btn ${canCreateNewReservation() ? 'btn-primary' : 'btn-disabled bg-gray-300 cursor-not-allowed'} inline-flex items-center`}
-              disabled={!canCreateNewReservation()}
-              title={!canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
-            >
-              <PlusCircleIcon className="h-5 w-5 mr-2" />
-              Забронировать столик
-            </button>
-            {!canCreateNewReservation() && (
-              <div className="mt-4 text-sm text-red-600 bg-red-50 p-3 rounded-md">
-                {reservations.filter(res => res.status === 'pending').length > 0 
-                  ? 'У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором.'
-                  : 'Пожалуйста, подождите 10 минут с момента последней попытки бронирования.'
-                }
+        {/* Список моих бронирований */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <h2 className="text-xl font-semibold p-6 bg-gray-50 border-b">Мои бронирования</h2>
+          
+          {isAuthenticated ? (
+            isLoading ? (
+              <div className="flex justify-center items-center p-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Мои бронирования</h2>
-              <button
-                onClick={() => setShowForm(true)}
-                className={`btn ${canCreateNewReservation() ? 'btn-primary' : 'btn-disabled bg-gray-300 cursor-not-allowed'} inline-flex items-center text-sm py-2`}
-                disabled={!canCreateNewReservation()}
-                title={!canCreateNewReservation() ? 'Вы не можете создать новую бронь сейчас. Возможно, у вас уже есть ожидающая подтверждения бронь или вы недавно делали попытку бронирования.' : ''}
-              >
-                <PlusCircleIcon className="h-4 w-4 mr-1" />
-                Новая бронь
-              </button>
-            </div>
-
-            {!canCreateNewReservation() && (
-              <div className="px-6 py-3 bg-red-50 text-sm text-red-600 border-b">
-                {reservations.filter(res => res.status === 'pending').length > 0 
-                  ? 'У вас уже есть ожидающая подтверждения бронь. Пожалуйста, дождитесь её подтверждения администратором.'
-                  : 'Пожалуйста, подождите 10 минут с момента последней попытки бронирования.'
-                }
+            ) : reservations.length === 0 ? (
+              <div className="text-center p-12 text-gray-500">
+                У вас нет бронирований. Создайте новое бронирование.
               </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      № брони
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Дата и время
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Гости
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Комментарий
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reservations.map((reservation) => (
-                    <tr key={reservation.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{reservation.id}</div>
-                        {reservation.reservation_code && (
-                          <div className="text-xs inline-flex items-center px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 mt-1">
-                            <KeyIcon className="h-3 w-3 mr-1" />
-                            <span className="font-mono tracking-wide">{reservation.reservation_code}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {reservation.reservation_date && reservation.reservation_time 
-                            ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
-                            : formatDateTime(reservation.reservation_time)
-                          }
-                        </div>
-                        {reservation.table && (
-                          <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
-                            Стол: {reservation.table.name}
-                          </div>
-                        )}
-                        {!reservation.table && reservation.table_number && (
-                          <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
-                            Столик №{reservation.table_number}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 font-medium">{reservation.guests_count} {reservation.guests_count === 1 ? 'человек' : reservation.guests_count < 5 ? 'человека' : 'человек'}</div>
-                        {reservation.guest_name && (
-                          <div className="text-xs text-gray-600 mt-1">
-                            {reservation.guest_name}
-                          </div>
-                        )}
-                        {reservation.guest_phone && (
-                          <div className="text-xs text-gray-600">
-                            {reservation.guest_phone}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(reservation.status)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 truncate max-w-xs">
-                          {reservation.comments || '—'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {reservation.status === 'pending' && (
-                          <button className="text-red-600 hover:text-red-800 mr-4">
-                            Отменить
-                          </button>
-                        )}
-                        <Link 
-                          href={`/reservations/${reservation.id}`} 
-                          className="text-primary hover:text-primary-dark"
-                        >
-                          Подробнее
-                        </Link>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        № брони
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Дата и время
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Гости
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Статус
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Действия
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reservations.map((reservation) => (
+                      <tr key={reservation.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">#{reservation.id}</div>
+                          {reservation.reservation_code && (
+                            <div className="text-xs inline-flex items-center px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 mt-1">
+                              <KeyIcon className="h-3 w-3 mr-1" />
+                              <span className="font-mono tracking-wide">{reservation.reservation_code}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {reservation.reservation_date && reservation.reservation_time 
+                              ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
+                              : formatDateTime(reservation.reservation_time)
+                            }
+                          </div>
+                          {reservation.table && (
+                            <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
+                              Стол: {reservation.table.name}
+                            </div>
+                          )}
+                          {!reservation.table && reservation.table_number && (
+                            <div className="text-xs text-gray-500 mt-1 bg-blue-50 text-blue-700 px-2 py-1 rounded inline-block">
+                              Столик №{reservation.table_number}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 font-medium">{reservation.guests_count} {reservation.guests_count === 1 ? 'человек' : reservation.guests_count < 5 ? 'человека' : 'человек'}</div>
+                          {reservation.guest_name && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              {reservation.guest_name}
+                            </div>
+                          )}
+                          {reservation.guest_phone && (
+                            <div className="text-xs text-gray-600">
+                              {reservation.guest_phone}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(reservation.status)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 truncate max-w-xs">
+                            {reservation.comments || '—'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {reservation.status === 'pending' && (
+                            <button className="text-red-600 hover:text-red-800 mr-4">
+                              Отменить
+                            </button>
+                          )}
+                          <Link 
+                            href={`/reservations/${reservation.id}`} 
+                            className="text-primary hover:text-primary-dark"
+                          >
+                            Подробнее
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            <div className="text-center p-12 text-gray-500">
+              У вас нет бронирований. Создайте новое бронирование.
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Информация о кодах бронирования */}
         <div className="mt-8 bg-blue-50 rounded-lg shadow-md p-6 border border-blue-100">

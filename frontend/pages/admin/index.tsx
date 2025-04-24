@@ -6,7 +6,6 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import {ordersApi, menuApi, adminApi, DashboardStats} from '../../lib/api';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
-import {useAuth} from '@/lib/auth-context';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
 
 const AdminPage: NextPage = () => {
@@ -84,43 +83,43 @@ const AdminPage: NextPage = () => {
     {
       title: 'Управление меню',
       description: 'Добавление, редактирование и удаление блюд, категорий и ингредиентов',
-      icon: <MenuIcon className="h-8 w-8 text-primary" />,
+      icon: <MenuIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/menu'
     },
     {
       title: 'Заказы',
       description: 'Просмотр и управление заказами, отчеты по продажам',
-      icon: <ShoppingCartIcon className="h-8 w-8 text-primary" />,
+      icon: <ShoppingCartIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/orders'
     },
     {
       title: 'Бронирования',
       description: 'Управление бронированием столиков',
-      icon: <CalendarIcon className="h-8 w-8 text-primary" />,
+      icon: <CalendarIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/reservations'
     },
     {
       title: 'Пользователи',
       description: 'Управление пользователями и персоналом',
-      icon: <UserIcon className="h-8 w-8 text-primary" />,
+      icon: <UserIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/users'
     },
     {
       title: 'Изображения',
       description: 'Управление изображениями блюд и оформления',
-      icon: <PhotographIcon className="h-8 w-8 text-primary" />,
+      icon: <PhotographIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/images'
     },
     {
       title: 'Аналитика',
       description: 'Статистика, отчеты и прогнозы',
-      icon: <ChartPieIcon className="h-8 w-8 text-primary" />,
+      icon: <ChartPieIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/analytics'
     },
     {
       title: 'Настройки',
       description: 'Настройки ресторана и системы',
-      icon: <CogIcon className="h-8 w-8 text-primary" />,
+      icon: <CogIcon className="h-8 w-8 text-primary dark:text-primary" />,
       link: '/admin/settings'
     }
   ];
@@ -130,7 +129,7 @@ const AdminPage: NextPage = () => {
       <Layout title="Админ-панель">
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary dark:border-primary"></div>
           </div>
         </div>
       </Layout>
@@ -141,7 +140,7 @@ const AdminPage: NextPage = () => {
     return (
       <Layout title="Админ-панель">
         <div className="container mx-auto px-4 py-8">
-          <div className="text-center text-red-600">{error}</div>
+          <div className="text-center text-red-600 dark:text-red-400">{error}</div>
         </div>
       </Layout>
     );
@@ -149,63 +148,63 @@ const AdminPage: NextPage = () => {
 
   return (
     <Layout title="Админ-панель">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">Панель управления</h1>
-        <p className="text-gray-600 mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
+      <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-2 dark:text-white">Панель управления</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
 
         {/* Карточки статистики */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
-              <div className="rounded-full bg-blue-100 p-3 mr-4">
-                <ShoppingCartIcon className="h-6 w-6 text-blue-600" />
+              <div className="rounded-full bg-blue-100 dark:bg-blue-900 p-3 mr-4">
+                <ShoppingCartIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700">Заказы сегодня</h2>
-                <p className="text-2xl font-bold">{stats.ordersToday}</p>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Заказы сегодня</h2>
+                <p className="text-2xl font-bold dark:text-white">{stats.ordersToday}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
-              <div className="rounded-full bg-green-100 p-3 mr-4">
-                <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
+              <div className="rounded-full bg-green-100 dark:bg-green-900 p-3 mr-4">
+                <CurrencyDollarIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700">Выручка</h2>
-                <p className="text-2xl font-bold">{stats.revenue.toLocaleString()} ₸</p>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка</h2>
+                <p className="text-2xl font-bold dark:text-white">{stats.revenue.toLocaleString()} ₸</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
-              <div className="rounded-full bg-purple-100 p-3 mr-4">
-                <CalendarIcon className="h-6 w-6 text-purple-600" />
+              <div className="rounded-full bg-purple-100 dark:bg-purple-900 p-3 mr-4">
+                <CalendarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700">Брони сегодня</h2>
-                <p className="text-2xl font-bold">{stats.reservationsToday}</p>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Брони сегодня</h2>
+                <p className="text-2xl font-bold dark:text-white">{stats.reservationsToday}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Разделы админки */}
-        <h2 className="text-2xl font-semibold mb-6">Управление рестораном</h2>
+        <h2 className="text-2xl font-semibold mb-6 dark:text-white">Управление рестораном</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {menuItems.map((item, index) => (
             <Link 
               href={item.link} 
               key={index}
-              className="bg-white rounded-lg shadow-md p-6 transition-transform hover:scale-105 hover:shadow-lg"
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-transform hover:scale-105 hover:shadow-lg"
             >
               <div className="flex items-start">
                 <div className="mr-4">{item.icon}</div>
                 <div>
-                  <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                  <p className="text-gray-600">{item.description}</p>
+                  <h3 className="text-xl font-semibold mb-2 dark:text-white">{item.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-300">{item.description}</p>
                 </div>
               </div>
             </Link>

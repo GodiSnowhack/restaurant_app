@@ -1,32 +1,30 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import Header from './Header';
 import Footer from './Footer';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
   title?: string;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан' }) => {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 dark:text-white">
       <Head>
-        <title>{title} | Ресторанная система</title>
-        <meta name="description" content="Система поддержки принятия решений для управления рестораном" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <meta name="theme-color" content="#e53e3e" />
+        <title>{title}</title>
+        <meta name="description" content="Система управления рестораном" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <Header />
-      
-      <main className="flex-grow bg-gray-50 mobile-padding">
-        <div className="container mx-auto">
-          {children}
-        </div>
+
+      <main className="flex-grow w-full">
+        {children}
       </main>
-      
+
       <Footer />
     </div>
   );

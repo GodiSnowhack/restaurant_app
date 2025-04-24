@@ -4,20 +4,17 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import useAuthStore from '../../../lib/auth-store';
-import {ArrowLeftIcon, UserIcon, MailIcon, PhoneIcon, LockClosedIcon, UserGroupIcon, CheckIcon as SaveIcon, XIcon, TrashIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
+import {ArrowLeftIcon, UserIcon, EnvelopeIcon, PhoneIcon, LockClosedIcon, UserGroupIcon, CheckIcon as SaveIcon, XMarkIcon, TrashIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
 import {usersApi} from '../../../lib/api';
 
 // Типы ролей
-type Role = 'user' | 'admin' | 'waiter' | 'kitchen' | 'supply' | 'guest';
+type Role = 'client' | 'admin' | 'waiter';
 
 // Данные о ролях для отображения
 const roleOptions = [
-  { id: 'user', name: 'Клиент', description: 'Обычный пользователь, может делать заказы и бронировать столики' },
+  { id: 'client', name: 'Клиент', description: 'Обычный пользователь, может делать заказы и бронировать столики' },
   { id: 'admin', name: 'Администратор', description: 'Полный доступ к системе управления рестораном' },
-  { id: 'waiter', name: 'Официант', description: 'Обслуживание столиков, прием заказов' },
-  { id: 'kitchen', name: 'Повар', description: 'Работа с заказами на кухне, управление меню' },
-  { id: 'supply', name: 'Поставщик', description: 'Управление поставками и ингредиентами' },
-  { id: 'guest', name: 'Гость', description: 'Ограниченный доступ только для просмотра' }
+  { id: 'waiter', name: 'Официант', description: 'Обслуживание столиков, прием заказов' }
 ];
 
 const UserEditPage: NextPage = () => {
@@ -37,7 +34,7 @@ const UserEditPage: NextPage = () => {
     confirm_password: '',
     full_name: '',
     phone: '',
-    role: 'user' as Role,
+    role: 'client' as Role,
     is_active: true
   });
   
@@ -281,7 +278,7 @@ const UserEditPage: NextPage = () => {
                 onClick={() => setError('')}
                 type="button"
               >
-                <XIcon className="h-5 w-5" />
+                <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
           )}
@@ -335,7 +332,7 @@ const UserEditPage: NextPage = () => {
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MailIcon className="h-5 w-5 text-gray-400" />
+                    <EnvelopeIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="email"

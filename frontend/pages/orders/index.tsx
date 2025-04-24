@@ -21,6 +21,11 @@ const OrdersPage: NextPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(),
+    endDate: new Date()
+  });
+  const [selectedStatus, setSelectedStatus] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -28,45 +33,45 @@ const OrdersPage: NextPage = () => {
       return;
     }
 
-    const fetchOrders = async () => {
-      try {
-        setIsLoading(true);
-        setError('');
-        
-        // Используем API клиент с обработкой ошибок
-        const data = await ordersApi.getOrders();
-        console.log('Полученные заказы:', data);
-        
-        // Проверяем полученные данные
-        if (Array.isArray(data) && data.length > 0) {
-          // Проверяем и нормализуем данные заказов
-          const validOrders = data.map(order => ({
-            ...order,
-            // Убеждаемся, что важные поля имеют значения по умолчанию
-            status: order.status || 'pending',
-            total_amount: order.total_amount ?? 0,
-            customer_name: order.customer_name || '',
-            customer_phone: order.customer_phone || '',
-            payment_status: order.payment_status || 'pending',
-            items: Array.isArray(order.items) ? order.items : []
-          }));
-          setOrders(validOrders);
-        } else {
-          console.log('Нет заказов или получен пустой массив');
-          setOrders([]);
-        }
-      } catch (error) {
-        console.error('Ошибка при загрузке заказов:', error);
-        setError('Не удалось загрузить список заказов. Пожалуйста, попробуйте позже.');
-        // Устанавливаем пустой массив, чтобы интерфейс корректно отображался
-        setOrders([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchOrders();
   }, [isAuthenticated, router]);
+
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      // Используем API клиент с обработкой ошибок
+      const data = await ordersApi.getOrders();
+      console.log('Полученные заказы:', data);
+      
+      // Проверяем полученные данные
+      if (Array.isArray(data) && data.length > 0) {
+        // Проверяем и нормализуем данные заказов
+        const validOrders = data.map(order => ({
+          ...order,
+          // Убеждаемся, что важные поля имеют значения по умолчанию
+          status: order.status || 'pending',
+          total_amount: order.total_amount ?? 0,
+          customer_name: order.customer_name || '',
+          customer_phone: order.customer_phone || '',
+          payment_status: order.payment_status || 'pending',
+          items: Array.isArray(order.items) ? order.items : []
+        }));
+        setOrders(validOrders);
+      } else {
+        console.log('Нет заказов или получен пустой массив');
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке заказов:', error);
+      setError('Не удалось загрузить список заказов. Пожалуйста, попробуйте позже.');
+      // Устанавливаем пустой массив, чтобы интерфейс корректно отображался
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -146,7 +151,7 @@ const OrdersPage: NextPage = () => {
   return (
     <Layout title="Мои заказы">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Мои заказы</h1>
+        <h1 className="text-3xl font-bold mb-6">Мои заказы</h1>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

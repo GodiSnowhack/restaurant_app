@@ -6,18 +6,7 @@ import Layout from '../components/Layout';
 import useCartStore from '../lib/cart-store';
 import useAuthStore from '../lib/auth-store';
 import useReservationsStore from '../lib/reservations-store';
-import {
-  CheckCircleIcon,
-  CreditCardIcon,
-  BanknotesIcon as CashIcon,
-  UserIcon,
-  PhoneIcon,
-  ClockIcon,
-  KeyIcon,
-  ExclamationTriangleIcon as ExclamationCircleIcon,
-  InformationCircleIcon,
-  MapPinIcon as LocationMarkerIcon
-} from '@heroicons/react/24/outline';
+import {CheckCircleIcon, CreditCardIcon, BanknotesIcon as CashIcon, UserIcon, PhoneIcon, ClockIcon, KeyIcon, ExclamationTriangleIcon as ExclamationCircleIcon, InformationCircleIcon, MapPinIcon as LocationMarkerIcon} from '@heroicons/react/24/outline';
 import {formatPrice} from '../utils/priceFormatter';
 import {ordersApi, orderCodesApi, settingsApi} from '../lib/api';
 
@@ -37,7 +26,7 @@ const CheckoutPage: NextPage = () => {
   const { items, totalPrice, clearCart, reservationCode } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
   const { verifyReservationCode } = useReservationsStore();
-  const [orderType, setOrderType] = useState<'dine-in' | 'delivery' | 'pickup'>('dine-in');
+  const [orderType, setOrderType] = useState<'dine-in'>('dine-in');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [comment, setComment] = useState('');

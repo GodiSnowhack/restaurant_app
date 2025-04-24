@@ -7,8 +7,8 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import {ArrowPathIcon as RefreshIcon, ClipboardDocumentIcon as ClipboardCopyIcon, TrashIcon, CheckCircleIcon} from '@heroicons/react/24/solid';
-import {orderCodesApi, settingsApi} from '../../lib/api';
-import {InformationCircleIcon} from '@heroicons/react/24/outline';
+import {orderCodesApi, settingsApi, RestaurantSettings} from '../../lib/api';
+import {InformationCircleIcon, QrCodeIcon} from '@heroicons/react/24/outline';
 
 // Тип для кода заказа
 interface OrderCode {
@@ -19,11 +19,12 @@ interface OrderCode {
   is_used: boolean;
 }
 
-// Тип для столов ресторана
-interface RestaurantTable {
+// Используем тип таблицы из настроек ресторана
+type RestaurantTable = {
   id: number;
-  name: string;
+  number: number;
   capacity: number;
+  name: string;
   is_active: boolean;
   position_x: number;
   position_y: number;
@@ -63,7 +64,18 @@ const WaiterPage: NextPage = () => {
       try {
         const settings = await settingsApi.getSettings();
         if (settings?.tables) {
-          setTables(settings.tables);
+          // Преобразуем таблицы из API в наш локальный формат
+          const formattedTables = settings.tables.map(table => ({
+            id: table.id || 0,
+            number: table.number,
+            capacity: table.capacity,
+            name: `Стол ${table.number}`,
+            is_active: true,
+            position_x: Math.random() * 80 + 10, // Случайные позиции для примера
+            position_y: Math.random() * 80 + 10,
+            status: (table.status as 'available' | 'reserved' | 'occupied') || 'available'
+          }));
+          setTables(formattedTables);
         }
       } catch (error) {
         console.error('Ошибка при загрузке настроек столов:', error);
@@ -204,14 +216,14 @@ const WaiterPage: NextPage = () => {
           <h2 className="text-xl font-semibold mb-4">Генерация кода для заказа</h2>
           
           <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
               <label htmlFor="tableNumber" className="block text-sm font-medium text-gray-700">
                 Номер столика (опционально)
               </label>
               <button 
                 type="button"
                 onClick={() => setShowFloorPlan(!showFloorPlan)}
-                className="text-sm font-medium text-primary flex items-center"
+                className="text-sm font-medium text-primary flex items-center self-start sm:self-auto"
               >
                 <InformationCircleIcon className="h-4 w-4 mr-1" />
                 {showFloorPlan ? 'Скрыть' : 'Показать'} схему зала
@@ -327,6 +339,41 @@ const WaiterPage: NextPage = () => {
             <RefreshIcon className="h-5 w-5 mr-2" />
             Сгенерировать новый код
           </button>
+        </div>
+        
+        {/* Блок сканирования QR-кода заказа */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Сканирование QR-кода заказа</h2>
+          
+          <div className="flex flex-col md:flex-row items-start gap-6">
+            <div className="w-full md:w-1/2">
+              <p className="text-gray-600 mb-4">
+                Отсканируйте QR-код заказа клиента, чтобы привязать его к вашему аккаунту и начать обслуживание.
+              </p>
+              
+              <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600 mb-4">
+                <li>Попросите клиента показать QR-код заказа</li>
+                <li>Держите камеру ровно и на расстоянии 15-30 см от кода</li>
+                <li>После успешного сканирования вы будете перенаправлены на страницу заказа</li>
+              </ul>
+              
+              <div className="flex justify-center md:justify-start">
+                <Link href="/waiter/scan" className="bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark transition duration-200 flex items-center">
+                  <QrCodeIcon className="h-5 w-5 mr-2" />
+                  Сканировать QR-код
+                </Link>
+              </div>
+            </div>
+            
+            <div className="w-full md:w-1/2 flex justify-center">
+              <div className="w-full max-w-xs h-64 bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                <QrCodeIcon className="h-20 w-20 text-gray-400" />
+                <p className="text-gray-500 text-sm mt-4 text-center px-4">
+                  Нажмите кнопку "Сканировать QR-код", чтобы открыть сканер камеры
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Список кодов */}

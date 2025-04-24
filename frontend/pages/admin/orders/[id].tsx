@@ -73,24 +73,9 @@ const AdminOrderDetailPage: NextPage = () => {
   const paymentStatusOrder = ['pending', 'paid', 'refunded', 'failed'];
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!isAuthenticated) {
-        router.push('/auth/login');
-        return;
-      }
-
-      if (!user || (user.role !== 'admin' && user.role !== 'waiter')) {
-        router.push('/');
-        return;
-      }
-
       if (!id) return;
-
       fetchOrder();
-    };
-
-    checkAuth();
-  }, [id, isAuthenticated, user, router]);
+  }, [id]);
 
   const fetchOrder = async () => {
     try {

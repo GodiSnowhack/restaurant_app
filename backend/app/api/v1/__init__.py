@@ -14,3 +14,15 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(waiter.router, prefix="/waiter", tags=["waiter"]) 
+
+@api_router.get("/health", tags=["system"])
+async def health_check():
+    """
+    Проверка работоспособности сервера.
+    Используется клиентскими приложениями для проверки доступности API.
+    """
+    return {
+        "status": "ok",
+        "version": "1.0",
+        "message": "API сервер работает нормально"
+    } 

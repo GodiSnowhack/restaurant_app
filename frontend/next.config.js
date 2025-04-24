@@ -2,8 +2,25 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'standalone',
   images: {
-    domains: ['res.cloudinary.com', 'localhost', '127.0.0.1', '192.168.0.10'],
+    domains: ['localhost', '127.0.0.1', '0.0.0.0'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/images/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+        pathname: '/static/**',
+      }
+    ],
+    // Устанавливаем заглушку на случай ошибки загрузки изображения
+    unoptimized: true,
   },
   // Настройка для устранения ошибок гидратации
   compiler: {
@@ -52,6 +69,15 @@ const nextConfig = {
       use: ['@svgr/webpack'],
     });
     return config;
+  },
+  async redirects() {
+    return [
+      {
+        source: '/admin',
+        destination: '/admin/dashboard',
+        permanent: true,
+      },
+    ];
   },
 }
 

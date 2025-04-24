@@ -7,11 +7,9 @@ from app.database.session import Base
 
 
 class UserRole(str, PyEnum):
-    GUEST = "guest"
+    CLIENT = "client"
     WAITER = "waiter"
     ADMIN = "admin"
-    KITCHEN = "kitchen"
-    SUPPLY = "supply"
 
 
 class User(Base):
@@ -23,7 +21,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, index=True)
     is_active = Column(Boolean, default=True)
-    role = Column(String, default=UserRole.GUEST)
+    role = Column(String, default=UserRole.CLIENT)
     
     # Время создания и обновления
     created_at = Column(DateTime, default=datetime.utcnow)

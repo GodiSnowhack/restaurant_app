@@ -6,17 +6,7 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import useSettingsStore from '../../lib/settings-store';
 import {settingsApi} from '../../lib/api';
-import {
-  ArrowLeftIcon,
-  ClockIcon,
-  Cog6ToothIcon as CogIcon,
-  PhoneIcon,
-  MapPinIcon as LocationMarkerIcon,
-  EnvelopeIcon as MailIcon,
-  PlusIcon,
-  TrashIcon,
-  Squares2X2Icon as ViewGridIcon
-} from '@heroicons/react/24/outline';
+import {ArrowLeftIcon, ClockIcon, Cog6ToothIcon as CogIcon, PhoneIcon, MapPinIcon as LocationMarkerIcon, EnvelopeIcon as MailIcon, PlusIcon, TrashIcon, Squares2X2Icon as ViewGridIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, GlobeAltIcon, DocumentTextIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
 import {RestaurantTable} from '../../lib/settings-store';
 import FloorPlan from '../../components/FloorPlan';
@@ -217,7 +207,7 @@ const AdminSettingsPage: NextPage = () => {
                     }`}
                   >
                     <CurrencyDollarIcon className="h-5 w-5 mr-2" />
-                    Оплата и доставка
+                    Оплата
                   </button>
                   <button
                     onClick={() => setActiveTab('notifications')}
@@ -369,32 +359,6 @@ const AdminSettingsPage: NextPage = () => {
                         Разрешить бронирование столиков
                       </label>
                     </div>
-                    <div className="flex items-center">
-                      <input
-                        id="delivery_enabled"
-                        name="delivery_enabled"
-                        type="checkbox"
-                        checked={formData.delivery_enabled}
-                        onChange={handleCheckboxChange}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="delivery_enabled" className="ml-2 block text-sm text-gray-900">
-                        Разрешить доставку
-                      </label>
-                    </div>
-                    <div className="flex items-center">
-                      <input
-                        id="pickup_enabled"
-                        name="pickup_enabled"
-                        type="checkbox"
-                        checked={formData.pickup_enabled}
-                        onChange={handleCheckboxChange}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="pickup_enabled" className="ml-2 block text-sm text-gray-900">
-                        Разрешить самовывоз
-                      </label>
-                    </div>
                   </div>
                 </div>
               )}
@@ -479,10 +443,10 @@ const AdminSettingsPage: NextPage = () => {
                 </div>
               )}
 
-              {/* Оплата и доставка */}
+              {/* Оплата */}
               {activeTab === 'payment' && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-medium">Оплата и доставка</h2>
+                  <h2 className="text-xl font-medium">Оплата</h2>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -549,40 +513,66 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
                     </div>
 
-                    <div>
-                      <label htmlFor="delivery_fee" className="block text-sm font-medium text-gray-700">
-                        Стоимость доставки
-                      </label>
-                      <div className="mt-1 relative rounded-md shadow-sm">
-                        <input
-                          type="number"
-                          id="delivery_fee"
-                          name="delivery_fee"
-                          value={formData.delivery_fee}
-                          onChange={handleInputChange}
-                          className="focus:ring-primary focus:border-primary block w-full sm:text-sm border-gray-300 rounded-md"
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">{formData.currency_symbol}</span>
+                    <div className="col-span-2">
+                      <h3 className="text-lg font-medium mb-4">Способы оплаты</h3>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <input
+                            id="payment_cash"
+                            name="payment_cash"
+                            type="checkbox"
+                            checked={formData.payment_methods?.includes('cash') || false}
+                            onChange={(e) => {
+                              const methods = formData.payment_methods || [];
+                              if (e.target.checked) {
+                                if (!methods.includes('cash')) {
+                                  setFormData({
+                                    ...formData,
+                                    payment_methods: [...methods, 'cash']
+                                  });
+                                }
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  payment_methods: methods.filter(m => m !== 'cash')
+                                });
+                              }
+                            }}
+                            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                          />
+                          <label htmlFor="payment_cash" className="ml-2 block text-sm text-gray-900">
+                            Наличные
+                          </label>
                         </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="free_delivery_threshold" className="block text-sm font-medium text-gray-700">
-                        Порог для бесплатной доставки
-                      </label>
-                      <div className="mt-1 relative rounded-md shadow-sm">
-                        <input
-                          type="number"
-                          id="free_delivery_threshold"
-                          name="free_delivery_threshold"
-                          value={formData.free_delivery_threshold}
-                          onChange={handleInputChange}
-                          className="focus:ring-primary focus:border-primary block w-full sm:text-sm border-gray-300 rounded-md"
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">{formData.currency_symbol}</span>
+                        
+                        <div className="flex items-center">
+                          <input
+                            id="payment_card"
+                            name="payment_card"
+                            type="checkbox"
+                            checked={formData.payment_methods?.includes('card') || false}
+                            onChange={(e) => {
+                              const methods = formData.payment_methods || [];
+                              if (e.target.checked) {
+                                if (!methods.includes('card')) {
+                                  setFormData({
+                                    ...formData,
+                                    payment_methods: [...methods, 'card']
+                                  });
+                                }
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  payment_methods: methods.filter(m => m !== 'card')
+                                });
+                              }
+                            }}
+                            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                          />
+                          <label htmlFor="payment_card" className="ml-2 block text-sm text-gray-900">
+                            Банковские карты
+                          </label>
                         </div>
                       </div>
                     </div>

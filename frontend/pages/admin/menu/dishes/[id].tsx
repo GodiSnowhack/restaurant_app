@@ -20,6 +20,7 @@ const EditDishPage: NextPage = () => {
     name: '',
     description: '',
     price: '',
+    cost_price: '',
     category_id: '',
     image_url: '',
     calories: '',
@@ -68,6 +69,7 @@ const EditDishPage: NextPage = () => {
           name: dishData.name,
           description: dishData.description || '',
           price: dishData.price.toString(),
+          cost_price: dishData.cost_price ? dishData.cost_price.toString() : '',
           category_id: dishData.category_id.toString(),
           image_url: dishData.image_url || '',
           calories: dishData.calories ? dishData.calories.toString() : '',
@@ -118,6 +120,7 @@ const EditDishPage: NextPage = () => {
       const dishData = {
         ...formData,
         price: parseFloat(formData.price),
+        cost_price: formData.cost_price ? parseFloat(formData.cost_price) : undefined,
         category_id: parseInt(formData.category_id),
         calories: formData.calories ? parseInt(formData.calories) : undefined,
         cooking_time: formData.cooking_time ? parseInt(formData.cooking_time) : undefined,
@@ -226,6 +229,22 @@ const EditDishPage: NextPage = () => {
                   min="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                   required
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700 mb-1">
+                  Себестоимость
+                </label>
+                <input
+                  type="number"
+                  id="cost_price"
+                  name="cost_price"
+                  value={formData.cost_price}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 />
               </div>
               

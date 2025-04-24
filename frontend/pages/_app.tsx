@@ -5,36 +5,155 @@ import '../styles/globals.css';
 import useAuthStore from '../lib/auth-store';
 import useSettingsStore from '../lib/settings-store';
 import { SettingsProvider } from '../settings-context';
+import dynamic from 'next/dynamic';
+import { ThemeProvider } from '../lib/theme-context';
+import { SessionProvider } from 'next-auth/react';
+
+// Динамический импорт компонента AuthDebugger для отображения только на клиенте
+const AuthDebugger = dynamic(() => import('../components/AuthDebugger'), {
+  ssr: false,
+});
+
+// Динамический импорт компонента MobileDetector для отображения только на клиенте
+const MobileDetector = dynamic(() => import('../components/MobileDetector').then(mod => mod.MobileDetector), {
+  ssr: false,
+});
+
+// Компонент загрузки без серверного рендеринга
+const LoadingIndicator = dynamic(() => Promise.resolve(({ authError }: { authError: string | null }) => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mb-4"></div>
+    <h1 className="text-xl font-semibold text-gray-800 mb-2">Загрузка приложения...</h1>
+    <p className="text-gray-600 text-center mb-4">Пожалуйста, подождите</p>
+    {authError && (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4">
+        <p>{authError}</p>
+        <button 
+          className="mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
+          onClick={() => window.location.reload()}
+        >
+          Обновить страницу
+        </button>
+      </div>
+    )}
+  </div>
+)), { ssr: false });
+
+// Функция получения токена из любого доступного хранилища
+const getAppToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const localToken = localStorage.getItem('token');
+    const sessionToken = sessionStorage.getItem('token');
+    
+    // Если есть токен в localStorage, используем его
+    if (localToken) {
+      return localToken;
+    } else if (sessionToken) {
+      // Если токен есть только в sessionStorage, копируем его в localStorage
+      try {
+        localStorage.setItem('token', sessionToken);
+      } catch (e) {
+        console.error('Не удалось скопировать токен из sessionStorage в localStorage:', e);
+      }
+      return sessionToken;
+    }
+  } catch (e) {
+    console.error('Ошибка при получении токена:', e);
+  }
+  
+  return null;
+};
 
 // Указываем Next.js использовать динамический рендеринг для всего приложения
-export const dynamic = 'force-dynamic';
+export const renderMode = 'force-dynamic';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const { isAuthenticated, user, fetchUserProfile } = useAuthStore();
+  const { isAuthenticated, user, fetchUserProfile, isMobileDevice, setInitialAuthState } = useAuthStore();
   const { loadSettings } = useSettingsStore();
-  const [token, setToken] = useState<string | null>(null);
   const [previousPath, setPreviousPath] = useState<string | null>(null);
-
+  const [showDebugger, setShowDebugger] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  
+  // Определяем, что мы на клиенте
   useEffect(() => {
-    // Получаем токен из localStorage при рендере на клиенте
-    const storedToken = localStorage.getItem('token');
-    setToken(storedToken);
-  }, []);
-
+    setIsClient(true);
+    
+    // Сразу устанавливаем начальное состояние авторизации по наличию токена
+    if (typeof window !== 'undefined') {
+      const token = getAppToken();
+      // Если есть токен, считаем пользователя предварительно авторизованным
+      if (token) {
+        setInitialAuthState(true, token);
+      }
+    }
+  }, [setInitialAuthState]);
+  
+  // Загрузка профиля и настроек без блокировки UI
   useEffect(() => {
+    if (!isClient) return;
+    
+    const loadUserData = async () => {
+      const token = getAppToken();
+      
+      // Загружаем настройки без ожидания
+      loadSettings();
+      
+      // Загружаем профиль пользователя, если есть токен
+      if (token) {
+        try {
+          await fetchUserProfile();
+        } catch (error) {
+          console.error('Ошибка при загрузке профиля:', error);
+          // Не блокируем UI при ошибке
+        }
+      }
+    };
+    
+    loadUserData();
+    
+    // Быстрая проверка каждые 30 секунд без блокировки UI
+    const intervalCheck = setInterval(() => {
+      if (getAppToken()) {
+        fetchUserProfile().catch(e => {
+          console.error('Ошибка фоновой проверки профиля:', e);
+        });
+      }
+    }, 30000);
+    
+    return () => clearInterval(intervalCheck);
+  }, [isClient, fetchUserProfile, loadSettings]);
+  
+  // Проверяем, имеет ли пользователь роль админа для отображения отладчика
+  useEffect(() => {
+    if (!isClient) return;
+    
+    // Проверяем не только роль, но и наличие пользователя
+    const isAdmin = user && user.role === 'admin';
+    setShowDebugger(!!isAdmin);
+  }, [user, isClient]);
+  
+  // Отслеживаем изменения пути
+  useEffect(() => {
+    if (!isClient) return;
+    
     const handleRouteChange = (path: string) => {
       setPreviousPath(router.pathname);
     };
-
+    
     router.events.on('routeChangeStart', handleRouteChange);
-
+    
     return () => {
       router.events.off('routeChangeStart', handleRouteChange);
     };
-  }, [router]);
-
+  }, [router, isClient]);
+  
+  // Проверяем доступ к защищенным маршрутам
   useEffect(() => {
+    if (!isClient) return;
+    
     // Расширяем список публичных маршрутов для гостей
     const publicRoutes = [
       '/auth/login', 
@@ -42,59 +161,101 @@ export default function App({ Component, pageProps }: AppProps) {
       '/', 
       '/menu', 
       '/menu/[id]', 
-      '/cart', // Разрешаем неавторизованным пользователям просматривать корзину
-      '/reservations', // Разрешаем неавторизованным пользователям просматривать страницу бронирования
-      '/checkout' // Разрешаем неавторизованным пользователям просматривать страницу оформления заказа
-    ];
-    
-    // Маршруты, требующие авторизации для фактических действий (оформление заказа, бронирование)
-    const actionProtectedRoutes = [
-      '/checkout/confirm', 
-      '/reservations/create', 
-      '/orders/create'
+      '/cart',
+      '/reservations',
+      '/checkout'
     ];
     
     const adminRoutes = ['/admin', '/admin/users', '/admin/orders', '/admin/settings', '/admin/menu', '/admin/reservations'];
-    const userRoutes = ['/profile', '/orders']; // Уменьшили список защищенных пользовательских маршрутов
     const chefRoutes = ['/kitchen'];
+    const waiterRoutes = ['/waiter', '/waiter/scan', '/waiter/orders', '/waiter/orders/[id]'];
     
     const path = router.pathname;
-
-    if (path !== '/auth/login' && path !== '/auth/register') {
-      // Перенаправляем на авторизацию только если пользователь пытается открыть защищенный роут
-      if (!isAuthenticated && 
-          !publicRoutes.includes(path) && 
-          !path.startsWith('/menu/') && 
-          !actionProtectedRoutes.includes(path)) {
-        setPreviousPath(path);
-        router.push('/auth/login');
-      }
-      
-      // Защита роутов админки
-      if (isAuthenticated && adminRoutes.includes(path) && user?.role !== 'admin') {
-        router.push('/');
-      }
-      
-      // Защита роутов кухни
-      if (isAuthenticated && chefRoutes.includes(path) && user?.role !== 'chef') {
-        router.push('/');
-      }
-    }
-  }, [router.pathname, isAuthenticated, router, token, previousPath, user]);
-
-  useEffect(() => {
-    // Проверяем, авторизован ли пользователь и загружаем его профиль
-    if (token) {
-      fetchUserProfile();
+    
+    // Защита роутов админки
+    if (isAuthenticated && adminRoutes.includes(path) && user?.role !== 'admin') {
+      console.log('Попытка доступа к админке без прав');
+      router.push('/');
+      return;
     }
     
-    // Загружаем настройки ресторана
-    loadSettings();
-  }, [token, fetchUserProfile, loadSettings]);
-
+    // Защита роутов кухни
+    if (isAuthenticated && chefRoutes.includes(path) && user?.role !== 'chef') {
+      console.log('Попытка доступа к кухне без прав');
+      router.push('/');
+      return;
+    }
+    
+    // Защита роутов официанта
+    if (isAuthenticated && 
+        waiterRoutes.some(route => path === route || (route.endsWith('[id]') && path.startsWith(route.replace('[id]', '')))) && 
+        user?.role !== 'waiter' && 
+        user?.role !== 'admin') {
+      console.log('Попытка доступа к панели официанта без прав');
+      router.push('/');
+      return;
+    }
+    
+    // Перенаправляем на авторизацию только если пользователь пытается открыть защищенный роут
+    // и точно не авторизован (нет токена)
+    if (!isAuthenticated && 
+        !publicRoutes.includes(path) && 
+        !path.startsWith('/menu/') && 
+        !getAppToken() && 
+        path !== '/auth/login' && 
+        path !== '/auth/register') {
+      console.log('Перенаправление на логин с:', path);
+      router.push('/auth/login');
+    }
+    
+    // Перенаправление официанта на панель официанта при входе
+    // Добавляем проверку на то, что маршрут не был изменен, чтобы избежать циклических перенаправлений
+    if (isAuthenticated && user?.role === 'waiter' && path === '/' && router.pathname === '/') {
+      // Добавляем проверку на предыдущий маршрут
+      if (previousPath !== '/waiter') {
+        console.log('Перенаправление официанта на панель официанта');
+        router.push('/waiter', undefined, { shallow: true });
+      }
+    }
+  }, [router.pathname, isAuthenticated, router, user, isClient, previousPath]);
+  
+  // Обернем отображение AuthDebugger в дополнительную проверку
+  const renderAuthDebugger = () => {
+    if (!isClient) return null;
+    
+    try {
+      if (showDebugger && isAuthenticated && user && user.role === 'admin') {
+        return <AuthDebugger />;
+      }
+    } catch (error) {
+      console.error('Ошибка при рендеринге AuthDebugger:', error);
+    }
+    return null;
+  };
+  
+  // Базовый рендер для сервера
+  if (!isClient) {
+    return (
+      <SettingsProvider>
+        <ThemeProvider>
+          <SessionProvider session={pageProps.session}>
+            <Component {...pageProps} />
+          </SessionProvider>
+        </ThemeProvider>
+      </SettingsProvider>
+    );
+  }
+  
   return (
     <SettingsProvider>
-      <Component {...pageProps} />
+      <ThemeProvider>
+        <SessionProvider session={pageProps.session}>
+          <MobileDetector>
+            <Component {...pageProps} />
+            {renderAuthDebugger()}
+          </MobileDetector>
+        </SessionProvider>
+      </ThemeProvider>
     </SettingsProvider>
   );
 } 

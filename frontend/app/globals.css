@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  --primary-color: #ff6b6b;
+  --secondary-color: #4ecdc4;
+  --text-color: #333;
+  --bg-color: #fff;
+  --card-bg: #f9f9f9;
+  --border-color: #eaeaea;
+  --primary: #DB3545;
+  --primary-foreground: #ffffff;
+  --secondary: #F8F9FA;
+  --secondary-foreground: #212529;
+  --muted: #6C757D;
+  --muted-foreground: #F8F9FA;
+  --accent: #F0F1F2;
+  --accent-foreground: #212529;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --border: #DEE2E6;
+  --input: #DEE2E6;
+  --ring: #DB3545;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 30, 30, 30;
+  --primary-color: #ff6b6b;
+  --secondary-color: #4ecdc4;
+  --text-color: #f0f0f0;
+  --bg-color: #121212;
+  --card-bg: #1e1e1e;
+  --background: #121212;
+  --foreground: #FFFFFF;
+  --primary: #FF4555;
+  --primary-foreground: #ffffff;
+  --secondary: #1E1E1E;
+  --secondary-foreground: #E9ECEF;
+  --muted: #6C757D;
+  --muted-foreground: #CED4DA;
+  --accent: #2D2D2D;
+  --accent-foreground: #F8F9FA;
+  --card: #1E1E1E;
+  --card-foreground: #FFFFFF;
+  --border: #333333;
+  --input: #333333;
+  --ring: #FF4555;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Плавный переход между темами */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+} 

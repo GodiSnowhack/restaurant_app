@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     full_name: Optional[str] = None
     is_active: Optional[bool] = True
-    role: Optional[UserRole] = UserRole.GUEST
+    role: Optional[UserRole] = UserRole.CLIENT
 
 
 # Схема для создания пользователя

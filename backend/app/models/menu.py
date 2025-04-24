@@ -66,6 +66,7 @@ class Dish(Base):
     name = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
     price = Column(Float, nullable=False)
+    cost_price = Column(Float, nullable=True)
     image_url = Column(String, nullable=True)
     video_url = Column(String, nullable=True)
     calories = Column(Integer, nullable=True)

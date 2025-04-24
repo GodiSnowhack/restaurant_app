@@ -73,6 +73,7 @@ class DishBase(BaseModel):
     name: str
     description: Optional[str] = None
     price: float
+    cost_price: Optional[float] = None
     image_url: Optional[str] = None
     video_url: Optional[str] = None
     calories: Optional[int] = None
@@ -91,6 +92,7 @@ class DishCreate(DishBase):
 class DishUpdate(DishBase):
     name: Optional[str] = None
     price: Optional[float] = None
+    cost_price: Optional[float] = None
     category_id: Optional[int] = None
     allergen_ids: Optional[List[int]] = None
     tag_ids: Optional[List[int]] = None

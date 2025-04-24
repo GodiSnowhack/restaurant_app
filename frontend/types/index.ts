@@ -32,6 +32,7 @@ export interface Dish {
   name: string;
   description: string;
   price: number;
+  cost_price?: number;
   image_url?: string;
   category_id: number;
   is_vegetarian: boolean;
@@ -59,12 +60,11 @@ export interface Cart {
 
 // Типы для заказов
 export interface OrderItem {
-  id: number;
   dish_id: number;
   quantity: number;
   price: number;
-  comment?: string;
-  dish?: Dish;
+  name: string;
+  special_instructions?: string;
 }
 
 export interface Order {
@@ -157,12 +157,9 @@ export interface RestaurantSettings {
   currency_symbol: string;
   tax_percentage: number;
   min_order_amount: number;
-  delivery_fee: number;
-  free_delivery_threshold: number;
   table_reservation_enabled: boolean;
-  delivery_enabled: boolean;
-  pickup_enabled: boolean;
   privacy_policy: string;
   terms_of_service: string;
   tables: Array<any>; // Можно определить более конкретный тип для столов
+  payment_methods?: string[]; // 'cash' | 'card' | 'online'
 } 

@@ -4,20 +4,26 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import useAuthStore from '../../../lib/auth-store';
-import {ArrowLeftIcon, UserIcon, MailIcon, PhoneIcon, LockClosedIcon, UserGroupIcon, CheckIcon as SaveIcon, XIcon} from '@heroicons/react/24/solid';
+import {
+  ArrowLeftIcon, 
+  UserIcon, 
+  EnvelopeIcon, 
+  PhoneIcon, 
+  LockClosedIcon, 
+  UserGroupIcon, 
+  CheckIcon, 
+  XMarkIcon
+} from '@heroicons/react/24/solid';
 import {usersApi, authApi} from '../../../lib/api';
 
 // Типы ролей
-type Role = 'user' | 'admin' | 'waiter' | 'kitchen' | 'supply' | 'guest';
+type Role = 'client' | 'admin' | 'waiter';
 
 // Данные о ролях для отображения
 const roleOptions = [
-  { id: 'user', name: 'Клиент', description: 'Обычный пользователь, может делать заказы и бронировать столики' },
+  { id: 'client', name: 'Клиент', description: 'Обычный пользователь, может делать заказы и бронировать столики' },
   { id: 'admin', name: 'Администратор', description: 'Полный доступ к системе управления рестораном' },
-  { id: 'waiter', name: 'Официант', description: 'Обслуживание столиков, прием заказов' },
-  { id: 'kitchen', name: 'Повар', description: 'Работа с заказами на кухне, управление меню' },
-  { id: 'supply', name: 'Поставщик', description: 'Управление поставками и ингредиентами' },
-  { id: 'guest', name: 'Гость', description: 'Ограниченный доступ только для просмотра' }
+  { id: 'waiter', name: 'Официант', description: 'Обслуживание столиков, прием заказов' }
 ];
 
 const CreateUserPage: NextPage = () => {
@@ -34,7 +40,7 @@ const CreateUserPage: NextPage = () => {
     confirm_password: '',
     full_name: '',
     phone: '',
-    role: 'user' as Role
+    role: 'client' as Role
   });
   
   // Состояние ошибок валидации
@@ -176,7 +182,7 @@ const CreateUserPage: NextPage = () => {
                   className="absolute top-0 bottom-0 right-0 px-4 py-3"
                   onClick={() => setError('')}
                 >
-                  <XIcon className="h-5 w-5" />
+                  <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
             )}
@@ -215,7 +221,7 @@ const CreateUserPage: NextPage = () => {
                   </label>
                   <div className="relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MailIcon className="h-5 w-5 text-gray-400" />
+                      <EnvelopeIcon className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
                       type="email"
@@ -342,7 +348,7 @@ const CreateUserPage: NextPage = () => {
                 disabled={isSubmitting}
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <SaveIcon className="h-5 w-5 mr-2" />
+                <CheckIcon className="h-5 w-5 mr-2" />
                 {isSubmitting ? 'Сохранение...' : 'Создать пользователя'}
               </button>
             </div>

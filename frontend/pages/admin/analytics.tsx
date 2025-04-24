@@ -3,156 +3,142 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import useAuthStore from '../../lib/auth-store';
+import { useAuth } from '../../hooks/useAuth';
 import { 
   ArrowLeftIcon,
-  ChartPieIcon,
   ChartBarIcon,
-  CalendarIcon,
-  CurrencyIcon,
   ShoppingBagIcon,
-  ClockIcon
+  UserIcon,
+  ClockIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
+import { 
+  analyticsApi 
+} from '../../lib/api/analytics-api';
+import { 
+  FinancialMetrics, 
+  MenuMetrics, 
+  CustomerMetrics, 
+  OperationalMetrics
+} from '../../types/analytics';
 
-type TimeRange = 'today' | 'week' | 'month' | 'year';
+type TimeRange = 'today' | 'week' | 'month';
+
+// Функция для получения названия категории по ID
+const getCategoryName = (categoryId: number): string => {
+  const categories: Record<number, string> = {
+    1: 'Супы',
+    2: 'Основные блюда',
+    3: 'Салаты',
+    4: 'Десерты',
+    5: 'Напитки',
+    6: 'Закуски',
+    7: 'Выпечка',
+    8: 'Завтраки',
+    9: 'Веганское меню',
+    10: 'Детское меню'
+  };
+  
+  return categories[categoryId] || `Категория ${categoryId}`;
+};
 
 const AdminAnalyticsPage: NextPage = () => {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [activeTab, setActiveTab] = useState('overview');
-  const [statsData, setStatsData] = useState({
-    revenue: {
-      total: 0,
-      today: 0,
-      week: 0,
-      month: 0,
-      year: 0,
-      growth: 0
-    },
-    orders: {
-      total: 0,
-      today: 0,
-      week: 0,
-      month: 0,
-      year: 0,
-      growth: 0
-    },
-    average_order: {
-      total: 0,
-      today: 0,
-      week: 0,
-      month: 0,
-      year: 0,
-      growth: 0
-    },
-    customers: {
-      total: 0,
-      today: 0,
-      week: 0,
-      month: 0,
-      year: 0,
-      growth: 0
-    },
-    top_dishes: [
-      { id: 1, name: 'Стейк Рибай', count: 42, revenue: 63000 },
-      { id: 2, name: 'Цезарь с курицей', count: 38, revenue: 38000 },
-      { id: 3, name: 'Паста Карбонара', count: 35, revenue: 35000 },
-      { id: 4, name: 'Тирамису', count: 30, revenue: 18000 },
-      { id: 5, name: 'Борщ', count: 28, revenue: 19600 }
-    ],
-    revenue_by_time: [
-      { time: '10:00', value: 5000 },
-      { time: '12:00', value: 12000 },
-      { time: '14:00', value: 18000 },
-      { time: '16:00', value: 10000 },
-      { time: '18:00', value: 15000 },
-      { time: '20:00', value: 25000 },
-      { time: '22:00', value: 20000 }
-    ],
-    orders_by_status: [
-      { status: 'completed', count: 120, percentage: 60 },
-      { status: 'processing', count: 45, percentage: 22.5 },
-      { status: 'cancelled', count: 35, percentage: 17.5 }
-    ],
-    revenue_by_category: [
-      { category: 'Горячие блюда', value: 180000, percentage: 35 },
-      { category: 'Закуски', value: 90000, percentage: 18 },
-      { category: 'Салаты', value: 70000, percentage: 14 },
-      { category: 'Десерты', value: 60000, percentage: 12 },
-      { category: 'Напитки', value: 55000, percentage: 11 },
-      { category: 'Супы', value: 45000, percentage: 9 }
-    ]
-  });
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>('month');
+  
+  // Состояния для различных типов метрик
+  const [financialMetrics, setFinancialMetrics] = useState<FinancialMetrics | null>(null);
+  const [menuMetrics, setMenuMetrics] = useState<MenuMetrics | null>(null);
+  const [customerMetrics, setCustomerMetrics] = useState<CustomerMetrics | null>(null);
+  const [operationalMetrics, setOperationalMetrics] = useState<OperationalMetrics | null>(null);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      if (!isAuthenticated) {
-        router.push('/auth/login');
-        return;
-      }
-
-      if (user?.role !== 'admin') {
-        router.push('/');
-        return;
-      }
-
-      // В реальном приложении здесь будет загрузка статистики с сервера
-      // API запрос будет выглядеть примерно так:
-      // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics?timeRange=${timeRange}`);
-      
-      // Имитируем загрузку данных
-      setTimeout(() => {
-        setIsLoading(false);
-        // В реальности данные будут получены от сервера в зависимости от timeRange
-        
-        // Для демонстрации обновим некоторые числа в зависимости от выбранного диапазона
-        const multiplier = 
-          timeRange === 'today' ? 1 :
-          timeRange === 'week' ? 7 :
-          timeRange === 'month' ? 30 : 365;
-          
-        setStatsData(prevData => ({
-          ...prevData,
-          revenue: {
-            ...prevData.revenue,
-            [timeRange]: Math.floor(15000 * multiplier * (0.8 + Math.random() * 0.4))
-          },
-          orders: {
-            ...prevData.orders,
-            [timeRange]: Math.floor(10 * multiplier * (0.8 + Math.random() * 0.4))
-          },
-          average_order: {
-            ...prevData.average_order,
-            [timeRange]: Math.floor(1500 * (0.8 + Math.random() * 0.4))
-          },
-          customers: {
-            ...prevData.customers,
-            [timeRange]: Math.floor(8 * multiplier * (0.8 + Math.random() * 0.4))
-          }
-        }));
-      }, 1000);
-    };
-
+    // Проверка прав админа
     checkAdmin();
-  }, [isAuthenticated, user, router, timeRange]);
+    
+    // Загрузка данных аналитики
+    loadAnalyticsData();
+  }, [timeRange]);
 
-  const formatCurrency = (value: number) => {
+  // Функция для проверки прав администратора
+  const checkAdmin = async () => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login?from=/admin/analytics');
+      return;
+    }
+
+    if (!isLoading && isAuthenticated && user?.role !== 'admin') {
+      router.push('/');
+      return;
+    }
+  };
+
+  // Функция для загрузки данных аналитики
+  const loadAnalyticsData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Определение временного диапазона для фильтров
+      const today = new Date();
+      let startDate = new Date();
+      
+      switch (timeRange) {
+        case 'today':
+          startDate = new Date(today.setHours(0, 0, 0, 0));
+          break;
+        case 'week':
+          startDate = new Date(today);
+          startDate.setDate(today.getDate() - 7);
+          break;
+        case 'month':
+          startDate = new Date(today);
+          startDate.setMonth(today.getMonth() - 1);
+          break;
+      }
+      
+      const filters = {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0]
+      };
+      
+      // Параллельная загрузка необходимых данных
+      const [financial, menu, customers, operational] = await Promise.all([
+        analyticsApi.getFinancialMetrics(filters),
+        analyticsApi.getMenuMetrics(filters),
+        analyticsApi.getCustomerMetrics(filters),
+        analyticsApi.getOperationalMetrics(filters)
+      ]);
+      
+      setFinancialMetrics(financial);
+      setMenuMetrics(menu);
+      setCustomerMetrics(customers);
+      setOperationalMetrics(operational);
+    } catch (err) {
+      console.error('Ошибка при загрузке данных аналитики:', err);
+      setError('Произошла ошибка при загрузке данных аналитики. Пожалуйста, попробуйте позже.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Форматирование валюты (без символа рубля)
+  const formatCurrency = (value: number | undefined) => {
+    if (value === undefined) return '0';
     return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'KZT',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
+  // Обработчик изменения временного диапазона
   const handleChangeTimeRange = (newRange: TimeRange) => {
     setTimeRange(newRange);
-    setIsLoading(true);
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Layout title="Аналитика | Админ-панель">
         <div className="container mx-auto px-4 py-8">
@@ -163,6 +149,33 @@ const AdminAnalyticsPage: NextPage = () => {
       </Layout>
     );
   }
+
+  // Если данные не загружены, показываем сообщение об ошибке
+  if (!financialMetrics || !menuMetrics || !customerMetrics || !operationalMetrics) {
+    return (
+      <Layout title="Аналитика | Админ-панель">
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  {error || "Не удалось загрузить данные аналитики. Пожалуйста, попробуйте позже."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Фильтрация статусов заказов (удаление статуса "Доставлен")
+  const filteredOrderStatuses = Object.entries(operationalMetrics.orderCompletionRates)
+    .filter(([status]) => status !== 'Доставлен')
+    .reduce((acc, [status, value]) => {
+      acc[status] = value;
+      return acc;
+    }, {} as Record<string, number>);
 
   return (
     <Layout title="Аналитика | Админ-панель">
@@ -207,79 +220,20 @@ const AdminAnalyticsPage: NextPage = () => {
             >
               Месяц
             </button>
-            <button
-              onClick={() => handleChangeTimeRange('year')}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                timeRange === 'year' 
-                  ? 'bg-primary text-white' 
-                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }`}
-            >
-              Год
-            </button>
           </div>
         </div>
 
-        {/* Навигация по вкладкам */}
-        <div className="mb-8">
-          <div className="flex flex-wrap gap-2 border-b">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                activeTab === 'overview' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Обзор
-            </button>
-            <button
-              onClick={() => setActiveTab('sales')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                activeTab === 'sales' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Продажи
-            </button>
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                activeTab === 'customers' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Клиенты
-            </button>
-            <button
-              onClick={() => setActiveTab('menu')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                activeTab === 'menu' 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Меню
-            </button>
-          </div>
-        </div>
-
-        {/* Карточки с основными метриками */}
+        {/* Основные показатели */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-gray-500 text-sm uppercase font-medium">Выручка</h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                +{statsData.revenue.growth}%
-              </span>
             </div>
             <div className="flex items-center">
-              <CurrencyIcon className="h-8 w-8 text-primary" />
+              <ChartBarIcon className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{formatCurrency(statsData.revenue[timeRange])}</p>
-                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За год'}</p>
+                <p className="text-2xl font-bold">{formatCurrency(financialMetrics.totalRevenue)}</p>
+                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : 'За месяц'}</p>
               </div>
             </div>
           </div>
@@ -287,15 +241,12 @@ const AdminAnalyticsPage: NextPage = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-gray-500 text-sm uppercase font-medium">Заказы</h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                +{statsData.orders.growth}%
-              </span>
             </div>
             <div className="flex items-center">
               <ShoppingBagIcon className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{statsData.orders[timeRange]}</p>
-                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За год'}</p>
+                <p className="text-2xl font-bold">{Math.round(financialMetrics.totalRevenue / financialMetrics.averageOrderValue)}</p>
+                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : 'За месяц'}</p>
               </div>
             </div>
           </div>
@@ -303,15 +254,12 @@ const AdminAnalyticsPage: NextPage = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-gray-500 text-sm uppercase font-medium">Средний чек</h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                +{statsData.average_order.growth}%
-              </span>
             </div>
             <div className="flex items-center">
-              <ChartBarIcon className="h-8 w-8 text-primary" />
+              <CheckCircleIcon className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{formatCurrency(statsData.average_order[timeRange])}</p>
-                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За год'}</p>
+                <p className="text-2xl font-bold">{formatCurrency(financialMetrics.averageOrderValue)}</p>
+                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : 'За месяц'}</p>
               </div>
             </div>
           </div>
@@ -319,136 +267,122 @@ const AdminAnalyticsPage: NextPage = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-gray-500 text-sm uppercase font-medium">Клиенты</h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                +{statsData.customers.growth}%
-              </span>
             </div>
             <div className="flex items-center">
-              <ClockIcon className="h-8 w-8 text-primary" />
+              <UserIcon className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{statsData.customers[timeRange]}</p>
-                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За год'}</p>
+                <p className="text-2xl font-bold">{customerMetrics.totalCustomers}</p>
+                <p className="text-sm text-gray-500">{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : 'За месяц'}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Контент вкладок */}
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Выручка по времени суток */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-medium mb-4">Выручка по времени суток</h3>
-              <div className="h-64 flex items-end space-x-2">
-                {statsData.revenue_by_time.map((item, index) => (
+        {/* Основные графики и таблицы */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Заказы по статусам */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-medium mb-4">Заказы по статусам</h3>
+            <div className="mb-4">
+              {Object.entries(filteredOrderStatuses).map(([status, percentage], index) => (
+                <div key={index} className="mb-4">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium capitalize">
+                      {status}
+                    </span>
+                    <span className="text-sm font-medium">{Math.round(Number(percentage))}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        status === 'Выполнен' || status === 'Оплачен' ? 'bg-green-500' : 
+                        status === 'Принят' || status === 'Готовится' || status === 'Готов' ? 'bg-blue-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Топ блюд */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-medium mb-4">Топ блюд</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Блюдо</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Кол-во</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выручка</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {menuMetrics.topSellingDishes.slice(0, 5).map((dish) => (
+                    <tr key={dish.dishId}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dish.dishName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dish.salesCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCurrency(dish.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Выручка по времени суток */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-medium mb-4">Выручка по времени суток</h3>
+            <div className="h-64 flex items-end space-x-2">
+              {Object.entries(financialMetrics.revenueByTimeOfDay).map(([time, value], index) => {
+                const maxValue = Math.max(...Object.values(financialMetrics.revenueByTimeOfDay));
+                const percentage = (value / maxValue) * 100;
+                
+                return (
                   <div key={index} className="flex flex-col items-center flex-1">
                     <div 
                       className="w-full bg-primary rounded-t" 
-                      style={{ 
-                        height: `${(item.value / Math.max(...statsData.revenue_by_time.map(i => i.value))) * 100}%` 
-                      }}
+                      style={{ height: `${percentage}%` }}
                     ></div>
-                    <div className="text-xs text-gray-600 mt-2">{item.time}</div>
+                    <div className="text-xs text-gray-600 mt-2">{time}</div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Заказы по статусам */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-medium mb-4">Заказы по статусам</h3>
-              <div className="mb-4">
-                {statsData.orders_by_status.map((item, index) => (
-                  <div key={index} className="mb-4">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium capitalize">
-                        {item.status === 'completed' ? 'Выполнены' : 
-                         item.status === 'processing' ? 'В обработке' : 'Отменены'}
-                      </span>
-                      <span className="text-sm font-medium">{item.count} ({item.percentage}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          item.status === 'completed' ? 'bg-green-500' : 
-                          item.status === 'processing' ? 'bg-blue-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${item.percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Топ блюд */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-medium mb-4">Топ блюд</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Блюдо</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Кол-во</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выручка</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {statsData.top_dishes.map((dish) => (
-                      <tr key={dish.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dish.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{dish.count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCurrency(dish.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Выручка по категориям */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-medium mb-4">Выручка по категориям</h3>
-              <div className="space-y-4">
-                {statsData.revenue_by_category.map((item, index) => (
-                  <div key={index} className="mb-4">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">{item.category}</span>
-                      <span className="text-sm font-medium">{formatCurrency(item.value)} ({item.percentage}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="h-2 bg-primary rounded-full"
-                        style={{ width: `${item.percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
-        )}
 
-        {activeTab === 'sales' && (
+          {/* Выручка по категориям */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6">Детальная аналитика продаж</h2>
-            <p className="text-gray-600">Детальная статистика по продажам будет добавлена позже.</p>
+            <h3 className="text-lg font-medium mb-4">Выручка по категориям</h3>
+            <div className="space-y-4">
+              {Object.entries(financialMetrics.revenueByCategory)
+                .sort((a, b) => b[1] - a[1]) // Сортировка по убыванию выручки
+                .slice(0, 5) // Только топ-5 категорий
+                .map(([categoryId, value], index) => {
+                  const totalRevenue = financialMetrics.totalRevenue;
+                  const percentage = Math.round((value / totalRevenue) * 100);
+                  const categoryName = getCategoryName(parseInt(categoryId, 10));
+                  
+                  return (
+                    <div key={index} className="mb-4">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium">{categoryName}</span>
+                        <span className="text-sm font-medium">{formatCurrency(value)} ({percentage}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="h-2 bg-primary rounded-full"
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
           </div>
-        )}
-
-        {activeTab === 'customers' && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6">Аналитика по клиентам</h2>
-            <p className="text-gray-600">Детальная статистика по клиентам будет добавлена позже.</p>
-          </div>
-        )}
-
-        {activeTab === 'menu' && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6">Аналитика по меню</h2>
-            <p className="text-gray-600">Детальная статистика по меню будет добавлена позже.</p>
-          </div>
-        )}
+        </div>
       </div>
     </Layout>
   );

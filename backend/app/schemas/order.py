@@ -102,9 +102,13 @@ class Order(OrderBase):
     completed_at: Optional[datetime] = None
     user: Optional[UserBasic] = None
     items: Optional[List[OrderItemInDB]] = []
+    waiter_id: Optional[int] = None
+    table_number: Optional[int] = None
+    user_id: Optional[int] = None
 
     class Config:
         from_attributes = True
+        extra = "allow"
 
 
 # Класс для обратной совместимости
@@ -159,7 +163,7 @@ class OrderItem(OrderItemBase):
     dish_image: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderResponse(BaseModel):
@@ -176,7 +180,7 @@ class OrderResponse(BaseModel):
     total_price: float = 0.0
     items: List[dict] = []
     delivery_address: Optional[str] = None
-    phone_number: Optional[str] = None
+    phone: Optional[str] = None
     is_delivery: Optional[bool] = False
     order_type: Optional[str] = "dine-in"
     user: Optional[dict] = None
@@ -221,3 +225,64 @@ class OrderResponse(BaseModel):
             ]
         }
         return cls(**data) 
+
+
+# Схемы для заказов обновления статуса
+class OrderStatusUpdateSchema(BaseModel):
+    status: str = Field(..., description="Новый статус заказа")
+
+
+# Схемы для чтения заказов
+class OrderReadSchema(OrderBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    items: Optional[List[OrderItemResponse]] = []
+    
+    class Config:
+        from_attributes = True
+        
+    def to_dict(self):
+        """Преобразует модель в словарь для ответа API"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "waiter_id": self.waiter_id,
+            "table_number": self.table_number,
+            "status": self.status,
+            "payment_status": self.payment_status,
+            "payment_method": self.payment_method,
+            "total_amount": self.total_amount,
+            "comment": self.comment,
+            "is_urgent": self.is_urgent,
+            "is_group_order": self.is_group_order,
+            "customer_name": self.customer_name,
+            "customer_phone": self.customer_phone,
+            "delivery_address": self.delivery_address,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "items": [item.dict() for item in self.items] if self.items else []
+        }
+
+
+# Схема для обновления заказа с API
+class OrderUpdateSchema(BaseModel):
+    user_id: Optional[int] = None
+    waiter_id: Optional[int] = None
+    table_number: Optional[int] = None
+    status: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
+    total_amount: Optional[float] = None
+    comment: Optional[str] = None
+    is_urgent: Optional[bool] = None
+    is_group_order: Optional[bool] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    delivery_address: Optional[str] = None
+    items: Optional[List[OrderItemUpdate]] = None
+    
+    class Config:
+        from_attributes = True 

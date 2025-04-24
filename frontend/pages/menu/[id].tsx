@@ -15,6 +15,7 @@ import {
   ChevronLeftIcon 
 } from '@heroicons/react/24/outline';
 import { formatPrice } from '../../utils/priceFormatter';
+import { getDishImageUrl, handleImageError } from '../../utils/imageHelper';
 
 const DishDetailPage: NextPage = () => {
   const [dish, setDish] = useState<Dish | null>(null);
@@ -112,17 +113,12 @@ const DishDetailPage: NextPage = () => {
           <div className="md:flex">
             {/* Изображение блюда */}
             <div className="md:w-1/2 h-64 md:h-auto">
-              {dish.image_url ? (
-                <img
-                  src={dish.image_url}
-                  alt={dish.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                  <span className="text-gray-400">Нет изображения</span>
-                </div>
-              )}
+              <img
+                src={getDishImageUrl(dish.image_url)}
+                alt={dish.name}
+                className="w-full h-full object-cover"
+                onError={handleImageError}
+              />
             </div>
 
             {/* Информация о блюде */}

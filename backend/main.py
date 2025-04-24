@@ -34,12 +34,21 @@ app = FastAPI(
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Указываем конкретные origins
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost", "http://127.0.0.1", "http://0.0.0.0:3000"],
     allow_credentials=True,  # Включаем credentials для поддержки куки авторизации
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-    expose_headers=["*"],
-    max_age=600  # Кешировать предполетные запросы на 10 минут
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=[
+        "Content-Type", 
+        "Authorization", 
+        "X-Requested-With", 
+        "Accept", 
+        "Origin", 
+        "Access-Control-Request-Method", 
+        "Access-Control-Request-Headers",
+        "X-CSRF-Token"
+    ],
+    expose_headers=["Content-Disposition", "Location"],
+    max_age=1800  # Кешировать предполетные запросы на 30 минут
 )
 
 # Монтируем статические файлы

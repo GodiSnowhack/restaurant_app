@@ -35,22 +35,8 @@ const AdminOrdersPage: NextPage = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      if (!isAuthenticated) {
-        router.push('/auth/login');
-        return;
-      }
-
-      if (user?.role !== 'admin') {
-        router.push('/');
-        return;
-      }
-
       fetchOrders();
-    };
-
-    checkAdmin();
-  }, [isAuthenticated, user, router, activeTab, dateRange]);
+  }, [activeTab, dateRange]);
 
   const fetchOrders = async () => {
     try {
@@ -286,327 +272,188 @@ const AdminOrdersPage: NextPage = () => {
 
   return (
     <Layout title="Управление заказами | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/admin" className="text-gray-600 hover:text-primary mr-4">
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Link>
-          <h1 className="text-3xl font-bold">Управление заказами</h1>
-        </div>
-
-        {/* Сообщение об ошибке */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* Фильтры */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-md">
-            {/* Статус заказа */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'all' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Все
-              </button>
-              <button
-                onClick={() => setActiveTab('pending')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'pending' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Новые
-              </button>
-              <button
-                onClick={() => setActiveTab('confirmed')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'confirmed' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Подтвержденные
-              </button>
-              <button
-                onClick={() => setActiveTab('preparing')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'preparing' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Готовятся
-              </button>
-              <button
-                onClick={() => setActiveTab('ready')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'ready' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Готовые
-              </button>
-              <button
-                onClick={() => setActiveTab('completed')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'completed' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Завершенные
-              </button>
-              <button
-                onClick={() => setActiveTab('cancelled')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  activeTab === 'cancelled' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-              >
-                Отмененные
-              </button>
-            </div>
-
-            {/* Выбор диапазона дат */}
-            <div className="flex items-center space-x-4">
-              <div>
-                <label htmlFor="start" className="block text-sm font-medium text-gray-700">От</label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CalendarIcon className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="date"
-                    id="start"
-                    name="start"
-                    value={dateRange.start}
-                    onChange={handleDateRangeChange}
-                    className="focus:ring-primary focus:border-primary block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="end" className="block text-sm font-medium text-gray-700">До</label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CalendarIcon className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="date"
-                    id="end"
-                    name="end"
-                    value={dateRange.end}
-                    onChange={handleDateRangeChange}
-                    className="focus:ring-primary focus:border-primary block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Кнопка обновления данных */}
-        <div className="mb-4 flex justify-end">
-          <button 
-            onClick={fetchOrders}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark flex items-center"
+      <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold dark:text-white">Управление заказами</h1>
+          <Link
+            href="/admin"
+            className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Обновить
-          </button>
+            <ArrowLeftIcon className="w-5 h-5 mr-1" />
+            Назад к панели управления
+          </Link>
         </div>
-
-        {/* Список заказов */}
-        {filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="flex justify-center mb-4">
-              <ClockIcon className="h-16 w-16 text-gray-400" />
+        
+        {/* Фильтры */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-6">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'all'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Все
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'pending'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Новые
+            </button>
+            <button
+              onClick={() => setActiveTab('confirmed')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'confirmed'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Подтвержденные
+            </button>
+            <button
+              onClick={() => setActiveTab('preparing')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'preparing'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              В процессе
+            </button>
+            <button
+              onClick={() => setActiveTab('completed')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'completed'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Завершенные
+            </button>
+            <button
+              onClick={() => setActiveTab('cancelled')}
+              className={`px-3 py-1.5 text-sm rounded-full ${
+                activeTab === 'cancelled'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Отмененные
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">С:</span>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => handleDateRangeChange(e)}
+                name="start"
+                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
+              />
             </div>
-            <h2 className="text-2xl font-medium mb-4">Нет заказов</h2>
-            <p className="text-gray-600 mb-6">
-              По выбранным фильтрам не найдено ни одного заказа
-            </p>
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">По:</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => handleDateRangeChange(e)}
+                name="end"
+                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <button
+              onClick={() => fetchOrders()}
+              className="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary-dark"
+            >
+              Применить
+            </button>
+          </div>
+        </div>
+        
+        {/* Таблица заказов */}
+        {isLoading ? (
+          <div className="flex justify-center items-center p-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+            <ExclamationIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Ошибка загрузки данных</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
+            <button
+              onClick={() => fetchOrders()}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+            <p className="text-gray-500 dark:text-gray-400 mb-4">Заказы не найдены</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      № заказа
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Дата и время
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Дата
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Клиент
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Столик
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Сумма
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Статус заказа
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Оплата
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Статус оплаты
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Действия
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{order.id}</div>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                        {order.id}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                        {new Date(order.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                        {order.user?.full_name || 'Гость'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                        {formatPrice(order.total_amount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(order.created_at)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {order.user_id ? `${order.user?.full_name || 'Клиент #' + order.user_id}` : 'Анонимный клиент'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {order.user?.phone || 'Телефон не указан'}
-                        </div>
+                        {getStatusBadge(order.status)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {order.table_number ? `№${order.table_number}` : '-'}
-                        </div>
+                        {getPaymentStatusIcon(order.payment_status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {formatPrice(order.total_amount)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(order.status as string | undefined)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {order.payment_status ? getPaymentStatusIcon(order.payment_status as string | undefined) : 
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Не указано
-                          </span>
-                        }
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => router.push(`/admin/orders/${order.id}`)}
-                            className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </button>
-                          {order.status === 'pending' && (
-                            <button 
-                              onClick={() => handleUpdateStatus(order.id, 'confirmed')}
-                              className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
-                              disabled={updatingOrderId === order.id}
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Подтверждение...
-                                </>
-                              ) : 'Подтвердить'}
-                            </button>
-                          )}
-                          {order.status === 'confirmed' && (
-                            <button 
-                              onClick={() => handleUpdateStatus(order.id, 'preparing')}
-                              className="px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600 flex items-center"
-                              disabled={updatingOrderId === order.id}
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Обновление...
-                                </>
-                              ) : 'Готовится'}
-                            </button>
-                          )}
-                          {order.status === 'preparing' && (
-                            <button 
-                              onClick={() => handleUpdateStatus(order.id, 'ready')}
-                              className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 flex items-center"
-                              disabled={updatingOrderId === order.id}
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Обновление...
-                                </>
-                              ) : 'Готов'}
-                            </button>
-                          )}
-                          {order.status === 'ready' && (
-                            <button 
-                              onClick={() => handleUpdateStatus(order.id, 'completed')}
-                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center"
-                              disabled={updatingOrderId === order.id}
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Завершение...
-                                </>
-                              ) : 'Завершить'}
-                            </button>
-                          )}
-                          {['pending', 'confirmed', 'preparing'].includes(order.status) && (
-                            <button 
-                              onClick={() => handleUpdateStatus(order.id, 'cancelled')}
-                              className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 flex items-center"
-                              disabled={updatingOrderId === order.id}
-                            >
-                              {updatingOrderId === order.id ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Отмена...
-                                </>
-                              ) : 'Отменить'}
-                            </button>
-                          )}
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <Link href={`/admin/orders/${order.id}`} className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4">
+                          <EyeIcon className="h-5 w-5 inline" /> Просмотр
+                        </Link>
                       </td>
                     </tr>
                   ))}
