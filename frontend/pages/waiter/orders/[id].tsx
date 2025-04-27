@@ -2,441 +2,762 @@ import { useState, useEffect } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Layout from '../../../components/Layout';
-import WaiterDashboard from '../../../components/WaiterDashboard';
+import WaiterLayout from '../../../components/WaiterLayout';
 import useAuthStore from '../../../lib/auth-store';
+import { Order as OrderType, OrderItem } from '../../../types';
 import { ordersApi } from '../../../lib/api';
-import { Order } from '../../../types';
 import { formatPrice } from '../../../utils/priceFormatter';
-import { toast } from 'react-hot-toast';
-import { 
-  ClockIcon, 
-  CheckCircleIcon, 
+import {
+  ClockIcon,
+  CheckCircleIcon,
   XCircleIcon,
-  ArrowLeftIcon,
-  BuildingStorefrontIcon,
-  TruckIcon,
-  SparklesIcon,
-  CheckIcon,
-  UserIcon,
+  BanknotesIcon as CashIcon, 
+  CreditCardIcon, 
+  ArrowLeftIcon, 
   PhoneIcon,
-  MapPinIcon,
-  CurrencyDollarIcon
+  EnvelopeIcon as MailIcon, 
+  MapPinIcon as LocationMarkerIcon, 
+  DocumentTextIcon,
+  UserIcon 
 } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon as ExclamationIcon, CheckIcon } from '@heroicons/react/24/solid';
 
-type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
+// Обновляем определение статусов для соответствия с бэкендом
+type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
-const statusTranslations: Record<string, string> = {
-  'pending': 'Ожидает',
-  'confirmed': 'Подтвержден',
-  'preparing': 'Готовится',
-  'ready': 'Готов',
-  'delivered': 'Доставлен',
-  'completed': 'Завершен',
-  'cancelled': 'Отменен'
+type Payment = {
+  method?: string;
+  status?: PaymentStatus;
+  amount?: number;
+  transaction_id?: string;
+  payment_date?: string;
+}
+
+// Расширяем импортированный тип Order
+type Order = OrderType & {
+  payment?: Payment;
+  special_requests?: string;
+}
+
+type StatusButtonProps = {
+  status: string;
+  currentStatus: string;
+  onClick: () => void;
+  disabled?: boolean;
 };
 
-const OrderDetailPage: NextPage = () => {
+const StatusButton = ({ status, currentStatus, onClick, disabled = false }: StatusButtonProps) => {
+  const getStatusColor = () => {
+    if (status === currentStatus) {
+      return 'bg-primary text-white';
+    }
+    return 'bg-white text-gray-700 hover:bg-gray-50';
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${getStatusColor()} inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    >
+      {status}
+    </button>
+  );
+};
+
+const WaiterOrderDetailPage: NextPage = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { isAuthenticated, user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | ''>('');
+
+  // Обновляем порядок статусов для соответствия бизнес-процессу
+  const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
 
   useEffect(() => {
-    // Проверка авторизации
     if (!isAuthenticated) {
-      router.push('/auth/login');
+      router.push('/login');
       return;
     }
-
-    // Проверка роли пользователя
-    if (user?.role !== 'waiter' && user?.role !== 'admin') {
-      router.push('/');
-      toast.error('Доступ запрещен. Эта страница только для официантов и администраторов.');
-      return;
-    }
-
+    
     if (!id) return;
-
-    // Загрузка данных заказа
-    const fetchOrder = async () => {
-      try {
-        setLoading(true);
-        const fetchedOrder = await ordersApi.getOrderById(Number(id));
-        setOrder(fetchedOrder);
-        setSelectedStatus(fetchedOrder.status || '');
-      } catch (err: any) {
-        console.error('Ошибка при загрузке заказа:', err);
-        setError(err.message || 'Не удалось загрузить данные заказа');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrder();
-  }, [id, isAuthenticated, router, user]);
+  }, [id, isAuthenticated]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            <ClockIcon className="h-4 w-4 mr-1" />
-            Ожидает
-          </span>
-        );
-      case 'confirmed':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-            <CheckCircleIcon className="h-4 w-4 mr-1" />
-            Подтвержден
-          </span>
-        );
-      case 'preparing':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
-            <SparklesIcon className="h-4 w-4 mr-1" />
-            Готовится
-          </span>
-        );
-      case 'ready':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            <CheckIcon className="h-4 w-4 mr-1" />
-            Готов
-          </span>
-        );
-      case 'delivered':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            <TruckIcon className="h-4 w-4 mr-1" />
-            Доставлен
-          </span>
-        );
-      case 'completed':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            <CheckCircleIcon className="h-4 w-4 mr-1" />
-            Завершен
-          </span>
-        );
-      case 'cancelled':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-            <XCircleIcon className="h-4 w-4 mr-1" />
-            Отменен
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-            {status}
-          </span>
-        );
+  const fetchOrder = async () => {
+    try {
+      setIsLoading(true);
+      const fetchedOrder = await ordersApi.getOrderById(Number(id));
+      
+      // Проверяем и нормализуем данные заказа
+      const normalizedOrder = {
+        ...fetchedOrder,
+        // Нормализуем платежные данные
+        payment_method: fetchedOrder.payment_method || 
+                         fetchedOrder.payment_details?.method || 
+                         fetchedOrder.payment?.method || 
+                         'unknown',
+        payment_status: fetchedOrder.payment_status || 
+                        fetchedOrder.payment_details?.status || 
+                        fetchedOrder.payment?.status || 
+                        'pending'
+      };
+      
+      console.log('Нормализованный заказ:', normalizedOrder);
+      setOrder(normalizedOrder);
+    } catch (err) {
+      console.error('Ошибка при загрузке данных заказа:', err);
+      setError('Не удалось загрузить данные заказа. Пожалуйста, попробуйте позже.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!order || updatingStatus) return;
+    
+    // Показываем индикатор загрузки
+    setUpdatingStatus(true);
+    setError('');
+
+    try {
+      // Исходный статус для отображения пользователю
+      const displayStatus = getStatusLabel(newStatus);
+      
+      console.log(`Отправка запроса на обновление статуса заказа ${order.id} на ${newStatus}`);
+      
+      // Преобразуем статус в нижний регистр для бэкенда
+      const normalizedStatus = newStatus.toLowerCase();
+      
+      // Обновляем статус заказа
+      const result = await ordersApi.updateOrderStatus(order.id, normalizedStatus);
+      
+      console.log('Результат обновления статуса:', result);
+      
+      // Перезагружаем данные заказа в любом случае
+      const prevStatus = order.status;
+      await fetchOrder();
+      
+      // Если есть ошибка в результате, но мы всё равно перезагрузили заказ
+      if (result && result.success === false) {
+        // Проверим, изменился ли статус заказа после перезагрузки
+        if (order.status.toLowerCase() === normalizedStatus) {
+          // Статус обновился успешно, несмотря на ошибку API
+          alert(`Статус заказа #${order.id} обновлен на "${displayStatus}"`);
+        } else if (prevStatus !== order.status) {
+          // Статус изменился, но не на тот, который мы запрашивали
+          alert(`Статус заказа изменен на "${getStatusLabel(order.status)}"`);
+        } else {
+          // Статус не изменился, отобразим предупреждение
+          console.warn('Предупреждение при обновлении статуса заказа:', result.message);
+          setError(`Не удалось обновить статус заказа. Пожалуйста, попробуйте позже или обратитесь к администратору.`);
+        }
+      } else {
+        // Успешное обновление статуса
+        alert(`Статус заказа #${order.id} обновлен на "${displayStatus}"`);
+      }
+    } catch (error: any) {
+      console.error('Ошибка при обновлении статуса заказа:', error);
+      
+      // Пробуем перезагрузить данные заказа даже при ошибке
+      try {
+        const prevStatus = order.status;
+        await fetchOrder();
+        
+        // Если статус изменился после перезагрузки, значит изменение всё же произошло
+        if (prevStatus !== order.status) {
+          alert(`Статус заказа изменен на "${getStatusLabel(order.status)}"`);
+        } else {
+          const errorMessage = 'Не удалось обновить статус заказа. Пожалуйста, попробуйте позже или обратитесь к администратору.';
+          setError(errorMessage);
+        }
+      } catch (refreshError) {
+        console.error('Не удалось перезагрузить данные заказа после ошибки:', refreshError);
+        setError('Произошла ошибка при обновлении статуса заказа и при попытке перезагрузить данные. Пожалуйста, обновите страницу.');
+      }
+    } finally {
+      // Убираем индикатор загрузки
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Выводим данные о заказе для отладки
+  useEffect(() => {
+    if (order) {
+      console.log('Детали заказа:', order);
+      console.log('Способ оплаты:', order.payment_method);
+      console.log('Статус оплаты:', order.payment_status);
+    }
+  }, [order]);
+
+  const isStatusChangeAllowed = (status: string) => {
+    if (!order) return false;
+    
+    // Нормализуем статусы в нижний регистр для сравнения
+    const normalizedCurrentStatus = order.status.toLowerCase();
+    const normalizedNewStatus = status.toLowerCase();
+    
+    // Определим правильную последовательность статусов
+    const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
+    
+    // Получаем индексы статусов в массиве
+    const currentIndex = statusOrder.indexOf(normalizedCurrentStatus);
+    const newIndex = statusOrder.indexOf(normalizedNewStatus);
+    
+    // Если текущий или новый статус не найдены в списке, проверяем специальные случаи
+    if (currentIndex === -1 || newIndex === -1) {
+      // Позволяем официанту установить любой статус, если текущий статус неизвестен
+      if (currentIndex === -1) return true;
+      
+      // Разрешаем только специальные переходы для известных статусов, если новый статус неизвестен
+      return false;
+    }
+    
+    // Особый случай для отмены заказа
+    if (normalizedNewStatus === 'cancelled') {
+      // Заказ можно отменить только если он не выполнен и не отменён
+      return !['completed', 'cancelled'].includes(normalizedCurrentStatus);
+    }
+    
+    // Для обычного порядка статусов:
+    // Можно изменить статус только на следующий в порядке или оставить текущий
+    return newIndex === currentIndex || newIndex === currentIndex + 1;
+  };
+
+  const getStatusLabel = (status: string | undefined) => {
+    if (!status) return 'Не указано';
+    
+    // Нормализуем статус в нижний регистр для корректного отображения
+    const normalizedStatus = status.toLowerCase();
+    
+    const statusLabels: Record<string, string> = {
+      'pending': 'Новый',
+      'confirmed': 'Подтвержден',
+      'preparing': 'Готовится',
+      'ready': 'Готов',
+      'completed': 'Завершен',
+      'cancelled': 'Отменен'
+    };
+    
+    return statusLabels[normalizedStatus] || status;
+  };
+  
+  const getPaymentStatusLabel = (status: string | undefined) => {
+    if (!status) return 'Не указано';
+    
+    // Нормализуем статус в нижний регистр для корректного отображения
+    const normalizedStatus = status.toLowerCase();
+    
+    const statusLabels: Record<string, string> = {
+      'pending': 'Ожидает оплаты',
+      'paid': 'Оплачен',
+      'refunded': 'Возврат средств',
+      'failed': 'Отказ оплаты'
+    };
+    
+    return statusLabels[normalizedStatus] || status;
+  };
+
+  const getStatusColor = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
+    // Нормализуем статус в нижний регистр для корректного отображения
+    const normalizedStatus = status.toLowerCase();
+    
+    const statusColors: Record<string, string> = {
+      'pending': 'bg-yellow-100 text-yellow-800',
+      'confirmed': 'bg-blue-100 text-blue-800',
+      'preparing': 'bg-orange-100 text-orange-800',
+      'ready': 'bg-green-100 text-green-800',
+      'completed': 'bg-gray-100 text-gray-800',
+      'cancelled': 'bg-red-100 text-red-800'
+    };
+    
+    return statusColors[normalizedStatus] || 'bg-gray-100 text-gray-800';
+  };
+  
+  const getPaymentStatusColor = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
+    // Нормализуем статус в нижний регистр для корректного отображения
+    const normalizedStatus = status.toLowerCase();
+    
+    const statusColors: Record<string, string> = {
+      'pending': 'bg-yellow-100 text-yellow-800',
+      'paid': 'bg-green-100 text-green-800',
+      'refunded': 'bg-blue-100 text-blue-800',
+      'failed': 'bg-red-100 text-red-800'
+    };
+    
+    return statusColors[normalizedStatus] || 'bg-gray-100 text-gray-800';
   };
 
   const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "Н/Д";
-    
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).format(date);
-    } catch (error) {
-      console.error('Ошибка форматирования даты:', error);
-      return 'Недоступно';
-    }
+    if (!dateString) return 'Не указано';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
-  const handleStatusUpdate = async () => {
-    if (!order || !selectedStatus) return;
+  const getPaymentMethodLabel = (method?: string): string => {
+    if (!method || method === 'unknown' || method === '' || method === null) return 'Не указано';
     
-    if (selectedStatus === order.status) {
-      toast.error('Выберите другой статус для обновления');
+    const normalizedMethod = method.toLowerCase().trim();
+    
+    if (['card', 'карта', 'картой', 'кредитка', 'кредитной картой', 'credit_card', 'кредитная_карта', 'credit', 'debit', 'дебетовая карта', 'visa', 'mastercard', 'mir', 'мир'].includes(normalizedMethod)) {
+      return 'Картой';
+    } else if (['cash', 'наличные', 'наличными', 'кэш', 'налик', 'нал'].includes(normalizedMethod)) {
+      return 'Наличными';
+    } else if (['online', 'онлайн', 'online_payment', 'web', 'веб', 'электронный платеж', 'electronic', 'электронно'].includes(normalizedMethod)) {
+      return 'Онлайн-оплата';
+    } else if (['transfer', 'перевод', 'bank_transfer', 'банковский_перевод', 'wire', 'банк'].includes(normalizedMethod)) {
+      return 'Банковский перевод';
+    } else if (['qr', 'qr_code', 'qr код', 'киукод', 'код', 'qrcode', 'sberbank_qr', 'сбп', 'sbp'].includes(normalizedMethod)) {
+      return 'QR-код (СБП)';
+    } else if (['app', 'приложение', 'mobile_app', 'мобильное_приложение'].includes(normalizedMethod)) {
+      return 'Через приложение';
+    } else if (['terminal', 'терминал', 'pos', 'pos_terminal', 'эквайринг'].includes(normalizedMethod)) {
+      return 'Через терминал';
+    }
+    
+    return method; // Возвращаем исходное значение, если не распознано
+  };
+
+  const handleUpdatePaymentStatus = async (newStatus: string) => {
+    // Если заказ не загружен или идет обновление, ничего не делаем
+    if (!order || updatingStatus) return;
+    
+    // Если статус не изменился, ничего не делаем
+    const currentStatus = order.payment_status ? order.payment_status.toLowerCase() : '';
+    if (currentStatus === newStatus.toLowerCase()) {
       return;
     }
     
+    setUpdatingStatus(true);
+    setError('');
+
     try {
-      setUpdatingStatus(true);
-      await ordersApi.updateOrderStatus(order.id || 0, selectedStatus);
+      // Исходный статус для отображения пользователю
+      const displayStatus = getPaymentStatusLabel(newStatus);
       
-      // Обновляем данные заказа
-      const updatedOrder = await ordersApi.getOrderById(Number(id));
-      setOrder(updatedOrder);
+      // Преобразуем статус в нижний регистр для бэкенда
+      const normalizedStatus = newStatus.toLowerCase();
       
-      toast.success(`Статус заказа изменен на "${statusTranslations[selectedStatus]}"`);
-    } catch (err: any) {
-      console.error('Ошибка при обновлении статуса:', err);
-      toast.error('Не удалось обновить статус заказа');
+      // Обновляем статус оплаты через новый API-эндпоинт
+      const result = await ordersApi.updateOrderPaymentStatus(order.id, normalizedStatus);
+      
+      // Проверяем результат запроса
+      if (result && result.success === false) {
+        // Логируем ошибку, но всё равно перезагружаем данные заказа, 
+        // так как статус оплаты мог обновиться в БД
+        console.warn('Предупреждение при обновлении статуса оплаты:', result.message);
+    }
+      
+      // Перезагружаем данные заказа в любом случае
+      await fetchOrder();
+      
+      // Показываем сообщение об успехе
+      alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}"`);
+    } catch (error: any) {
+      // В случае критической ошибки (например, проблема авторизации), показываем сообщение
+      console.error('Ошибка при обновлении статуса оплаты:', error);
+      
+      // Пробуем всё равно перезагрузить данные заказа
+      try {
+        await fetchOrder();
+      } catch (fetchError) {
+        console.error('Не удалось перезагрузить данные заказа:', fetchError);
+      }
+      
+      // Показываем сообщение об ошибке, только если не удалось перезагрузить данные
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Произошла неизвестная ошибка при обновлении статуса оплаты';
+      
+      setError(errorMessage);
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  // Проверяем доступные переходы статуса на основе текущего статуса
-  const getAvailableStatuses = (currentStatus: string): OrderStatus[] => {
-    switch (currentStatus) {
-      case 'pending':
-        return ['confirmed', 'cancelled'];
-      case 'confirmed':
-        return ['preparing', 'cancelled'];
-      case 'preparing':
-        return ['ready', 'cancelled'];
-      case 'ready':
-        return ['delivered', 'cancelled'];
-      case 'delivered':
-        return ['completed', 'cancelled'];
-      default:
-        return [];
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <Layout title="Загрузка...">
-        <WaiterDashboard>
-          <div className="p-4 flex justify-center">
+      <WaiterLayout title="Детали заказа" activeTab="orders">
+        <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
-        </WaiterDashboard>
-      </Layout>
+        </div>
+      </WaiterLayout>
     );
   }
 
   if (error) {
     return (
-      <Layout title="Ошибка">
-        <WaiterDashboard>
-          <div className="p-4">
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4">
-              <p>{error}</p>
-            </div>
-            <div className="mt-4">
-              <Link href="/waiter/orders" className="inline-flex items-center text-blue-500">
-                <ArrowLeftIcon className="h-4 w-4 mr-1" />
+      <WaiterLayout title="Ошибка" activeTab="orders">
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="flex items-center font-medium">
+              <ExclamationIcon className="h-5 w-5 mr-2" />
+              {error}
+            </p>
+            <p className="mt-2">
+              <Link href="/waiter/orders" className="text-red-700 underline">
                 Вернуться к списку заказов
               </Link>
-            </div>
+            </p>
           </div>
-        </WaiterDashboard>
-      </Layout>
+        </div>
+      </WaiterLayout>
     );
   }
 
   if (!order) {
     return (
-      <Layout title="Заказ не найден">
-        <WaiterDashboard>
-          <div className="p-4">
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Заказ не найден</h3>
-              <p className="text-gray-500 mb-4">
-                Запрашиваемый заказ не найден или был удален
-              </p>
-              <Link href="/waiter/orders" className="btn btn-primary inline-flex items-center">
-                <ArrowLeftIcon className="h-5 w-5 mr-1" />
+      <WaiterLayout title="Заказ не найден" activeTab="orders">
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+            <p className="flex items-center font-medium">
+              <ExclamationIcon className="h-5 w-5 mr-2" />
+              Заказ не найден
+            </p>
+            <p className="mt-2">
+              <Link href="/waiter/orders" className="text-yellow-700 underline">
                 Вернуться к списку заказов
               </Link>
-            </div>
+            </p>
           </div>
-        </WaiterDashboard>
-      </Layout>
+        </div>
+      </WaiterLayout>
     );
   }
 
-  const availableStatuses = getAvailableStatuses(order.status);
-
   return (
-    <Layout title={`Заказ №${order.id}`}>
-      <WaiterDashboard>
-        <div className="p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <Link href="/waiter/orders" className="inline-flex items-center text-blue-500">
-              <ArrowLeftIcon className="h-4 w-4 mr-1" />
-              Назад к заказам
-            </Link>
-            <div>
-              {getStatusBadge(order.status)}
+    <WaiterLayout title={`Заказ #${order.id}`} activeTab="orders">
+      <div className="container mx-auto px-4 py-8">
+        {/* Навигация */}
+        <div className="mb-6">
+          <Link href="/waiter/orders" className="text-primary hover:text-primary-dark inline-flex items-center">
+            <ArrowLeftIcon className="h-4 w-4 mr-1" />
+            Вернуться к списку заказов
+          </Link>
+          </div>
+
+        {/* Заголовок и статус */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+          <h1 className="text-3xl font-bold mb-4 md:mb-0">Заказ #{order.id}</h1>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <span className={`${getStatusColor(order.status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
+              {getStatusLabel(order.status)}
+            </span>
+            <span className={`${getPaymentStatusColor(order.payment_status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
+              {getPaymentStatusLabel(order.payment_status)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Информация о заказе */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-xl font-semibold">Информация о заказе</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Дата заказа</p>
+                    <p className="font-medium">{formatDate(order.created_at)}</p>
+            </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Способ оплаты</p>
+                    <p className="font-medium flex items-center">
+                      {order.payment_status === 'paid' ? (
+                        <CreditCardIcon className="h-5 w-5 text-gray-500 mr-1" />
+                      ) : (
+                        <CashIcon className="h-5 w-5 text-gray-500 mr-1" />
+                      )}
+                      {getPaymentMethodLabel(order.payment_method)}
+                    </p>
+                    <details className="text-xs text-gray-500 mt-1">
+                      <summary>Детали платежа</summary>
+                      <p>Способ: "{order.payment_method || 'не задано'}"</p>
+                      <p>Статус: "{order.payment_status || 'не задано'}"</p>
+                      {order.payment && (
+                        <pre className="text-xs mt-1 bg-gray-50 p-1 rounded overflow-auto max-h-24">
+                          {JSON.stringify(order.payment, null, 2)}
+                        </pre>
+                      )}
+                    </details>
+                  </div>
+                  {order.table_number && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Столик</p>
+                      <p className="font-medium">№{order.table_number}</p>
+            </div>
+          )}
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Срочный заказ</p>
+                    <p className="font-medium">{order.is_urgent ? 'Да' : 'Нет'}</p>
+                  </div>
+        </div>
+
+                {order.comment && (
+          <div className="mb-6">
+                    <p className="text-sm text-gray-600 mb-1">Комментарий к заказу</p>
+                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800">{order.comment}</p>
+                  </div>
+                )}
+                
+                {/* Информация о клиенте */}
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Имя клиента</p>
+                      <p className="font-medium">
+                        {order.customer_name || order.user?.full_name || 'Не указано'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Телефон</p>
+                      <p className="font-medium">
+                        {order.customer_phone || order.user?.phone || 'Не указано'}
+                      </p>
+                    </div>
+                    {order.user && (
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Email</p>
+                        <p className="font-medium">{order.user.email || 'Не указано'}</p>
+                      </div>
+                )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Список позиций заказа */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-xl font-semibold">Состав заказа</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Блюдо
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Количество
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Цена
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Сумма
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {order.items && order.items.map((item: OrderItem, index) => (
+                      <tr key={item.dish_id || index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{item.name || `Блюдо #${item.dish_id}`}</div>
+                          {item.special_instructions && (
+                            <div className="text-xs text-gray-500 mt-1 italic">{item.special_instructions}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="text-sm text-gray-900">{item.quantity}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm text-gray-900">{formatPrice(item.price)}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm font-medium text-gray-900">{formatPrice(item.price * item.quantity)}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                        Итого:
+                      </td>
+                      <td className="px-6 py-4 text-right text-base font-bold text-primary">
+                        {formatPrice(order.total_amount)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {/* Заголовок заказа */}
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Заказ №{order.id}</h2>
-                <div className="text-sm text-gray-500">
-                  {formatDate(order.created_at)}
-                </div>
+
+          {/* Сайдбар */}
+          <div className="lg:col-span-1">
+            {/* Управление статусом заказа */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-xl font-semibold">Управление статусом</h2>
               </div>
-            </div>
-            
-            {/* Секция для обновления статуса */}
-            {availableStatuses.length > 0 && (
-              <div className="p-4 border-b border-gray-200 bg-indigo-50">
-                <h3 className="text-sm font-semibold mb-2">Обновить статус заказа</h3>
-                <div className="flex flex-wrap gap-3">
-                  {availableStatuses.map((status) => (
-                    <button
-                      key={status}
-                      className={`px-3 py-1.5 rounded text-sm font-medium ${
-                        selectedStatus === status 
-                          ? 'bg-indigo-600 text-white' 
-                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setSelectedStatus(status)}
+              <div className="p-6 space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <label htmlFor="orderStatus" className="block text-sm font-medium text-gray-700 mb-1">
+                    Статус заказа
+                  </label>
+                  <div className="flex items-center">
+                    <select
+                      id="orderStatus"
+                      value={order.status}
+                      onChange={(e) => {
+                        if (isStatusChangeAllowed(e.target.value)) {
+                          handleUpdateStatus(e.target.value);
+                        } else {
+                          // Предотвращаем изменение, если статус недоступен
+                          alert(`Невозможно изменить статус с "${getStatusLabel(order.status)}" на "${getStatusLabel(e.target.value)}"`);
+                        }
+                      }}
+                      disabled={updatingStatus}
+                      className="block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                     >
-                      {statusTranslations[status]}
-                    </button>
-                  ))}
-                  
-                  <button
-                    className="ml-auto px-4 py-1.5 rounded bg-primary text-white text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    onClick={handleStatusUpdate}
-                    disabled={updatingStatus || selectedStatus === order.status || !selectedStatus}
-                  >
-                    {updatingStatus ? 'Обновление...' : 'Обновить статус'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Содержимое заказа */}
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Левая колонка - блюда */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Блюда в заказе</h3>
-                <div className="space-y-3">
-                  {order.items && order.items.length > 0 ? (
-                    <>
-                      {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between border-b border-gray-100 pb-3">
-                          <div>
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-sm text-gray-600">Количество: {item.quantity}</p>
-                            {item.special_instructions && (
-                              <p className="text-sm text-gray-500 italic">"{item.special_instructions}"</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{formatPrice(item.price * item.quantity)}</p>
-                            <p className="text-sm text-gray-600">{formatPrice(item.price)} за шт.</p>
-                          </div>
-                        </div>
+                      {/* Добавляем текущий статус в список, если он не входит в стандартные (проверяем без учета регистра) */}
+                      {!statusOrder.includes(order.status.toLowerCase()) && (
+                        <option value={order.status}>
+                          {getStatusLabel(order.status)}
+                        </option>
+                      )}
+                      {statusOrder.map((status) => (
+                        <option 
+                          key={status} 
+                          value={status}
+                        >
+                          {getStatusLabel(status)}
+                        </option>
                       ))}
-                      <div className="pt-3 flex justify-between font-bold">
-                        <p>Итого:</p>
-                        <p>{formatPrice(order.total_amount)}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-gray-500 italic">Нет данных о блюдах в заказе</p>
-                  )}
+                    </select>
+                    {updatingStatus && (
+                      <div className="ml-3">
+                        <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+          </div>
+        )}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Текущий статус: <span className={`${getStatusColor(order.status)} px-2 py-0.5 rounded-full text-xs font-medium`}>{getStatusLabel(order.status)}</span>
+                  </p>
                 </div>
+
+                {/* Управление статусом оплаты */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="text-lg font-medium mb-3">Статус оплаты</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      className={`px-3 py-2 text-sm text-center rounded-md font-medium transition ${order.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      onClick={() => handleUpdatePaymentStatus('pending')}
+                      disabled={updatingStatus || order.payment_status === 'pending'}
+                    >
+                      Ожидает оплаты
+                    </button>
+                    <button
+                      className={`px-3 py-2 text-sm text-center rounded-md font-medium transition ${order.payment_status === 'paid' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      onClick={() => handleUpdatePaymentStatus('paid')}
+                      disabled={updatingStatus || order.payment_status === 'paid'}
+                    >
+                      Оплачен
+                    </button>
+                    <button
+                      className={`px-3 py-2 text-sm text-center rounded-md font-medium transition ${order.payment_status === 'refunded' ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      onClick={() => handleUpdatePaymentStatus('refunded')}
+                      disabled={updatingStatus || order.payment_status === 'refunded'}
+                    >
+                      Возврат
+                    </button>
+                    <button
+                      className={`px-3 py-2 text-sm text-center rounded-md font-medium transition ${order.payment_status === 'failed' ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                      onClick={() => handleUpdatePaymentStatus('failed')}
+                      disabled={updatingStatus || order.payment_status === 'failed'}
+                    >
+                      Отказ оплаты
+                    </button>
+                  </div>
+                  {updatingStatus && (
+                    <div className="flex justify-center mt-2">
+                      <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  )}
+          </div>
+
+                <div className="border-t mt-4 pt-4">
+                  <p className="text-sm text-gray-600 mb-4">История изменений статуса</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-500 mt-1"></div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium">Создан</p>
+                        <p className="text-xs text-gray-500">{formatDate(order.created_at)}</p>
+                      </div>
+                    </div>
+                    {order.updated_at && order.updated_at !== order.created_at && (
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-500 mt-1"></div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium">Обновлен</p>
+                          <p className="text-xs text-gray-500">{formatDate(order.updated_at)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {(() => {
+                      if (order && 'completed_at' in order && order.completed_at) {
+                        return (
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-600 mt-1"></div>
+                            <div className="ml-3">
+                              <p className="text-sm font-medium">Завершен</p>
+                              <p className="text-xs text-gray-500">{formatDate(order.completed_at as string)}</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+            </div>
+          </div>
+        </div>
+
+            {/* Действия */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-xl font-semibold">Действия</h2>
               </div>
-              
-              {/* Правая колонка - информация о заказе */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Информация о заказе</h3>
-                <div className="space-y-3">
-                  {order.table_number && (
-                    <div className="flex items-start">
-                      <BuildingStorefrontIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
-                      <div>
-                        <p className="font-medium">Стол №{order.table_number}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.user && (
-                    <div className="flex items-start">
-                      <UserIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
-                      <div>
-                        <p className="font-medium">{order.user.full_name || 'Гость'}</p>
-                        {order.user.phone && <p className="text-sm text-gray-600">{order.user.phone}</p>}
-                        {order.user.email && <p className="text-sm text-gray-600">{order.user.email}</p>}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {!order.user && order.customer_name && (
-                    <div className="flex items-start">
-                      <UserIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
-                      <div>
-                        <p className="font-medium">{order.customer_name}</p>
-                        {order.customer_phone && <p className="text-sm text-gray-600">{order.customer_phone}</p>}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.payment_status && (
-                    <div className="flex items-start">
-                      <CurrencyDollarIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
-                      <div>
-                        <p className="font-medium">
-                          Статус оплаты: 
-                          <span className={`ml-1 ${
-                            order.payment_status === 'paid' 
-                              ? 'text-green-600' 
-                              : order.payment_status === 'pending' 
-                                ? 'text-yellow-600' 
-                                : 'text-red-600'
-                          }`}>
-                            {order.payment_status === 'paid' 
-                              ? 'Оплачен' 
-                              : order.payment_status === 'pending' 
-                                ? 'Ожидает оплаты' 
-                                : 'Ошибка оплаты'}
-                          </span>
-                        </p>
-                        {order.payment_method && (
-                          <p className="text-sm text-gray-600">
-                            Способ оплаты: {
-                              order.payment_method === 'cash' 
-                                ? 'Наличные' 
-                                : order.payment_method === 'card' 
-                                  ? 'Карта' 
-                                  : order.payment_method
-                            }
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.delivery_address && (
-                    <div className="flex items-start">
-                      <MapPinIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
-                      <div>
-                        <p className="font-medium">Адрес доставки:</p>
-                        <p className="text-sm text-gray-600">{order.delivery_address}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.comment && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                      <p className="text-sm font-medium mb-1">Комментарий к заказу:</p>
-                      <p className="text-sm text-gray-600">{order.comment}</p>
-                    </div>
-                  )}
-                </div>
+              <div className="p-6 space-y-3">
+                <Link href={`/waiter/orders`} className="bg-gray-100 text-gray-800 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 transition flex items-center justify-center">
+                  <DocumentTextIcon className="h-5 w-5 mr-2" />
+                  Вернуться к списку заказов
+                </Link>
               </div>
             </div>
           </div>
         </div>
-      </WaiterDashboard>
-    </Layout>
+      </div>
+    </WaiterLayout>
   );
 };
 
-export default OrderDetailPage; 
+export default WaiterOrderDetailPage; 

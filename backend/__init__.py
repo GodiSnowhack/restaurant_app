@@ -1,1 +1,0 @@
-# Restaurant SPPR backend package 

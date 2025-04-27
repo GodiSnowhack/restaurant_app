@@ -7,7 +7,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Layout from '../components/Layout';
 import useAuthStore from '../lib/auth-store';
-import {UserIcon, QrCodeIcon, ClipboardDocumentListIcon, Cog6ToothIcon as CogIcon} from '@heroicons/react/24/solid';
+import {UserIcon, ClipboardDocumentListIcon, Cog6ToothIcon as CogIcon} from '@heroicons/react/24/solid';
 import { ArrowRightIcon, StarIcon, MapIcon, PhoneIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon } from '@heroicons/react/24/outline';
 import { Spinner } from '@/components/ui/spinner';
@@ -90,13 +90,6 @@ const QuickAccess = () => {
         <Link key="waiter" href="/waiter" className="flex items-center bg-blue-500 text-white p-3 rounded-lg mb-2 hover:bg-blue-600 transition-colors">
           <ClipboardDocumentListIcon className="h-6 w-6 mr-2" />
           <span>Панель официанта</span>
-        </Link>
-      );
-      
-      links.push(
-        <Link key="waiter-scan" href="/waiter/scan" className="flex items-center bg-green-500 text-white p-3 rounded-lg mb-2 hover:bg-green-600 transition-colors">
-          <QrCodeIcon className="h-6 w-6 mr-2" />
-          <span>Сканировать QR-код</span>
         </Link>
       );
     }

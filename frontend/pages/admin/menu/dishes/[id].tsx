@@ -16,6 +16,7 @@ const EditDishPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -29,8 +30,7 @@ const EditDishPage: NextPage = () => {
     is_vegetarian: false,
     is_vegan: false,
     is_spicy: false,
-    is_available: true,
-    ingredients: ''
+    is_available: true
   });
 
   useEffect(() => {
@@ -78,8 +78,7 @@ const EditDishPage: NextPage = () => {
           is_vegetarian: dishData.is_vegetarian || false,
           is_vegan: dishData.is_vegan || false,
           is_spicy: dishData.is_spicy || false,
-          is_available: dishData.is_available !== false, // по умолчанию true
-          ingredients: dishData.ingredients || ''
+          is_available: dishData.is_available !== false // по умолчанию true
         });
         
         setIsLoading(false);
@@ -115,6 +114,7 @@ const EditDishPage: NextPage = () => {
     try {
       setIsSaving(true);
       setError(null);
+      setSuccess(null);
       
       // Преобразуем строковые значения в числа
       const dishData = {
@@ -127,14 +127,23 @@ const EditDishPage: NextPage = () => {
         weight: formData.weight ? parseInt(formData.weight) : undefined,
       };
       
-      // Отправляем запрос на обновление блюда
-      await menuApi.updateDish(parseInt(id), dishData);
+      console.log('Отправляем данные для обновления:', dishData);
       
-      // Перенаправляем на страницу управления меню
-      router.push('/admin/menu');
-    } catch (error) {
+      // Отправляем запрос на обновление блюда
+      const updatedDish = await menuApi.updateDish(parseInt(id), dishData);
+      
+      console.log('Блюдо успешно обновлено:', updatedDish);
+      
+      // Показываем сообщение об успехе
+      setSuccess('Блюдо успешно обновлено');
+      
+      // Задержка перед перенаправлением
+      setTimeout(() => {
+        router.push('/admin/menu');
+      }, 1500);
+    } catch (error: any) {
       console.error('Ошибка при обновлении блюда:', error);
-      setError('Не удалось обновить блюдо. Пожалуйста, проверьте введенные данные.');
+      setError(error.message || 'Не удалось обновить блюдо. Пожалуйста, проверьте введенные данные и попробуйте снова.');
     } finally {
       setIsSaving(false);
     }
@@ -142,36 +151,44 @@ const EditDishPage: NextPage = () => {
 
   if (isLoading) {
     return (
-      <Layout title="Редактирование блюда | Админ-панель">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
+      <Layout title="Редактирование блюда | Админ-панель" section="admin">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary"></div>
         </div>
       </Layout>
     );
   }
 
   return (
-    <Layout title="Редактирование блюда | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/admin/menu" className="text-gray-600 hover:text-primary mr-4">
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Link>
-          <h1 className="text-3xl font-bold">Редактирование блюда</h1>
+    <Layout title="Редактирование блюда | Админ-панель" section="admin">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Link href="/admin/menu" className="mr-4 hover:bg-gray-100 p-2 rounded-full transition-colors">
+              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Редактирование блюда</h1>
+          </div>
         </div>
         
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+          <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-md mb-6">
+            <p className="font-medium">Ошибка</p>
+            <p>{error}</p>
           </div>
         )}
         
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <form onSubmit={handleSubmit}>
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-md mb-6">
+            <p className="font-medium">Успешно</p>
+            <p>{success}</p>
+          </div>
+        )}
+        
+        <div className="bg-white shadow-md rounded-lg p-6 border border-gray-200">
+          <form onSubmit={handleSubmit} className="space-y-8">
             <div className="mb-6">
-              <h3 className="text-lg font-medium mb-4">Изображение блюда</h3>
+              <h3 className="text-lg font-medium mb-4 text-gray-900">Изображение блюда</h3>
               <ImageUploader 
                 initialImage={formData.image_url}
                 onImageUpload={handleImageUpload}
@@ -191,7 +208,7 @@ const EditDishPage: NextPage = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   required
                 />
               </div>
@@ -205,7 +222,7 @@ const EditDishPage: NextPage = () => {
                   name="category_id"
                   value={formData.category_id}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   required
                 >
                   <option value="">Выберите категорию</option>
@@ -227,7 +244,7 @@ const EditDishPage: NextPage = () => {
                   onChange={handleInputChange}
                   step="0.01"
                   min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   required
                 />
               </div>
@@ -244,7 +261,7 @@ const EditDishPage: NextPage = () => {
                   onChange={handleInputChange}
                   step="0.01"
                   min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                 />
               </div>
               
@@ -258,7 +275,7 @@ const EditDishPage: NextPage = () => {
                   name="calories"
                   value={formData.calories}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                 />
               </div>
               
@@ -272,7 +289,7 @@ const EditDishPage: NextPage = () => {
                   name="cooking_time"
                   value={formData.cooking_time}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                 />
               </div>
               
@@ -286,91 +303,76 @@ const EditDishPage: NextPage = () => {
                   name="weight"
                   value={formData.weight}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                 />
               </div>
             </div>
             
             <div className="mb-6">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Описание блюда
+                Описание
               </label>
               <textarea
                 id="description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
               ></textarea>
             </div>
             
-            <div className="mb-6">
-              <label htmlFor="ingredients" className="block text-sm font-medium text-gray-700 mb-1">
-                Ингредиенты
-              </label>
-              <textarea
-                id="ingredients"
-                name="ingredients"
-                value={formData.ingredients}
-                onChange={handleInputChange}
-                rows={3}
-                placeholder="Введите ингредиенты, по одному на строку"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-              ></textarea>
-            </div>
-            
-            <div className="flex flex-wrap gap-6 mb-6">
-              <div className="flex items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
                 <input
                   type="checkbox"
                   id="is_vegetarian"
                   name="is_vegetarian"
                   checked={formData.is_vegetarian}
                   onChange={handleCheckboxChange}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
                 />
                 <label htmlFor="is_vegetarian" className="ml-2 block text-sm text-gray-700">
                   Вегетарианское блюдо
                 </label>
               </div>
               
-              <div className="flex items-center">
+              <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
                 <input
                   type="checkbox"
                   id="is_vegan"
                   name="is_vegan"
                   checked={formData.is_vegan}
                   onChange={handleCheckboxChange}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
                 />
                 <label htmlFor="is_vegan" className="ml-2 block text-sm text-gray-700">
                   Веганское блюдо
                 </label>
               </div>
               
-              <div className="flex items-center">
+              <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
                 <input
                   type="checkbox"
                   id="is_spicy"
                   name="is_spicy"
                   checked={formData.is_spicy}
                   onChange={handleCheckboxChange}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
                 />
                 <label htmlFor="is_spicy" className="ml-2 block text-sm text-gray-700">
                   Острое блюдо
                 </label>
               </div>
               
-              <div className="flex items-center">
+              <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
                 <input
                   type="checkbox"
                   id="is_available"
                   name="is_available"
                   checked={formData.is_available}
                   onChange={handleCheckboxChange}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
                 />
                 <label htmlFor="is_available" className="ml-2 block text-sm text-gray-700">
                   Доступно к заказу
@@ -378,25 +380,26 @@ const EditDishPage: NextPage = () => {
               </div>
             </div>
             
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
               <Link
                 href="/admin/menu"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="inline-flex items-center px-5 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
               >
                 Отмена
               </Link>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+                className="inline-flex items-center px-5 py-2.5 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 transition-colors"
               >
                 {isSaving ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
                     Сохранение...
                   </>
                 ) : (
                   <>
+                    <SaveIcon className="h-5 w-5 mr-2" />
                     Сохранить
                   </>
                 )}

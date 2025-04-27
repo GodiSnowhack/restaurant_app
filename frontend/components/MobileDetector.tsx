@@ -125,4 +125,76 @@ export const MobileDetector: React.FC<MobileDetectorProps> = ({ children }) => {
   
   // Если все проверки пройдены, отображаем дочерние компоненты
   return <>{children}</>;
+};
+
+/**
+ * Версия детектора для использования без children
+ * Используется в _app.tsx для отображения состояния подключения мобильных устройств
+ */
+export const MobileDetectorIndicator: React.FC = () => {
+  const [isActive, setIsActive] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Проверяем только на мобильных устройствах
+    if (!isMobileDevice()) {
+      return;
+    }
+
+    setIsActive(true);
+
+    // Проверяем соединение с сервером
+    const checkConnection = async () => {
+      try {
+        const response = await fetch('/api/ping?type=indicator', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Mobile-Check': 'true'
+          },
+          cache: 'no-store'
+        });
+        
+        if (response.ok) {
+          setIsConnected(true);
+          setConnectionStatus('Подключено');
+        } else {
+          setIsConnected(false);
+          setConnectionStatus('Ошибка соединения');
+        }
+      } catch (error) {
+        setIsConnected(false);
+        setConnectionStatus('Нет соединения');
+      }
+    };
+    
+    checkConnection();
+    
+    // Периодическая проверка соединения
+    const interval = setInterval(checkConnection, 30000);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // Если не активно, или не мобильное устройство, ничего не показываем
+  if (!isActive) {
+    return null;
+  }
+  
+  // Индикатор состояния подключения
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <div className={`flex items-center px-3 py-1 rounded-full text-xs ${
+        isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+      }`}>
+        <div className={`w-2 h-2 rounded-full mr-1 ${
+          isConnected ? 'bg-green-500' : 'bg-red-500'
+        }`}></div>
+        {connectionStatus || (isConnected ? 'Онлайн' : 'Офлайн')}
+      </div>
+    </div>
+  );
 }; 

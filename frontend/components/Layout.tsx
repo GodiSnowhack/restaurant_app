@@ -7,9 +7,23 @@ import Footer from './Footer';
 interface LayoutProps {
   children: ReactNode;
   title?: string;
+  section?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан' }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан', section }) => {
+  const getSectionStyles = () => {
+    switch (section) {
+      case 'admin':
+        return 'container mx-auto px-4 py-6 max-w-7xl';
+      case 'waiter':
+        return 'container mx-auto px-4 py-6 max-w-5xl';
+      case 'customer':
+        return 'container mx-auto px-4 py-6';
+      default:
+        return 'w-full';
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 dark:text-white">
       <Head>
@@ -21,8 +35,10 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан' })
 
       <Header />
 
-      <main className="flex-grow w-full">
-        {children}
+      <main className="flex-grow">
+        <div className={section ? getSectionStyles() : 'w-full'}>
+          {children}
+        </div>
       </main>
 
       <Footer />

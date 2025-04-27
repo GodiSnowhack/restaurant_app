@@ -13,6 +13,20 @@ from app.core.config import settings
 router = APIRouter()
 
 
+@router.get("/")
+async def auth_info():
+    """Информация об API авторизации"""
+    return {
+        "message": "API авторизации работает",
+        "endpoints": [
+            {"path": "/login", "method": "POST", "description": "Авторизация пользователя"},
+            {"path": "/register", "method": "POST", "description": "Регистрация пользователя"},
+            {"path": "/_log", "method": "POST", "description": "Логирование ошибок авторизации"}
+        ],
+        "status": "ok"
+    }
+
+
 @router.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),

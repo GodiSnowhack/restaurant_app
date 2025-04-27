@@ -52,34 +52,34 @@ export default function MenuPage() {
   // Загрузка категорий
   useEffect(() => {
     const loadCategories = async () => {
-      try {
-        setCategoriesLoading(true);
-        const data = await menuApi.getCategories();
-        setCategories(data);
+    try {
+      setCategoriesLoading(true);
+      const data = await menuApi.getCategories();
+      setCategories(data);
       } catch (error) {
         console.error('Ошибка при загрузке категорий:', error);
         setError('Не удалось загрузить категории');
       } finally {
-        setCategoriesLoading(false);
+      setCategoriesLoading(false);
       }
     };
 
-    loadCategories();
+          loadCategories();
   }, []);
 
   // Загрузка блюд
   useEffect(() => {
     const loadDishes = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = selectedCategory ? { category_id: selectedCategory } : undefined;
-        const data = await menuApi.getDishes(params);
-        setDishes(data);
+    try {
+      setLoading(true);
+      setError(null);
+      const params = selectedCategory ? { category_id: selectedCategory } : undefined;
+      const data = await menuApi.getDishes(params);
+      setDishes(data);
         setRetryCount(0);
       } catch (error) {
         console.error('Ошибка при загрузке блюд:', error);
-        if (retryCount < maxRetries) {
+      if (retryCount < maxRetries) {
           setRetryCount(prev => prev + 1);
           setTimeout(loadDishes, 2000 * Math.pow(2, retryCount));
         } else {
@@ -131,13 +131,13 @@ export default function MenuPage() {
           `}>
             Откройте для себя наши изысканные блюда, приготовленные с любовью и заботой о каждой детали
           </p>
-        </div>
+          </div>
 
         {/* Фильтр категорий */}
         {!categoriesLoading && categories.length > 0 && (
           <div className="max-w-7xl mx-auto mb-8">
             <div className="flex flex-wrap justify-center gap-2">
-              <button
+                <button
                 onClick={() => setSelectedCategory(null)}
                 className={`
                   px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
@@ -150,12 +150,12 @@ export default function MenuPage() {
                       : 'bg-white text-gray-600 hover:bg-gray-100'
                   }
                 `}
-              >
-                Все блюда
-              </button>
-              {categories.map((category) => (
-                <button
-                  key={category.id}
+                >
+                  Все блюда
+                </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
                   className={`
                     px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
@@ -168,11 +168,11 @@ export default function MenuPage() {
                         : 'bg-white text-gray-600 hover:bg-gray-100'
                     }
                   `}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
+                  >
+                    {category.name}
+                  </button>
+                ))}
+        </div>
           </div>
         )}
 
@@ -189,12 +189,12 @@ export default function MenuPage() {
         {/* Сетка блюд */}
         {dishes.length > 0 && (
           <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {dishes.map((dish) => {
-                const cartItem = items.find(item => item.dishId === dish.id);
-                return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {dishes.map((dish) => {
+              const cartItem = items.find(item => item.dishId === dish.id);
+              return (
                   <DishCard
-                    key={dish.id}
+                  key={dish.id}
                     id={dish.id}
                     name={dish.name}
                     description={dish.description}
@@ -207,8 +207,8 @@ export default function MenuPage() {
                   />
                 );
               })}
-            </div>
-          </div>
+                  </div>
+                        </div>
         )}
 
         {/* Сообщение об ошибке */}
@@ -218,7 +218,7 @@ export default function MenuPage() {
             ${isDark ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800'}
           `}>
             <p>{error}</p>
-            <button
+                        <button
               onClick={() => {
                 setError(null);
                 setRetryCount(0);
@@ -230,9 +230,9 @@ export default function MenuPage() {
                   : 'bg-red-200 text-red-900 hover:bg-red-300'
                 }
               `}
-            >
+                        >
               Попробовать снова
-            </button>
+                        </button>
           </div>
         )}
 

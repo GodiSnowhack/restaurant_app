@@ -19,7 +19,6 @@ type Dish = {
   category_id: number;
   image_url: string;
   is_available: boolean;
-  ingredients: string;
   calories: number;
   weight: number;
   is_vegetarian: boolean;
@@ -62,8 +61,7 @@ const AdminMenuPage: NextPage = () => {
     is_vegetarian: false,
     is_vegan: false,
     is_spicy: false,
-    is_available: true,
-    ingredients: ''
+    is_available: true
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -154,7 +152,6 @@ const AdminMenuPage: NextPage = () => {
   const filteredDishes = searchQuery
     ? dishes.filter(dish => 
         dish.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (dish.ingredients && typeof dish.ingredients === 'string' && dish.ingredients.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (dish.description && dish.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : dishes;
@@ -209,8 +206,7 @@ const AdminMenuPage: NextPage = () => {
           id: Math.max(0, ...dishes.map(d => d.id)) + 1,
           position: position,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          ingredients: dishData.ingredients || "Не указаны"
+          updated_at: new Date().toISOString()
         } as Dish;
         
         setDishes(prev => [...prev, newDish]);
@@ -230,8 +226,7 @@ const AdminMenuPage: NextPage = () => {
         is_vegetarian: false,
         is_vegan: false,
         is_spicy: false,
-        is_available: true,
-        ingredients: ''
+        is_available: true
       });
       
       setShowDishForm(false);
@@ -283,7 +278,7 @@ const AdminMenuPage: NextPage = () => {
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Добавить блюдо
-            </Link>
+          </Link>
           </div>
         </div>
 
@@ -374,36 +369,36 @@ const AdminMenuPage: NextPage = () => {
                   <Link
                     href="/admin/menu/add"
                     className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
-                  >
+              >
                     <PlusIcon className="h-4 w-4 mr-2" />
-                    Добавить блюдо
+                Добавить блюдо
                   </Link>
-                </div>
+            </div>
               ) : (
-                <div className="overflow-x-auto">
+              <div className="overflow-x-auto">
                   <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
                     <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
-                      <tr>
+                    <tr>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Изображение
-                        </th>
+                        Изображение
+                      </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Название
-                        </th>
+                        Название
+                      </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Категория
-                        </th>
+                        Категория
+                      </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Цена
-                        </th>
+                        Цена
+                      </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Статус
-                        </th>
+                        Статус
+                      </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Действия
-                        </th>
-                      </tr>
-                    </thead>
+                        Действия
+                      </th>
+                    </tr>
+                  </thead>
                     <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
                       {finalFilteredDishes.map((dish) => (
                         <tr key={dish.id} className={
@@ -449,7 +444,7 @@ const AdminMenuPage: NextPage = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-3">
-                              <Link
+                              <Link 
                                 href={`/admin/menu/${dish.id}/edit`}
                                 className={`text-${isDark ? 'primary-400 hover:text-primary-300' : 'primary-600 hover:text-primary-900'}`}
                               >
@@ -465,9 +460,9 @@ const AdminMenuPage: NextPage = () => {
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                  </tbody>
+                </table>
+              </div>
               )}
             </div>
 
@@ -577,21 +572,6 @@ const AdminMenuPage: NextPage = () => {
                         value={formData.description}
                         onChange={handleInputChange}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      ></textarea>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="ingredients" className="block text-sm font-medium text-gray-700 mb-1">
-                        Ингредиенты
-                      </label>
-                      <textarea
-                        id="ingredients"
-                        name="ingredients"
-                        value={formData.ingredients}
-                        onChange={handleInputChange}
-                        rows={2}
-                        placeholder="Перечислите основные ингредиенты через запятую"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                       ></textarea>
                     </div>

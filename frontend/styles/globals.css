@@ -222,7 +222,7 @@ button {
     transition: all 0.3s ease;
     
     &:hover {
-      @apply transform scale-110;
+    @apply transform scale-110;
       background-color: var(--accent);
     }
   }

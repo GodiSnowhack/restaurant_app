@@ -13,6 +13,7 @@ import {
   UserIcon,
   PhoneIcon,
   UserGroupIcon,
+  ArrowPathIcon,
   FunnelIcon as FilterIcon
 } from '@heroicons/react/24/outline';
 import { reservationsApi } from '../../lib/api';
@@ -203,16 +204,29 @@ const AdminReservationsPage: NextPage = () => {
 
   const handleUpdateStatus = async (id: number, newStatus: string) => {
     try {
-      // Обновляем статус через API
-      await reservationsApi.updateReservationStatus(id, newStatus);
+      setIsLoading(true);
+      console.log(`Изменение статуса бронирования #${id} на "${newStatus}"`);
       
-      // Обновляем состояние в UI
-      setReservations(reservations.map(res => 
-        res.id === id ? { ...res, status: newStatus as any } : res
-      ));
+      await reservationsApi.updateReservationStatus(id, newStatus)
+        .then(() => {
+          // Обновляем статус брони в локальном массиве
+          const updatedReservations = reservations.map(reservation => {
+            if (reservation.id === id) {
+              return { ...reservation, status: newStatus as 'pending' | 'confirmed' | 'completed' | 'cancelled' };
+            }
+            return reservation;
+          });
+          
+          setReservations(updatedReservations);
+          
+          // Показываем уведомление об успешном обновлении
+          alert(`Статус бронирования #${id} изменен на "${newStatus}"`);
+        });
     } catch (error) {
-      console.error('Ошибка при обновлении статуса бронирования:', error);
-      alert('Не удалось обновить статус бронирования. Попробуйте позже.');
+      console.error(`Ошибка при обновлении статуса бронирования #${id}:`, error);
+      alert(`Ошибка при изменении статуса бронирования #${id}. Попробуйте еще раз.`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -241,254 +255,298 @@ const AdminReservationsPage: NextPage = () => {
 
   if (isLoading) {
     return (
-      <Layout title="Управление бронированиями | Админ-панель">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
+      <Layout title="Управление бронированиями | Админ-панель" section="admin">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary"></div>
         </div>
       </Layout>
     );
   }
 
   return (
-    <Layout title="Управление бронированиями | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/admin" className="text-gray-600 hover:text-primary mr-4">
-            <ArrowLeftIcon className="h-5 w-5" />
-          </Link>
-          <h1 className="text-3xl font-bold">Управление бронированиями</h1>
-        </div>
-
-        {/* Кнопка фильтров */}
-        <div className="mb-4">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center px-4 py-2 bg-white shadow rounded-md text-gray-700 hover:bg-gray-50"
+    <Layout title="Управление бронированиями | Админ-панель" section="admin">
+      <div className="space-y-6">
+        {/* Заголовок и навигация */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <div className="flex items-center">
+            <Link href="/admin" className="mr-4 hover:bg-gray-100 p-2 rounded-full transition-colors">
+              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Управление бронированиями</h1>
+          </div>
+          
+          <button 
+            onClick={refreshData} 
+            className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm transition-colors"
           >
-            <FilterIcon className="h-5 w-5 mr-2" />
-            {showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+            <ArrowPathIcon className="h-4 w-4 mr-2" />
+            Обновить данные
           </button>
         </div>
-
-        {/* Фильтры */}
-        {showFilters && (
-          <div className="mb-8">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 bg-white p-4 rounded-lg shadow-md">
-              {/* Статус бронирования */}
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Статус бронирования</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setActiveTab('pending')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
-                      activeTab === 'pending' 
-                        ? 'bg-primary text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    Ожидают
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('confirmed')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
-                      activeTab === 'confirmed' 
-                        ? 'bg-primary text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    Подтверждены
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('completed')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
-                      activeTab === 'completed' 
-                        ? 'bg-primary text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    Завершены
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('cancelled')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
-                      activeTab === 'cancelled' 
-                        ? 'bg-primary text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    Отменены
-                  </button>
-                </div>
-              </div>
-
-              {/* Выбор даты */}
-              <div className="md:w-64">
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">Дата бронирования</label>
-                <div className="relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CalendarIcon className="h-5 w-5 text-gray-400" />
+        
+        {/* Панель фильтров */}
+        <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+          <div className="px-6 py-5">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Фильтры</h2>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="text-sm text-primary hover:text-primary-dark font-medium"
+              >
+                {showFilters ? 'Скрыть фильтры' : 'Развернуть фильтры'}
+              </button>
+            </div>
+            
+            {/* Фильтры по статусу */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => setActiveTab(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === null ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Все
+              </button>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'pending' ? 'bg-yellow-500 text-white shadow-sm' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                }`}
+              >
+                Ожидающие
+              </button>
+              <button
+                onClick={() => setActiveTab('confirmed')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'confirmed' ? 'bg-green-500 text-white shadow-sm' : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                Подтвержденные
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'completed' ? 'bg-blue-500 text-white shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                Завершенные
+              </button>
+              <button
+                onClick={() => setActiveTab('cancelled')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'cancelled' ? 'bg-red-500 text-white shadow-sm' : 'bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                Отмененные
+              </button>
+            </div>
+            
+            {/* Дополнительные фильтры */}
+            {showFilters && (
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-end pt-4 border-t border-gray-200">
+                <div className="w-full md:w-auto">
+                  <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Выберите дату
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <CalendarIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="date"
+                      id="date-filter"
+                      value={selectedDate || ''}
+                      onChange={handleDateChange}
+                      className="pl-10 shadow-sm focus:ring-primary focus:border-primary block w-full md:w-48 sm:text-sm border-gray-300 rounded-md"
+                    />
                   </div>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={selectedDate || ''}
-                    onChange={handleDateChange}
-                    className="focus:ring-primary focus:border-primary block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-                  />
                 </div>
-              </div>
-              
-              {/* Кнопка сброса фильтров */}
-              <div className="flex items-end">
+                
                 <button
                   onClick={handleResetFilters}
-                  className="px-4 py-2 bg-gray-200 rounded-md text-gray-700 hover:bg-gray-300"
+                  className="mt-2 md:mt-0 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                 >
-                  Сбросить фильтры
+                  Сбросить все фильтры
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Индикатор активных фильтров */}
-        {(activeTab || selectedDate) && (
-          <div className="flex items-center mb-4 text-sm text-gray-600">
-            <span>Активные фильтры:</span>
-            {activeTab && (
-              <span className="ml-2 px-2 py-1 bg-gray-100 rounded-md">
-                {activeTab === 'pending' && 'Ожидают подтверждения'}
-                {activeTab === 'confirmed' && 'Подтверждены'}
-                {activeTab === 'completed' && 'Завершены'}
-                {activeTab === 'cancelled' && 'Отменены'}
-              </span>
             )}
-            {selectedDate && (
-              <span className="ml-2 px-2 py-1 bg-gray-100 rounded-md">
-                Дата: {new Date(selectedDate).toLocaleDateString('ru-RU')}
-              </span>
-            )}
-            <button 
-              onClick={handleResetFilters}
-              className="ml-2 text-primary hover:text-primary-dark"
-            >
-              Сбросить
-            </button>
           </div>
-        )}
-
-        {/* Список бронирований */}
-        {filteredReservations.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="flex justify-center mb-4">
-              <CalendarIcon className="h-16 w-16 text-gray-400" />
-            </div>
-            <h2 className="text-2xl font-medium mb-4">Нет бронирований</h2>
-            <p className="text-gray-600 mb-6">
-              {activeTab || selectedDate
-                ? 'По выбранным фильтрам не найдено ни одного бронирования'
-                : 'В системе пока нет ни одного бронирования'}
+        </div>
+        
+        {/* Счётчик и информация о результатах */}
+        {filteredReservations.length > 0 && (
+          <div className="bg-gray-50 shadow-inner rounded-lg px-6 py-3 text-sm text-gray-700 border border-gray-200">
+            <p>
+              Найдено бронирований: <span className="font-medium">{filteredReservations.length}</span>
+              {activeTab && (
+                <span className="ml-2">
+                  со статусом: <span className="font-medium capitalize">{activeTab}</span>
+                </span>
+              )}
+              {selectedDate && (
+                <span className="ml-2">
+                  за дату: <span className="font-medium">{new Date(selectedDate).toLocaleDateString('ru-RU')}</span>
+                </span>
+              )}
             </p>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      № брони
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Дата и время
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Гость
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Столик
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Гости
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredReservations.map((reservation) => (
-                    <tr key={reservation.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{reservation.id}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDateTime(reservation.reservation_time)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{reservation.guest_name}</div>
-                        <div className="text-sm text-gray-500 flex items-center">
-                          <PhoneIcon className="h-3 w-3 mr-1" />
-                          {reservation.guest_phone}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">№{reservation.table_number}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 flex items-center">
-                          <UserGroupIcon className="h-4 w-4 mr-1" />
-                          {reservation.guests_count}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(reservation.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          {reservation.status === 'pending' && (
-                            <>
-                              <button 
-                                onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
-                                className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-                              >
-                                Подтвердить
-                              </button>
-                              <button 
-                                onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
-                                className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                              >
-                                Отменить
-                              </button>
-                            </>
-                          )}
-                          {reservation.status === 'confirmed' && (
-                            <button 
-                              onClick={() => handleUpdateStatus(reservation.id, 'completed')}
-                              className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                            >
-                              Завершить
-                            </button>
-                          )}
-                          <button
-                            onClick={() => router.push(`/admin/reservations/${reservation.id}`)}
-                            className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                          >
-                            Детали
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        )}
+        
+        {/* Список бронирований */}
+        {reservations.length === 0 ? (
+          <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div className="px-6 py-10 text-center">
+              <CalendarIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Нет доступных бронирований</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                В данный момент нет бронирований в системе. Когда клиенты начнут бронировать столики, они появятся здесь.
+              </p>
             </div>
+          </div>
+        ) : filteredReservations.length === 0 ? (
+          <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div className="px-6 py-10 text-center">
+              <FilterIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Нет результатов для текущих фильтров</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                По выбранным фильтрам не найдено бронирований. Попробуйте изменить параметры фильтрации или сбросить фильтры.
+              </p>
+              <button
+                onClick={handleResetFilters}
+                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              >
+                Сбросить фильтры
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredReservations.map((reservation) => (
+              <div key={reservation.id} className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow duration-200">
+                <div className={`px-4 py-3 flex justify-between items-center border-b ${
+                  reservation.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
+                  reservation.status === 'confirmed' ? 'bg-green-50 border-green-200' :
+                  reservation.status === 'completed' ? 'bg-blue-50 border-blue-200' :
+                  'bg-red-50 border-red-200'
+                }`}>
+                  <h3 className="text-base font-semibold text-gray-900">Бронирование #{reservation.id}</h3>
+                  {getStatusBadge(reservation.status)}
+                </div>
+                
+                <div className="px-4 py-4 border-b border-gray-200">
+                  <div className="flex items-center text-sm text-gray-700 mb-2">
+                    <CalendarIcon className="flex-shrink-0 mr-2 h-5 w-5 text-gray-500" />
+                    <span className="font-medium">{formatDateTime(reservation.reservation_time)}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-sm text-gray-700 mb-2">
+                    <UserIcon className="flex-shrink-0 mr-2 h-5 w-5 text-gray-500" />
+                    <span>{reservation.guest_name || (reservation.user?.full_name || 'Гость')}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-sm text-gray-700 mb-2">
+                    <PhoneIcon className="flex-shrink-0 mr-2 h-5 w-5 text-gray-500" />
+                    <span>{reservation.guest_phone || 'Телефон не указан'}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-sm text-gray-700">
+                    <UserGroupIcon className="flex-shrink-0 mr-2 h-5 w-5 text-gray-500" />
+                    <span><strong>{reservation.guests_count}</strong> гостей, стол №<strong>{reservation.table_number || '—'}</strong></span>
+                  </div>
+                </div>
+                
+                {reservation.comment && (
+                  <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium block mb-1">Комментарий:</span>
+                      <span className="italic">{reservation.comment}</span>
+                    </p>
+                  </div>
+                )}
+                
+                <div className="px-4 py-3 bg-gray-50">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {reservation.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                        >
+                          <CheckCircleIcon className="h-4 w-4 mr-1.5" />
+                          Подтвердить
+                        </button>
+                        
+                        <button
+                          onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                        >
+                          <XCircleIcon className="h-4 w-4 mr-1.5" />
+                          Отменить
+                        </button>
+                      </>
+                    )}
+                    
+                    {reservation.status === 'confirmed' && (
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus(reservation.id, 'completed')}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                        >
+                          <CheckCircleIcon className="h-4 w-4 mr-1.5" />
+                          Завершить
+                        </button>
+                        
+                        <button
+                          onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                        >
+                          <XCircleIcon className="h-4 w-4 mr-1.5" />
+                          Отменить
+                        </button>
+                      </>
+                    )}
+                    
+                    {(reservation.status === 'completed' || reservation.status === 'cancelled') && (
+                      <button
+                        onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+                      >
+                        <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
+                        Вернуть в подтвержденные
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Пагинация (если потребуется) */}
+        {filteredReservations.length > 15 && (
+          <div className="flex justify-center pt-6">
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <a href="#" className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <span className="sr-only">Предыдущая</span>
+                <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+              </a>
+              <a href="#" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                1
+              </a>
+              <a href="#" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-primary text-sm font-medium text-white">
+                2
+              </a>
+              <a href="#" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                3
+              </a>
+              <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                ...
+              </span>
+              <a href="#" className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <span className="sr-only">Следующая</span>
+                <ArrowLeftIcon className="h-5 w-5 transform rotate-180" aria-hidden="true" />
+              </a>
+            </nav>
           </div>
         )}
       </div>

@@ -202,7 +202,7 @@ const AdminAnalyticsPage: NextPage = () => {
       setLoading(false);
     }
   };
-  
+
   // Генерация бизнес-рекомендаций на основе данных аналитики
   const generateBusinessRecommendations = (
     financial: FinancialMetrics,
@@ -755,62 +755,62 @@ const AdminAnalyticsPage: NextPage = () => {
         {currentView === 'dashboard' && (
           <>
             {/* Карточки ключевых показателей */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
-                <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
                   <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Выручка</h3>
-                </div>
-                <div className="flex items-center">
+            </div>
+            <div className="flex items-center">
                   <ChartBarIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
-                  <div className="ml-4">
+              <div className="ml-4">
                     <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.totalRevenue)} ₸</p>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За квартал'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Прибыль</h3>
-                </div>
-                <div className="flex items-center">
-                  <CurrencyDollarIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
-                  <div className="ml-4">
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.grossProfit)} ₸</p>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {financialMetrics.profitMargin}%</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Средний чек</h3>
-                </div>
-                <div className="flex items-center">
-                  <ShoppingBagIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
-                  <div className="ml-4">
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.averageOrderValue)} ₸</p>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За квартал'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Удовлетворенность</h3>
-                </div>
-                <div className="flex items-center">
-                  <HandThumbUpIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
-                  <div className="ml-4">
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{customerMetrics.customerSatisfaction} / 5.0</p>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Общий рейтинг</p>
-                  </div>
-                </div>
               </div>
             </div>
+          </div>
+
+              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
+            <div className="flex items-center justify-between mb-4">
+                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Прибыль</h3>
+            </div>
+            <div className="flex items-center">
+                  <CurrencyDollarIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
+              <div className="ml-4">
+                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.grossProfit)} ₸</p>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {financialMetrics.profitMargin}%</p>
+              </div>
+            </div>
+          </div>
+
+              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
+            <div className="flex items-center justify-between mb-4">
+                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Средний чек</h3>
+            </div>
+            <div className="flex items-center">
+                  <ShoppingBagIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
+              <div className="ml-4">
+                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.averageOrderValue)} ₸</p>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За квартал'}</p>
+              </div>
+            </div>
+          </div>
+
+              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
+            <div className="flex items-center justify-between mb-4">
+                  <h3 className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-sm uppercase font-medium`}>Удовлетворенность</h3>
+            </div>
+            <div className="flex items-center">
+                  <HandThumbUpIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
+              <div className="ml-4">
+                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{customerMetrics.customerSatisfaction} / 5.0</p>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Общий рейтинг</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
             {/* Приоритетные рекомендации и алерты */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* Алерты */}
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
                 <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -824,7 +824,7 @@ const AdminAnalyticsPage: NextPage = () => {
                           : isDark ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {alerts.length}
-                      </span>
+                    </span>
                     )}
                   </div>
                 </h3>
@@ -874,12 +874,12 @@ const AdminAnalyticsPage: NextPage = () => {
                             </h4>
                             <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{alert.description}</p>
                           </div>
-                        </div>
-                      </div>
-                    ))}
                   </div>
+                </div>
+              ))}
+            </div>
                 )}
-              </div>
+          </div>
 
               {/* Рекомендации */}
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
@@ -964,30 +964,30 @@ const AdminAnalyticsPage: NextPage = () => {
 
             {/* Основные показатели - быстрый обзор */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Топ блюд */}
+          {/* Топ блюд */}
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
                 <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Топ-продажи блюд</h3>
-                <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
                   <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
                     <thead className={isDark ? 'bg-gray-700' : 'bg-gray-50'}>
                       <tr>
                         <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>Блюдо</th>
                         <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>Кол-во</th>
                         <th className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>Выручка</th>
-                      </tr>
-                    </thead>
+                  </tr>
+                </thead>
                     <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
-                      {menuMetrics.topSellingDishes.slice(0, 5).map((dish) => (
+                  {menuMetrics.topSellingDishes.slice(0, 5).map((dish) => (
                         <tr key={dish.dishId} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{dish.dishName}</td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{dish.salesCount}</td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(dish.revenue)} ₸</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
               {/* Прогноз продаж */}
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
@@ -998,28 +998,28 @@ const AdminAnalyticsPage: NextPage = () => {
                   </div>
                 </h3>
                 {predictiveMetrics?.salesForecast ? (
-                  <div className="h-64 flex items-end space-x-2">
+            <div className="h-64 flex items-end space-x-2">
                     {predictiveMetrics.salesForecast.slice(-7).map((item, index) => {
                       const maxValue = Math.max(...predictiveMetrics.salesForecast.map(i => i.value));
                       const percentage = (item.value / maxValue) * 100;
-                      
-                      return (
-                        <div key={index} className="flex flex-col items-center flex-1">
-                          <div 
+                
+                return (
+                  <div key={index} className="flex flex-col items-center flex-1">
+                    <div 
                             className={`w-full ${isDark ? 'bg-primary-700' : 'bg-primary'} rounded-t`} 
-                            style={{ height: `${percentage}%` }}
-                          ></div>
+                      style={{ height: `${percentage}%` }}
+                    ></div>
                           <div className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                             {new Date(item.date).getDate()}
                           </div>
-                        </div>
-                      );
-                    })}
                   </div>
+                );
+              })}
+            </div>
                 ) : (
                   <div className={`h-64 flex items-center justify-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     <p>Нет данных для прогноза</p>
-                  </div>
+          </div>
                 )}
               </div>
             </div>
@@ -1244,7 +1244,7 @@ const AdminAnalyticsPage: NextPage = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div>
                           <h5 className={`text-sm font-medium mb-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Параметры сценария</h5>
-                          <div className="space-y-4">
+            <div className="space-y-4">
                             {Object.entries(scenarioParams).map(([key, value]) => (
                               <div key={key}>
                                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-700'}`}>
@@ -1432,8 +1432,8 @@ const AdminAnalyticsPage: NextPage = () => {
                           );
                           const revenueHeight = (revenue / maxValue) * 100;
                           const expenseHeight = (expense / maxValue) * 100;
-                          
-                          return (
+                  
+                  return (
                             <div key={month} className="flex-1 flex flex-col space-y-1 items-center">
                               <div className="w-full flex items-end justify-center space-x-1">
                                 <div 
@@ -1539,12 +1539,12 @@ const AdminAnalyticsPage: NextPage = () => {
                           <div className="flex justify-between items-center mb-1">
                             <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category}</span>
                             <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{formatCurrency(amount)} ₸ ({percentage.toFixed(1)}%)</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
                               className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" 
-                              style={{ width: `${percentage}%` }}
-                            ></div>
+                          style={{ width: `${percentage}%` }}
+                        ></div>
                           </div>
                         </div>
                       );
@@ -1983,17 +1983,17 @@ const AdminAnalyticsPage: NextPage = () => {
                                   <p className="text-sm font-medium text-gray-800">{gender}</p>
                                   <p className="text-lg font-bold text-gray-900">{percentage as number}%</p>
                                 </div>
-                              </div>
-                            </div>
-                          );
-                        })
+                      </div>
+                    </div>
+                  );
+                })
                       ) : (
                         <div className={`text-center p-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                           <p>Нет данных о гендерных группах</p>
-                        </div>
+            </div>
                       )}
-                    </div>
-                  </div>
+          </div>
+        </div>
                 </div>
               </div>
               

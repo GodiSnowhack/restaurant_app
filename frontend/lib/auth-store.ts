@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from './api';
+import axios from 'axios';
 
 // Функция определения мобильного устройства
 const isMobileDevice = (): boolean => {
@@ -129,6 +130,65 @@ const isMobileDeviceFn = (): boolean => {
   return mobileRegex.test(navigator.userAgent);
 };
 
+// Функция для отправки логов об ошибках авторизации
+const sendAuthErrorLog = async (error: any, endpoint: string, diagnosticInfo?: any) => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Используем относительный URL вместо полного пути
+    const logUrl = '/api/auth/_log';
+    
+    const networkInfo = {
+      online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
+      connection: (navigator as any).connection 
+        ? {
+            effectiveType: (navigator as any).connection.effectiveType,
+            downlink: (navigator as any).connection.downlink,
+            rtt: (navigator as any).connection.rtt,
+            saveData: (navigator as any).connection.saveData
+          }
+        : null
+    };
+
+    // Преобразуем объект ошибки в строку
+    let errorMessage = 'Неизвестная ошибка';
+    if (error) {
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object') {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) {
+          errorMessage = 'Ошибка объект: ' + Object.keys(error).join(', ');
+        }
+      }
+    }
+    
+    await fetch(logUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        error: errorMessage,
+        endpoint,
+        timestamp: new Date().toISOString(),
+        diagnosticInfo,
+        networkInfo
+      }),
+      // Используем AbortController для предотвращения блокировки
+      signal: AbortSignal.timeout(5000) // 5 секунд таймаут
+    });
+    
+    console.log('AuthStore: Отправлен лог об ошибке авторизации');
+  } catch (e) {
+    // Просто логируем ошибку, но не прерываем выполнение
+    console.warn('AuthStore: Не удалось отправить лог об ошибке:', e);
+  }
+};
+
 export interface AuthState {
   isAuthenticated: boolean;
   token: string | null;
@@ -139,7 +199,7 @@ export interface AuthState {
   networkDiagnostics: any[];
   
   login: (username: string, password: string) => Promise<void>;
-  register: (credentials: any) => Promise<void>;
+  register: (email: string, password: string, fullName: string, phone?: string) => Promise<void>;
   logout: () => void;
   fetchUserProfile: () => Promise<void>;
   setInitialAuthState: (isAuth: boolean, token: string | null) => void;
@@ -209,8 +269,8 @@ const useAuthStore = create<AuthState>((set, get) => ({
       maxRetries: 3,
       success: false,
       isMobile: isMobileDeviceFn(),
-  error: null
-};
+      error: null
+    };
 
     try {
       // Проверяем тип устройства для выбора метода авторизации
@@ -240,185 +300,75 @@ const useAuthStore = create<AuthState>((set, get) => ({
             step: `начало попытки ${attemptNumber}` 
           });
           
-          // Прокси-URL для авторизации
-          const proxyUrl = '/api/auth/login';
-          
-          // На основе логов определяем, что form-username работает лучше всего на мобильных
-          // Используем сразу urlencoded формат вместо JSON, чтобы избежать ошибок 422
-          const formData = new URLSearchParams();
-          formData.append('username', username);
-          formData.append('password', password);
-          
-          // Email - это опционально, можно использовать username в качестве email
-          const userEmail = username.includes('@') ? username : null;
-          if (userEmail) {
-            formData.append('email', userEmail);
-          }
-          
-          diagnosticInfo.steps.push({ 
-            timestamp: Date.now(), 
-            step: `подготовлены данные формы`, 
-            format: 'urlencoded'
-          });
-          
-          // Отправляем запрос
-          const response = await fetch(proxyUrl, {
+          // Используем обычный fetch вместо axios для улучшения совместимости с мобильными устройствами
+          // Для мобильных устройств используем только относительные URL, что помогает избежать проблем с CORS
+          const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Accept': 'application/json',
-              'X-Client-Type': 'mobile',
-              'X-Mobile-Auth': 'true',
-              'X-Requested-With': 'XMLHttpRequest',
-              'X-Low-Quality': hasLowQualityConnection() ? 'true' : 'false',
-              'X-Save-Data': (navigator as any).connection?.saveData ? 'true' : 'false'
+              'Content-Type': 'application/json'
             },
-            body: formData.toString(),
-            credentials: 'include',
-            cache: 'no-cache',
-            mode: 'cors'
+            body: JSON.stringify({
+              username,
+              password
+            })
           });
           
           if (!response.ok) {
-            const errorData = await response.json();
-            diagnosticInfo.steps.push({ 
-              timestamp: Date.now(), 
-              step: 'ошибка мобильного запроса', 
-              status: response.status,
-              errorData
-            });
-            
-            throw new Error(errorData.detail || errorData.message || 'Ошибка авторизации');
+            const error = await response.json().catch(() => ({ detail: 'Ошибка авторизации' }));
+            throw new Error(error.detail || 'Не удалось авторизоваться');
           }
           
-          return await response.json();
+          const result = await response.json();
+          
+          // Если успешно получили токен
+          if (result && result.access_token) {
+            return result;
+          }
+          
+          throw new Error('Не удалось получить токен доступа');
         };
         
-        try {
-          // Запускаем мобильную авторизацию с повторными попытками
-          let data;
-          let retryCount = 0;
-          const maxRetries = 2;
-          
-          while (retryCount <= maxRetries) {
-            try {
-              data = await attemptMobileLogin(retryCount + 1);
-              break; // Успех, выходим из цикла
-    } catch (error: any) {
-              retryCount++;
-              console.log(`AuthStore: Ошибка авторизации, попытка ${retryCount} из ${maxRetries + 1}`);
-              
-              if (retryCount <= maxRetries) {
-                // Ждем перед следующей попыткой (с увеличивающимся интервалом)
-                const waitTime = 1000 * retryCount;
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-              } else {
-                // Если все попытки использованы, пробрасываем ошибку дальше
-                throw error;
-              }
-            }
-          }
-          
-          if (!data) {
-            throw new Error('Не удалось получить данные авторизации после всех попыток');
-          }
-          
-          diagnosticInfo.steps.push({ 
-            timestamp: Date.now(), 
-            step: 'успешная мобильная авторизация',
-            tokenReceived: !!data.access_token,
-            retries: retryCount
-          });
-          
-          // Сохраняем токен
-          saveAuthToken(data.access_token);
-          
-          // Обновляем состояние
-          set({ 
-            isAuthenticated: true, 
-            token: data.access_token, 
-            error: null, 
-            isLoading: false 
-          });
-          
-          // Получаем профиль пользователя
-          await get().fetchUserProfile();
-          
-          diagnosticInfo.success = true;
-        } catch (mobileError: any) {
-          console.error('AuthStore: Ошибка мобильной авторизации:', mobileError);
-          
-          // Пробуем обычный метод через прокси как запасной вариант
+        // Пробуем авторизоваться несколько раз с экспоненциальной задержкой
+        for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            diagnosticInfo.steps.push({ 
-              timestamp: Date.now(), 
-              step: 'запасной метод после ошибки мобильной авторизации' 
-            });
+            diagnosticInfo.retries = attempt - 1;
+            const result = await attemptMobileLogin(attempt);
             
-            // URL для запроса
-            const url = '/api/auth/login';
-            
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'запасной запрос', url });
-            
-            // Отправляем запрос
-            const proxyResponse = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Fallback': 'true'
-              },
-              body: JSON.stringify({ username, password, email: username }),
-              cache: 'no-store'
-            });
-            
-            diagnosticInfo.steps.push({ 
-              timestamp: Date.now(), 
-              step: 'получен ответ от запасного метода', 
-              status: proxyResponse.status 
-            });
-            
-            // Проверяем статус ответа
-            if (!proxyResponse.ok) {
-              const errorData = await proxyResponse.json();
-              throw new Error(errorData.detail || errorData.message || 'Ошибка авторизации');
-            }
-            
-            const proxyData = await proxyResponse.json();
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'разбор ответа запасного метода' });
-            
-            // Сохраняем токен
-            saveAuthToken(proxyData.access_token);
-            
-            // Обновляем состояние
-            set({ 
-              isAuthenticated: true, 
-              token: proxyData.access_token, 
-              error: null, 
-              isLoading: false 
-            });
+            // Сохраняем токен и профиль пользователя
+            saveAuthToken(result.access_token);
             
             // Получаем профиль пользователя
             await get().fetchUserProfile();
-            
             diagnosticInfo.success = true;
-          } catch (proxyError: any) {
-            console.error('AuthStore: Ошибка запасного метода:', proxyError);
-            
-            diagnosticInfo.steps.push({ 
-              timestamp: Date.now(), 
-              step: 'ошибка запасного метода', 
-              error: proxyError.message 
-            });
             
             set({ 
-              isLoading: false, 
-              error: `Не удалось авторизоваться. Проверьте подключение к интернету и правильность данных. Ошибка: ${proxyError.message}` 
+              isAuthenticated: true, 
+              token: result.access_token, 
+              isLoading: false,
+              error: null 
             });
-            diagnosticInfo.error = proxyError.message;
+            
+            return;
+          } catch (error: any) {
+            // Если это последняя попытка или получили 401 (неверные учетные данные),
+            // прекращаем повторные попытки
+            if (attempt === 3 || error?.response?.status === 401) {
+              diagnosticInfo.error = error.message;
+              
+              set({ 
+                isLoading: false, 
+                error: error.message || 'Ошибка авторизации. Проверьте логин и пароль.' 
+              });
+              
+              return;
+            }
+            
+            // Ждем перед следующей попыткой
+            const delay = Math.pow(2, attempt) * 1000; // 2, 4, 8 секунд
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
-        } else {
+      } else {
         // Для десктопных устройств используем прокси
         diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'запрос через прокси для десктопа' });
         
@@ -614,9 +564,17 @@ const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   // Регистрация пользователя
-  register: async (credentials) => {
+  register: async (email, password, fullName, phone) => {
     try {
       set({ isLoading: true, error: null });
+      
+      // Правильно формируем данные для API
+      const credentials = {
+        email,
+        password,
+        full_name: fullName,
+        phone: phone || undefined
+      };
       
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -633,18 +591,26 @@ const useAuthStore = create<AuthState>((set, get) => ({
       
       const data = await response.json();
       
-      // Сохраняем токен
-      saveAuthToken(data.access_token);
-      
-      set({ 
-        isAuthenticated: true, 
-        token: data.access_token, 
-        error: null, 
-        isLoading: false 
-      });
-      
-      // Получаем профиль пользователя
-      await get().fetchUserProfile();
+      // Сохраняем токен, если он есть в ответе
+      if (data.access_token) {
+        saveAuthToken(data.access_token);
+        
+        set({ 
+          isAuthenticated: true, 
+          token: data.access_token, 
+          error: null, 
+          isLoading: false 
+        });
+        
+        // Получаем профиль пользователя
+        await get().fetchUserProfile();
+      } else {
+        // Если токена нет, просто заканчиваем регистрацию
+        set({ 
+          isLoading: false,
+          error: null
+        });
+      }
     } catch (error: any) {
       console.error('Ошибка регистрации:', error);
       set({ 

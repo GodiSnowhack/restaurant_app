@@ -61,7 +61,6 @@ def get_order(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
             "completed_at": db_order.completed_at,
             "customer_name": db_order.customer_name or "",
             "customer_phone": db_order.customer_phone or "",
-            "delivery_address": db_order.delivery_address or "",
             "order_code": db_order.order_code or "",
             "items": []
         }
@@ -149,7 +148,7 @@ def get_orders(
                 o.status, o.payment_status, o.payment_method,
                 o.created_at, o.updated_at, o.total_amount,
                 o.comment, o.customer_name, o.customer_phone,
-                o.delivery_address, o.order_code, o.reservation_code,
+                o.order_code, o.reservation_code,
                 o.is_urgent, o.is_group_order, o.completed_at
             FROM orders o
             WHERE 1=1
@@ -483,7 +482,6 @@ def format_order_for_response(db: Session, db_order: Order) -> Dict[str, Any]:
         "is_group_order": db_order.is_group_order,
         "customer_name": db_order.customer_name or "",
         "customer_phone": db_order.customer_phone or "",
-        "delivery_address": db_order.delivery_address or "",
         "order_code": db_order.order_code or "",
         "created_at": db_order.created_at.isoformat() if db_order.created_at else "",
         "updated_at": db_order.updated_at.isoformat() if db_order.updated_at else "",
@@ -545,8 +543,48 @@ def create_order(db: Session, order_data: Dict) -> Dict:
     try:
         logger.info(f"Создание нового заказа с данными: {order_data}")
         
-        # Генерируем уникальный код заказа
-        order_code = generate_order_code()
+        # Проверяем наличие кода официанта в параметрах запроса
+        # Обратите внимание, что мы рассматриваем разные возможные названия поля
+        waiter_code = None
+        if 'waiter_code' in order_data:
+            waiter_code = order_data.pop('waiter_code')
+            logger.info(f"Найден waiter_code в данных запроса: {waiter_code}")
+        
+        # Проверяем, передан ли уже готовый код заказа
+        # Если есть уже готовый код заказа, используем его
+        if 'order_code' in order_data and order_data['order_code']:
+            order_code = order_data['order_code']
+            logger.info(f"Используем уже существующий order_code из данных: {order_code}")
+        # Иначе, если есть код официанта, используем его
+        elif waiter_code:
+            order_code = waiter_code
+            order_data['order_code'] = order_code
+            logger.info(f"Устанавливаем код официанта {waiter_code} в качестве кода заказа")
+            
+            # Попытка найти соответствующего официанта по коду
+            try:
+                from app.models.order_code import OrderCode
+                from app.models.user import User, UserRole
+                
+                # Ищем сначала в таблице order_codes
+                order_code_record = db.query(OrderCode).filter(OrderCode.code == waiter_code).first()
+                
+                if order_code_record and order_code_record.waiter_id:
+                    logger.info(f"Найден официант с ID {order_code_record.waiter_id} для кода {waiter_code}")
+                    order_data['waiter_id'] = order_code_record.waiter_id
+                else:
+                    # Пробуем найти любого официанта для демо
+                    waiter = db.query(User).filter(User.role == UserRole.WAITER.value).first()
+                    if waiter:
+                        order_data['waiter_id'] = waiter.id
+                        logger.info(f"Для демо назначен официант с ID {waiter.id}")
+            except Exception as e:
+                logger.warning(f"Не удалось найти или привязать официанта по коду: {str(e)}")
+        else:
+            # Только если нет ни кода заказа, ни кода официанта - генерируем новый код
+            order_code = generate_order_code()
+            order_data['order_code'] = order_code
+            logger.info(f"Сгенерирован новый код заказа: {order_code}")
         
         # Подготавливаем данные заказа
         items = order_data.pop('items', [])
@@ -560,9 +598,6 @@ def create_order(db: Session, order_data: Dict) -> Dict:
             order_data['status'] = OrderStatus.PENDING.value
         if 'payment_status' not in order_data:
             order_data['payment_status'] = PaymentStatus.UNPAID.value
-        
-        # Добавляем код заказа
-        order_data['order_code'] = order_code
         
         # Создаем новый заказ
         db_order = Order(**order_data)
@@ -591,7 +626,8 @@ def create_order(db: Session, order_data: Dict) -> Dict:
                 order_id=db_order.id,
                 dish_id=dish_id,
                 quantity=quantity,
-                special_instructions=special_instructions
+                special_instructions=special_instructions,
+                price=dish.price  # Добавляем цену из блюда
             )
             db.add(order_dish)
             
@@ -622,19 +658,21 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         raise HTTPException(status_code=500, detail=f"Ошибка при создании заказа: {str(e)}")
 
 
-def update_order(db: Session, order_id: int, order_in: Union[OrderUpdate, OrderUpdateSchema]) -> Optional[Dict]:
+def update_order(db: Session, order_id: int, order_update: Union[OrderUpdate, OrderUpdateSchema, Dict[str, Any]]) -> Optional[Dict]:
     """
     Обновление заказа по ID
     
     Args:
         db: сессия базы данных
         order_id: ID заказа
-        order_in: данные для обновления
+        order_update: данные для обновления (схема Pydantic или dict)
         
     Returns:
-        Обновленный заказ в виде словаря или None, если заказ не найден
+        Обновленный заказ в виде словаря или None, если заказ не найден или произошла ошибка
     """
     try:
+        logger.info(f"Начало обновления заказа {order_id}")
+        
         # Проверяем существование заказа
         db_order = db.query(Order).filter(Order.id == order_id).first()
         
@@ -643,33 +681,69 @@ def update_order(db: Session, order_id: int, order_in: Union[OrderUpdate, OrderU
             return None
         
         # Подготавливаем данные для обновления
-        if hasattr(order_in, 'dict'):
-            update_data = order_in.dict(exclude_unset=True)
+        if hasattr(order_update, 'dict'):
+            # Если это Pydantic-модель
+            update_data = order_update.dict(exclude_unset=True)
         else:
-            update_data = order_in
+            # Если это словарь
+            update_data = order_update
+            
+        logger.debug(f"Данные для обновления заказа {order_id}: {update_data}")
         
         # Если обновляем статус на "completed", добавляем время завершения
         if update_data.get("status") == "completed" and "completed_at" not in update_data:
             update_data["completed_at"] = datetime.utcnow()
+            logger.debug(f"Устанавливаем completed_at для заказа {order_id}")
         
         # Если есть поле items, обрабатываем его отдельно
         items = update_data.pop("items", None)
         
         # Применяем обновления к объекту заказа
         for key, value in update_data.items():
+            if value is None:
+                # Пропускаем None значения
+                continue
+                
             # Обрабатываем enum поля
             if key == 'status' and value is not None:
-                db_order.status = safe_enum_value(OrderStatus, value)
+                logger.debug(f"Обновление статуса заказа {order_id} на {value}")
+                
+                # Используем безопасное преобразование в enum
+                enum_value = safe_enum_value(OrderStatus, value)
+                if enum_value is None:
+                    logger.warning(f"Неверное значение статуса '{value}' для заказа {order_id}")
+                    raise ValueError(f"Неверное значение статуса: {value}")
+                    
+                db_order.status = enum_value
             elif key == 'payment_status' and value is not None:
-                db_order.payment_status = safe_enum_value(PaymentStatus, value)
+                logger.debug(f"Обновление статуса оплаты заказа {order_id} на {value}")
+                
+                # Используем безопасное преобразование в enum
+                enum_value = safe_enum_value(PaymentStatus, value)
+                if enum_value is None:
+                    logger.warning(f"Неверное значение статуса оплаты '{value}' для заказа {order_id}")
+                    raise ValueError(f"Неверное значение статуса оплаты: {value}")
+                    
+                db_order.payment_status = enum_value
             elif key == 'payment_method' and value is not None:
-                db_order.payment_method = safe_enum_value(PaymentMethod, value)
+                logger.debug(f"Обновление метода оплаты заказа {order_id} на {value}")
+                
+                # Используем безопасное преобразование в enum
+                enum_value = safe_enum_value(PaymentMethod, value)
+                if enum_value is None:
+                    logger.warning(f"Неверное значение метода оплаты '{value}' для заказа {order_id}")
+                    raise ValueError(f"Неверное значение метода оплаты: {value}")
+                    
+                db_order.payment_method = enum_value
             else:
                 # Устанавливаем остальные поля
+                logger.debug(f"Установка поля {key}={value} для заказа {order_id}")
                 setattr(db_order, key, value)
         
         # Если есть items, обновляем их
         if items:
+            logger.debug(f"Обновление элементов заказа {order_id}")
+            
             # Удаляем существующие элементы заказа
             db.query(OrderDish).filter(OrderDish.order_id == order_id).delete()
             
@@ -689,7 +763,8 @@ def update_order(db: Session, order_id: int, order_in: Union[OrderUpdate, OrderU
                             order_id=order_id,
                             dish_id=dish_id,
                             quantity=quantity,
-                            special_instructions=special_instructions
+                            special_instructions=special_instructions,
+                            price=dish.price  # Добавляем цену из блюда
                         )
                         db.add(order_dish)
                         
@@ -699,20 +774,41 @@ def update_order(db: Session, order_id: int, order_in: Union[OrderUpdate, OrderU
             
             # Обновляем общую сумму заказа
             db_order.total_amount = total_amount
+            logger.debug(f"Обновлена общая сумма заказа {order_id}: {total_amount}")
         
         # Обновляем время изменения
         db_order.updated_at = datetime.utcnow()
         
         # Фиксируем изменения
+        try:
         db.commit()
+            logger.info(f"Заказ {order_id} успешно обновлен")
+        except Exception as commit_error:
+            db.rollback()
+            logger.error(f"Ошибка при коммите изменений заказа {order_id}: {str(commit_error)}")
+            raise
+            
+        # Перезагружаем данные из БД
         db.refresh(db_order)
         
         # Возвращаем обновленный заказ
-        return get_order(db, order_id)
+        try:
+            # Пробуем получить детальную информацию о заказе
+            updated_order = get_order_detailed(db, order_id)
+            return updated_order
+        except Exception as get_error:
+            logger.error(f"Не удалось получить детальную информацию о заказе {order_id} после обновления: {str(get_error)}")
+            # Если детальную информацию получить не удалось, возвращаем основные данные
+            return {
+                "id": db_order.id,
+                "status": db_order.status.value if db_order.status else "unknown",
+                "payment_status": db_order.payment_status.value if db_order.payment_status else "unknown",
+                "updated_at": db_order.updated_at.isoformat() if db_order.updated_at else None
+            }
     
     except Exception as e:
         db.rollback()
-        logger.error(f"Ошибка при обновлении заказа {order_id}: {str(e)}")
+        logger.error(f"Критическая ошибка при обновлении заказа {order_id}: {str(e)}")
         logger.exception(e)
         return None
 
@@ -834,7 +930,7 @@ def get_order_detailed(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
                 o.status, o.payment_status, o.payment_method,
                 o.created_at, o.updated_at, o.total_amount,
                 o.comment, o.customer_name, o.customer_phone,
-                o.delivery_address, o.order_code, o.reservation_code,
+                o.order_code, o.reservation_code,
                 o.is_urgent, o.is_group_order, o.completed_at
             FROM orders o
             WHERE o.id = :order_id

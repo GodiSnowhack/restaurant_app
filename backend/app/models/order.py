@@ -39,10 +39,11 @@ class OrderDish(Base):
     dish_id = Column(Integer, ForeignKey("dishes.id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Integer, default=1)
     special_instructions = Column(Text, nullable=True)
+    price = Column(Float, nullable=False)  # Цена блюда на момент заказа
     
     # Связи с явным указанием overlaps
     order = relationship("Order", back_populates="order_dishes", overlaps="items,dish")
-    dish = relationship("Dish", back_populates="order_dishes", overlaps="orders,items")
+    dish = relationship("app.models.menu.Dish", back_populates="order_dishes", overlaps="orders,items")
 
 
 class Order(Base):
@@ -57,7 +58,6 @@ class Order(Base):
     payment_method = Column(Enum(PaymentMethod), nullable=True)
     customer_name = Column(String, nullable=True)
     customer_phone = Column(String, nullable=True)
-    delivery_address = Column(String, nullable=True)
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
     
@@ -75,9 +75,8 @@ class Order(Base):
     # Отношения
     user = relationship("User", foreign_keys=[user_id], back_populates="orders")
     waiter = relationship("User", foreign_keys=[waiter_id], back_populates="served_orders")
-    items = relationship("Dish", secondary="order_dish", back_populates="orders", overlaps="order_dishes,dish")
+    items = relationship("app.models.menu.Dish", secondary="order_dish", back_populates="orders", overlaps="order_dishes,dish")
     order_dishes = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan", overlaps="items")
-    feedback = relationship("Feedback", back_populates="order")
     
     def to_dict(self):
         from datetime import datetime
@@ -100,7 +99,6 @@ class Order(Base):
             "payment_method": self.payment_method,
             "customer_name": self.customer_name,
             "customer_phone": self.customer_phone,
-            "delivery_address": self.delivery_address,
             "reservation_code": self.reservation_code,
             "order_code": self.order_code,
             "is_urgent": self.is_urgent,
@@ -124,10 +122,8 @@ class Feedback(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     dish_id = Column(Integer, ForeignKey("dishes.id"), nullable=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
     rating = Column(Integer, nullable=False)  # От 1 до 5
     comment = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)
     
     # Время создания
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -136,4 +132,3 @@ class Feedback(Base):
     user = relationship("User", back_populates="feedback")
     # Используем строковое имя с полным модулем
     dish = relationship("app.models.menu.Dish", back_populates="feedbacks")
-    order = relationship("Order", back_populates="feedback") 

@@ -28,7 +28,6 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)
     
     # Время создания и обновления
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -68,7 +67,6 @@ class Dish(Base):
     price = Column(Float, nullable=False)
     cost_price = Column(Float, nullable=True)
     image_url = Column(String, nullable=True)
-    video_url = Column(String, nullable=True)
     calories = Column(Integer, nullable=True)
     cooking_time = Column(Integer, nullable=True)  # в минутах
     is_vegetarian = Column(Boolean, default=False)
@@ -85,39 +83,5 @@ class Dish(Base):
     allergens = relationship("Allergen", secondary=dish_allergen, back_populates="dishes")
     tags = relationship("Tag", secondary=dish_tag, back_populates="dishes")
     feedbacks = relationship("Feedback", back_populates="dish", cascade="all, delete-orphan")
-    ingredient_groups = relationship("IngredientGroup", back_populates="dish", cascade="all, delete-orphan")
     orders = relationship("Order", secondary="order_dish", back_populates="items", overlaps="order_dishes,dish")
     order_dishes = relationship("OrderDish", back_populates="dish", overlaps="orders,items")
-
-
-class IngredientGroup(Base):
-    __tablename__ = "ingredient_groups"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    dish_id = Column(Integer, ForeignKey("dishes.id", ondelete="CASCADE"))
-    
-    # Время создания и обновления
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Связи с другими таблицами
-    dish = relationship("Dish", back_populates="ingredient_groups")
-    ingredients = relationship("Ingredient", back_populates="group", cascade="all, delete-orphan")
-
-
-class Ingredient(Base):
-    __tablename__ = "ingredients"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    quantity = Column(Float, nullable=True)
-    unit = Column(String, nullable=True)
-    group_id = Column(Integer, ForeignKey("ingredient_groups.id", ondelete="CASCADE"))
-    
-    # Время создания и обновления
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Связи с другими таблицами
-    group = relationship("IngredientGroup", back_populates="ingredients") 

@@ -27,8 +27,8 @@ def read_reservations(
 ):
     """Получение списка бронирований"""
     # Проверяем права доступа
-    if current_user.role == UserRole.ADMIN or current_user.role == UserRole.WAITER:
-        # Администратор и официант могут видеть все бронирования
+    if current_user.role == UserRole.ADMIN:
+        # Администратор может видеть все бронирования
         if date:
             return get_reservations_by_date(db, date, skip, limit)
         elif status:
@@ -36,6 +36,12 @@ def read_reservations(
         else:
             # Возвращаем все бронирования
             return db.query(Reservation).offset(skip).limit(limit).all()
+    elif current_user.role == UserRole.WAITER:
+        # Официант должен видеть только свои бронирования, 
+        # но поскольку нет понятия "официант бронирования", 
+        # возвращаем обычному пользователю пустой список
+        # Будем считать, что официант может видеть только свои личные бронирования
+        return get_reservations_by_user(db, current_user.id, skip, limit)
     else:
         # Обычный пользователь видит только свои бронирования
         return get_reservations_by_user(db, current_user.id, skip, limit)

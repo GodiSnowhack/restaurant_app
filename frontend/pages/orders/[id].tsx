@@ -7,7 +7,7 @@ import useAuthStore from '../../lib/auth-store';
 import { Order, OrderItem } from '../../types';
 import { ordersApi } from '../../lib/api';
 import { formatPrice } from '../../utils/priceFormatter';
-import QRCode from 'react-qr-code';
+import OrderCode from '../../components/OrderCode';
 import { 
   ClockIcon, 
   CheckCircleIcon, 
@@ -20,18 +20,23 @@ import {
   MapPinIcon as LocationMarkerIcon,
   CheckIcon,
   XMarkIcon as XIcon,
-  BugAntIcon,
-  QrCodeIcon
+  BugAntIcon
 } from '@heroicons/react/24/outline';
 import { 
   ExclamationTriangleIcon as ExclamationIcon
 } from '@heroicons/react/24/solid';
 
+// Расширяем тип Order с полем comment и special_instructions
+interface ExtendedOrder extends Order {
+  comment?: string;
+  special_instructions?: string;
+}
+
 const OrderDetailPage: NextPage = () => {
   const router = useRouter();
   const { id, success } = router.query;
   const { isAuthenticated, user } = useAuthStore();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<ExtendedOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
@@ -40,7 +45,7 @@ const OrderDetailPage: NextPage = () => {
   const [debugData, setDebugData] = useState<any>(null);
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
-  const [showQrCode, setShowQrCode] = useState(false);
+  const [waiterCode, setWaiterCode] = useState<string | null>(null);
 
   // Устанавливаем флаг монтирования компонента после рендера на клиенте
   useEffect(() => {
@@ -63,7 +68,7 @@ const OrderDetailPage: NextPage = () => {
       }
       
       // Проверка и нормализация полученных данных
-      const normalizedOrder: Order = {
+      const normalizedOrder: ExtendedOrder = {
         ...fetchedOrder,
         id: fetchedOrder.id || 0,
         status: fetchedOrder.status || 'pending',
@@ -143,6 +148,31 @@ const OrderDetailPage: NextPage = () => {
 
     fetchOrderData();
   }, [id, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (order?.id) {
+      try {
+        const storedCode = localStorage.getItem(`order_${order.id}_waiter_code`);
+        if (storedCode) {
+          console.log('Найден код официанта для заказа в localStorage:', storedCode);
+          setWaiterCode(storedCode);
+          
+          // Если код заказа не задан или не совпадает с кодом официанта,
+          // устанавливаем код официанта как код заказа для отображения
+          if (!order.order_code || order.order_code !== storedCode) {
+            console.log('Код заказа и код официанта различаются:', 
+              { orderCode: order.order_code, waiterCode: storedCode });
+            
+            const updatedOrder = {...order, order_code: storedCode};
+            setOrder(updatedOrder);
+            console.log('Код официанта установлен как код заказа:', storedCode);
+          }
+        }
+      } catch (e) {
+        console.error('Ошибка при получении кода официанта из localStorage', e);
+      }
+    }
+  }, [order?.id]);
 
   const handleCancelOrder = async () => {
     if (!order || isCancelling) return;
@@ -294,25 +324,6 @@ const OrderDetailPage: NextPage = () => {
     }
   };
 
-  const toggleQrCode = () => {
-    setShowQrCode(!showQrCode);
-  };
-
-  // Формируем данные для QR-кода
-  const getQrCodeData = () => {
-    if (!order || !order.order_code) return '';
-    
-    // Создаем URL с данными заказа для сканирования официантом
-    const qrData = {
-      type: 'restaurant_order',
-      order_id: order.id,
-      order_code: order.order_code,
-      timestamp: new Date().getTime()
-    };
-    
-    return JSON.stringify(qrData);
-  };
-
   // Отображаем заглушку до полного монтирования компонента на клиенте
   if (!isMounted) {
     return (
@@ -454,16 +465,6 @@ const OrderDetailPage: NextPage = () => {
                   </button>
                 )}
                 
-                {order.order_code && (
-                  <button
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md flex items-center hover:bg-blue-600"
-                    onClick={toggleQrCode}
-                  >
-                    <QrCodeIcon className="h-5 w-5 mr-1" />
-                    {showQrCode ? 'Скрыть QR-код' : 'Показать QR-код'}
-                  </button>
-                )}
-                
                 {user?.role === 'admin' && (
                   <button 
                     className="px-4 py-2 bg-purple-500 text-white rounded-md flex items-center hover:bg-purple-600 disabled:bg-purple-300 disabled:cursor-not-allowed"
@@ -486,24 +487,6 @@ const OrderDetailPage: NextPage = () => {
               </div>
             </div>
             
-            {/* QR-код заказа (если есть) */}
-            {showQrCode && order.order_code && (
-              <div className="p-6 border-b border-gray-200">
-                <div className="bg-white p-4 rounded-lg shadow-inner mx-auto max-w-xs text-center">
-                  <h3 className="text-lg font-semibold mb-3">QR-код заказа</h3>
-                  <div className="bg-white p-2 inline-block mb-2">
-                    <QRCode 
-                      value={getQrCodeData()}
-                      size={200}
-                      level="H"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">Код заказа: <span className="font-bold">{order.order_code}</span></p>
-                  <p className="text-xs text-gray-500 mt-1">Покажите этот код официанту</p>
-                </div>
-              </div>
-            )}
-
             {/* Информация о заказе */}
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Колонка с блюдами */}
@@ -536,6 +519,31 @@ const OrderDetailPage: NextPage = () => {
                 ) : (
                   <p className="text-gray-500 italic">Нет данных о блюдах в заказе</p>
                 )}
+
+                {/* Отображаем код заказа */}
+                {order && order.order_code && (
+                  <div className="mt-4">
+                    <OrderCode code={order.order_code} />
+                  </div>
+                )}
+
+                {/* Не показываем отдельный код официанта, если он совпадает с кодом заказа */}
+                {!order.order_code && waiterCode && (
+                  <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h3 className="font-semibold text-blue-800 mb-2 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Код официанта
+                    </h3>
+                    <div className="flex items-center">
+                      <span className="font-mono font-semibold bg-white px-3 py-1 rounded border border-blue-100">{waiterCode}</span>
+                    </div>
+                    <p className="text-sm text-blue-600 mt-2">
+                      Ваш заказ привязан к этому официанту
+                    </p>
+                  </div>
+                )}
               </div>
               
               {/* Колонка с деталями заказа */}
@@ -545,7 +553,7 @@ const OrderDetailPage: NextPage = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <p className="text-gray-600">Статус оплаты:</p>
-                    <div>{getPaymentStatusBadge(order.payment_status)}</div>
+                    <div>{getPaymentStatusBadge(order.payment_status || 'pending')}</div>
                   </div>
                   
                   <div className="flex justify-between">
@@ -589,7 +597,7 @@ const OrderDetailPage: NextPage = () => {
                     </div>
                   )}
                   
-                  {order.delivery_address && (
+                  {order?.delivery_address && (
                     <div className="flex justify-between">
                       <p className="text-gray-600">Адрес доставки:</p>
                       <p className="flex items-center text-right">
@@ -599,10 +607,11 @@ const OrderDetailPage: NextPage = () => {
                     </div>
                   )}
                   
-                  {order.special_instructions && (
+                  {/* Используем поле comment вместо special_instructions, так как его нет в Order из types/index.ts */}
+                  {order?.comment && (
                     <div className="flex justify-between">
                       <p className="text-gray-600">Примечания:</p>
-                      <p className="text-right">{order.special_instructions}</p>
+                      <p className="text-right">{order.comment}</p>
                     </div>
                   )}
                 </div>
@@ -627,6 +636,17 @@ const OrderDetailPage: NextPage = () => {
                         </>
                       )}
                     </button>
+                  </div>
+                )}
+
+                {/* Особые инструкции - используем поле comment вместо special_instructions */}
+                {order?.comment && (
+                  <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h3 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                      <ExclamationIcon className="h-5 w-5 mr-2 text-yellow-600" />
+                      Особые инструкции
+                    </h3>
+                    <p className="text-gray-800">{order.comment}</p>
                   </div>
                 )}
               </div>

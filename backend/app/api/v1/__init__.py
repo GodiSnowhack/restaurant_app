@@ -25,4 +25,26 @@ async def health_check():
         "status": "ok",
         "version": "1.0",
         "message": "API сервер работает нормально"
-    } 
+    }
+
+@api_router.post("/auth/_log", tags=["system"])
+async def auth_log(data: dict):
+    """
+    Эндпоинт для логирования ошибок авторизации.
+    Используется мобильными клиентами для отправки диагностической информации.
+    """
+    # Логируем полученные данные
+    print(f"[AUTH LOG] Получены данные об ошибке авторизации:")
+    print(f"  Ошибка: {data.get('error')}")
+    print(f"  Эндпоинт: {data.get('endpoint')}")
+    print(f"  Время: {data.get('timestamp')}")
+    
+    # Дополнительная диагностическая информация
+    if "diagnosticInfo" in data:
+        print(f"  Диагностика: {data['diagnosticInfo']}")
+    
+    if "networkInfo" in data:
+        print(f"  Информация о сети: {data['networkInfo']}")
+    
+    # Возвращаем подтверждение
+    return {"status": "logged", "received": True} 

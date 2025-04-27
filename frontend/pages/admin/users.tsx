@@ -239,7 +239,7 @@ const AdminUsersPage: NextPage = () => {
           </div>
 
           <Link
-            href="/admin/users/add"
+            href="/admin/users/create"
             className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
           >
             <UserAddIcon className="h-4 w-4 mr-2" />
@@ -272,7 +272,7 @@ const AdminUsersPage: NextPage = () => {
               <button
                 onClick={() => handleRoleChange('all')}
                 className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  showRoleFilter === 'all'
+                  showRoleFilter === 'all' 
                     ? isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
                     : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
                 }`}
@@ -282,7 +282,7 @@ const AdminUsersPage: NextPage = () => {
               <button
                 onClick={() => handleRoleChange('admin')}
                 className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  showRoleFilter === 'admin'
+                  showRoleFilter === 'admin' 
                     ? isDark ? 'bg-purple-900/50 text-purple-200' : 'bg-purple-100 text-purple-900'
                     : isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
                 }`}
@@ -315,33 +315,33 @@ const AdminUsersPage: NextPage = () => {
 
         {/* Таблица пользователей */}
         <div className={`${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-lg shadow-md overflow-hidden`}>
-          <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
               <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
-                <tr>
+                  <tr>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Пользователь
-                  </th>
+                      Пользователь
+                    </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     Контакты
-                  </th>
+                    </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Роль
-                  </th>
+                      Роль
+                    </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     Регистрация
                   </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Статистика
-                  </th>
+                      Статистика
+                    </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Статус
-                  </th>
+                      Статус
+                    </th>
                   <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Действия
-                  </th>
-                </tr>
-              </thead>
+                      Действия
+                    </th>
+                  </tr>
+                </thead>
               <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
                 {users.length === 0 ? (
                   <tr>
@@ -445,10 +445,10 @@ const AdminUsersPage: NextPage = () => {
                     </tr>
                   ))
                 )}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
       </div>
     </Layout>
   );

@@ -174,7 +174,7 @@ def update_order(
     """Обновляет существующий заказ."""
     try:
         # Проверка прав доступа
-        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN]:
+        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления заказов"
@@ -208,7 +208,8 @@ def update_order_status(
     """Обновляет статус заказа."""
     try:
         # Проверка прав доступа
-        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN]:
+        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+            logger.warning(f"Пользователь {current_user.id} с ролью {current_user.role} попытался обновить статус заказа {order_id}")
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления статуса заказа"

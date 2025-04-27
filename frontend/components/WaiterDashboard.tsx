@@ -3,10 +3,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ordersApi } from '../lib/api';
 import { 
-  ListBulletIcon, 
-  QrCodeIcon,
-  UserIcon,
-  CalendarIcon,
+  ListBulletIcon,
+  PlusCircleIcon
 } from '@heroicons/react/24/outline';
 
 type NavigationItem = {
@@ -27,12 +25,8 @@ const WaiterDashboard = ({ children }: { children: React.ReactNode }) => {
     const path = router.pathname;
     if (path.includes('/waiter/orders')) {
       setActiveNavItem('orders');
-    } else if (path.includes('/waiter/scan')) {
-      setActiveNavItem('scan');
-    } else if (path.includes('/waiter/reservations')) {
-      setActiveNavItem('reservations');
-    } else if (path.includes('/waiter/profile')) {
-      setActiveNavItem('profile');
+    } else if (path.includes('/waiter/create-order')) {
+      setActiveNavItem('create-order');
     }
   }, [router.pathname]);
 
@@ -73,19 +67,9 @@ const WaiterDashboard = ({ children }: { children: React.ReactNode }) => {
       count: assignedOrdersCount
     },
     {
-      name: 'Сканировать QR',
-      href: '/waiter/scan',
-      icon: <QrCodeIcon className="h-6 w-6" />
-    },
-    {
-      name: 'Бронирования',
-      href: '/waiter/reservations',
-      icon: <CalendarIcon className="h-6 w-6" />
-    },
-    {
-      name: 'Профиль',
-      href: '/waiter/profile',
-      icon: <UserIcon className="h-6 w-6" />
+      name: 'Создать заказ',
+      href: '/waiter/create-order',
+      icon: <PlusCircleIcon className="h-6 w-6" />
     }
   ];
 
@@ -100,26 +84,22 @@ const WaiterDashboard = ({ children }: { children: React.ReactNode }) => {
       
       {/* Нижняя навигация */}
       <div className="bg-white border-t border-gray-200 fixed bottom-0 left-0 right-0 z-10 shadow-up">
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-2 h-16">
           {navigationItems.map((item) => (
-            <Link href={item.href} key={item.name}>
-              <div 
-                className={`flex flex-col items-center justify-center h-full ${
-                  activeNavItem === item.href.split('/').pop() 
-                    ? 'text-primary' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <div className="relative">
-                  {item.icon}
-                  {item.count && item.count > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
-                      {item.count > 9 ? '9+' : item.count}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs mt-1">{item.name}</span>
+            <Link href={item.href} key={item.name} className={`flex flex-col items-center justify-center h-full ${
+              activeNavItem === item.href.split('/').pop() 
+                ? 'text-primary' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}>
+              <div className="relative">
+                {item.icon}
+                {item.count && item.count > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
+                    {item.count > 9 ? '9+' : item.count}
+                  </span>
+                )}
               </div>
+              <span className="text-xs mt-1">{item.name}</span>
             </Link>
           ))}
         </div>

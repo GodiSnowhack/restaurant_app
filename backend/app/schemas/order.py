@@ -47,7 +47,6 @@ class OrderBase(BaseModel):
     order_type: Optional[str] = "dine-in"
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    delivery_address: Optional[str] = None
     reservation_code: Optional[str] = None
     order_code: Optional[str] = None
 
@@ -70,7 +69,6 @@ class OrderUpdate(BaseModel):
     order_type: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    delivery_address: Optional[str] = None
     reservation_code: Optional[str] = None
     order_code: Optional[str] = None
     items: Optional[List[OrderItemUpdate]] = None
@@ -172,14 +170,25 @@ class OrderResponse(BaseModel):
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
     status: str = "pending"
+    order_status: Optional[str] = None
     payment_status: str = "pending"
     payment_method: Optional[str] = None
     special_instructions: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     total_price: float = 0.0
+    total: Optional[float] = None
+    total_amount: Optional[float] = None
+    total_sum: Optional[float] = None
+    total_formatted: Optional[str] = None
+    total_price_formatted: Optional[str] = None
+    total_amount_formatted: Optional[str] = None
+    total_sum_formatted: Optional[str] = None
     items: List[dict] = []
     delivery_address: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    name: Optional[str] = None
     phone: Optional[str] = None
     is_delivery: Optional[bool] = False
     order_type: Optional[str] = "dine-in"
@@ -206,7 +215,6 @@ class OrderResponse(BaseModel):
             "order_type": obj.order_type,
             "customer_name": obj.customer_name,
             "customer_phone": obj.customer_phone,
-            "delivery_address": obj.delivery_address,
             "reservation_code": obj.reservation_code,
             "order_code": obj.order_code,
             "created_at": obj.created_at,
@@ -259,7 +267,7 @@ class OrderReadSchema(OrderBase):
             "is_group_order": self.is_group_order,
             "customer_name": self.customer_name,
             "customer_phone": self.customer_phone,
-            "delivery_address": self.delivery_address,
+            "reservation_code": self.reservation_code,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
@@ -281,7 +289,6 @@ class OrderUpdateSchema(BaseModel):
     is_group_order: Optional[bool] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    delivery_address: Optional[str] = None
     items: Optional[List[OrderItemUpdate]] = None
     
     class Config:

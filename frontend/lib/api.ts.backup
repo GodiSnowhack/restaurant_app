@@ -1,0 +1,2790 @@
+import axios, { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+
+// Функция для определения правильного baseURL для API
+const getApiBaseUrl = () => {
+  // Используем URL из переменной окружения, если он задан
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // Если мы на клиенте, определим baseURL на основе текущего хоста
+  if (typeof window !== 'undefined') {
+    // Получаем хост из URL (например, localhost:3000 или 192.168.0.16:3000)
+    const host = window.location.hostname;
+    
+    // Возвращаем API URL с текущим хостом, но портом бэкенда
+    return `http://${host}:8000/api/v1`;
+  }
+  
+  // Если мы на сервере или не можем определить, используем стандартный URL
+  return 'http://localhost:8000/api/v1';
+};
+
+const baseURL = getApiBaseUrl();
+// Используем baseURL как API_URL для унификации
+const API_URL = baseURL;
+
+export const api = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest'
+  },
+  withCredentials: true, // Включаем отправку куки для поддержки авторизации
+  timeout: 60000, // Увеличиваем таймаут для мобильных устройств до 60 секунд
+  maxRedirects: 5, // Максимальное количество редиректов
+});
+
+// Функция повторных попыток для критически важных API-вызовов
+export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> => {
+  let lastError;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      console.log(`Попытка ${i + 1} из ${maxRetries} не удалась:`, error);
+      lastError = error;
+      
+      // Ожидаем перед следующей попыткой с увеличением времени ожидания (экспоненциальная выдержка)
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+      }
+    }
+  }
+  
+  throw lastError;
+};
+
+// Проверка, не истёк ли токен
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    const { exp } = JSON.parse(jsonPayload);
+    const expired = Date.now() >= exp * 1000;
+    
+    return expired;
+  } catch (e) {
+    return false; // Если ошибка при декодировании, считаем что токен не истёк
+  }
+};
+
+// Функция получения токена из любого доступного хранилища
+const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const localToken = localStorage.getItem('token');
+    const sessionToken = sessionStorage.getItem('token');
+    
+    // Если есть токен в localStorage, используем его, иначе из sessionStorage
+    if (localToken) {
+      return localToken;
+    } else if (sessionToken) {
+      // Если токен есть только в sessionStorage, копируем его в localStorage
+      try {
+        localStorage.setItem('token', sessionToken);
+      } catch (e) {
+        console.error('Не удалось скопировать токен из sessionStorage в localStorage:', e);
+      }
+      return sessionToken;
+    }
+  } catch (e) {
+    console.error('Ошибка при получении токена:', e);
+  }
+  
+  return null;
+};
+
+// Interceptor для добавления токена в заголовки
+api.interceptors.request.use(
+  (config) => {
+    const token = getAuthToken();
+    
+    if (token && !isTokenExpired(token)) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Проверяем, является ли запрос регистрацией
+    if (config.url === '/auth/register' && config.method === 'post') {
+      // Если это запрос на регистрацию, проверяем, что роль установлена как 'guest'
+      if (config.data && typeof config.data === 'object') {
+        // Если роль не указана или указана как 'user', устанавливаем её как 'guest'
+        if (!config.data.role || config.data.role === 'user') {
+          config.data.role = 'guest';
+          console.log('API Interceptor: Установлена роль "guest" для запроса регистрации');
+        }
+      }
+    }
+    
+    return config;
+  },
+  (error) => {
+    console.error('Ошибка запроса API:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Добавляем обработчик ответов для централизованной обработки ошибок
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    const isMobile = typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+    
+    // Сохраняем информацию о последней ошибке для диагностики
+    if (typeof window !== 'undefined') {
+      try {
+        const lastErrors = JSON.parse(localStorage.getItem('api_last_errors') || '[]');
+        const newError = {
+          timestamp: new Date().toISOString(),
+          url: error.config?.url,
+          method: error.config?.method?.toUpperCase(),
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+          isMobile
+        };
+        
+        // Сохраняем последние 5 ошибок
+        lastErrors.unshift(newError);
+        if (lastErrors.length > 5) lastErrors.pop();
+        
+        localStorage.setItem('api_last_errors', JSON.stringify(lastErrors));
+      } catch (e) {
+        console.error('Не удалось сохранить информацию об ошибке:', e);
+      }
+    }
+    
+    if (error.response) {
+      // Сервер вернул статус отличный от 2xx
+      console.error('API Response Error:', {
+        message: error.message,
+        status: error.response.status,
+        data: error.response.data
+      });
+      
+      // Преобразуем ошибку в строку, если это объект
+      if (error.response.data && typeof error.response.data === 'object') {
+        if (error.response.data.detail) {
+          if (typeof error.response.data.detail === 'string') {
+            error.response.data.detail = error.response.data.detail;
+          } else if (Array.isArray(error.response.data.detail)) {
+            error.response.data.detail = error.response.data.detail.map((err: any) => {
+              if (err.loc && err.msg) {
+                const field = err.loc.slice(1).join('.') || 'значение';
+                return `Поле "${field}": ${err.msg}`;
+              }
+              return typeof err === 'string' ? err : JSON.stringify(err);
+            }).join('\n');
+          } else {
+            error.response.data.detail = JSON.stringify(error.response.data.detail);
+          }
+        } else {
+          error.response.data.detail = JSON.stringify(error.response.data);
+        }
+      }
+      
+      // Обрабатываем ошибку авторизации
+      if (error.response.status === 401) {
+        console.warn('Получена ошибка 401, возможно токен истек');
+        
+        // На мобильных устройствах не удаляем токен и не перенаправляем сразу,
+        // чтобы дать возможность обработать ошибку и повторить запрос
+        if (!isMobile) {
+        localStorage.removeItem('token');
+          
+        // Если не находимся на странице авторизации, перенаправляем
+        if (typeof window !== 'undefined' && window.location.pathname !== '/auth/login') {
+          window.location.href = '/auth/login';
+          }
+        } else {
+          console.log('Мобильное устройство: ошибка 401 будет обработана локально');
+        }
+      }
+    } else if (error.request) {
+      // Запрос был создан, но ответ не получен (ошибка сети)
+      console.error('API Response Error:', {
+        message: error.message,
+        response: 'No response',
+        request: 'Request was sent',
+      });
+      
+      // Для мобильных устройств отображаем более подробную ошибку
+      if (isMobile) {
+        const networkDiagnostics = {
+          timestamp: new Date().toISOString(),
+          online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
+          userAgent: navigator.userAgent,
+          url: error.config?.url,
+          method: error.config?.method
+        };
+        
+        console.log('Мобильное устройство: диагностика сети', networkDiagnostics);
+        
+        try {
+          localStorage.setItem('network_diagnostics', JSON.stringify(networkDiagnostics));
+        } catch (e) {
+          console.error('Не удалось сохранить диагностику сети:', e);
+        }
+        
+        error.response = { 
+          data: { 
+            detail: `Ошибка сети: ${error.message}. Проверьте подключение к интернету и повторите попытку.` 
+          } 
+        };
+      } else {
+      error.response = { data: { detail: 'Ошибка сети. Пожалуйста, проверьте подключение к интернету.' } };
+      }
+    } else {
+      // Произошла ошибка во время создания запроса
+      console.error('API Error:', error.message);
+      error.response = { data: { detail: error.message } };
+    }
+    
+    // Дополнительное логирование для сетевых ошибок
+    if (error.code === 'ECONNABORTED' || error.message.includes('Network Error')) {
+      console.error('Ошибка сети или таймаут запроса', error);
+      
+      // Для мобильных устройств пытаемся сохранить информацию о сети
+      if (isMobile && typeof navigator !== 'undefined') {
+        const connectionInfo = {
+          online: navigator.onLine,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          url: error.config?.url,
+          method: error.config?.method
+        };
+        
+        console.log('Информация о подключении:', connectionInfo);
+        
+        try {
+          localStorage.setItem('last_connection_error', JSON.stringify(connectionInfo));
+        } catch (e) {
+          console.error('Не удалось сохранить информацию о подключении:', e);
+        }
+      }
+      
+      error.response = { data: { detail: 'Ошибка сети или таймаут запроса. Пожалуйста, попробуйте позже.' } };
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Типы для API запросов
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export interface RegisterCredentials {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  role?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  full_name: string;
+  phone?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FileUploadResponse {
+  success: boolean;
+  fileUrl: string;
+  filename: string;
+  originalFilename: string;
+  message?: string;
+}
+
+export interface DashboardStats {
+  ordersToday: number;
+  ordersTotal: number;
+  revenue: number;
+  reservationsToday: number;
+  users: number;
+  dishes: number;
+}
+
+export interface WorkingHoursItem {
+  open: string;
+  close: string;
+  is_closed: boolean;
+}
+
+export interface WorkingHours {
+  monday: WorkingHoursItem;
+  tuesday: WorkingHoursItem;
+  wednesday: WorkingHoursItem;
+  thursday: WorkingHoursItem;
+  friday: WorkingHoursItem;
+  saturday: WorkingHoursItem;
+  sunday: WorkingHoursItem;
+}
+
+export interface RestaurantTable {
+  id?: number;
+  number: number;
+  capacity: number;
+  status?: string;
+}
+
+export interface RestaurantSettings {
+  restaurant_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  website: string;
+  working_hours: WorkingHours;
+  currency: string;
+  currency_symbol: string;
+  tax_percentage: number;
+  min_order_amount: number;
+  delivery_fee: number;
+  free_delivery_threshold: number;
+  table_reservation_enabled: boolean;
+  delivery_enabled: boolean;
+  pickup_enabled: boolean;
+  privacy_policy: string;
+  terms_of_service: string;
+  tables: RestaurantTable[];
+}
+
+export interface OrderItem {
+  dish_id: number;
+  quantity: number;
+  price: number;
+  name: string;
+  special_instructions?: string;
+}
+
+export interface Order {
+  id?: number;
+  user_id?: number;
+  table_number?: number;
+  status: string;
+  payment_status: string;
+  payment_method: string;
+  order_type: string;
+  items: OrderItem[];
+  total_amount: number;
+  special_instructions?: string;
+  created_at?: string;
+  updated_at?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  delivery_address?: string;
+}
+
+// Обновление функции logout для очистки обоих хранилищ
+const clearAuthTokens = () => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('auth_timestamp');
+    localStorage.removeItem('auth_method');
+    localStorage.removeItem('user_profile');
+  } catch (e) {
+    console.error('Ошибка при очистке токенов:', e);
+  }
+};
+
+// API функции для аутентификации
+export const authApi = {
+  login: async (credentials: LoginCredentials) => {
+    try {
+      console.log('API login - Отправка запроса через прокси');
+      
+      // Добавляем user-agent для отладки
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+      console.log('API login - User Agent:', userAgent);
+      
+      // Определяем, является ли устройство мобильным
+      const isMobile = /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(userAgent);
+      console.log('API login - Мобильное устройство:', isMobile);
+      
+      // Специальная обработка для мобильных устройств - используем прямой запрос к API
+      if (isMobile) {
+        try {
+          console.log('API login - Используем прямой запрос для мобильного устройства');
+          
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const loginUrl = `${apiUrl}/auth/login`;
+          
+          console.log('API login - URL для мобильного:', loginUrl);
+          
+          // Формируем данные для запроса
+          const formData = new URLSearchParams();
+          formData.append('username', credentials.username);
+          formData.append('password', credentials.password);
+          
+          try {
+            console.log('API login - Отправка запроса к:', loginUrl);
+            
+            // Проверяем подключение к сети
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+              throw new Error('Нет подключения к интернету');
+            }
+            
+            // Пробуем через XMLHttpRequest для мобильных устройств (более надежно)
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', loginUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.setRequestHeader('User-Agent', userAgent);
+            xhr.setRequestHeader('X-User-Agent', userAgent);
+            xhr.setRequestHeader('Accept', 'application/json');
+            
+            // Создаем Promise для обработки XMLHttpRequest
+            const mobileData = await new Promise<any>((resolve, reject) => {
+              xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  try {
+                    const data = JSON.parse(xhr.responseText);
+                    resolve(data);
+                  } catch (e) {
+                    reject(new Error('Неверный формат ответа'));
+                  }
+                } else {
+                  reject(new Error(`Ошибка авторизации: ${xhr.status}`));
+                }
+              };
+              
+              xhr.onerror = function() {
+                reject(new Error('Ошибка сети при авторизации'));
+              };
+              
+              xhr.ontimeout = function() {
+                reject(new Error('Таймаут авторизации'));
+              };
+              
+              xhr.timeout = 30000; // 30 секунд таймаут
+              xhr.send(formData.toString());
+            });
+            
+            if (mobileData.access_token) {
+              console.log('API login - Успешно получен токен через прямой запрос');
+              localStorage.setItem('token', mobileData.access_token);
+              localStorage.setItem('auth_timestamp', Date.now().toString());
+              localStorage.setItem('auth_method', 'direct_mobile');
+              
+              // Также сохраним в sessionStorage для надежности
+              sessionStorage.setItem('token', mobileData.access_token);
+              
+              return { access_token: mobileData.access_token, token_type: 'bearer' };
+            } else {
+              console.error('API login - Отсутствует токен в ответе прямого запроса');
+              throw new Error('Не удалось получить токен авторизации');
+            }
+          } catch (mobileError: any) {
+            console.error('API login - Ошибка в XMLHttpRequest:', mobileError);
+            
+            // Пробуем через fetch как запасной вариант
+            console.log('API login - Пробуем fetch на мобильном устройстве');
+            
+            const mobileResponse = await fetch(loginUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': userAgent,
+                'X-User-Agent': userAgent,
+                'Accept': 'application/json',
+              },
+              body: formData.toString()
+            });
+            
+            console.log('API login - Прямой fetch, статус:', mobileResponse.status);
+            
+            if (!mobileResponse.ok) {
+              const errorText = await mobileResponse.text();
+              console.error('API login - Ошибка прямого fetch запроса:', errorText);
+              throw new Error(`Ошибка авторизации: ${mobileResponse.status}`);
+            }
+            
+            const mobileData = await mobileResponse.json();
+            
+            if (mobileData.access_token) {
+              console.log('API login - Успешно получен токен через fetch');
+              localStorage.setItem('token', mobileData.access_token);
+              localStorage.setItem('auth_timestamp', Date.now().toString());
+              localStorage.setItem('auth_method', 'direct_mobile_fetch');
+              
+              // Также сохраним в sessionStorage для надежности
+              sessionStorage.setItem('token', mobileData.access_token);
+              
+              return { access_token: mobileData.access_token, token_type: 'bearer' };
+            } else {
+              console.error('API login - Отсутствует токен в ответе fetch');
+              throw new Error('Не удалось получить токен авторизации');
+            }
+          }
+        } catch (mobileError: any) {
+          console.error('API login - Все попытки на мобильном устройстве не удались:', mobileError);
+          
+          // Запишем всю доступную информацию для отладки
+          try {
+            localStorage.setItem('mobile_auth_error', JSON.stringify({
+              message: mobileError.message,
+              stack: mobileError.stack?.slice(0, 500),
+              timestamp: new Date().toISOString(),
+              online: navigator.onLine,
+              userAgent: navigator.userAgent
+            }));
+          } catch (e) {
+            console.error('Не удалось сохранить ошибку:', e);
+          }
+          
+          // Продолжаем с обычным запросом через прокси как последняя попытка
+          console.log('API login - Продолжаем с обычным запросом через прокси');
+        }
+      }
+      
+      // Используем fetch с дополнительными опциями для мобильных устройств
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Agent': userAgent,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+        body: JSON.stringify(credentials),
+        credentials: 'include', // Важно для обработки cookies
+        mode: 'cors', // Разрешаем CORS запросы
+        cache: 'no-cache',
+        redirect: 'follow',
+      });
+      
+      console.log('API login - Получен ответ со статусом:', response.status);
+      
+      // Проверяем на ошибки HTTP
+      if (!response.ok) {
+        let errorMessage = 'Ошибка авторизации';
+        
+        try {
+        const errorData = await response.json();
+          errorMessage = errorData.message || `Ошибка авторизации: ${response.status}`;
+          console.error('API login - Ошибка авторизации:', errorData);
+        } catch (e) {
+          console.error('API login - Не удалось прочитать ответ с ошибкой:', e);
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Безопасно пробуем прочитать тело ответа
+      let data;
+      try {
+        data = await response.json();
+        console.log('API login - Успешно получены данные');
+      } catch (e) {
+        console.error('API login - Ошибка при чтении ответа:', e);
+        throw new Error('Невозможно обработать ответ сервера');
+      }
+      
+      // Сохраняем токен в localStorage (дублируем из cookie для доступа на клиенте)
+      if (data.token) {
+        try {
+        localStorage.setItem('token', data.token);
+        console.log('API login - Токен сохранен в localStorage');
+          
+          // Добавляем временную метку для обновления состояния
+          localStorage.setItem('auth_timestamp', Date.now().toString());
+          localStorage.setItem('auth_method', 'proxy');
+          
+          // Дополнительно сохраняем токен в sessionStorage для надежности на мобильных устройствах
+          sessionStorage.setItem('token', data.token);
+        } catch (e) {
+          console.error('API login - Не удалось сохранить токен в localStorage:', e);
+        }
+      } else {
+        console.warn('API login - Токен отсутствует в ответе');
+      }
+      
+      return { access_token: data.token, token_type: 'bearer' };
+    } catch (error: any) {
+      console.error('API login - Ошибка:', error);
+      
+      // Записываем ошибку в localStorage для отладки на мобильных устройствах
+      try {
+        localStorage.setItem('last_auth_error', JSON.stringify({
+          message: error.message,
+          timestamp: new Date().toISOString()
+        }));
+      } catch (e) {
+        console.error('Не удалось сохранить ошибку в localStorage:', e);
+      }
+      
+      throw error;
+    }
+  },
+  
+  register: async (credentials: RegisterCredentials) => {
+    console.log('API: Отправляем запрос на регистрацию с данными:', credentials);
+    const response = await api.post<UserProfile>('/auth/register', credentials);
+    console.log('API: Получен ответ на регистрацию:', response.data);
+    return response.data;
+  },
+  
+  logout: () => {
+    clearAuthTokens();
+  },
+  
+  getProfile: async () => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Токен авторизации не найден');
+    }
+    
+    // Проверяем, работаем ли на клиенте
+    const isClient = typeof window !== 'undefined';
+    
+    // Получаем сохраненный профиль для использования в случае ошибок
+    let cachedProfile = null;
+    
+    if (isClient) {
+      try {
+        const profileJson = localStorage.getItem('user_profile');
+        if (profileJson) {
+          cachedProfile = JSON.parse(profileJson);
+          console.log('API - Найден кэшированный профиль:', cachedProfile?.role || 'unknown');
+        }
+      } catch (e) {
+        console.error('API - Ошибка при чтении кэшированного профиля:', e);
+      }
+    }
+    
+    // Проверяем подключение к сети
+    if (isClient && typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.log('API - Нет подключения к сети, возвращаем кэшированный профиль');
+      if (cachedProfile) {
+        return cachedProfile;
+      }
+      throw new Error('Отсутствует подключение к интернету');
+    }
+    
+    // Сохраняем информацию о запросе
+    const diagnosticInfo = {
+      timestamp: new Date().toISOString(),
+      online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      tokenExists: !!token,
+      tokenLength: token?.length || 0
+    };
+    
+    if (isClient) {
+      try {
+        localStorage.setItem('last_profile_request', JSON.stringify(diagnosticInfo));
+      } catch (e) {
+        console.error('API - Не удалось сохранить диагностику запроса:', e);
+      }
+    }
+    
+    // Определяем, является ли устройство мобильным
+    const isMobile = isClient && typeof navigator !== 'undefined' && 
+      /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+
+    // Для мобильных устройств сначала пробуем использовать кэшированный профиль
+    if (isMobile && cachedProfile) {
+      console.log('API - Мобильное устройство использует кэшированный профиль');
+      
+      // Выполняем проверку профиля в фоне, чтобы обновить кэш, но не блокировать UI
+      setTimeout(() => {
+        console.log('API - Фоновое обновление профиля для мобильного устройства');
+        api.get<UserProfile>('/users/me')
+          .then(response => {
+            try {
+              localStorage.setItem('user_profile', JSON.stringify(response.data));
+              localStorage.setItem('user_role', response.data.role);
+              console.log('API - Профиль обновлен в фоне');
+            } catch (e) {
+              console.error('API - Ошибка при обновлении профиля в фоне:', e);
+            }
+          })
+          .catch(e => console.error('API - Ошибка фонового обновления профиля:', e));
+      }, 100);
+      
+      return cachedProfile;
+    }
+    
+    // Попытка получить профиль через axios
+    try {
+      console.log('API - Запрос профиля с помощью axios');
+    const response = await api.get<UserProfile>('/users/me');
+      const profile = response.data;
+      
+      // Кэшируем профиль
+      if (isClient && profile) {
+        try {
+          localStorage.setItem('user_profile', JSON.stringify(profile));
+          localStorage.setItem('user_role', profile.role);
+          console.log('API - Профиль сохранен в localStorage, роль:', profile.role);
+        } catch (e) {
+          console.error('API - Ошибка при сохранении профиля:', e);
+        }
+      }
+      
+      return profile;
+    } catch (axiosError) {
+      console.error('API - Ошибка axios при получении профиля:', axiosError);
+      
+      // Проверяем, является ли ошибка сетевой
+      const isNetworkError = isClient && 
+        ((axiosError as any)?.message === 'Network Error' || 
+        (axiosError as any)?.code === 'ECONNABORTED' ||
+        (axiosError as any)?.name === 'AbortError');
+      
+      // Если ошибка сети, пробуем прямой fetch
+      if (isNetworkError) {
+        console.log('API - Пробуем прямой fetch запрос из-за ошибки сети');
+        
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          
+          // Проверяем валидность URL
+          let validApiUrl = apiUrl;
+          try {
+            // Проверяем, что URL правильно сформирован
+            new URL(apiUrl);
+          } catch (urlError) {
+            console.error('API - Неверный формат API URL, используем резервный URL:', urlError);
+            // Если URL некорректен, используем резервный
+            validApiUrl = 'http://localhost:8000/api/v1';
+            
+            // Записываем информацию об ошибке
+            if (isClient) {
+              try {
+                localStorage.setItem('api_url_error', JSON.stringify({
+                  originalUrl: apiUrl,
+                  fallbackUrl: validApiUrl,
+                  error: String(urlError),
+                  timestamp: new Date().toISOString()
+                }));
+              } catch (e) {
+                console.error('Не удалось записать ошибку URL:', e);
+              }
+            }
+          }
+          
+          // Полный URL для запроса
+          const requestUrl = `${validApiUrl}/users/me`;
+          console.log('API - Используем URL для запроса:', requestUrl);
+          
+          // Добавляем обработку таймаута для fetch запроса
+          const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
+            // Проверяем подключение перед запросом
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+              throw new Error('Нет подключения к интернету');
+            }
+            
+            const controller = new AbortController();
+            const id = setTimeout(() => {
+              console.log(`API - Таймаут запроса к ${url} превышен (${timeout}ms)`);
+              controller.abort();
+            }, timeout);
+            
+            try {
+              console.log(`API - Начинаем fetch запрос к ${url}`);
+              const startTime = Date.now();
+              
+              // Добавляем проверку на случай, если URL неверный
+              if (!url || !url.startsWith('http')) {
+                throw new Error(`Неверный URL: ${url}`);
+              }
+              
+              const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+              });
+              
+              const duration = Date.now() - startTime;
+              console.log(`API - Fetch запрос завершен за ${duration}ms, статус: ${response.status}`);
+              
+              clearTimeout(id);
+              return response;
+            } catch (err) {
+              clearTimeout(id);
+              console.error(`API - Ошибка fetch: ${err instanceof Error ? err.message : String(err)}`);
+              
+              // Записываем диагностическую информацию
+              if (isClient) {
+                try {
+                  const diagnosticInfo = {
+                    timestamp: new Date().toISOString(),
+                    url,
+                    errorType: err instanceof Error ? err.name : typeof err,
+                    errorMessage: err instanceof Error ? err.message : String(err),
+                    stack: err instanceof Error ? err.stack?.slice(0, 500) : null,
+                    online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+                    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+                    connectionType: typeof navigator !== 'undefined' && 'connection' in navigator 
+                      ? (navigator as any).connection?.type || 'unknown' 
+                      : 'not_supported'
+                  };
+                  
+                  localStorage.setItem('fetch_error_info', JSON.stringify(diagnosticInfo));
+                  console.log('API - Сохранена диагностическая информация об ошибке fetch');
+                } catch (storageError) {
+                  console.error('API - Не удалось сохранить диагностику:', storageError);
+                }
+              }
+              
+              // Если есть кэш, возвращаем его вместо ошибки
+              if (cachedProfile) {
+                console.log('API - Возвращаем кэшированный профиль из-за ошибки fetch');
+                // Не выбрасываем ошибку, используем кэшированные данные
+                throw new Error(`Ошибка запроса: ${err instanceof Error ? err.message : String(err)}. Используем кэшированные данные.`);
+              }
+              
+              throw err;
+            }
+          };
+          
+          // Резервный механизм - если основной запрос не удастся, пробуем GET запрос без лишних заголовков
+          try {
+            console.log('API - Отправка прямого запроса к:', `${requestUrl}`);
+            const response = await fetchWithTimeout(requestUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+              },
+              cache: 'no-cache',
+              credentials: 'omit' // Отключаем cookies для прямого запроса
+            }, 30000); // 30 секунд таймаут
+            
+            if (!response.ok) {
+              // Если не прошла авторизация, но мы имеем кэшированный профиль, возвращаем его
+              if (response.status === 401 && cachedProfile) {
+                console.log('API - Неавторизованный запрос, возвращаем кэшированный профиль');
+                return cachedProfile;
+              }
+              
+              throw new Error(`HTTP ошибка! Статус: ${response.status}`);
+            }
+            
+            const profile = await response.json();
+            
+            // Кэшируем профиль
+            if (profile) {
+              try {
+                localStorage.setItem('user_profile', JSON.stringify(profile));
+                localStorage.setItem('user_role', profile.role);
+                console.log('API - Профиль сохранен после прямого запроса, роль:', profile.role);
+              } catch (e) {
+                console.error('API - Ошибка при сохранении профиля:', e);
+              }
+            }
+            
+            return profile;
+          } catch (mainFetchError) {
+            console.error('API - Ошибка основного fetch запроса:', mainFetchError);
+            
+            // Пробуем XMLHttpRequest как резервный вариант для мобильных устройств
+            if (isMobile) {
+              console.log('API - Пробуем XMLHttpRequest на мобильном устройстве');
+              
+              const xhrProfile = await new Promise<UserProfile>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', requestUrl, true);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Accept', 'application/json');
+                
+                xhr.onload = function() {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      const profile = JSON.parse(xhr.responseText);
+                      resolve(profile);
+                    } catch (e) {
+                      if (cachedProfile) resolve(cachedProfile);
+                      else reject(new Error('Ошибка формата данных профиля'));
+                    }
+                  } else {
+                    if (xhr.status === 401 && cachedProfile) {
+                      resolve(cachedProfile);
+                    } else {
+                      reject(new Error(`HTTP ошибка: ${xhr.status}`));
+                    }
+                  }
+                };
+                
+                xhr.onerror = function() {
+                  if (cachedProfile) resolve(cachedProfile);
+                  else reject(new Error('Ошибка сети при получении профиля'));
+                };
+                
+                xhr.ontimeout = function() {
+                  if (cachedProfile) resolve(cachedProfile);
+                  else reject(new Error('Таймаут получения профиля'));
+                };
+                
+                xhr.timeout = 20000; // 20 секунд таймаут
+                xhr.send();
+              });
+              
+              // Сохраняем профиль в кэш, если получили через XMLHttpRequest
+              try {
+                localStorage.setItem('user_profile', JSON.stringify(xhrProfile));
+                localStorage.setItem('user_role', xhrProfile.role);
+                console.log('API - Профиль сохранен после XMLHttpRequest, роль:', xhrProfile.role);
+              } catch (e) {
+                console.error('API - Ошибка при сохранении профиля после XMLHttpRequest:', e);
+              }
+              
+              return xhrProfile;
+            }
+            
+            // Простой запрос с минимумом заголовков как последний вариант
+            console.log('API - Пробуем простой запрос как последний вариант');
+            const simpleResponse = await fetch(requestUrl, { 
+              headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            
+            if (!simpleResponse.ok) {
+              if (simpleResponse.status === 401 && cachedProfile) {
+                return cachedProfile;
+              }
+              throw new Error(`Простой запрос не удался! Статус: ${simpleResponse.status}`);
+            }
+            
+            const simpleProfile = await simpleResponse.json();
+            
+            // Кэшируем профиль
+            if (simpleProfile) {
+              try {
+                localStorage.setItem('user_profile', JSON.stringify(simpleProfile));
+                localStorage.setItem('user_role', simpleProfile.role);
+              } catch (e) {
+                console.error('API - Ошибка при сохранении профиля:', e);
+              }
+            }
+            
+            return simpleProfile;
+          }
+        } catch (fetchError) {
+          console.error('API - Все попытки fetch не удались:', fetchError);
+          
+          // Если мы имеем кэшированный профиль, возвращаем его как запасной вариант
+          if (cachedProfile) {
+            console.log('API - Возвращаем кэшированный профиль после всех ошибок сети');
+            return cachedProfile;
+          }
+          
+          throw fetchError;
+        }
+      }
+      
+      // Если это не ошибка сети или прямой запрос не удался
+      // и мы имеем кэшированный профиль, возвращаем его как запасной вариант
+      if (cachedProfile) {
+        console.log('API - Возвращаем кэшированный профиль после ошибки axios');
+        return cachedProfile;
+      }
+      
+      // В противном случае пробрасываем ошибку дальше
+      throw axiosError;
+    }
+  },
+};
+
+// Улучшенная функция для определения мобильного устройства
+export const isMobileDevice = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  
+  // Проверка на мобильное устройство по User-Agent
+  const mobileRegex = /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i;
+  const userAgent = navigator.userAgent || '';
+  
+  // Дополнительная проверка через mediaQuery для лучшего определения
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallScreen = window.innerWidth < 768;
+  
+  console.log('Проверка устройства:', {
+    userAgent,
+    isMobileByUA: mobileRegex.test(userAgent),
+    isTouchDevice,
+    isSmallScreen,
+    innerWidth: window.innerWidth
+  });
+  
+  return mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen);
+};
+
+// Улучшенная функция для проверки соединения
+export const checkConnection = async (url: string): Promise<{isOnline: boolean, pingTime?: number, error?: string}> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { isOnline: false, error: 'Браузер сообщает об отсутствии соединения' };
+  }
+  
+  try {
+    const start = Date.now();
+    const response = await fetch(`${url}/ping`, {
+      method: 'HEAD',
+      cache: 'no-store',
+      mode: 'cors',
+      headers: { 'x-requested-with': 'ping-test' }
+    });
+    const pingTime = Date.now() - start;
+    
+    return { 
+      isOnline: response.ok, 
+      pingTime,
+      error: response.ok ? undefined : `Сервер вернул статус ${response.status}`
+    };
+  } catch (error: any) {
+    console.error('Ошибка при проверке соединения:', error);
+    return { 
+      isOnline: false, 
+      error: error.message || 'Неизвестная ошибка соединения'
+    };
+  }
+};
+
+// API функции для работы с меню
+export const menuApi = {
+  _cachedCategories: null as any[] | null,
+  _cachedDishes: null as any[] | null,
+  _lastCategoriesUpdate: 0,
+  _lastDishesUpdate: 0,
+  _cacheTimeout: 5 * 60 * 1000, // 5 минут
+  _networkDiagnostics: [] as any[], // Хранение диагностики сети
+
+  // Сохранение информации о диагностике
+  _logDiagnostic: (info: any) => {
+    try {
+      menuApi._networkDiagnostics.unshift({
+        ...info,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Ограничиваем размер массива диагностики
+      if (menuApi._networkDiagnostics.length > 10) {
+        menuApi._networkDiagnostics.pop();
+      }
+      
+      // Сохраняем в localStorage для анализа
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('network_diagnostics', JSON.stringify(menuApi._networkDiagnostics));
+      }
+    } catch (e) {
+      console.error('Ошибка при сохранении диагностики:', e);
+    }
+  },
+
+  getCategories: async () => {
+    const startTime = Date.now();
+    const requestInfo = {
+      method: 'getCategories',
+      isMobile: false,
+      fromCache: false,
+      successPath: 'unknown',
+      duration: 0,
+      error: null as string | null
+    };
+    
+    try {
+      // Проверяем кэш
+      const now = Date.now();
+      if (menuApi._cachedCategories && (now - menuApi._lastCategoriesUpdate) < menuApi._cacheTimeout) {
+        console.log('API getCategories - Используем кэшированные категории');
+        requestInfo.fromCache = true;
+        requestInfo.successPath = 'memory-cache';
+        return menuApi._cachedCategories;
+      }
+
+      // Определяем, является ли устройство мобильным
+      const isMobile = isMobileDevice();
+      requestInfo.isMobile = isMobile;
+      
+      console.log('API getCategories - Мобильное устройство:', isMobile);
+      
+      // Проверяем сетевое подключение
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        console.warn('API getCategories - Нет подключения к сети');
+        requestInfo.error = 'no-network-connection';
+        
+        if (menuApi._cachedCategories) {
+          requestInfo.successPath = 'memory-cache-offline';
+          return menuApi._cachedCategories;
+        }
+        
+        // Проверяем локальный кэш
+        try {
+          const cachedData = localStorage.getItem('cached_categories');
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            menuApi._cachedCategories = parsed;
+            requestInfo.successPath = 'localStorage-offline';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getCategories - Ошибка чтения локального кэша:', e);
+          requestInfo.error = 'localStorage-error';
+        }
+        
+        throw new Error('Нет подключения к интернету');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Проверяем соединение с сервером
+      const connectionStatus = await checkConnection(apiUrl);
+      if (!connectionStatus.isOnline) {
+        console.warn(`API getCategories - Проблема с соединением: ${connectionStatus.error}`);
+        requestInfo.error = `connection-check-failed: ${connectionStatus.error}`;
+        
+        // Пробуем использовать кэш
+        if (menuApi._cachedCategories) {
+          requestInfo.successPath = 'memory-cache-connection-failed';
+          return menuApi._cachedCategories;
+        }
+        
+        // Проверяем локальный кэш
+        try {
+          const cachedData = localStorage.getItem('cached_categories');
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            menuApi._cachedCategories = parsed;
+            requestInfo.successPath = 'localStorage-connection-failed';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getCategories - Ошибка чтения локального кэша:', e);
+        }
+      }
+      
+      // Для мобильных устройств используем прямой запрос
+      if (isMobile) {
+        try {
+          console.log('API getCategories - Используем прямой запрос для мобильного устройства');
+          const token = localStorage.getItem('token');
+          
+          // Проверяем валидность URL
+          if (!apiUrl || !apiUrl.startsWith('http')) {
+            throw new Error(`Неверный URL API: ${apiUrl}`);
+          }
+          
+          // Используем fetch с таймаутом
+          const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 60000) => {
+            const controller = new AbortController();
+            const { signal } = controller;
+            
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+              const response = await fetch(url, { ...options, signal });
+              clearTimeout(timeoutId);
+              return response;
+    } catch (error) {
+              clearTimeout(timeoutId);
+              throw error;
+            }
+          };
+          
+          // Пробуем через fetch с таймаутом
+          console.log(`API getCategories - Отправка запроса на ${apiUrl}/menu/categories`);
+          const fetchResponse = await fetchWithTimeout(`${apiUrl}/menu/categories`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-Mobile-Request': 'true',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            cache: 'no-store',
+            mode: 'cors',
+            credentials: 'include'
+          }, 60000);
+          
+          if (!fetchResponse.ok) {
+            throw new Error(`Ошибка при получении категорий: ${fetchResponse.status} ${fetchResponse.statusText}`);
+          }
+          
+          const data = await fetchResponse.json();
+          console.log('API getCategories - Успешно получены категории напрямую');
+          
+          // Кэшируем результаты
+          menuApi._cachedCategories = data;
+          menuApi._lastCategoriesUpdate = now;
+          
+          // Сохраняем в localStorage для офлайн-доступа
+          try {
+            localStorage.setItem('cached_categories', JSON.stringify(data));
+            localStorage.setItem('categories_update_time', String(now));
+          } catch (e) {
+            console.error('API getCategories - Ошибка при сохранении кэша:', e);
+          }
+          
+          requestInfo.successPath = 'direct-fetch';
+          return data;
+        } catch (mobileError: any) {
+          console.error('API getCategories - Ошибка прямого запроса:', mobileError);
+          requestInfo.error = `direct-fetch-error: ${mobileError.message}`;
+          
+          // Проверяем локальный кэш в localStorage
+          try {
+            const cachedData = localStorage.getItem('cached_categories');
+            if (cachedData) {
+              console.log('API getCategories - Используем локальный кэш из localStorage');
+              const parsed = JSON.parse(cachedData);
+              menuApi._cachedCategories = parsed;
+              requestInfo.successPath = 'localStorage-after-direct-fetch-error';
+              return parsed;
+            }
+          } catch (cacheError) {
+            console.error('API getCategories - Ошибка чтения локального кэша:', cacheError);
+          }
+          
+          // Пробуем через прокси
+          console.log('API getCategories - Пробуем через прокси');
+        }
+      }
+
+      // Стандартный запрос через прокси (для десктопа или если прямой запрос не удался)
+      console.log('API getCategories - Запрос через API прокси');
+      
+      // Формируем URL для запроса
+      const proxyUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/api/menu?method=categories&_=${Date.now()}` 
+        : '/api/menu?method=categories';
+      
+      console.log(`API getCategories - Отправка запроса на прокси: ${proxyUrl}`);
+      
+      // Формируем заголовки с токеном
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      };
+      
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Выполняем запрос через прокси с fetch вместо axios
+      const proxyResponse = await fetch(proxyUrl, {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+        credentials: 'include'
+      });
+      
+      if (!proxyResponse.ok) {
+        throw new Error(`Ошибка при получении категорий через прокси: ${proxyResponse.status}`);
+      }
+      
+      const responseData = await proxyResponse.json();
+      
+      menuApi._cachedCategories = responseData;
+      menuApi._lastCategoriesUpdate = now;
+      
+      // Сохраняем в localStorage для офлайн-доступа
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('cached_categories', JSON.stringify(responseData));
+          localStorage.setItem('categories_update_time', String(now));
+        } catch (e) {
+          console.error('API getCategories - Ошибка при сохранении кэша:', e);
+        }
+      }
+      
+      requestInfo.successPath = 'proxy-fetch';
+      return responseData;
+    } catch (error: any) {
+      console.error('API getCategories - Ошибка при получении категорий:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      
+      // Пробуем восстановить из localStorage в случае ошибки
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const cachedData = localStorage.getItem('cached_categories');
+          if (cachedData) {
+            console.log('API getCategories - Восстановление из localStorage после ошибки');
+            const parsed = JSON.parse(cachedData);
+            requestInfo.successPath = 'localStorage-after-all-errors';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getCategories - Ошибка чтения из localStorage:', e);
+        }
+      }
+      
+      // Возвращаем кэшированные данные в случае ошибки
+      if (menuApi._cachedCategories) {
+        requestInfo.successPath = 'memory-cache-after-all-errors';
+        return menuApi._cachedCategories;
+      }
+      
+      // Если все методы не удались, возвращаем пустой массив вместо ошибки
+      console.log('API getCategories - Все методы не удались, возвращаем пустой массив');
+      requestInfo.successPath = 'empty-array-fallback';
+      return [];
+    } finally {
+      // Завершаем замер времени и логируем диагностику
+      requestInfo.duration = Date.now() - startTime;
+      menuApi._logDiagnostic(requestInfo);
+    }
+  },
+  
+  getDishes: async (params?: { 
+    category_id?: number, 
+    is_vegetarian?: boolean,
+    is_vegan?: boolean,
+    available_only?: boolean 
+  }) => {
+    const startTime = Date.now();
+    const requestInfo = {
+      method: 'getDishes',
+      params: params ? JSON.stringify(params) : 'none',
+      isMobile: false,
+      fromCache: false,
+      successPath: 'unknown',
+      duration: 0,
+      error: null as string | null
+    };
+    
+    try {
+      // Определяем, является ли устройство мобильным
+      const isMobile = isMobileDevice();
+      requestInfo.isMobile = isMobile;
+      
+      // Проверяем кэш только если нет параметров фильтрации
+      const now = Date.now();
+      if (!params && menuApi._cachedDishes && (now - menuApi._lastDishesUpdate) < menuApi._cacheTimeout) {
+        console.log('API getDishes - Используем кэшированные блюда');
+        requestInfo.fromCache = true;
+        requestInfo.successPath = 'memory-cache';
+        return menuApi._cachedDishes;
+      }
+
+      console.log('API getDishes - Мобильное устройство:', isMobile);
+      
+      // Проверяем сетевое подключение
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        console.warn('API getDishes - Нет подключения к сети');
+        requestInfo.error = 'no-network-connection';
+        
+        // Если запрос без параметров и есть кэш, используем его
+        if (!params && menuApi._cachedDishes) {
+          requestInfo.successPath = 'memory-cache-offline';
+          return menuApi._cachedDishes;
+        }
+        
+        // Проверяем локальный кэш
+        try {
+          const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            requestInfo.successPath = 'localStorage-offline';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getDishes - Ошибка при чтении локального кэша:', e);
+        }
+        
+        throw new Error('Нет подключения к интернету');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Проверяем соединение с сервером
+      const connectionStatus = await checkConnection(apiUrl);
+      if (!connectionStatus.isOnline) {
+        console.warn(`API getDishes - Проблема с соединением: ${connectionStatus.error}`);
+        requestInfo.error = `connection-check-failed: ${connectionStatus.error}`;
+        
+        // Пробуем использовать кэш
+        if (!params && menuApi._cachedDishes) {
+          requestInfo.successPath = 'memory-cache-connection-failed';
+          return menuApi._cachedDishes;
+        }
+        
+        // Проверяем локальный кэш
+        try {
+          const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            requestInfo.successPath = 'localStorage-connection-failed';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getDishes - Ошибка чтения локального кэша:', e);
+        }
+      }
+      
+      // Для мобильных устройств используем прямой запрос
+      if (isMobile) {
+        try {
+          console.log('API getDishes - Используем прямой запрос для мобильного устройства');
+          const token = localStorage.getItem('token');
+          
+          // Проверяем валидность URL
+          if (!apiUrl || !apiUrl.startsWith('http')) {
+            throw new Error(`Неверный URL API: ${apiUrl}`);
+          }
+          
+          // Формируем query параметры
+          let queryParams = '';
+          if (params) {
+            const urlParams = new URLSearchParams();
+            if (params.category_id) urlParams.append('category_id', params.category_id.toString());
+            if (params.is_vegetarian !== undefined) urlParams.append('is_vegetarian', params.is_vegetarian.toString());
+            if (params.is_vegan !== undefined) urlParams.append('is_vegan', params.is_vegan.toString());
+            if (params.available_only !== undefined) urlParams.append('available_only', params.available_only.toString());
+            queryParams = `?${urlParams.toString()}`;
+          }
+          
+          // Используем fetch с таймаутом
+          const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 60000) => {
+            const controller = new AbortController();
+            const { signal } = controller;
+            
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+              const response = await fetch(url, { ...options, signal });
+              clearTimeout(timeoutId);
+              return response;
+            } catch (error) {
+              clearTimeout(timeoutId);
+              throw error;
+            }
+          };
+          
+          // Пробуем через fetch с таймаутом
+          console.log(`API getDishes - Отправка запроса на ${apiUrl}/menu/dishes${queryParams}`);
+          const fetchResponse = await fetchWithTimeout(`${apiUrl}/menu/dishes${queryParams}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-Mobile-Request': 'true',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            cache: 'no-store',
+            mode: 'cors',
+            credentials: 'include'
+          }, 60000);
+          
+          if (!fetchResponse.ok) {
+            throw new Error(`Ошибка при получении блюд: ${fetchResponse.status} ${fetchResponse.statusText}`);
+          }
+          
+          const data = await fetchResponse.json();
+          console.log('API getDishes - Успешно получены блюда напрямую');
+          
+          // Обновляем кэш только если нет параметров фильтрации
+          if (!params) {
+            menuApi._cachedDishes = data;
+            menuApi._lastDishesUpdate = now;
+          }
+          
+          // Сохраняем в localStorage для офлайн-доступа
+          try {
+            const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            if (!params) {
+              localStorage.setItem('dishes_update_time', String(now));
+            }
+          } catch (e) {
+            console.error('API getDishes - Ошибка при сохранении кэша:', e);
+          }
+          
+          requestInfo.successPath = 'direct-fetch';
+          return data;
+        } catch (mobileError: any) {
+          console.error('API getDishes - Ошибка прямого запроса:', mobileError);
+          requestInfo.error = `direct-fetch-error: ${mobileError.message}`;
+          
+          // Проверяем локальный кэш в localStorage
+          try {
+            const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+            const cachedData = localStorage.getItem(cacheKey);
+            if (cachedData) {
+              console.log('API getDishes - Используем локальный кэш из localStorage');
+              const parsed = JSON.parse(cachedData);
+              if (!params) {
+                menuApi._cachedDishes = parsed;
+              }
+              requestInfo.successPath = 'localStorage-after-direct-fetch-error';
+              return parsed;
+            }
+          } catch (cacheError) {
+            console.error('API getDishes - Ошибка чтения локального кэша:', cacheError);
+          }
+          
+          // Пробуем через прокси
+          console.log('API getDishes - Пробуем через прокси');
+        }
+      }
+
+      // Стандартный запрос через прокси (для десктопа или если прямой запрос не удался)
+      console.log('API getDishes - Запрос через API прокси');
+      
+      // Формируем URL для запроса к прокси
+      let proxyUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/api/menu?method=dishes&_=${Date.now()}` 
+        : '/api/menu?method=dishes';
+      
+      // Добавляем параметры, если они есть
+      if (params) {
+        const urlParams = new URLSearchParams();
+        if (params.category_id) urlParams.append('category_id', params.category_id.toString());
+        if (params.is_vegetarian !== undefined) urlParams.append('is_vegetarian', params.is_vegetarian.toString());
+        if (params.is_vegan !== undefined) urlParams.append('is_vegan', params.is_vegan.toString());
+        if (params.available_only !== undefined) urlParams.append('available_only', params.available_only.toString());
+        
+        // Добавляем параметры к URL прокси
+        if (urlParams.toString()) {
+          proxyUrl += `&${urlParams.toString()}`;
+        }
+      }
+      
+      console.log(`API getDishes - Отправка запроса на прокси: ${proxyUrl}`);
+      
+      // Формируем заголовки с токеном
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      };
+      
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Выполняем запрос через прокси с fetch вместо axios
+      const proxyResponse = await fetch(proxyUrl, {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+        credentials: 'include'
+      });
+      
+      if (!proxyResponse.ok) {
+        throw new Error(`Ошибка при получении блюд через прокси: ${proxyResponse.status}`);
+      }
+      
+      const responseData = await proxyResponse.json();
+      
+      // Обновляем кэш только если нет параметров фильтрации
+      if (!params) {
+        menuApi._cachedDishes = responseData;
+        menuApi._lastDishesUpdate = now;
+      }
+      
+      // Сохраняем в localStorage для офлайн-доступа
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+          localStorage.setItem(cacheKey, JSON.stringify(responseData));
+          if (!params) {
+            localStorage.setItem('dishes_update_time', String(now));
+          }
+        } catch (e) {
+          console.error('API getDishes - Ошибка при сохранении кэша:', e);
+        }
+      }
+      
+      requestInfo.successPath = 'proxy-fetch';
+      return responseData;
+    } catch (error: any) {
+      console.error('API getDishes - Ошибка при получении блюд:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      
+      // Пробуем восстановить из localStorage в случае ошибки
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const cacheKey = params ? `cached_dishes_${JSON.stringify(params)}` : 'cached_dishes';
+          const cachedData = localStorage.getItem(cacheKey);
+          if (cachedData) {
+            console.log('API getDishes - Восстановление из localStorage после ошибки');
+            const parsed = JSON.parse(cachedData);
+            requestInfo.successPath = 'localStorage-after-all-errors';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getDishes - Ошибка чтения из localStorage:', e);
+        }
+      }
+      
+      // Возвращаем кэшированные данные в случае ошибки
+      if (!params && menuApi._cachedDishes) {
+        requestInfo.successPath = 'memory-cache-after-all-errors';
+        return menuApi._cachedDishes;
+      }
+      
+      // Если все методы не удались, возвращаем пустой массив вместо ошибки
+      console.log('API getDishes - Все методы не удались, возвращаем пустой массив');
+      requestInfo.successPath = 'empty-array-fallback';
+      return [];
+    } finally {
+      // Завершаем замер времени и логируем диагностику
+      requestInfo.duration = Date.now() - startTime;
+      menuApi._logDiagnostic(requestInfo);
+    }
+  },
+  
+  getDishById: async (id: number) => {
+    try {
+      const response = await api.get(`/menu/dishes/${id}`, {
+        timeout: 30000, // Увеличенный таймаут для мобильных устройств
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при получении блюда с ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  createDish: async (dishData: any) => {
+    try {
+      const response = await api.post('/menu/dishes', dishData);
+      // Инвалидируем кэш блюд
+      menuApi._cachedDishes = null;
+      return response.data;
+    } catch (error) {
+      console.error('Ошибка при создании блюда:', error);
+      throw error;
+    }
+  },
+  
+  updateDish: async (id: number, dishData: any) => {
+    try {
+      const response = await api.put(`/menu/dishes/${id}`, dishData);
+      // Инвалидируем кэш блюд
+      menuApi._cachedDishes = null;
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при обновлении блюда с ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  deleteDish: async (id: number) => {
+    try {
+      const response = await api.delete(`/menu/dishes/${id}`);
+      // Инвалидируем кэш блюд
+      menuApi._cachedDishes = null;
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при удалении блюда с ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  createCategory: async (categoryData: any) => {
+    const response = await api.post('/menu/categories', categoryData);
+    return response.data;
+  },
+  
+  updateCategory: async (id: number, categoryData: any) => {
+    const response = await api.put(`/menu/categories/${id}`, categoryData);
+    return response.data;
+  },
+  
+  deleteCategory: async (id: number) => {
+    const response = await api.delete(`/menu/categories/${id}`);
+    return response.data;
+  },
+  
+  uploadDishImage: async (file: File) => {
+    try {
+      console.log('API uploadDishImage - Загрузка изображения:', file.name);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка загрузки изображения: ${response.statusText}`);
+      }
+      
+      const data = await response.json() as FileUploadResponse;
+      console.log('API uploadDishImage - Успешный ответ:', data);
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Неизвестная ошибка при загрузке изображения');
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('API uploadDishImage - Ошибка:', error);
+      throw error;
+    }
+  },
+  
+  deleteDishImage: async (filename: string) => {
+    try {
+      console.log('API deleteDishImage - Удаление изображения:', filename);
+      
+      // Извлекаем только имя файла из URL, если передан полный URL
+      const filenamePart = filename.includes('/') 
+        ? filename.split('/').pop() 
+        : filename;
+        
+      if (!filenamePart) {
+        throw new Error('Невозможно определить имя файла из URL');
+      }
+      
+      const response = await fetch(`/api/delete-image?filename=${encodeURIComponent(filenamePart)}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка удаления изображения: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('API deleteDishImage - Успешный ответ:', data);
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Неизвестная ошибка при удалении изображения');
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('API deleteDishImage - Ошибка:', error);
+      throw error;
+    }
+  }
+};
+
+// Функция получения заголовков авторизации для запросов к API
+const getAuthHeaders = (): Record<string, string> => {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+// Универсальная функция для выполнения fetch с таймаутом
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
+  const controller = new AbortController();
+  const { signal } = controller;
+  
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, { ...options, signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
+export const ordersApi = {
+  _cachedOrders: null as any[] | null,
+  _lastOrdersUpdate: 0,
+  
+  getOrders: async (params?: any): Promise<any[]> => {
+    const startTime = Date.now();
+    const requestInfo = {
+      method: 'getOrders',
+      isMobile: false,
+      fromCache: false,
+      successPath: 'unknown',
+      duration: 0,
+      error: null as string | null
+    };
+    
+    try {
+      const isMobile = isMobileDevice();
+      requestInfo.isMobile = isMobile;
+      
+      // Проверяем кэш
+      const now = Date.now();
+      if (ordersApi._cachedOrders && (now - ordersApi._lastOrdersUpdate) < 2 * 60 * 1000) {
+        console.log('API getOrders - Используем кэшированные заказы');
+        requestInfo.fromCache = true;
+        requestInfo.successPath = 'memory-cache';
+        return ordersApi._cachedOrders;
+      }
+      
+      // Проверяем сетевое подключение
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        console.warn('API getOrders - Нет подключения к сети');
+        requestInfo.error = 'no-network-connection';
+        
+        // Проверяем кэш
+        if (ordersApi._cachedOrders) {
+          requestInfo.successPath = 'memory-cache-offline';
+          return ordersApi._cachedOrders;
+        }
+        
+        // Проверяем локальный кэш
+        try {
+          const cachedData = localStorage.getItem('cached_orders');
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            ordersApi._cachedOrders = parsed;
+            requestInfo.successPath = 'localStorage-offline';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getOrders - Ошибка при чтении локального кэша:', e);
+          requestInfo.error = 'localStorage-error';
+        }
+        
+        return [];
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Токен авторизации отсутствует');
+      }
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/orders`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/orders?_=${Date.now()}` 
+          : '/api/orders';
+      }
+      
+      console.log(`API getOrders - Отправка запроса на ${url}`);
+      
+      // Используем fetch с таймаутом
+      const controller = new AbortController();
+      const { signal } = controller;
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      try {
+        const response = await fetch(url, { ...fetchOptions, signal });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка при получении заказов: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('API getOrders - Успешно получены заказы');
+        
+        // Кэшируем результаты
+        ordersApi._cachedOrders = data;
+        ordersApi._lastOrdersUpdate = now;
+        
+        // Сохраняем в localStorage для офлайн-доступа
+        try {
+          localStorage.setItem('cached_orders', JSON.stringify(data));
+          localStorage.setItem('orders_update_time', String(now));
+        } catch (e) {
+          console.error('API getOrders - Ошибка при сохранении кэша:', e);
+        }
+        
+        requestInfo.successPath = 'fetch-success';
+        return data;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        console.error('API getOrders - Ошибка запроса:', fetchError);
+        requestInfo.error = `fetch-error: ${fetchError.message}`;
+        
+        // Пробуем восстановить из localStorage в случае ошибки
+        try {
+          const cachedData = localStorage.getItem('cached_orders');
+          if (cachedData) {
+            console.log('API getOrders - Восстановление из localStorage после ошибки');
+            const parsed = JSON.parse(cachedData);
+            requestInfo.successPath = 'localStorage-after-error';
+            return parsed;
+          }
+        } catch (e) {
+          console.error('API getOrders - Ошибка чтения из localStorage:', e);
+        }
+        
+        // Возвращаем кэшированные данные в случае ошибки
+        if (ordersApi._cachedOrders) {
+          requestInfo.successPath = 'memory-cache-after-error';
+          return ordersApi._cachedOrders;
+        }
+        
+        throw fetchError;
+      }
+    } catch (error: any) {
+      console.error('API getOrders - Ошибка при получении заказов:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      
+      // Если все методы не удались, возвращаем пустой массив
+      return [];
+    } finally {
+      // Завершаем замер времени
+      requestInfo.duration = Date.now() - startTime;
+      console.log('API getOrders - Диагностика:', requestInfo);
+    }
+  },
+  
+  getOrderById: async (id: number): Promise<any> => {
+    try {
+      const isMobile = isMobileDevice();
+        const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Токен авторизации отсутствует');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/orders/${id}`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/orders/${id}?_=${Date.now()}` 
+          : `/api/orders/${id}`;
+      }
+      
+      console.log(`API getOrderById - Отправка запроса на ${url}`);
+      
+      // Используем fetch с таймаутом
+      const controller = new AbortController();
+      const { signal } = controller;
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      try {
+        const response = await fetch(url, { ...fetchOptions, signal });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка при получении заказа: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('API getOrderById - Успешно получен заказ');
+        
+        return data;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('API getOrderById - Ошибка запроса:', fetchError);
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error(`API getOrderById - Ошибка при получении заказа с ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  createOrder: async (orderData: any): Promise<any> => {
+    const startTime = Date.now();
+    const requestInfo = {
+      startTime,
+      method: 'createOrder',
+      device: isMobileDevice() ? 'mobile' : 'desktop', 
+      attempts: 0,
+      successPath: '',
+      networkError: false,
+      timeoutError: false,
+      error: null as any,
+      errorType: '',
+      duration: 0
+    };
+    
+    try {
+      console.log('API createOrder - Создание заказа:', orderData);
+      requestInfo.attempts++;
+      
+      let endpoint = '/api/orders';
+      
+      // На мобильных устройствах используем прямой запрос к API
+      if (isMobileDevice()) {
+        endpoint = `${API_URL}/api/v1/orders`;
+      }
+      
+      const response = await fetchWithTimeout(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          ...getAuthHeaders()
+          },
+          body: JSON.stringify(orderData)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+        console.error('API createOrder - Ошибка при создании заказа:', errorData);
+        requestInfo.errorType = 'server';
+        requestInfo.error = errorData;
+        throw new Error(errorData.detail || 'Ошибка при создании заказа');
+        }
+        
+        const data = await response.json();
+      console.log('API createOrder - Заказ успешно создан:', data);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      requestInfo.successPath = 'api-success';
+      requestInfo.duration = Date.now() - startTime;
+      
+        return data;
+    } catch (error: any) {
+      console.error('API createOrder - Ошибка при создании заказа:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      requestInfo.errorType = 'client';
+      requestInfo.duration = Date.now() - startTime;
+      return requestInfo;
+    }
+  },
+  
+  updateOrder: async (id: string, updateData: any): Promise<any> => {
+    const startTime = Date.now();
+    const requestInfo = {
+      startTime,
+      method: 'updateOrder',
+      device: isMobileDevice() ? 'mobile' : 'desktop',
+      attempts: 0,
+      successPath: '',
+      networkError: false,
+      timeoutError: false,
+      error: null as any,
+      errorType: '',
+      duration: 0,
+      orderId: id
+    };
+    
+    try {
+      console.log(`API updateOrder - Обновление заказа ${id}:`, updateData);
+      requestInfo.attempts++;
+      
+      let endpoint = `/api/orders/${id}`;
+      
+      // На мобильных устройствах используем прямой запрос к API
+      if (isMobileDevice()) {
+        endpoint = `${API_URL}/api/v1/orders/${id}`;
+      }
+      
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+        console.error(`API updateOrder - Ошибка при обновлении заказа ${id}:`, errorData);
+        requestInfo.errorType = 'server';
+        requestInfo.error = errorData;
+        throw new Error(errorData.detail || 'Ошибка при обновлении заказа');
+        }
+        
+        const data = await response.json();
+      console.log(`API updateOrder - Заказ ${id} успешно обновлен:`, data);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      requestInfo.successPath = 'api-success';
+      requestInfo.duration = Date.now() - startTime;
+      
+        return data;
+    } catch (error: any) {
+      console.error('API updateOrder - Ошибка при обновлении заказа:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      requestInfo.errorType = 'client';
+      requestInfo.duration = Date.now() - startTime;
+      return requestInfo;
+    }
+  },
+  
+  deleteOrder: async (id: string): Promise<any> => {
+    const startTime = Date.now();
+    const requestInfo = {
+      startTime,
+      method: 'deleteOrder',
+      device: isMobileDevice() ? 'mobile' : 'desktop',
+      attempts: 0,
+      successPath: '',
+      networkError: false,
+      timeoutError: false,
+      error: null as any,
+      errorType: '',
+      duration: 0,
+      orderId: id
+    };
+    
+    try {
+      console.log(`API deleteOrder - Удаление заказа ${id}:`);
+      requestInfo.attempts++;
+      
+      let endpoint = `/api/orders/${id}`;
+      
+      // На мобильных устройствах используем прямой запрос к API
+      if (isMobileDevice()) {
+        endpoint = `${API_URL}/api/v1/orders/${id}`;
+      }
+      
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+        console.error(`API deleteOrder - Ошибка при удалении заказа ${id}:`, errorData);
+        requestInfo.errorType = 'server';
+        requestInfo.error = errorData;
+        throw new Error(errorData.detail || 'Ошибка при удалении заказа');
+        }
+        
+        const data = await response.json();
+      console.log(`API deleteOrder - Заказ ${id} успешно удален:`, data);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      requestInfo.successPath = 'api-success';
+      requestInfo.duration = Date.now() - startTime;
+      
+        return data;
+    } catch (error: any) {
+      console.error('API deleteOrder - Ошибка при удалении заказа:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      requestInfo.errorType = 'client';
+      requestInfo.duration = Date.now() - startTime;
+      return requestInfo;
+    }
+  },
+  
+  getOrderByCode: async (code: string): Promise<any> => {
+    const startTime = Date.now();
+    const requestInfo = {
+      startTime,
+      method: 'getOrderByCode',
+      device: isMobileDevice() ? 'mobile' : 'desktop',
+      attempts: 0,
+      successPath: '',
+      networkError: false,
+      timeoutError: false,
+      error: null as any,
+      errorType: '',
+      duration: 0,
+      code
+    };
+    
+    try {
+      console.log(`API getOrderByCode - Получение заказа по коду: ${code}`);
+      requestInfo.attempts++;
+      
+      let endpoint = `/api/orders/code/${code}`;
+      
+      // На мобильных устройствах используем прямой запрос к API
+      if (isMobileDevice()) {
+        endpoint = `${API_URL}/api/v1/orders/code/${code}`;
+      }
+      
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'GET',
+        headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+        console.error(`API getOrderByCode - Ошибка при получении заказа по коду ${code}:`, errorData);
+        requestInfo.errorType = 'server';
+        requestInfo.error = errorData;
+        throw new Error(errorData.detail || 'Ошибка при получении заказа по коду');
+        }
+        
+        const data = await response.json();
+      console.log(`API getOrderByCode - Заказ по коду ${code} успешно получен:`, data);
+      
+      requestInfo.successPath = 'api-success';
+      requestInfo.duration = Date.now() - startTime;
+      
+        return data;
+    } catch (error: any) {
+      console.error('API getOrderByCode - Ошибка при получении заказа по коду:', error);
+      requestInfo.error = `final-error: ${error.message}`;
+      requestInfo.errorType = 'client';
+      requestInfo.duration = Date.now() - startTime;
+      return requestInfo;
+    }
+  },
+  
+  // Метод для привязки заказа к официанту
+  assignOrderToWaiter: async (orderId: number, orderCode: string): Promise<any> => {
+    try {
+      const isMobile = isMobileDevice();
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Токен авторизации отсутствует');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ order_code: orderCode }),
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/orders/${orderId}/assign`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/orders/${orderId}/assign` 
+          : `/api/orders/${orderId}/assign`;
+      }
+      
+      console.log(`API assignOrderToWaiter - Отправка запроса на ${url}`);
+      
+      const response = await fetch(url, fetchOptions);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Ошибка при привязке заказа: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API assignOrderToWaiter - Заказ успешно привязан:', data);
+      
+      return data;
+    } catch (error: any) {
+      console.error('API assignOrderToWaiter - Ошибка при привязке заказа:', error);
+      throw new Error(error.message || 'Не удалось привязать заказ к официанту');
+    }
+  },
+  
+  // Метод для получения заказов, назначенных официанту
+  getWaiterOrders: async (): Promise<any[]> => {
+    try {
+      const isMobile = isMobileDevice();
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Токен авторизации отсутствует');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/waiter/orders`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/waiter/orders` 
+          : `/api/waiter/orders`;
+      }
+      
+      console.log(`API getWaiterOrders - Отправка запроса на ${url}`);
+      
+      const response = await fetch(url, fetchOptions);
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка при получении заказов официанта: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error: any) {
+      console.error('API getWaiterOrders - Ошибка:', error);
+      // Возвращаем пустой массив вместо выбрасывания ошибки
+      return [];
+    }
+  },
+  
+  // Метод для валидации кода заказа
+  validateOrderCode: async (orderCode: string): Promise<{ order_id: number, valid: boolean }> => {
+    try {
+      const isMobile = isMobileDevice();
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Токен авторизации отсутствует');
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ code: orderCode }),
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/orders/validate-code`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/orders/validate-code` 
+          : `/api/orders/validate-code`;
+      }
+      
+      console.log(`API validateOrderCode - Отправка запроса на ${url}`);
+      
+      const response = await fetch(url, fetchOptions);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Ошибка при проверке кода заказа: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('API validateOrderCode - Ошибка:', error);
+      throw new Error(error.message || 'Не удалось проверить код заказа');
+    }
+  },
+  
+  /**
+   * Валидирует код заказа без необходимости сканирования QR-кода
+   * @param code Код заказа для проверки
+   * @returns Промис с результатом валидации
+   */
+  validateOrderCode: async (code: string): Promise<{ valid: boolean; orderId?: string }> => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Не авторизован');
+    }
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // Используем разные URL для мобильных и десктопных клиентов
+    const apiUrl = isMobile 
+      ? '/api/orders/validate-code' 
+      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/orders/validate-code`;
+    
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ code })
+    };
+
+    try {
+      const response = await fetch(apiUrl, options);
+      
+      if (!response.ok) {
+        console.error('Ошибка валидации кода:', await response.text());
+        throw new Error('Не удалось проверить код заказа');
+      }
+      
+      const data = await response.json();
+      return {
+        valid: data.valid || false,
+        orderId: data.order_id
+      };
+    } catch (error) {
+      console.error('Ошибка при валидации кода заказа:', error);
+      throw error;
+    }
+  },
+
+  // Метод для валидации кода заказа, введенного вручную
+  validateOrderCode: async (orderCode: string): Promise<ValidateOrderCodeResponse> => {
+    try {
+      const isMobile = isMobileDevice();
+      const token = getAuthToken();
+      
+      if (!token) {
+        return { valid: false, message: 'Не авторизован' };
+      }
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Формируем URL для запроса
+      let url = '';
+      let fetchOptions: RequestInit = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ order_code: orderCode }),
+        cache: 'no-store',
+        credentials: 'include'
+      };
+      
+      if (isMobile) {
+        // Прямой запрос к API для мобильных устройств
+        url = `${apiUrl}/orders/validate-code`;
+        fetchOptions.mode = 'cors';
+        fetchOptions.headers = {
+          ...fetchOptions.headers,
+          'X-Mobile-Request': 'true'
+        };
+      } else {
+        // Запрос через прокси для десктопа
+        url = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/orders/validate-code` 
+          : `/api/orders/validate-code`;
+      }
+      
+      console.log(`API validateOrderCode - Отправка запроса на ${url} с кодом ${orderCode}`);
+      
+      const response = await fetch(url, fetchOptions);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Ошибка валидации кода:', errorData);
+        return { valid: false, message: errorData.detail || `Ошибка при проверке кода заказа: ${response.status}` };
+      }
+      
+      const data = await response.json();
+      console.log('API validateOrderCode - Ответ:', data);
+      
+      return {
+        valid: data.valid || false,
+        orderId: data.order_id,
+        message: data.message
+      };
+    } catch (error: any) {
+      console.error('API validateOrderCode - Ошибка:', error);
+      handleApiError(error);
+      return { valid: false, message: extractErrorMessage(error) };
+    }
+  },
+};
+
+// API функции для работы с пользователями
+export const usersApi = {
+  getUsers: async (params?: { role?: string, query?: string }) => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.role) queryParams.append('role', params.role);
+      if (params?.query) queryParams.append('query', params.query);
+      
+      const response = await api.get(`/users?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Ошибка при получении списка пользователей:', error);
+      throw error;
+    }
+  }
+};
+
+// API функции для работы с кодами заказов
+export const orderCodesApi = {
+  // Получение списка кодов заказов
+  getCodes: async () => {
+    try {
+      if (shouldUseProxy()) {
+        // Используем прокси для решения проблем с CORS
+        const response = await fetch('/api/order-codes', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+          },
+        });
+        const data = await response.json();
+        return data;
+      } else {
+        // Используем прямой запрос к API
+        const response = await api.get('/order-codes');
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Ошибка при получении кодов заказов:', error);
+      throw error;
+    }
+  },
+  
+  // Создание нового кода заказа
+  createCode: async (tableNumber: number) => {
+    try {
+      if (shouldUseProxy()) {
+        // Используем прокси для решения проблем с CORS
+        const response = await fetch('/api/order-codes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`,
+          },
+          body: JSON.stringify({ table_number: tableNumber }),
+        });
+        const data = await response.json();
+        return data;
+      } else {
+        // Используем прямой запрос к API
+        const response = await api.post('/order-codes', { table_number: tableNumber });
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Ошибка при создании кода заказа:', error);
+      throw error;
+    }
+  },
+  
+  // Проверка кода заказа
+  verifyCode: async (code: string) => {
+    try {
+      if (shouldUseProxy()) {
+        // Используем прокси для решения проблем с CORS
+        const response = await fetch('/api/order-codes/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`,
+          },
+          body: JSON.stringify({ code }),
+        });
+        const data = await response.json();
+        return data;
+      } else {
+        // Используем прямой запрос к API
+        const response = await api.post('/order-codes/verify', { code });
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Ошибка при проверке кода заказа:', error);
+      throw error;
+    }
+  },
+  
+  // Удаление кода заказа
+  deleteCode: async (codeId: number) => {
+    try {
+      if (shouldUseProxy()) {
+        // Используем прокси для решения проблем с CORS
+        const response = await fetch(`/api/order-codes?id=${codeId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+          },
+        });
+        const data = await response.json();
+        return data;
+      } else {
+        // Используем прямой запрос к API
+        const response = await api.delete(`/order-codes/${codeId}`);
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении кода заказа:', error);
+      throw error;
+    }
+  }
+};
+
+export const adminApi = {
+  getDashboardStats: async () => {
+    const response = await api.get<DashboardStats>('/admin/dashboard/stats');
+    return response.data;
+  }
+};
+
+export const waiterApi = {
+  getOrders: async (): Promise<Order[]> => {
+    const response = await api.get('/waiter/orders');
+    return response.data;
+  },
+
+  takeOrder: async (orderId: number): Promise<void> => {
+    await api.post(`/waiter/orders/${orderId}/take`);
+  },
+
+  confirmPayment: async (orderId: number): Promise<void> => {
+    await api.post(`/waiter/orders/${orderId}/confirm-payment`);
+  },
+
+  completeOrder: async (orderId: number): Promise<void> => {
+    await api.post(`/waiter/orders/${orderId}/complete`);
+  }
+}; 
+
+// Список эндпоинтов, для которых доступны прокси в Pages API
+const proxyEndpoints = ['order-codes', 'auth/login', 'auth/profile'];
+
+// Проверка, является ли текущее устройство мобильным или используется доступ по IP
+const shouldUseProxy = () => {
+  // На сервере всегда используем прямые запросы
+  if (typeof window === 'undefined') return false;
+  
+  // На мобильных устройствах используем прокси
+  if (isMobileDevice()) return true;
+  
+  // Если доступ по IP, а не localhost, тоже используем прокси
+  const hostname = window.location.hostname;
+  return hostname !== 'localhost' && hostname !== '127.0.0.1';
+};
+
+// Добавляем интерфейс для ответа валидации кода заказа
+export interface ValidateOrderCodeResponse {
+  valid: boolean;
+  orderId?: number;
+  message?: string;
+}
+
+// Функция обработки ошибок API
+const handleApiError = (error: any) => {
+  console.error('API Error:', error);
+  if (error.response) {
+    console.error('Response data:', error.response.data);
+  }
+};
+
+// Функция извлечения сообщения об ошибке
+const extractErrorMessage = (error: any): string => {
+  if (error.response && error.response.data) {
+    if (typeof error.response.data === 'string') {
+      return error.response.data;
+    }
+    if (error.response.data.message) {
+      return error.response.data.message;
+    }
+    if (error.response.data.detail) {
+      return error.response.data.detail;
+    }
+    return JSON.stringify(error.response.data);
+  }
+  return error.message || 'Произошла ошибка при обработке запроса';
+};
+
+// Создаем экземпляр для прямых запросов к API
+const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
+
+// Добавляем интерсептор запросов для включения токена
+apiClient.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});

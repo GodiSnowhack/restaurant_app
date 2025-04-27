@@ -8,6 +8,7 @@ import { SettingsProvider } from '../settings-context';
 import dynamic from 'next/dynamic';
 import { ThemeProvider } from '../lib/theme-context';
 import { SessionProvider } from 'next-auth/react';
+import Head from 'next/head';
 
 // Динамический импорт компонента AuthDebugger для отображения только на клиенте
 const AuthDebugger = dynamic(() => import('../components/AuthDebugger'), {
@@ -15,7 +16,7 @@ const AuthDebugger = dynamic(() => import('../components/AuthDebugger'), {
 });
 
 // Динамический импорт компонента MobileDetector для отображения только на клиенте
-const MobileDetector = dynamic(() => import('../components/MobileDetector').then(mod => mod.MobileDetector), {
+const MobileDetectorIndicator = dynamic(() => import('../components/MobileDetector').then(mod => mod.MobileDetectorIndicator), {
   ssr: false,
 });
 
@@ -167,7 +168,6 @@ export default function App({ Component, pageProps }: AppProps) {
     ];
     
     const adminRoutes = ['/admin', '/admin/users', '/admin/orders', '/admin/settings', '/admin/menu', '/admin/reservations'];
-    const chefRoutes = ['/kitchen'];
     const waiterRoutes = ['/waiter', '/waiter/scan', '/waiter/orders', '/waiter/orders/[id]'];
     
     const path = router.pathname;
@@ -175,13 +175,6 @@ export default function App({ Component, pageProps }: AppProps) {
     // Защита роутов админки
     if (isAuthenticated && adminRoutes.includes(path) && user?.role !== 'admin') {
       console.log('Попытка доступа к админке без прав');
-      router.push('/');
-      return;
-    }
-    
-    // Защита роутов кухни
-    if (isAuthenticated && chefRoutes.includes(path) && user?.role !== 'chef') {
-      console.log('Попытка доступа к кухне без прав');
       router.push('/');
       return;
     }
@@ -207,16 +200,6 @@ export default function App({ Component, pageProps }: AppProps) {
       console.log('Перенаправление на логин с:', path);
       router.push('/auth/login');
     }
-    
-    // Перенаправление официанта на панель официанта при входе
-    // Добавляем проверку на то, что маршрут не был изменен, чтобы избежать циклических перенаправлений
-    if (isAuthenticated && user?.role === 'waiter' && path === '/' && router.pathname === '/') {
-      // Добавляем проверку на предыдущий маршрут
-      if (previousPath !== '/waiter') {
-        console.log('Перенаправление официанта на панель официанта');
-        router.push('/waiter', undefined, { shallow: true });
-      }
-    }
   }, [router.pathname, isAuthenticated, router, user, isClient, previousPath]);
   
   // Обернем отображение AuthDebugger в дополнительную проверку
@@ -239,6 +222,9 @@ export default function App({ Component, pageProps }: AppProps) {
       <SettingsProvider>
         <ThemeProvider>
           <SessionProvider session={pageProps.session}>
+            <Head>
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+            </Head>
             <Component {...pageProps} />
           </SessionProvider>
         </ThemeProvider>
@@ -250,10 +236,12 @@ export default function App({ Component, pageProps }: AppProps) {
     <SettingsProvider>
       <ThemeProvider>
         <SessionProvider session={pageProps.session}>
-          <MobileDetector>
-            <Component {...pageProps} />
-            {renderAuthDebugger()}
-          </MobileDetector>
+          <Head>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+          </Head>
+          <Component {...pageProps} />
+          {renderAuthDebugger()}
+          {isMobileDevice && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
         </SessionProvider>
       </ThemeProvider>
     </SettingsProvider>

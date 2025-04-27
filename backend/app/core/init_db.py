@@ -6,7 +6,7 @@ from app.database.session import Base, engine
 from app.services.user import get_user_by_email, create_user
 from app.schemas.user import UserCreate
 from app.models.user import User, UserRole
-from app.models.menu import Category, Dish, Allergen, Tag, IngredientGroup, Ingredient
+from app.models.menu import Category, Dish, Allergen, Tag
 from app.models.order import Order, Feedback, OrderStatus, PaymentStatus
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.settings import Settings
