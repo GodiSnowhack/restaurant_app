@@ -543,8 +543,22 @@ def create_order(db: Session, order_data: Dict) -> Dict:
     try:
         logger.info(f"Создание нового заказа с данными: {order_data}")
         
+        # Проверка на идемпотентность (ключ идемпотентности для предотвращения дублирования заказов)
+        idempotency_key = order_data.pop('idempotency_key', None)
+        if idempotency_key:
+            logger.info(f"Получен ключ идемпотентности: {idempotency_key}")
+            # Проверяем, существуют ли уже заказы с таким ключом (используем комментарий для хранения)
+            existing_orders = db.query(Order).filter(Order.comment.like(f"%idempotency_key:{idempotency_key}%")).all()
+            if existing_orders:
+                logger.warning(f"Найден существующий заказ с ключом идемпотентности {idempotency_key}")
+                # Возвращаем первый найденный заказ
+                existing_order = format_order_for_response(db, existing_orders[0])
+                # Добавляем информацию о том, что это повторный запрос
+                existing_order["is_duplicate"] = True
+                existing_order["duplicate_message"] = "Заказ был создан ранее с тем же ключом идемпотентности"
+                return existing_order
+        
         # Проверяем наличие кода официанта в параметрах запроса
-        # Обратите внимание, что мы рассматриваем разные возможные названия поля
         waiter_code = None
         if 'waiter_code' in order_data:
             waiter_code = order_data.pop('waiter_code')
@@ -586,6 +600,72 @@ def create_order(db: Session, order_data: Dict) -> Dict:
             order_data['order_code'] = order_code
             logger.info(f"Сгенерирован новый код заказа: {order_code}")
         
+        # Устанавливаем статусы по умолчанию, если они не указаны
+        if 'status' not in order_data:
+            order_data['status'] = OrderStatus.PENDING.value
+        else:
+            # Если статус есть, проверяем, что это строка и конвертируем в enum
+            if isinstance(order_data['status'], str):
+                enum_status = safe_enum_value(OrderStatus, order_data['status'])
+                if enum_status:
+                    order_data['status'] = enum_status
+                else:
+                    order_data['status'] = OrderStatus.PENDING
+
+        if 'payment_status' not in order_data:
+            order_data['payment_status'] = PaymentStatus.PENDING.value
+        else:
+            # Если статус платежа есть, проверяем, что это строка и конвертируем в enum
+            if isinstance(order_data['payment_status'], str):
+                enum_payment_status = safe_enum_value(PaymentStatus, order_data['payment_status'])
+                if enum_payment_status:
+                    order_data['payment_status'] = enum_payment_status
+                else:
+                    order_data['payment_status'] = PaymentStatus.PENDING
+
+        # Обработка payment_method, если он есть
+        if 'payment_method' in order_data and isinstance(order_data['payment_method'], str):
+            enum_payment_method = safe_enum_value(PaymentMethod, order_data['payment_method'])
+            if enum_payment_method:
+                order_data['payment_method'] = enum_payment_method
+            else:
+                # Если не удалось сконвертировать, удаляем поле, чтобы использовалось значение по умолчанию
+                logger.warning(f"Не удалось преобразовать payment_method '{order_data['payment_method']}' в enum, удаляем поле")
+                order_data.pop('payment_method', None)
+
+        # Логируем обработанные данные заказа
+        logger.info(f"Обработанные данные заказа перед созданием: status={order_data.get('status')}, payment_status={order_data.get('payment_status')}, payment_method={order_data.get('payment_method')}")
+        
+        # Проверяем наличие waiter_id в запросе
+        if 'waiter_id' in order_data and order_data['waiter_id']:
+            logger.info(f"Найден waiter_id в запросе: {order_data['waiter_id']}")
+            # Проверяем, существует ли официант с указанным ID
+            try:
+                from app.models.user import User, UserRole
+                waiter = db.query(User).filter(User.id == order_data['waiter_id']).first()
+                if waiter:
+                    if waiter.role == UserRole.WAITER.value:
+                        logger.info(f"Найден официант с ID {waiter.id}, роль: {waiter.role}")
+                    else:
+                        logger.warning(f"Пользователь с ID {waiter.id} не является официантом (роль: {waiter.role})")
+                        # Если пользователь не является официантом, все равно сохраняем его ID,
+                        # так как это может быть администратор, создающий заказ
+                else:
+                    logger.warning(f"Не найден пользователь с ID {order_data['waiter_id']}")
+            except Exception as e:
+                logger.warning(f"Ошибка при проверке официанта: {str(e)}")
+        else:
+            # Если waiter_id не был передан, попробуем найти подходящего официанта
+            try:
+                from app.models.user import User, UserRole
+                # Пробуем найти любого официанта для демо
+                waiter = db.query(User).filter(User.role == UserRole.WAITER.value).first()
+                if waiter:
+                    order_data['waiter_id'] = waiter.id
+                    logger.info(f"Автоматически назначен официант с ID {waiter.id}")
+            except Exception as e:
+                logger.warning(f"Не удалось автоматически назначить официанта: {str(e)}")
+        
         # Подготавливаем данные заказа
         items = order_data.pop('items', [])
         
@@ -593,13 +673,13 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         if 'order_type' in order_data:
             order_data.pop('order_type')
         
-        # Устанавливаем статусы по умолчанию, если они не указаны
-        if 'status' not in order_data:
-            order_data['status'] = OrderStatus.PENDING.value
-        if 'payment_status' not in order_data:
-            order_data['payment_status'] = PaymentStatus.UNPAID.value
-        
         # Создаем новый заказ
+        # Если есть ключ идемпотентности, сохраняем его в комментарии
+        if idempotency_key and 'comment' in order_data:
+            order_data['comment'] = f"{order_data['comment']} [idempotency_key:{idempotency_key}]"
+        elif idempotency_key:
+            order_data['comment'] = f"[idempotency_key:{idempotency_key}]"
+            
         db_order = Order(**order_data)
         db.add(db_order)
         db.flush()  # Сохраняем заказ для получения ID
@@ -781,7 +861,7 @@ def update_order(db: Session, order_id: int, order_update: Union[OrderUpdate, Or
         
         # Фиксируем изменения
         try:
-        db.commit()
+            db.commit()
             logger.info(f"Заказ {order_id} успешно обновлен")
         except Exception as commit_error:
             db.rollback()

@@ -64,6 +64,18 @@ export default function LoginPage() {
     }
   }, []);
   
+  // Перенаправляем авторизованных пользователей на главную страницу
+  useEffect(() => {
+    // Проверяем, авторизован ли пользователь
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    // Если пользователь уже авторизован, перенаправляем на главную
+    if (token) {
+      console.log('Пользователь уже авторизован, перенаправление...');
+      router.push('/');
+    }
+  }, [router]);
+  
   // Мониторим состояние загрузки
   useEffect(() => {
     if (!isLoading && isSubmitting) {

@@ -35,9 +35,10 @@ import {
   PredictiveMetrics
 } from '../../types/analytics';
 import { useTheme } from '@/lib/theme-context';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 type TimeRange = 'today' | 'week' | 'month' | 'quarter';
-type AnalyticsView = 'dashboard' | 'predictions' | 'recommendations' | 'operations' | 'finance' | 'menu' | 'customers';
+type AnalyticsView = 'dashboard' | 'predictions' | 'recommendations' | 'finance' | 'menu' | 'customers';
 
 // Интерфейс для бизнес-рекомендаций
 interface BusinessRecommendation {
@@ -128,7 +129,7 @@ const AdminAnalyticsPage: NextPage = () => {
   // Функция для проверки прав администратора
   const checkAdmin = async () => {
     if (!isLoading && !isAuthenticated) {
-      router.push('/login?from=/admin/analytics');
+      router.push('/auth/login?from=/admin/analytics');
       return;
     }
 
@@ -582,17 +583,27 @@ const AdminAnalyticsPage: NextPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <Layout title="Система поддержки принятия решений | Админ-панель">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDark ? 'border-primary-400' : 'border-primary'}`}></div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  // Изменяем conditional rendering контента страницы
+  const renderContent = () => {
+    if (isLoading) return <LoadingSpinner />;
+    
+    switch (currentView) {
+      case 'dashboard':
+        return renderDashboardView();
+      case 'recommendations':
+        return renderRecommendationsView();
+      case 'predictions':
+        return renderPredictionsView();
+      case 'finance':
+        return renderFinancialView();
+      case 'menu':
+        return renderMenuView();
+      case 'customers':
+        return renderCustomersView();
+      default:
+        return renderDashboardView();
+    }
+  };
 
   // Если данные не загружены, показываем сообщение об ошибке
   if (!financialMetrics || !menuMetrics || !customerMetrics || !operationalMetrics) {
@@ -663,16 +674,6 @@ const AdminAnalyticsPage: NextPage = () => {
               }`}
             >
               Прогнозы
-            </button>
-            <button
-              onClick={() => handleChangeView('operations')}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                currentView === 'operations' 
-                  ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
-                  : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }`}
-            >
-              Операции
             </button>
             <button
               onClick={() => handleChangeView('finance')}

@@ -75,7 +75,6 @@ class DishBase(BaseModel):
     price: float
     cost_price: Optional[float] = None
     image_url: Optional[str] = None
-    video_url: Optional[str] = None
     calories: Optional[int] = None
     cooking_time: Optional[int] = None
     is_vegetarian: Optional[bool] = False

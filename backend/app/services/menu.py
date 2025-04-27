@@ -210,6 +210,11 @@ def create_dish(db: Session, dish_in: DishCreate) -> Dish:
     """Создание нового блюда"""
     # Создаем блюдо без связанных сущностей
     dish_data = dish_in.dict(exclude={"allergen_ids", "tag_ids"})
+    
+    # Удаляем поле video_url, если оно есть, так как оно не поддерживается моделью
+    if "video_url" in dish_data:
+        dish_data.pop("video_url")
+        
     db_dish = Dish(**dish_data)
     
     # Добавляем аллергены
@@ -238,23 +243,27 @@ def update_dish(
     if not db_dish:
         return None
     
-    # Обновляем основные поля
-    update_data = dish_in.dict(exclude={"allergen_ids", "tag_ids"}, exclude_unset=True)
+    # Получаем данные для обновления
+    update_data = dish_in.dict(exclude_unset=True, exclude={"allergen_ids", "tag_ids"})
     
-    for field, value in update_data.items():
-        setattr(db_dish, field, value)
+    # Удаляем поле video_url, если оно есть, так как оно не поддерживается моделью
+    if "video_url" in update_data:
+        update_data.pop("video_url")
     
-    # Обновляем аллергены при необходимости
-    if dish_in.allergen_ids is not None:
+    # Обновляем аллергены, если они указаны
+    if hasattr(dish_in, "allergen_ids") and dish_in.allergen_ids is not None:
         allergens = db.query(Allergen).filter(Allergen.id.in_(dish_in.allergen_ids)).all()
         db_dish.allergens = allergens
     
-    # Обновляем теги при необходимости
-    if dish_in.tag_ids is not None:
+    # Обновляем теги, если они указаны
+    if hasattr(dish_in, "tag_ids") and dish_in.tag_ids is not None:
         tags = db.query(Tag).filter(Tag.id.in_(dish_in.tag_ids)).all()
         db_dish.tags = tags
     
-    db.add(db_dish)
+    # Обновляем остальные поля
+    for key, value in update_data.items():
+        setattr(db_dish, key, value)
+    
     db.commit()
     db.refresh(db_dish)
     

@@ -1,205 +1,192 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
 
 /**
- * Улучшенное API для получения списка заказов официанта
- * Прямой запрос к бэкенду, минуя промежуточные прокси
+ * Улучшенное API для получения заказов официанта.
+ * Показываются только заказы, прикрепленные к ID авторизованного пользователя (waiter_id)
  */
-export default async function simpleWaiterOrdersApi(req: NextApiRequest, res: NextApiResponse) {
-  // Разрешаем CORS
+export default async function simpleWaiterOrdersApi(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Настройка CORS заголовков
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-User-Role, X-User-ID, X-Is-Admin'
   );
 
+  // Обрабатываем предварительный запрос OPTIONS
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
+  // Проверяем, что это GET запрос
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Метод не поддерживается' });
+    console.error('[API Proxy] Неподдерживаемый метод HTTP:', req.method);
+    return res.status(405).json({ error: 'Метод не разрешен' });
   }
 
   try {
-    // Получаем токен авторизации
+    console.log('[API Proxy] Получен запрос на /api/waiter/simple-orders');
+    
+    // Получаем токен авторизации из заголовков
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        orders: [],
-        message: 'Токен авторизации отсутствует'
-      });
+      console.error('[API Proxy] Отсутствует токен авторизации');
+      return res.status(401).json({ error: 'Необходима авторизация' });
     }
     
     const token = authHeader.substring(7);
     
-    // Тестовые данные будут возвращены, только если указан параметр test=true
-    if (req.query.test === 'true') {
-      console.log('[SIMPLE API] Запрошены тестовые данные');
-      
-      const testOrders = [
-        {
-          id: Math.floor(Math.random() * 10000) + 1000, // Генерируем случайный ID
-          status: 'new',
-          payment_status: 'pending',
-          payment_method: 'cash',
-          order_type: 'dine-in',
-          total_amount: 1250 + Math.floor(Math.random() * 300), // Случайная сумма
-          items: [
-            { dish_id: 1, quantity: 2, price: 450, name: 'Бургер премиум' },
-            { dish_id: 2, quantity: 1, price: 350, name: 'Картофель по-деревенски' },
-            { dish_id: 3, quantity: 1, price: 120, name: 'Кола средняя' }
-          ],
-          created_at: new Date().toISOString(),
-          table_number: Math.floor(Math.random() * 10) + 1, // Случайный номер стола
-          customer_name: 'Клиент ' + (Math.floor(Math.random() * 100) + 1) // Случайное имя
+    // Получаем роль пользователя и ID из заголовков
+    let userRole = req.headers['x-user-role'] as string || 'unknown';
+    let userId = req.headers['x-user-id'] as string || '';
+    let isAdminRole = req.headers['x-is-admin'] === 'true' || 
+                      req.query.is_admin === 'true' || 
+                      req.query.role === 'admin' || 
+                      userRole === 'admin';
+    
+    // Извлекаем информацию о пользователе из токена
+    try {
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = parts[1];
+          // Правильно декодируем base64url формат токена
+          const decodedPayload = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+          
+          const payloadJson = JSON.parse(decodedPayload);
+          console.log('[API Proxy] Информация из токена:', payloadJson);
+          
+          // Получаем ID пользователя из токена
+          if (payloadJson.sub) {
+            userId = String(payloadJson.sub);
+            console.log(`[API Proxy] ID пользователя из токена: ${userId}`);
+          }
+          
+          // Если в токене есть информация о роли - используем её
+          if (payloadJson.role) {
+            userRole = payloadJson.role;
+            isAdminRole = userRole === 'admin';
+          }
         }
-      ];
-      
-      return res.status(200).json(testOrders);
+      }
+    } catch (tokenError) {
+      console.warn('[API Proxy] Не удалось декодировать токен:', tokenError);
     }
     
-    // Формируем URL для запроса к API
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    if (!userId) {
+      console.error('[API Proxy] Не удалось определить ID пользователя');
+      return res.status(400).json({ error: 'Отсутствует идентификатор пользователя' });
+    }
     
-    // Прямой запрос к бэкенду на основной URL
-    try {
-      console.log(`[SIMPLE API] Прямой запрос к ${apiBaseUrl}/orders/waiter`);
-      
-      const response = await axios({
-        method: 'GET',
-        url: `${apiBaseUrl}/orders/waiter`,
-        headers: {
+    console.log(`[API Proxy] Получение заказов для пользователя: роль=${userRole}, ID=${userId}, isAdmin=${isAdminRole}`);
+    
+    // База API
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    
+    // Определяем эндпоинты в зависимости от роли
+    const endpoints = isAdminRole
+      ? [
+          '/admin/orders',  // Админский эндпоинт
+          '/orders',        // Общий эндпоинт
+        ]
+      : [
+          '/waiter/orders',  // Эндпоинт для официанта
+        ];
+    
+    let orderData = null;
+    let lastError = null;
+    
+    // Проходим по эндпоинтам и пытаемся получить данные
+    for (const endpoint of endpoints) {
+      try {
+        let queryParams = '';
+        
+        // Добавляем фильтр по waiter_id для официантов
+        if (userRole === 'waiter') {
+          queryParams = `?waiter_id=${userId}`;
+        } 
+        // Для админа параметры могут быть разными в зависимости от эндпоинта
+        else if (isAdminRole) {
+          if (endpoint === '/admin/orders') {
+            queryParams = '?role=admin';
+          } else {
+            // Для обычного эндпоинта /orders можно фильтровать по конкретному ID
+            queryParams = `?waiter_id=${userId}&role=admin`;
+          }
+        }
+        
+        const targetUrl = `${apiBase}${endpoint}`;
+        const fullUrl = `${targetUrl}${queryParams}`;
+        console.log(`[API Proxy] Попытка запроса к ${fullUrl}`);
+        
+        const headers: HeadersInit = {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-API-Version': '1.0'
-        },
-        timeout: 10000
-      });
-      
-      if (response.status === 200) {
-        console.log(`[SIMPLE API] Успешный ответ от бэкенда: получено ${Array.isArray(response.data) ? response.data.length : 0} заказов`);
+          'X-User-Role': userRole,
+          'X-User-ID': userId
+        };
         
-        if (Array.isArray(response.data)) {
-          res.status(200).json(response.data);
-        } else {
-          console.warn('[SIMPLE API] Ответ не является массивом, форматируем');
-          res.status(200).json(response.data ? [response.data] : []);
+        // Добавляем заголовок для админа
+        if (isAdminRole) {
+          headers['X-Is-Admin'] = 'true';
         }
-        return;
-      }
-    } catch (error: any) {
-      console.error('[SIMPLE API] Ошибка при запросе заказов:', error.message);
-      
-      if (error.response?.status === 422) {
-        console.log('[SIMPLE API] Ошибка валидации, пробуем упростить запрос');
         
-        try {
-          // Пробуем запрос без тела и с минимальными заголовками
-          const simpleResponse = await axios({
-            method: 'GET',
-            url: `${apiBaseUrl}/orders/waiter`,
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            timeout: 10000
-          });
-          
-          if (simpleResponse.status === 200) {
-            console.log(`[SIMPLE API] Успешный упрощенный запрос: получено ${Array.isArray(simpleResponse.data) ? simpleResponse.data.length : 0} заказов`);
-            res.status(200).json(Array.isArray(simpleResponse.data) ? simpleResponse.data : []);
-            return;
-          }
-        } catch (simpleError) {
-          console.error('[SIMPLE API] Ошибка при упрощенном запросе:', simpleError);
-        }
-      }
-    }
-    
-    // Запасной вариант - создаем и возвращаем случайные данные
-    console.log('[SIMPLE API] Возвращаем сгенерированные данные');
-    
-    // Генерируем 1-3 случайных заказа
-    const count = Math.floor(Math.random() * 3) + 1;
-    const orders = [];
-    
-    for (let i = 0; i < count; i++) {
-      const id = Math.floor(Math.random() * 10000) + 1000;
-      const table = Math.floor(Math.random() * 15) + 1;
-      const names = ['Александр', 'Екатерина', 'Иван', 'Мария', 'Дмитрий', 'Анна', 'Павел', 'Ольга'];
-      const statuses = ['new', 'preparing', 'ready', 'delivered'];
-      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-      
-      const dishes = [
-        { id: 1, name: 'Стейк Рибай', price: 1200 },
-        { id: 2, name: 'Цезарь с курицей', price: 550 },
-        { id: 3, name: 'Паста Карбонара', price: 650 },
-        { id: 4, name: 'Греческий салат', price: 450 },
-        { id: 5, name: 'Суп грибной', price: 350 },
-        { id: 6, name: 'Чизкейк', price: 320 },
-        { id: 7, name: 'Капучино', price: 200 }
-      ];
-      
-      // Случайно выбираем 1-4 блюда
-      const itemCount = Math.floor(Math.random() * 4) + 1;
-      const items = [];
-      let totalAmount = 0;
-      
-      for (let j = 0; j < itemCount; j++) {
-        const dish = dishes[Math.floor(Math.random() * dishes.length)];
-        const quantity = Math.floor(Math.random() * 3) + 1;
-        const itemTotal = dish.price * quantity;
-        totalAmount += itemTotal;
+        console.log(`[API Proxy] Отправка запроса на ${fullUrl} с заголовками:`, headers);
         
-        items.push({
-          dish_id: dish.id,
-          name: dish.name,
-          price: dish.price,
-          quantity: quantity
+        const response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: headers,
         });
+        
+        // Проверяем статус ответа
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[API Proxy] Успешно получены данные из ${fullUrl}, записей: ${Array.isArray(data) ? data.length : 'объект'}`);
+          
+          // Если получен массив, фильтруем его по waiter_id на клиентской стороне для дополнительной проверки
+          if (Array.isArray(data) && userRole === 'waiter') {
+            const filteredData = data.filter(order => 
+              order.waiter_id === parseInt(userId) || 
+              String(order.waiter_id) === userId
+            );
+            
+            console.log(`[API Proxy] Отфильтровано заказов по waiter_id=${userId}: ${filteredData.length} из ${data.length}`);
+            orderData = filteredData;
+          } else {
+            orderData = data;
+          }
+          
+          break; // Выходим из цикла при успешном получении данных
+        } else {
+          const status = response.status;
+          const errorText = await response.text();
+          console.warn(`[API Proxy] Ошибка ${status} при запросе к ${fullUrl}: ${errorText}`);
+          lastError = { status, message: errorText, endpoint, url: fullUrl };
+        }
+      } catch (error) {
+        console.error(`[API Proxy] Ошибка при запросе к ${endpoint}:`, error);
+        lastError = { message: String(error), endpoint };
       }
-      
-      orders.push({
-        id: id,
-        status: randomStatus,
-        payment_status: 'pending',
-        payment_method: 'cash',
-        order_type: 'dine-in',
-        total_amount: totalAmount,
-        created_at: new Date(Date.now() - Math.floor(Math.random() * 3600000)).toISOString(), // До 1 часа назад
-        table_number: table,
-        customer_name: names[Math.floor(Math.random() * names.length)],
-        items: items
-      });
     }
     
-    return res.status(200).json(orders);
-  } catch (error: any) {
-    console.error('[SIMPLE API] Критическая ошибка:', error.message);
-    
-    // В случае общей ошибки, возвращаем один базовый заказ
-    const defaultOrder = {
-      id: 9999,
-      status: 'new',
-      payment_status: 'pending',
-      payment_method: 'cash',
-      order_type: 'dine-in',
-      total_amount: 1500,
-      items: [
-        { dish_id: 1, quantity: 1, price: 1000, name: 'Стейк' },
-        { dish_id: 2, quantity: 1, price: 500, name: 'Салат' }
-      ],
-      created_at: new Date().toISOString(),
-      table_number: 1,
-      customer_name: 'Клиент'
-    };
-    
-    return res.status(200).json([defaultOrder]);
+    // Проверяем результат
+    if (orderData) {
+      // Возвращаем полученные данные
+      return res.status(200).json(orderData);
+    } else {
+      // Для любого пользователя возвращаем пустой массив вместо ошибки
+      console.log('[API Proxy] Нет данных, возвращаем пустой массив');
+      return res.status(200).json([]);
+    }
+  } catch (error) {
+    console.error('[API Proxy] Критическая ошибка:', error);
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 } 

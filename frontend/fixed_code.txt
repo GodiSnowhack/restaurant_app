@@ -1,0 +1,45 @@
+// Заменить в файле api.ts начиная с этой строки:
+    // Добавляем специальный заголовок для админов
+    if (userRole === 'admin') {
+      headers['X-Admin-Override'] = 'true';
+    }
+    
+    // Отправляем запрос на прокси-сервер
+    const proxyUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}${apiUrl}` 
+      : apiUrl;
+    
+    console.log(`[getUserOrdersData] Отправка запроса на: ${proxyUrl}`);
+    
+    const response = await fetch(proxyUrl, {
+      method: 'GET',
+      headers,
+      cache: 'no-store'
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[getUserOrdersData] Ошибка ${response.status}: ${errorText}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log(`[getUserOrdersData] Получено данных:`, data);
+    
+    return data;
+  } catch (error) {
+    console.error('[getUserOrdersData] Ошибка:', error);
+    return [];
+  }
+};
+
+// -------------------------------------------------------------------------
+// Также замените начало функции getUserOrdersData на следующий код:
+// -------------------------------------------------------------------------
+// Функция для получения заказов пользователя
+export const getUserOrdersData = async (): Promise<Order[] | { error: string }> => {
+  
+// -------------------------------------------------------------------------
+// Удалите также строку с дублирующимся экспортом reservationsApi:
+// export { reservationsApi };
+// ------------------------------------------------------------------------- 

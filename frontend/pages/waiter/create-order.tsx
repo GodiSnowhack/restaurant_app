@@ -5,13 +5,19 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import WaiterLayout from '../../components/WaiterLayout';
 import useAuthStore from '../../lib/auth-store';
-import { menuApi, ordersApi } from '../../lib/api';
+import { menuApi, ordersApi, settingsApi, RestaurantTable as BaseRestaurantTable } from '../../lib/api';
 import { 
   PlusIcon, 
   MinusIcon, 
   TrashIcon, 
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
+
+// Расширяем базовый интерфейс столов для добавления поля name
+interface RestaurantTable extends BaseRestaurantTable {
+  name?: string;
+}
 
 interface MenuItem {
   id: string;
@@ -53,6 +59,7 @@ const CreateOrderPage: NextPage = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [tables, setTables] = useState<RestaurantTable[]>([]);
   
   // Перенаправляем на страницу входа, если пользователь не авторизован
   useEffect(() => {
@@ -61,34 +68,93 @@ const CreateOrderPage: NextPage = () => {
     }
   }, [isAuthenticated, router]);
   
-  // Загружаем меню при монтировании
+  // Загружаем столы ресторана и меню при монтировании
   useEffect(() => {
-    const fetchMenuItems = async () => {
+    const fetchTablesAndMenu = async () => {
       try {
         setLoading(true);
-        // Получаем меню используя запрос к API
-        const menu = await fetch('/api/menu').then(res => res.json()) as MenuResponse;
-        setMenuItems(menu.items || []);
         
-        // Извлекаем уникальные категории из меню
-        const uniqueCategories = Array.from(
-          new Set(menu.items.map((item: MenuItem) => item.category))
-        ).map((categoryName: string) => ({ 
-          id: categoryName,
-          name: categoryName 
-        }));
+        // Получаем настройки ресторана, включая столы
+        const settings = await settingsApi.getSettings();
+        console.log('Полученные настройки:', settings);
         
-        setCategories(uniqueCategories);
+        if (settings && settings.tables && Array.isArray(settings.tables)) {
+          console.log('Исходные столы до обработки:', JSON.stringify(settings.tables));
+          
+          // Выводим подробную информацию о каждом столе для отладки
+          settings.tables.forEach((table: RestaurantTable, index: number) => {
+            console.log(`Стол ${index + 1} (детали):`, JSON.stringify(table));
+          });
+          
+          // Фильтруем столы, чтобы показать только доступные
+          const availableTables = settings.tables
+            .filter((table: RestaurantTable) => 
+              table.status === 'available' || !table.status
+            )
+            .map((table: RestaurantTable, index: number) => {
+              return {
+                ...table,
+                // Используем id как идентификатор для стола
+                id: table.id || index + 1,
+                // Устанавливаем number равным id, если он отсутствует
+                number: typeof table.number === 'number' ? table.number : table.id || index + 1
+              };
+            });
+            
+          console.log('Доступные столы после обработки:', JSON.stringify(availableTables));
+          setTables(availableTables);
+          
+          // Если есть доступные столы, устанавливаем первый по умолчанию
+          if (availableTables.length > 0) {
+            // Устанавливаем ID первого стола
+            const firstTableId = String(availableTables[0].id);
+            console.log('Установка ID первого стола:', firstTableId);
+            setTableNumber(firstTableId);
+          }
+        } else {
+          // Если столов нет в настройках, создаем временные столы для демонстрации
+          const defaultTables = [
+            { id: 1, number: 1, capacity: 2, status: 'available', name: 'Стол 1' },
+            { id: 2, number: 2, capacity: 4, status: 'available', name: 'Стол 2' },
+            { id: 3, number: 3, capacity: 6, status: 'available', name: 'VIP' }
+          ];
+          console.log('Используем стандартные столы:', defaultTables);
+          setTables(defaultTables);
+          setTableNumber('1'); // Устанавливаем первый стол по умолчанию
+        }
+        
+        // Получаем меню используя запрос к API с указанием метода
+        const menu = await fetch('/api/menu?method=dishes').then(res => res.json()) as MenuResponse;
+        
+        // Проверяем, что menu.items существует и является массивом
+        const items = Array.isArray(menu.items) ? menu.items : Array.isArray(menu) ? menu : [];
+        setMenuItems(items);
+        
+        // Получаем категории отдельным запросом
+        const categoriesResponse = await fetch('/api/menu?method=categories').then(res => res.json());
+        let categoriesList: Category[] = [];
+        
+        if (Array.isArray(categoriesResponse)) {
+          categoriesList = categoriesResponse.map(category => ({
+            id: category.id.toString(),
+            name: category.name
+          }));
+        }
+        
+        setCategories(categoriesList);
         setLoading(false);
       } catch (err) {
-        console.error('Ошибка при загрузке меню:', err);
-        setError('Не удалось загрузить меню. Пожалуйста, попробуйте еще раз.');
+        console.error('Ошибка при загрузке данных:', err);
+        setError('Не удалось загрузить данные. Пожалуйста, попробуйте еще раз.');
+        setMenuItems([]);
+        setCategories([]);
+        setTables([]);
         setLoading(false);
       }
     };
     
     if (isAuthenticated) {
-      fetchMenuItems();
+      fetchTablesAndMenu();
     }
   }, [isAuthenticated]);
   
@@ -174,26 +240,177 @@ const CreateOrderPage: NextPage = () => {
       setSubmitting(true);
       setError(null);
       
-      const orderData = {
-        items: orderItems,
-        table_number: tableNumber,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        created_by_waiter: user?.id,
-        status: 'pending',
-        total_amount: totalAmount
+      // Найдем выбранный стол
+      const selectedTable = tables.find(t => String(t.id) === tableNumber);
+      console.log('Выбранный стол для заказа:', selectedTable);
+      
+      // Используем номер стола из объекта, если есть, иначе используем ID
+      const tableNumberToSend = selectedTable && typeof selectedTable.number === 'number' 
+        ? selectedTable.number 
+        : selectedTable && selectedTable.id 
+          ? Number(selectedTable.id) 
+          : Number(tableNumber);
+      
+      console.log('Отправка заказа для стола:', selectedTable?.name, 'номер:', tableNumberToSend);
+      
+      // Максимально упрощенный формат элементов заказа с проверкой типов
+      const formattedItems = orderItems.map(item => ({
+        dish_id: Number(item.id), // Гарантированно число
+        quantity: Number(item.quantity), // Гарантированно число
+        special_instructions: item.special_instructions || ''
+      }));
+      
+      // Создаем минимальный необходимый формат заказа
+      const orderData: {
+        table_number: number;
+        items: { 
+          dish_id: number; 
+          quantity: number; 
+          special_instructions: string;
+        }[];
+        status: string;
+        payment_status: string;
+        payment_method: string;
+        order_type: string;
+        total_amount: number;
+        waiter_id?: number;
+        customer_name?: string;
+        customer_phone?: string;
+      } = {
+        table_number: tableNumberToSend,
+        items: formattedItems,
+        status: "pending",
+        payment_status: "PENDING",
+        payment_method: "cash",
+        order_type: "dine_in",
+        total_amount: Number(totalAmount.toFixed(2)) // Гарантированно число с 2 знаками
       };
       
-      // Создаем новый заказ через API
-      await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderData)
-      });
+      // Добавляем необязательные поля только если они имеют значение
+      if (customerName && customerName.trim()) {
+        orderData.customer_name = customerName.trim();
+      }
       
-      // Сбрасываем форму
+      if (customerPhone && customerPhone.trim()) {
+        orderData.customer_phone = customerPhone.trim();
+      }
+      
+      // Добавляем ID официанта
+      if (user?.id) {
+        orderData.waiter_id = Number(user.id);
+        console.log(`Прикрепляем заказ к официанту с ID: ${user.id}`);
+      }
+      
+      console.log('Данные заказа для отправки:', JSON.stringify(orderData));
+      
+      // Получаем токен авторизации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Токен авторизации отсутствует');
+        setError('Ошибка авторизации. Пожалуйста, войдите снова.');
+        return;
+      }
+      
+      // Функция для отправки заказа с повторными попытками
+      const sendOrderWithRetry = async (maxRetries = 3) => {
+        let lastError = null;
+        
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            // Если это повторная попытка, добавляем небольшую задержку
+            if (attempt > 0) {
+              const delay = 1000 * attempt;
+              console.log(`Ожидание ${delay}мс перед повторной попыткой ${attempt + 1}/${maxRetries}...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            
+            // Используем Next.js API прокси
+            const response = await fetch('/api/orders', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(orderData)
+            });
+            
+            // Обработка ответа от сервера
+            const responseText = await response.text();
+            console.log(`Ответ сервера (${response.status}):`, responseText);
+            
+            let responseData;
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (e) {
+              responseData = { message: responseText };
+            }
+            
+            if (!response.ok) {
+              console.error(`Ошибка API (${response.status}):`, responseData);
+              
+              // Проверяем, является ли ошибка результатом блокировки базы данных
+              const isDatabaseLocked = 
+                responseText.includes('database is locked') || 
+                (responseData.error && responseData.error.includes('database is locked')) ||
+                (responseData.message && responseData.message.includes('database is locked'));
+              
+              if (isDatabaseLocked && attempt < maxRetries - 1) {
+                // Если база заблокирована и это не последняя попытка, продолжаем повторы
+                console.log('Обнаружена блокировка базы данных, повторяем запрос...');
+                lastError = new Error(responseData.message || `Ошибка создания заказа: ${response.status} ${response.statusText}`);
+                continue;
+              }
+              
+              throw new Error(responseData.message || `Ошибка создания заказа: ${response.status} ${response.statusText}`);
+            }
+            
+            // Обрабатываем случаи, когда заказ был создан, но возвращена дополнительная информация
+            if (responseData._recovered) {
+              console.log('Заказ был восстановлен после ошибки сервера:', responseData);
+              toast.success(responseData.message || "Заказ создан, несмотря на временную ошибку сервера", { 
+                duration: 3000,
+                position: 'top-center',
+              });
+            } else if (responseData.is_duplicate) {
+              console.log('Обнаружено, что заказ является дубликатом:', responseData);
+              toast(responseData.duplicate_message || "Заказ уже был создан ранее", {
+                duration: 3000,
+                position: 'top-center',
+                icon: '🔄',
+              });
+            }
+            
+            console.log('Заказ успешно создан:', responseData);
+            return responseData;
+          } catch (err: any) {
+            lastError = err;
+            
+            // Если это ошибка сети, а не ответ сервера, просто повторяем
+            if (err instanceof TypeError && err.message.includes('fetch')) {
+              console.error('Ошибка сети при отправке заказа:', err);
+              continue;
+            }
+            
+            // Для других ошибок проверяем, связана ли она с блокировкой базы данных
+            if (err.message && err.message.includes('database is locked') && attempt < maxRetries - 1) {
+              console.log('Обнаружена блокировка базы данных в сообщении об ошибке, повторяем запрос...');
+              continue;
+            }
+            
+            // Если это последняя попытка или другая ошибка, выбрасываем её
+            throw err;
+          }
+        }
+        
+        // Если мы здесь, значит все попытки не удались
+        throw lastError || new Error('Не удалось создать заказ после нескольких попыток');
+      };
+      
+      // Отправляем заказ с повторными попытками
+      await sendOrderWithRetry(3);
+      
+      // Сбрасываем форму после успешного создания заказа
       setOrderItems([]);
       setTableNumber('');
       setCustomerName('');
@@ -205,12 +422,39 @@ const CreateOrderPage: NextPage = () => {
         setSuccess(false);
       }, 3000);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Ошибка при создании заказа:', err);
-      setError('Не удалось создать заказ. Пожалуйста, попробуйте еще раз.');
+      
+      // Специальное сообщение для пользователя при ошибке блокировки базы данных
+      if (err.message && err.message.includes('database is locked')) {
+        setError('База данных временно занята. Пожалуйста, подождите несколько секунд и попробуйте снова.');
+      } else {
+        setError(`Не удалось создать заказ: ${err.message}`);
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+  
+  // Обработчик выбора стола
+  const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedValue = e.target.value;
+    console.log('Выбран стол (ID):', selectedValue);
+    
+    if (!selectedValue) {
+      console.warn('Выбрано пустое значение стола!');
+      return;
+    }
+    
+    // Сохраняем выбранный ID стола
+    setTableNumber(selectedValue);
+    
+    // Найдем соответствующий стол для диагностики
+    const selectedTable = tables.find(table => String(table.id) === selectedValue);
+    console.log('Найденный стол по ID:', selectedTable);
+    
+    // Дополнительное логирование сразу после установки значения
+    console.log('tableNumber установлен в:', selectedValue, 'для стола:', selectedTable?.name);
   };
   
   if (!isAuthenticated) {
@@ -275,7 +519,7 @@ const CreateOrderPage: NextPage = () => {
                       <div>
                         <h3 className="font-medium">{item.name}</h3>
                         <p className="text-sm text-gray-600">{item.description}</p>
-                        <p className="mt-1 font-medium text-primary">{item.price.toFixed(2)} ₽</p>
+                        <p className="mt-1 font-medium text-primary">{item.price.toFixed(2)} ₸</p>
                       </div>
                       <button
                         onClick={() => addItemToOrder(item)}
@@ -308,15 +552,43 @@ const CreateOrderPage: NextPage = () => {
                 <label htmlFor="tableNumber" className="block text-sm font-medium text-gray-700 mb-1">
                   Номер стола *
                 </label>
-                <input
-                  type="text"
+                <select
                   id="tableNumber"
                   value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
+                  onChange={handleTableChange}
                   className="w-full p-2 border rounded focus:ring-primary focus:border-primary"
-                  placeholder="Например: 5"
                   required
-                />
+                >
+                  <option value="">Выберите стол</option>
+                  {tables.length > 0 ? (
+                    tables.map((table: RestaurantTable) => {
+                      // Используем ID стола для значения
+                      const tableIdStr = String(table.id);
+                      console.log(`Опция стола ${table.name}: id=${tableIdStr}, номер=${table.number}`);
+                      return (
+                        <option 
+                          key={table.id} 
+                          value={tableIdStr}
+                        >
+                          {table.name || `Стол №${table.number}`} (мест: {table.capacity})
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option value="" disabled>Нет доступных столов</option>
+                  )}
+                </select>
+                <div className="mt-2">
+                  {tableNumber ? (
+                    <div className="p-2 bg-green-50 text-green-700 rounded border border-green-200">
+                      Выбран стол: {tables.find(t => String(t.id) === tableNumber)?.name || `ID: ${tableNumber}`}
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-yellow-50 text-yellow-700 rounded border border-yellow-200">
+                      Пожалуйста, выберите стол для заказа
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="mb-3">
@@ -356,7 +628,7 @@ const CreateOrderPage: NextPage = () => {
                     <div key={item.id} className="p-4">
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-medium">{item.name}</span>
-                        <span className="text-primary font-medium">{(item.price * item.quantity).toFixed(2)} ₽</span>
+                        <span className="text-primary font-medium">{(item.price * item.quantity).toFixed(2)} ₸</span>
                       </div>
                       
                       <div className="flex items-center justify-between mt-2">
@@ -407,7 +679,7 @@ const CreateOrderPage: NextPage = () => {
             <div className="p-4 border-t">
               <div className="flex justify-between items-center font-bold mb-4">
                 <span>Итого:</span>
-                <span className="text-primary">{totalAmount.toFixed(2)} ₽</span>
+                <span className="text-primary">{totalAmount.toFixed(2)} ₸</span>
               </div>
               
               {error && (

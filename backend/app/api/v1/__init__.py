@@ -27,6 +27,13 @@ async def health_check():
         "message": "API сервер работает нормально"
     }
 
+@api_router.get("/ping", tags=["system"])
+async def ping():
+    """
+    Простая проверка доступности API для клиентских приложений.
+    """
+    return {"status": "ok", "message": "pong"}
+
 @api_router.post("/auth/_log", tags=["system"])
 async def auth_log(data: dict):
     """

@@ -1,15 +1,40 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
+// Список разрешенных полей для блюда
+const allowedDishFields = [
+  'name', 'description', 'price', 'category_id', 'image_url', 
+  'is_available', 'calories', 'weight', 'position', 'is_vegetarian', 
+  'is_vegan', 'is_spicy', 'cooking_time', 'cost_price'
+];
+
+// Функция для фильтрации полей объекта
+const filterObject = (obj: any, allowedFields: string[]) => {
+  const filteredObj: any = {};
+  
+  for (const field of allowedFields) {
+    if (field in obj) {
+      filteredObj[field] = obj[field];
+    }
+  }
+  
+  return filteredObj;
+};
+
 /**
  * API-прокси для получения меню и категорий
  * Используется как для десктопных, так и для мобильных устройств
  */
 export default async function menuProxy(req: NextApiRequest, res: NextApiResponse) {
+  // Добавляем проверку для ping запросов
+  if (req.query && req.query.method === 'ping') {
+    return res.status(200).json({ status: 'ok', message: 'pong' });
+  }
+
   // Разрешаем CORS для всех клиентов
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
@@ -21,7 +46,8 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
     return;
   }
 
-  if (req.method !== 'GET') {
+  // Проверяем метод запроса и обрабатываем соответственно
+  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'DELETE') {
     return res.status(405).json({ message: 'Метод не поддерживается' });
   }
 
@@ -50,8 +76,8 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
       return res.status(400).json({ message: 'Неверный метод или отсутствует id для получения блюда' });
     }
     
-    // Добавляем query-параметры, если это запрос блюд
-    if ((method === 'dishes' || method === 'get-dishes') && 
+    // Добавляем query-параметры, если это запрос блюд и метод GET
+    if (req.method === 'GET' && (method === 'dishes' || method === 'get-dishes') && 
         (category_id || is_vegetarian || is_vegan || available_only)) {
       const params = new URLSearchParams();
       
@@ -63,7 +89,7 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
       endpoint = `${endpoint}?${params.toString()}`;
     }
     
-    console.log(`Menu API - Отправка запроса на ${endpoint}`);
+    console.log(`Menu API - Отправка ${req.method} запроса на ${endpoint}`);
     
     // Делаем запрос к основному API с передачей токена авторизации, если он есть
     const headers: Record<string, string> = {
@@ -87,13 +113,48 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
       let retryCount = 0;
       const maxRetries = 3;
       
+      // Фильтруем данные запроса для POST и PUT запросов
+      let filteredBody = req.body;
+      if ((req.method === 'POST' || req.method === 'PUT') && method === 'dishes') {
+        // Фильтруем поля перед отправкой на бэкенд
+        filteredBody = filterObject(req.body, allowedDishFields);
+        console.log('Menu API - Отфильтрованные данные блюда:', filteredBody);
+        
+        // Проверяем, были ли удалены какие-либо поля
+        const removedFields = Object.keys(req.body).filter(key => !allowedDishFields.includes(key));
+        if (removedFields.length > 0) {
+          console.log('Menu API - Удалены неподдерживаемые поля:', removedFields);
+        }
+      }
+      
       while (retryCount < maxRetries) {
         try {
-          response = await axios.get(endpoint, {
-            headers,
-            timeout,
-            validateStatus: (status) => status < 500 // Принимаем все ответы кроме 5xx
-          });
+          // Отправляем запрос в зависимости от HTTP метода
+          if (req.method === 'GET') {
+            response = await axios.get(endpoint, {
+              headers,
+              timeout,
+              validateStatus: (status) => status < 500 // Принимаем все ответы кроме 5xx
+            });
+          } else if (req.method === 'POST') {
+            response = await axios.post(endpoint, filteredBody, {
+              headers,
+              timeout,
+              validateStatus: (status) => status < 500
+            });
+          } else if (req.method === 'PUT') {
+            response = await axios.put(endpoint, filteredBody, {
+              headers,
+              timeout,
+              validateStatus: (status) => status < 500
+            });
+          } else if (req.method === 'DELETE') {
+            response = await axios.delete(endpoint, {
+              headers,
+              timeout,
+              validateStatus: (status) => status < 500
+            });
+          }
           
           // Успешный запрос, выходим из цикла
           break;
@@ -122,7 +183,7 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
         
         return res.status(response.status).json({
           success: false,
-          message: `Ошибка при получении данных: ${response.status}`,
+          message: `Ошибка при ${req.method === 'GET' ? 'получении' : req.method === 'POST' ? 'создании' : req.method === 'PUT' ? 'обновлении' : 'удалении'} данных: ${response.status}`,
           error: response.data,
           endpoint
         });
@@ -135,8 +196,8 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
     } catch (apiError: any) {
       console.error('Menu API - Ошибка при запросе к серверу:', apiError.message);
       
-      // Для мобильных устройств пробуем сделать прямой запрос
-      if (isMobile) {
+      // Для мобильных устройств пробуем сделать прямой запрос только для GET-запросов
+      if (isMobile && req.method === 'GET') {
         try {
           console.log('Menu API - Пробуем прямой fetch для мобильного устройства');
           
@@ -158,7 +219,7 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
       }
       
       // Формируем информативное сообщение об ошибке
-      let errorMessage = 'Ошибка при получении данных';
+      let errorMessage = `Ошибка при ${req.method === 'GET' ? 'получении' : req.method === 'POST' ? 'создании' : req.method === 'PUT' ? 'обновлении' : 'удалении'} данных`;
       let statusCode = 500;
       
       if (apiError.response) {

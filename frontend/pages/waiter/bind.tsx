@@ -17,7 +17,7 @@ export default function BindOrderPage() {
   // Проверяем авторизацию
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push(`/login?redirect=${encodeURIComponent('/waiter/bind')}`);
+      router.push(`/auth/login?redirect=${encodeURIComponent('/waiter/bind')}`);
     }
   }, [status, router]);
 

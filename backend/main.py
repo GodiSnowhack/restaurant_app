@@ -57,6 +57,22 @@ origins = [
     "http://10.0.0.3:3000",
     "http://10.0.0.4:3000",
     "http://10.0.0.5:3000",
+    # Добавляем хосты без порта
+    "http://localhost", 
+    "http://127.0.0.1",
+    "http://0.0.0.0",
+    "http://192.168.0.10",
+    "http://192.168.0.11",
+    "http://192.168.0.12",
+    "http://192.168.0.13",
+    "http://192.168.0.14",
+    "http://192.168.0.15",
+    "http://192.168.0.16",
+    "http://192.168.1.1",
+    "http://192.168.1.2",
+    "http://192.168.1.3",
+    "http://192.168.1.4",
+    "http://192.168.1.5",
     # Добавляем и HTTPS варианты для корректной работы в безопасной среде
     "https://localhost:3000", 
     "https://127.0.0.1:3000",
@@ -67,33 +83,29 @@ origins = [
     "https://192.168.0.14:3000",
     "https://192.168.0.15:3000",
     "https://192.168.0.16:3000",
+    # HTTPS без порта
+    "https://localhost",
+    "https://127.0.0.1",
+    "https://192.168.0.10",
+    "https://192.168.0.11",
+    "https://192.168.0.12",
+    "https://192.168.0.13",
+    "https://192.168.0.14",
+    "https://192.168.0.15",
+    "https://192.168.0.16"
 ]
 
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
     # Расширенный список origins для поддержки мобильных устройств
-    allow_origins=origins,
+    allow_origins=origins,  # Возвращаем список origins
     allow_credentials=True,  # Включаем credentials для поддержки куки авторизации
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allow_headers=[
-        "Content-Type", 
-        "Authorization", 
-        "X-Requested-With", 
-        "Accept", 
-        "Origin", 
-        "Access-Control-Request-Method", 
-        "Access-Control-Request-Headers",
-        "X-CSRF-Token",
-        "X-Client-Type",
-        "X-Mobile-Auth",
-        "X-Low-Quality",
-        "X-Save-Data",
-        "X-Fallback",
-        "X-Attempt"
-    ],
+    allow_headers=["*"],  # Разрешаем все заголовки для упрощения отладки
     expose_headers=["Content-Disposition", "Location"],
-    max_age=1800  # Кешировать предполетные запросы на 30 минут
+    max_age=1800,  # Кешировать предполетные запросы на 30 минут
+    allow_origin_regex="http://localhost:.*"  # Добавляем поддержку всех локальных портов для разработки
 )
 
 # Middleware для логирования запросов, особенно важно для отладки мобильных клиентов

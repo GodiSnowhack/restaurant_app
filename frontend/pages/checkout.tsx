@@ -66,8 +66,15 @@ const CheckoutPage: NextPage = () => {
 
   // Добавляем локальную функцию для проверки кода резервации
   const verifyReservationCode = async (code: string) => {
-    // Имитация проверки резервации
-    return { valid: code.length === 8, tableNumber: 12, time: new Date() };
+    try {
+      // Проверяем код бронирования так же, как и на странице корзины
+      // Для простоты считаем код действительным, если его длина равна 7 или 8 символов
+      // Это имитирует поведение в корзине
+      return { valid: code.length >= 7 && code.length <= 8, tableNumber: 12, time: new Date() };
+    } catch (error) {
+      console.error('Ошибка при проверке кода бронирования:', error);
+      return { valid: false, tableNumber: null, time: null };
+    }
   };
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 {
-  "restaurant_name": "Ресторан \"Godordom\"",
+  "restaurant_name": "Ресторан \"Godi and Fast\"",
   "email": "info@restaurant.com",
   "phone": "+7 (999) 123-45-66",
   "address": "г. Петропавловск, ул. Жукова, д. 7",
@@ -107,7 +107,7 @@
       "position_y": 250
     }
   ],
-  "updated_at": "2025-04-22T20:44:59.891Z",
+  "updated_at": "2025-04-27T23:24:00.978Z",
   "smtp_user": "admin1@example.com",
   "smtp_password": "admin123",
   "tables": [

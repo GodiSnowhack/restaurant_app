@@ -81,14 +81,39 @@ const AdminMenuPage: NextPage = () => {
       try {
         setIsLoading(true);
         
+        // Принудительно очищаем кэш перед загрузкой для получения актуальных данных
+        try {
+          // Сбрасываем кэш в API объекте
+          if (menuApi._cachedDishes) {
+            menuApi._cachedDishes = null;
+            menuApi._lastDishesUpdate = 0;
+          }
+          
+          // Сбрасываем localStorage кэш
+          localStorage.removeItem('cached_dishes');
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('cached_dishes_')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          console.error('Ошибка при очистке кэша:', e);
+        }
+        
         // Загружаем данные с сервера через API
         const categoriesData = await menuApi.getCategories();
         setCategories(categoriesData);
         
-        const dishesData = await menuApi.getDishes();
+        // Добавляем параметр для принудительной загрузки с сервера
+        const dishesData = await menuApi.getDishes({ _bypass_cache: true });
         setDishes(dishesData);
         
         setIsLoading(false);
+        
+        // Проверяем наличие параметра showDishForm в URL
+        if (router.query.showDishForm === 'true') {
+          setShowDishForm(true);
+        }
       } catch (error) {
         console.error('Ошибка при загрузке данных меню:', error);
         setIsLoading(false);
@@ -106,12 +131,17 @@ const AdminMenuPage: NextPage = () => {
           // Не загружаем предустановленные блюда
           setDishes([]);
           setIsLoading(false);
+          
+          // Проверяем наличие параметра showDishForm в URL даже в случае ошибки
+          if (router.query.showDishForm === 'true') {
+            setShowDishForm(true);
+          }
         }, 1000);
       }
     };
 
     checkAdmin();
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, router.asPath]);
 
   const handleDeleteDish = async (id: number) => {
     if (window.confirm('Вы уверены, что хотите удалить это блюдо?')) {

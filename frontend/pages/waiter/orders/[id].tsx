@@ -80,7 +80,7 @@ const WaiterOrderDetailPage: NextPage = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push('/auth/login');
       return;
     }
     
