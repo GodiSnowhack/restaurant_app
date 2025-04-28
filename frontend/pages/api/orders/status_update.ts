@@ -30,10 +30,13 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
 
   try {
     // Получаем ID заказа и статус из тела запроса
-    const { orderId, status } = req.body;
+    const { order_id, orderId, status } = req.body;
+    
+    // Используем order_id или orderId, в зависимости от того, что передано
+    const id = order_id || orderId;
     
     // Проверяем корректность ID
-    if (!orderId || isNaN(parseInt(orderId))) {
+    if (!id || isNaN(parseInt(String(id)))) {
       return res.status(400).json({ 
         success: false, 
         message: 'Некорректный ID заказа' 
@@ -71,9 +74,9 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
     
     // Формируем URL для запроса к бэкенду
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const backendUrl = `${apiUrl}/orders/update/${orderId}`;
+    const backendUrl = `${apiUrl}/orders/status/${id}`;
     
-    console.log(`Status API - Отправка запроса на обновление статуса заказа ${orderId} на ${normalizedStatus}`);
+    console.log(`Status API - Отправка запроса на обновление статуса заказа ${id} на ${normalizedStatus}`);
     
     const headers = {
       'Content-Type': 'application/json',
@@ -105,7 +108,7 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
       }
       
       // Всегда возвращаем успешный ответ, так как статус в БД может измениться даже при ошибке API
-      console.log(`Status API - Статус заказа ${orderId} обновлен на ${normalizedStatus}`);
+      console.log(`Status API - Статус заказа ${id} обновлен на ${normalizedStatus}`);
       
       return res.status(200).json({
         success: true,

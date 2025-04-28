@@ -256,7 +256,7 @@ const AdminReservationsPage: NextPage = () => {
   if (isLoading) {
     return (
       <Layout title="Управление бронированиями | Админ-панель" section="admin">
-        <div className="flex justify-center items-center h-64">
+          <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary"></div>
         </div>
       </Layout>
@@ -271,11 +271,11 @@ const AdminReservationsPage: NextPage = () => {
           <div className="flex items-center">
             <Link href="/admin" className="mr-4 hover:bg-gray-100 p-2 rounded-full transition-colors">
               <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-            </Link>
+          </Link>
             <h1 className="text-2xl font-bold text-gray-900">Управление бронированиями</h1>
-          </div>
-          
-          <button 
+        </div>
+
+          <button
             onClick={refreshData} 
             className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm transition-colors"
           >
@@ -283,7 +283,7 @@ const AdminReservationsPage: NextPage = () => {
             Обновить данные
           </button>
         </div>
-        
+
         {/* Панель фильтров */}
         <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
           <div className="px-6 py-5">
@@ -307,40 +307,40 @@ const AdminReservationsPage: NextPage = () => {
               >
                 Все
               </button>
-              <button
-                onClick={() => setActiveTab('pending')}
+                  <button
+                    onClick={() => setActiveTab('pending')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'pending' ? 'bg-yellow-500 text-white shadow-sm' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
-                }`}
-              >
+                    }`}
+                  >
                 Ожидающие
-              </button>
-              <button
-                onClick={() => setActiveTab('confirmed')}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('confirmed')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'confirmed' ? 'bg-green-500 text-white shadow-sm' : 'bg-green-50 text-green-700 hover:bg-green-100'
-                }`}
-              >
+                    }`}
+                  >
                 Подтвержденные
-              </button>
-              <button
-                onClick={() => setActiveTab('completed')}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('completed')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'completed' ? 'bg-blue-500 text-white shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                }`}
-              >
+                    }`}
+                  >
                 Завершенные
-              </button>
-              <button
-                onClick={() => setActiveTab('cancelled')}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('cancelled')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'cancelled' ? 'bg-red-500 text-white shadow-sm' : 'bg-red-50 text-red-700 hover:bg-red-100'
-                }`}
-              >
+                    }`}
+                  >
                 Отмененные
-              </button>
-            </div>
-            
+                  </button>
+              </div>
+
             {/* Дополнительные фильтры */}
             {showFilters && (
               <div className="flex flex-col md:flex-row gap-4 items-start md:items-end pt-4 border-t border-gray-200">
@@ -350,18 +350,18 @@ const AdminReservationsPage: NextPage = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <CalendarIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="date"
-                      id="date-filter"
-                      value={selectedDate || ''}
-                      onChange={handleDateChange}
-                      className="pl-10 shadow-sm focus:ring-primary focus:border-primary block w-full md:w-48 sm:text-sm border-gray-300 rounded-md"
-                    />
+                    <CalendarIcon className="h-5 w-5 text-gray-400" />
                   </div>
+                  <input
+                    type="date"
+                      id="date-filter"
+                    value={selectedDate || ''}
+                    onChange={handleDateChange}
+                      className="pl-10 shadow-sm focus:ring-primary focus:border-primary block w-full md:w-48 sm:text-sm border-gray-300 rounded-md"
+                  />
                 </div>
-                
+              </div>
+              
                 <button
                   onClick={handleResetFilters}
                   className="mt-2 md:mt-0 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
@@ -372,26 +372,26 @@ const AdminReservationsPage: NextPage = () => {
             )}
           </div>
         </div>
-        
+
         {/* Счётчик и информация о результатах */}
         {filteredReservations.length > 0 && (
           <div className="bg-gray-50 shadow-inner rounded-lg px-6 py-3 text-sm text-gray-700 border border-gray-200">
             <p>
               Найдено бронирований: <span className="font-medium">{filteredReservations.length}</span>
-              {activeTab && (
+            {activeTab && (
                 <span className="ml-2">
                   со статусом: <span className="font-medium capitalize">{activeTab}</span>
-                </span>
-              )}
-              {selectedDate && (
+              </span>
+            )}
+            {selectedDate && (
                 <span className="ml-2">
                   за дату: <span className="font-medium">{new Date(selectedDate).toLocaleDateString('ru-RU')}</span>
-                </span>
-              )}
+              </span>
+            )}
             </p>
           </div>
         )}
-        
+
         {/* Список бронирований */}
         {reservations.length === 0 ? (
           <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
@@ -421,7 +421,7 @@ const AdminReservationsPage: NextPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredReservations.map((reservation) => (
+                  {filteredReservations.map((reservation) => (
               <div key={reservation.id} className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow duration-200">
                 <div className={`px-4 py-3 flex justify-between items-center border-b ${
                   reservation.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
@@ -453,7 +453,7 @@ const AdminReservationsPage: NextPage = () => {
                     <UserGroupIcon className="flex-shrink-0 mr-2 h-5 w-5 text-gray-500" />
                     <span><strong>{reservation.guests_count}</strong> гостей, стол №<strong>{reservation.table_number || '—'}</strong></span>
                   </div>
-                </div>
+                        </div>
                 
                 {reservation.comment && (
                   <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -461,40 +461,40 @@ const AdminReservationsPage: NextPage = () => {
                       <span className="font-medium block mb-1">Комментарий:</span>
                       <span className="italic">{reservation.comment}</span>
                     </p>
-                  </div>
+                        </div>
                 )}
                 
                 <div className="px-4 py-3 bg-gray-50">
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {reservation.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
+                          {reservation.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                        >
+                              >
                           <CheckCircleIcon className="h-4 w-4 mr-1.5" />
-                          Подтвердить
-                        </button>
+                                Подтвердить
+                              </button>
                         
-                        <button
-                          onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
+                              <button 
+                                onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                        >
+                              >
                           <XCircleIcon className="h-4 w-4 mr-1.5" />
-                          Отменить
-                        </button>
-                      </>
-                    )}
+                                Отменить
+                              </button>
+                            </>
+                          )}
                     
-                    {reservation.status === 'confirmed' && (
+                          {reservation.status === 'confirmed' && (
                       <>
-                        <button
-                          onClick={() => handleUpdateStatus(reservation.id, 'completed')}
+                            <button 
+                              onClick={() => handleUpdateStatus(reservation.id, 'completed')}
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                        >
+                            >
                           <CheckCircleIcon className="h-4 w-4 mr-1.5" />
-                          Завершить
-                        </button>
+                              Завершить
+                            </button>
                         
                         <button
                           onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
@@ -507,19 +507,19 @@ const AdminReservationsPage: NextPage = () => {
                     )}
                     
                     {(reservation.status === 'completed' || reservation.status === 'cancelled') && (
-                      <button
+                          <button
                         onClick={() => handleUpdateStatus(reservation.id, 'confirmed')}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-                      >
+                          >
                         <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
                         Вернуть в подтвержденные
-                      </button>
+                          </button>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+                        </div>
+                  ))}
+            </div>
         )}
         
         {/* Пагинация (если потребуется) */}

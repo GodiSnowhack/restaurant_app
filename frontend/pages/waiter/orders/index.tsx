@@ -76,6 +76,7 @@ interface WaiterOrder {
   table_number?: number;
   customer_name?: string;
   items: OrderItem[];
+  statusUpdating?: boolean;
 }
 
 interface OrderItem {
@@ -156,7 +157,8 @@ const WaiterOrdersPage: NextPage = () => {
               created_at: order.created_at || new Date().toISOString(),
               table_number: order.table_number,
               customer_name: order.customer_name,
-              items: Array.isArray(order.items) ? order.items : []
+              items: Array.isArray(order.items) ? order.items : [],
+              statusUpdating: false
             }));
           
           if (validOrders.length < data.length) {
@@ -189,16 +191,113 @@ const WaiterOrdersPage: NextPage = () => {
   }, [refreshTrigger]);
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
+    // Проверяем, не обновляется ли уже заказ
+    const orderBeingUpdated = orders.find(o => o.id === orderId);
+    if (orderBeingUpdated?.statusUpdating) {
+      return;
+    }
+    
+    // Получаем текущий статус для возможного отката
+    const currentOrder = orders.find(o => o.id === orderId);
+    const oldStatus = currentOrder?.status || '';
+    
+    // Немедленно обновляем UI (оптимистичное обновление)
+    setOrders(prev => prev.map(order => 
+      order.id === orderId ? { ...order, statusUpdating: true, status: newStatus } : order
+    ));
+    
+    const displayStatus = statusLabels[newStatus as keyof typeof statusLabels] || newStatus;
+    console.log(`Изменение статуса заказа #${orderId} на ${newStatus} (${displayStatus})`);
+    
     try {
-      // Вызываем метод для обновления статуса заказа
-      await waiterApi.updateOrder(orderId.toString(), { status: newStatus });
+      // Получаем токен
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Необходима авторизация');
+      }
       
-      // Обновляем список заказов
-      setOrders(orders.map(order => 
-        order.id === orderId ? { ...order, status: newStatus } : order
+      // Пробуем все возможные способы обновления статуса заказа
+      let updateSuccessful = false;
+      
+      // ВАРИАНТ 1: API-маршрут update-status
+      try {
+        console.log(`Пробуем обновить статус через основной API-маршрут`);
+        const response = await fetch(`/api/orders/${orderId}/update-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Результат обновления через основной маршрут:', data);
+          updateSuccessful = true;
+        } else {
+          console.warn(`Основной API-маршрут вернул код ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Ошибка при использовании основного API-маршрута:', error);
+      }
+      
+      // ВАРИАНТ 2: Запасной API-маршрут
+      if (!updateSuccessful) {
+        try {
+          console.log(`Пробуем обновить статус через запасной API-маршрут`);
+          const response = await fetch(`/api/waiter/update-order/${orderId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Результат обновления через запасной маршрут:', data);
+            updateSuccessful = true;
+          } else {
+            console.warn(`Запасной API-маршрут вернул код ${response.status}`);
+          }
+        } catch (error) {
+          console.error('Ошибка при использовании запасного API-маршрута:', error);
+        }
+      }
+      
+      // Обновляем UI, показывая, что загрузка завершена
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, statusUpdating: false, status: newStatus } : order
       ));
-    } catch (err: any) {
-      console.error('Ошибка при обновлении статуса заказа:', err);
+      
+      // Показываем сообщение об успехе
+      if (updateSuccessful) {
+        alert(`Статус заказа #${orderId} успешно изменен на "${displayStatus}"`);
+        // Обновляем список заказов через 1 секунду
+        setTimeout(() => refreshOrders(), 1000);
+      } else {
+        alert(`Статус заказа #${orderId} изменен на "${displayStatus}" (только в интерфейсе)`);
+        // Пробуем обновить список заказов через 2 секунды
+        setTimeout(() => refreshOrders(), 2000);
+      }
+    } catch (error: any) {
+      console.error('Критическая ошибка при обновлении статуса заказа:', error);
+      
+      // Если произошла критическая ошибка, возвращаем старый статус
+      if (oldStatus) {
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, statusUpdating: false, status: oldStatus } : order
+        ));
+        alert(`Ошибка: ${error.message || 'Не удалось обновить статус заказа'}`);
+      } else {
+        // Если не можем восстановить старый статус, оставляем новый, но показываем сообщение
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, statusUpdating: false } : order
+        ));
+        alert(`Предупреждение: ${error.message || 'Возникла ошибка при обновлении статуса заказа, но интерфейс был обновлен'}`);
+      }
     }
   };
 
@@ -304,40 +403,52 @@ const WaiterOrdersPage: NextPage = () => {
                           Подробнее
                         </Link>
                         
-                        {order.status === 'new' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'preparing')}
-                            className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors text-sm"
-                          >
-                            Принять
-                          </button>
-                        )}
-                        
-                        {order.status === 'preparing' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'ready')}
-                            className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm"
-                          >
-                            Готов
-                          </button>
-                        )}
-                        
-                        {order.status === 'ready' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'delivered')}
-                            className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm"
-                          >
-                            Доставлен
-                          </button>
-                        )}
-                        
-                        {order.status === 'delivered' && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'completed')}
-                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
-                          >
-                            Завершить
-                          </button>
+                        {order.statusUpdating ? (
+                          <div className="px-3 py-1 bg-gray-100 rounded-md flex items-center">
+                            <svg className="animate-spin h-4 w-4 text-primary mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="text-sm">Обновление...</span>
+                          </div>
+                        ) : (
+                          <>
+                            {order.status === 'new' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'preparing')}
+                                className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors text-sm"
+                              >
+                                Принять
+                              </button>
+                            )}
+                            
+                            {order.status === 'preparing' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'ready')}
+                                className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm"
+                              >
+                                Готов
+                              </button>
+                            )}
+                            
+                            {order.status === 'ready' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'delivered')}
+                                className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm"
+                              >
+                                Доставлен
+                              </button>
+                            )}
+                            
+                            {order.status === 'delivered' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'completed')}
+                                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
+                              >
+                                Завершить
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

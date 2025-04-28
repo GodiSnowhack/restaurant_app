@@ -37,7 +37,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан', s
 
       <main className="flex-grow">
         <div className={section ? getSectionStyles() : 'w-full'}>
-          {children}
+        {children}
         </div>
       </main>
 

@@ -718,8 +718,14 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         # Обновляем общую сумму заказа
         db_order.total_amount = total_amount
         
-        # Сохраняем изменения в базе данных
-        db.commit()
+        # Фиксируем изменения
+        try:
+            db.commit()
+            logger.info(f"Заказ {order_id} успешно обновлен")
+        except Exception as commit_error:
+            db.rollback()
+            logger.error(f"Ошибка при коммите изменений заказа {order_id}: {str(commit_error)}")
+            raise
         
         # Форматируем заказ для ответа
         result = format_order_for_response(db, db_order)

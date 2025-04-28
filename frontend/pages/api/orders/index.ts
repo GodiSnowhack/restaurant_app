@@ -41,8 +41,8 @@ export default async function ordersProxy(req: NextApiRequest, res: NextApiRespo
     
     // Передаем токен авторизации, если он есть в заголовках запроса
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       'User-Agent': userAgent
     };
     
@@ -153,10 +153,10 @@ export default async function ordersProxy(req: NextApiRequest, res: NextApiRespo
                 console.log('Orders API - Модифицированные данные перед отправкой:', JSON.stringify(cleanBody, null, 2));
                 
                 response = await axios.post(endpoint, cleanBody, {
-                  headers,
-                  timeout,
-                  validateStatus: (status) => status < 500
-                });
+                headers,
+                timeout,
+                validateStatus: (status) => status < 500
+              });
               } else {
                 // Для повторных попыток - просто проверяем, не создан ли уже заказ
                 // Если возникла ошибка 500, вероятно заказ уже создан, но ответ не был получен
@@ -254,7 +254,7 @@ export default async function ordersProxy(req: NextApiRequest, res: NextApiRespo
             throw error;
           } else if (isDBLocked) {
             console.log('Orders API - Обнаружена блокировка базы данных, повторяем запрос');
-            
+          
             // Увеличиваем задержку для блокировки БД
             const lockDelay = 1000 * (retryCount + 1);
             await new Promise(resolve => setTimeout(resolve, lockDelay));
@@ -325,7 +325,7 @@ export default async function ordersProxy(req: NextApiRequest, res: NextApiRespo
         ...errorData,
         isMobile,
         endpoint
-      });
+        });
     }
   } catch (error: any) {
     console.error('Orders API - Внутренняя ошибка:', error);

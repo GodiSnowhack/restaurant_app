@@ -131,11 +131,11 @@ export default async function menuProxy(req: NextApiRequest, res: NextApiRespons
         try {
           // Отправляем запрос в зависимости от HTTP метода
           if (req.method === 'GET') {
-            response = await axios.get(endpoint, {
-              headers,
-              timeout,
-              validateStatus: (status) => status < 500 // Принимаем все ответы кроме 5xx
-            });
+          response = await axios.get(endpoint, {
+            headers,
+            timeout,
+            validateStatus: (status) => status < 500 // Принимаем все ответы кроме 5xx
+          });
           } else if (req.method === 'POST') {
             response = await axios.post(endpoint, filteredBody, {
               headers,

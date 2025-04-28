@@ -324,18 +324,18 @@ const useReservationsStore = create<ReservationsState>((set, get) => ({
         return true;
       }
       
-      // Если код не найден в локальном хранилище, пробуем проверить через API
-      try {
-        // Предполагаем, что у нас есть API-метод для проверки кода бронирования
-        const response = await api.post('/reservations/verify-code', { code });
-        
-        // Если сервер подтвердил код, добавляем его в локальное хранилище
-        if (response.data && response.data.valid) {
-          storedCodes[code] = response.data.reservation_id;
-          localStorage.setItem('reservationCodes', JSON.stringify(storedCodes));
+        // Если код не найден в локальном хранилище, пробуем проверить через API
+        try {
+          // Предполагаем, что у нас есть API-метод для проверки кода бронирования
+          const response = await api.post('/reservations/verify-code', { code });
+          
+          // Если сервер подтвердил код, добавляем его в локальное хранилище
+          if (response.data && response.data.valid) {
+            storedCodes[code] = response.data.reservation_id;
+            localStorage.setItem('reservationCodes', JSON.stringify(storedCodes));
           console.log(`Код ${code} подтвержден через API`);
-          return true;
-        }
+            return true;
+          }
       } catch (error) {
         console.log(`Ошибка API при проверке кода ${code}:`, error);
         // Если API недоступен или вернул ошибку, для упрощения тестирования

@@ -602,7 +602,7 @@ const AdminAnalyticsPage: NextPage = () => {
         return renderCustomersView();
       default:
         return renderDashboardView();
-    }
+  }
   };
 
   // Если данные не загружены, показываем сообщение об ошибке

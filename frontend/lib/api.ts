@@ -1054,7 +1054,7 @@ export const checkConnection = async (
     });
     
     if (!response.ok) {
-      return {
+    return { 
         isOnline: false,
         error: `Ошибка соединения: ${response.status} ${response.statusText}`,
       };
@@ -1069,15 +1069,15 @@ export const checkConnection = async (
       return {
         isOnline: false,
         error: 'Неверный ответ от сервера',
-      };
+    };
     }
   } catch (error: any) {
     if (!options?.silent) {
-      console.error('Ошибка при проверке соединения:', error);
+    console.error('Ошибка при проверке соединения:', error);
     }
     
-    return {
-      isOnline: false,
+    return { 
+      isOnline: false, 
       error: error.message || 'Не удалось подключиться к серверу',
     };
   }
@@ -2337,7 +2337,7 @@ export const ordersApi = {
     }
   },
   
-  updateOrder: async (id: string, updateData: any): Promise<any> => {
+  updateOrder: async (orderId: string, updateData: any): Promise<any> => {
     const startTime = Date.now();
     const requestInfo = {
       startTime,
@@ -2350,40 +2350,40 @@ export const ordersApi = {
       error: null as any,
       errorType: '',
       duration: 0,
-      orderId: id
+      orderId: orderId
     };
     
     try {
-      console.log(`API updateOrder - Обновление заказа ${id}:`, updateData);
+      console.log(`API updateOrder - Обновление заказа ${orderId}:`, updateData);
       requestInfo.attempts++;
       
-      let endpoint = `/api/orders/${id}`;
+      let endpoint = `/api/orders/${orderId}`;
       
       // На мобильных устройствах используем прямой запрос к API
       if (isMobileDevice()) {
-        endpoint = `${API_URL}/api/v1/orders/${id}`;
+        endpoint = `${API_URL}/api/v1/orders/${orderId}`;
       }
       
       // Изменяем метод с PATCH на PUT для соответствия серверному API
       const response = await fetchWithTimeout(endpoint, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+          headers: {
+            'Content-Type': 'application/json',
           ...getAuthHeaders()
         },
         body: JSON.stringify(updateData)
-      });
+        });
         
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`API updateOrder - Ошибка при обновлении заказа ${id}:`, errorData);
+        if (!response.ok) {
+          const errorData = await response.json();
+        console.error(`API updateOrder - Ошибка при обновлении заказа ${orderId}:`, errorData);
         requestInfo.errorType = 'server';
         requestInfo.error = errorData;
         throw new Error(errorData.detail || 'Ошибка при обновлении заказа');
-      }
-      
-      const data = await response.json();
-      console.log(`API updateOrder - Заказ ${id} успешно обновлен:`, data);
+        }
+        
+        const data = await response.json();
+      console.log(`API updateOrder - Заказ ${orderId} успешно обновлен:`, data);
       
       // Сбрасываем кэш заказов
       ordersApi._cachedOrders = null;
@@ -2549,7 +2549,7 @@ export const ordersApi = {
         }
       } catch (e) {
         console.warn('API getWaiterOrders - Не удалось получить информацию о пользователе', e);
-      }
+    }
       
       // Разрешаем доступ для ролей waiter и admin
       const allowedRoles = ['waiter', 'admin'];
@@ -2564,20 +2564,20 @@ export const ordersApi = {
         const proxyUrl = typeof window !== 'undefined' 
           ? `${window.location.origin}/api/waiter/simple-orders${userRole === 'admin' ? '?role=admin' : ''}` 
           : `/api/waiter/simple-orders${userRole === 'admin' ? '?role=admin' : ''}`;
-        
+      
         console.log(`API getWaiterOrders - Отправка запроса через прокси: ${proxyUrl}`);
-        
+      
         const proxyResponse = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
             'X-User-Role': userRole, // Добавляем роль в заголовок
             'X-User-ID': userId ? userId.toString() : '' // Добавляем ID пользователя
           },
           cache: 'no-store'
-        });
-        
+      });
+      
         if (proxyResponse.ok) {
           const data = await proxyResponse.json();
           console.log(`API getWaiterOrders - Получено ${Array.isArray(data) ? data.length : 0} заказов через прокси`);
@@ -2588,37 +2588,37 @@ export const ordersApi = {
             return data ? [data] : [];
           }
           
-          return data;
+      return data;
         } else {
           console.warn(`API getWaiterOrders - Прокси вернул ошибку: ${proxyResponse.status}`);
         }
       } catch (proxyError) {
         console.error('API getWaiterOrders - Ошибка при использовании прокси:', proxyError);
-      }
+    }
       
       // Второй вариант: прямой запрос через waiter/orders (для ролей waiter и admin)
       if (hasAccess) {
         try {
           const url = `${apiUrl}/waiter/orders`;
           console.log(`API getWaiterOrders - Прямой запрос на ${url}`);
-          
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
               'X-User-Role': userRole
-            },
-            cache: 'no-store'
-          });
-          
+        },
+        cache: 'no-store'
+      });
+      
           if (response.ok) {
-            const data = await response.json();
+      const data = await response.json();
             console.log(`API getWaiterOrders - Получено ${Array.isArray(data) ? data.length : 0} заказов через /waiter/orders`);
             return Array.isArray(data) ? data : data ? [data] : [];
           } else {
             console.warn(`API getWaiterOrders - /waiter/orders вернул ошибку: ${response.status}`);
-          }
+      }
         } catch (directError) {
           console.error('API getWaiterOrders - Ошибка при прямом запросе на /waiter/orders:', directError);
         }
@@ -2674,31 +2674,70 @@ export const ordersApi = {
   updateOrder: async (orderId: string, updateData: {status?: string}): Promise<Order> => {
     try {
       console.log(`waiterApi.updateOrder - Обновление заказа ${orderId}`, updateData);
+      
+      // Получаем токен
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Необходима авторизация');
+      }
+      
+      // Формируем URL для запроса
       const url = `${getApiBaseUrl()}/orders/${orderId}`;
       
-      // Пробуем обновить заказ на бэкенде
-      try {
-        const response = await api.put(url, updateData);
-        return response.data;
-      } catch (backendError) {
-        console.error(`waiterApi.updateOrder - Ошибка бэкенда при обновлении заказа ${orderId}:`, backendError);
+      // Прямой запрос через Fetch API с кастомной обработкой ошибок
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      // Обрабатываем ответ
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
+      if (!response.ok) {
+        // Если сервер вернул ошибку, пробуем прочитать сообщение
+        const errorData = isJson ? await response.json() : await response.text();
+        console.error(`waiterApi.updateOrder - Ошибка сервера при обновлении заказа ${orderId}:`, errorData);
         
-        // Для отладки: возвращаем локальный ответ, чтобы интерфейс продолжал работать
-        // имитируя успешное обновление
-        return {
-          id: parseInt(orderId),
-          status: updateData.status || 'new',
-          payment_status: 'pending',
-          payment_method: 'cash',
-          order_type: 'dine-in',
-          total_amount: 0,
-          items: [],
-          created_at: new Date().toISOString()
-        };
+        // Пробуем запасной путь через прокси
+        console.log(`waiterApi.updateOrder - Попытка обновления через прокси-эндпоинт`);
+        const proxyUrl = `/api/waiter/update-order/${orderId}`;
+        
+        const proxyResponse = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData)
+        });
+        
+        if (!proxyResponse.ok) {
+          const proxyErrorData = await proxyResponse.text();
+          console.error(`waiterApi.updateOrder - Ошибка прокси при обновлении заказа ${orderId}:`, proxyErrorData);
+          throw new Error('Не удалось обновить заказ. Пожалуйста, попробуйте позже.');
+        }
+        
+        const proxyData = await proxyResponse.json();
+        return proxyData;
       }
-    } catch (error) {
+      
+      // Успешный ответ
+      const data = await response.json();
+      console.log(`waiterApi.updateOrder - Заказ ${orderId} успешно обновлен`);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      return data;
+    } catch (error: any) {
       console.error(`waiterApi.updateOrder - Критическая ошибка при обновлении заказа ${orderId}:`, error);
-      throw error;
+      throw new Error('Не удалось обновить статус заказа: ' + (error.message || 'Неизвестная ошибка'));
     }
   },
 
@@ -2712,7 +2751,99 @@ export const ordersApi = {
 
   completeOrder: async (orderId: number): Promise<void> => {
     await api.post(`/waiter/orders/${orderId}/complete`);
-  }
+  },
+  
+  assignOrderByCode: async (orderCode: string): Promise<any> => {
+    try {
+      console.log('API assignOrderByCode - Вызов с кодом:', orderCode);
+      
+      if (!orderCode || orderCode.trim() === '') {
+        throw new Error('Необходимо указать код заказа');
+      }
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Необходима авторизация');
+      }
+      
+      // Определяем URL для запроса
+      const endpointUrl = '/api/waiter/assign-by-code';
+      
+      // Отправляем запрос
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ order_code: orderCode })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API assignOrderByCode - Ошибка:', errorData);
+        throw new Error(errorData.detail || errorData.message || 'Ошибка при привязке заказа');
+      }
+      
+      const data = await response.json();
+      console.log('API assignOrderByCode - Успех:', data);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      return data;
+    } catch (error: any) {
+      console.error('API assignOrderByCode - Критическая ошибка:', error);
+      throw error;
+    }
+  },
+  
+  updateOrderPaymentStatus: async (orderId: number | string, paymentStatus: string): Promise<any> => {
+    try {
+      console.log(`API updateOrderPaymentStatus - Обновление статуса оплаты заказа ${orderId} на ${paymentStatus}`);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Необходима авторизация');
+      }
+      
+      // Статус оплаты может быть только 'paid' при использовании эндпоинта подтверждения оплаты
+      if (paymentStatus.toLowerCase() !== 'paid') {
+        throw new Error(`Для смены статуса на ${paymentStatus} используйте другой метод. Этот метод поддерживает только подтверждение оплаты.`);
+      }
+      
+      // Используем специальный эндпоинт для подтверждения оплаты официантом
+      const url = `/api/waiter/orders/${orderId}/confirm-payment`;
+      
+      // Отправляем запрос с изменением payment_status на "paid"
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error(`API updateOrderPaymentStatus - Ошибка при подтверждении оплаты заказа ${orderId}:`, errorData);
+        throw new Error(errorData.detail || errorData.message || 'Ошибка при подтверждении оплаты');
+      }
+      
+      const data = await response.json();
+      console.log(`API updateOrderPaymentStatus - Оплата заказа ${orderId} успешно подтверждена`);
+      
+      // Сбрасываем кэш заказов
+      ordersApi._cachedOrders = null;
+      ordersApi._lastOrdersUpdate = 0;
+      
+      return { success: true, data };
+    } catch (error: any) {
+      console.error(`API updateOrderPaymentStatus - Критическая ошибка при обновлении статуса оплаты заказа ${orderId}:`, error);
+      throw error;
+    }
+  },
 };
 
 // API функции для работы с настройками ресторана

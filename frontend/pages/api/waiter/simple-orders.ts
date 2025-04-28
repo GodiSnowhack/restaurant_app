@@ -141,7 +141,7 @@ export default async function simpleWaiterOrdersApi(
         console.log(`[API Proxy] Отправка запроса на ${fullUrl} с заголовками:`, headers);
         
         const response = await fetch(fullUrl, {
-          method: 'GET',
+            method: 'GET',
           headers: headers,
         });
         

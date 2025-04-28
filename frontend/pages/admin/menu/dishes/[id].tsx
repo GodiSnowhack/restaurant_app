@@ -139,7 +139,7 @@ const EditDishPage: NextPage = () => {
       
       // Задержка перед перенаправлением
       setTimeout(() => {
-        router.push('/admin/menu');
+      router.push('/admin/menu');
       }, 1500);
     } catch (error: any) {
       console.error('Ошибка при обновлении блюда:', error);
@@ -152,7 +152,7 @@ const EditDishPage: NextPage = () => {
   if (isLoading) {
     return (
       <Layout title="Редактирование блюда | Админ-панель" section="admin">
-        <div className="flex justify-center items-center h-64">
+          <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary"></div>
         </div>
       </Layout>
@@ -166,7 +166,7 @@ const EditDishPage: NextPage = () => {
           <div className="flex items-center">
             <Link href="/admin/menu" className="mr-4 hover:bg-gray-100 p-2 rounded-full transition-colors">
               <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-            </Link>
+          </Link>
             <h1 className="text-2xl font-bold text-gray-900">Редактирование блюда</h1>
           </div>
         </div>
