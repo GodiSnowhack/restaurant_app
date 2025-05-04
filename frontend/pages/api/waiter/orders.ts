@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { decode } from 'jsonwebtoken';
 
 /**
  * API-прокси для заказов официанта 
- * Обрабатывает получение заказов с нескольких эндпоинтов
  */
 export default async function waiterOrdersProxy(req: NextApiRequest, res: NextApiResponse) {
   // Разрешаем CORS
@@ -22,7 +22,7 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Метод не поддерживается' });
+    return res.status(405).json({ error: 'Метод не поддерживается' });
   }
 
   try {
@@ -30,87 +30,69 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        detail: 'Отсутствует токен авторизации',
-        message: 'Необходимо авторизоваться'
-      });
+      console.log('Waiter Orders API - Отсутствует токен авторизации');
+      
+      // Возвращаем пустой массив вместо ошибки, чтобы клиентская часть могла корректно обработать
+      return res.status(200).json([]);
     }
     
+    // Извлекаем токен
     const token = authHeader.substring(7);
     
     // Формируем основной URL для API
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const endpoint = `${apiBaseUrl}/waiter/orders`;
     
-    // Список эндпоинтов для попытки получения заказов
-    const endpoints = [
-      `${apiBaseUrl}/orders/waiter`,
-      `${apiBaseUrl}/waiter/orders`
-    ];
+    // Формируем заголовки
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
     
-    // Информация о дополнительных попытках
-    const attempts = [];
-    
-    // Пробуем получать данные с каждого эндпоинта, пока не получим успешный ответ
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Waiter Orders API - Попытка получения данных с ${endpoint}`);
-        
-        const response = await axios.get(endpoint, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000 // 30 секунд таймаут
-        });
-        
-        // Если получили данные, возвращаем их
-        if (response.status === 200) {
-          const data = response.data;
-          
-          // Проверяем, что данные корректны
-          if (Array.isArray(data)) {
-            console.log(`Waiter Orders API - Успешно получено ${data.length} заказов с эндпоинта ${endpoint}`);
-            return res.status(200).json(data);
-          } else {
-            console.warn(`Waiter Orders API - Получены некорректные данные с ${endpoint}:`, typeof data);
-            attempts.push({
-              endpoint,
-              status: response.status,
-              error: 'Получены некорректные данные (не массив)'
-            });
-          }
-        } else {
-          console.warn(`Waiter Orders API - Необычный статус ответа от ${endpoint}: ${response.status}`);
-          attempts.push({
-            endpoint,
-            status: response.status,
-            error: 'Необычный статус ответа'
-          });
-        }
-      } catch (error: any) {
-        console.error(`Waiter Orders API - Ошибка при запросе к ${endpoint}:`, error.message);
-        
-        attempts.push({
-          endpoint,
-          status: error.response?.status || 0,
-          error: error.message
-        });
-        
-        // Если получили 404, это может означать отсутствие заказов
-        if (error.response?.status === 404) {
-          console.log(`Waiter Orders API - Эндпоинт ${endpoint} вернул 404, возможно заказов нет`);
-        }
-      }
+    // Добавляем заголовки из запроса
+    if (req.headers['x-user-role']) {
+      headers['X-User-Role'] = req.headers['x-user-role'] as string;
     }
     
-    // Если все попытки неудачны, возвращаем пустой массив с информацией об ошибках
-    console.log('Waiter Orders API - Все попытки получения заказов не удались');
-    return res.status(200).json([]);
+    if (req.headers['x-user-id']) {
+      headers['X-User-ID'] = req.headers['x-user-id'] as string;
+    }
     
+    try {
+      // Делаем запрос к API с коротким таймаутом
+      const response = await axios.get(endpoint, {
+        headers,
+        timeout: 5000 // 5 секунд таймаут для быстрого UI
+      });
+      
+      // Если получили данные, возвращаем их
+      if (response.status === 200 && Array.isArray(response.data)) {
+        const data = response.data;
+        console.log(`Waiter Orders API - Получено ${data.length} заказов`);
+        
+        // Дополняем данные полем total_price для совместимости
+        const enhancedData = data.map(order => ({
+          ...order,
+          total_price: order.total_amount // Дублируем для совместимости
+        }));
+        
+        return res.status(200).json(enhancedData);
+      } else {
+        console.log('Waiter Orders API - Некорректный формат данных');
+        // Возвращаем пустой массив вместо ошибки
+        return res.status(200).json([]);
+      }
+    } catch (apiError: any) {
+      console.error('Waiter Orders API - Ошибка при запросе к API:', apiError.message);
+      
+      // Независимо от типа ошибки, возвращаем пустой массив
+      // Это позволит клиентской части корректно обрабатывать ответ
+      return res.status(200).json([]);
+    }
   } catch (error: any) {
     console.error('Waiter Orders API - Общая ошибка:', error.message);
-    
-    // При любой общей ошибке возвращаем пустой массив для предотвращения поломки интерфейса
+    // Возвращаем пустой массив вместо ошибки
     return res.status(200).json([]);
   }
 } 

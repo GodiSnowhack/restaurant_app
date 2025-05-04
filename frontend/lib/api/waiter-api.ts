@@ -2,115 +2,37 @@
  * API для работы с функциями официанта
  */
 
-import { Order } from '../api';
+import { Order } from './types';
 
-// Функция для получения информации о пользователе
-const getUserInfo = (): { role: string, id?: number | null } => {
+// Функция для получения информации о пользователе из localStorage
+const getUserInfo = () => {
+  if (typeof window === 'undefined') return null;
+  
   try {
-    // Сначала пытаемся получить токен и извлечь из него информацию
-    const token = getAuthToken();
-    if (token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = parts[1];
-          // Правильно декодируем base64url формат токена
-          const decodedPayload = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
-          
-          const tokenData = JSON.parse(decodedPayload);
-          
-          // Если в токене есть ID пользователя, считаем это главным источником
-          if (tokenData.sub) {
-            // Если в токене есть поле role, используем его
-            if (tokenData.role) {
-              // Приводим роль к нижнему регистру для единообразия
-              const normalizedRole = String(tokenData.role).toLowerCase();
-              // Проверяем, содержит ли роль слово "admin" или явно указана как "admin"
-              const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-              return {
-                role: isAdmin ? 'admin' : normalizedRole,
-                id: parseInt(tokenData.sub)
-              };
-            }
-            
-            // Если пользователь с ID 1, то по умолчанию считаем его админом
-            if (tokenData.sub === 1 || tokenData.sub === "1") {
-              return { 
-                role: 'admin', 
-                id: 1 
-              };
-            }
-            
-            // Для остальных пользователей с ID в токене устанавливаем роль waiter
-            return { 
-              role: 'waiter', 
-              id: parseInt(tokenData.sub) 
-            };
-          }
-        }
-      } catch (tokenError) {
-        console.warn('getUserInfo - Ошибка декодирования токена:', tokenError);
-      }
+    // Проверяем информацию из localStorage
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      return JSON.parse(userStr);
     }
     
-    // Проверяем localStorage на наличие данных пользователя
-    const localUserStr = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-    if (localUserStr) {
-      try {
-        const localUser = JSON.parse(localUserStr);
-        if (localUser && localUser.role) {
-          // Проверяем, является ли пользователь админом
-          const normalizedRole = String(localUser.role).toLowerCase();
-          const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-          return { 
-            role: isAdmin ? 'admin' : normalizedRole,
-            id: localUser.id || null
-          };
-        }
-      } catch (parseError) {
-        console.warn('getUserInfo - Ошибка при парсинге данных из localStorage:', parseError);
-      }
+    // Альтернативные источники информации о пользователе
+    const userProfileStr = localStorage.getItem('user_profile');
+    if (userProfileStr) {
+      return JSON.parse(userProfileStr);
     }
     
-    // Если не получилось, пробуем из sessionStorage
-    const sessionUserStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('user') : null;
-    if (sessionUserStr) {
-      try {
-        const sessionUser = JSON.parse(sessionUserStr);
-        if (sessionUser && sessionUser.role) {
-          const normalizedRole = String(sessionUser.role).toLowerCase();
-          const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-          return { 
-            role: isAdmin ? 'admin' : normalizedRole,
-            id: sessionUser.id || null
-          };
-        }
-      } catch (parseError) {
-        console.warn('getUserInfo - Ошибка при парсинге данных из sessionStorage:', parseError);
-      }
-    }
-
-    // Если есть какой-то токен, но из него не удалось получить роль, 
-    // предполагаем что это официант (для работы приложения)
-    if (token) {
-      return { role: 'waiter', id: null };
-    }
+    return null;
   } catch (e) {
     console.error('Ошибка при получении информации о пользователе:', e);
+    return null;
   }
-  
-  console.warn('getUserInfo - Не удалось получить данные пользователя, возвращаем unknown');
-  return { role: 'unknown', id: null };
 };
 
 // Получение токена авторизации
-const getAuthToken = (): string | null => {
-  try {
-    return typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
-  } catch (e) {
-    console.error('Ошибка при получении токена:', e);
-    return null;
-  }
+const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  
+  return localStorage.getItem('token') || null;
 };
 
 /**
@@ -148,10 +70,6 @@ export const waiterApi = {
         return [];
       }
 
-      // Определяем роль администратора
-      const isAdmin = userRole === 'admin';
-      console.log(`waiterApi.getWaiterOrders - Итоговая роль: ${userRole}, ID: ${userId}, isAdmin: ${isAdmin}`);
-
       // Формируем URL запроса
       const apiUrl = '/api/waiter/orders';
       
@@ -166,28 +84,40 @@ export const waiterApi = {
         'X-User-ID': userId ? String(userId) : ''
       };
 
-      // Выполняем запрос
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: headers,
-        cache: 'no-store'
-      });
+      try {
+        // Выполняем запрос
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: headers,
+          cache: 'no-store'
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}: ${errorText}`);
-        throw new Error(`Ошибка запроса: ${response.status} ${errorText}`);
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}: ${errorText}`);
+          
+          // Если ошибка 401 (не авторизован), возвращаем пустой массив
+          if (response.status === 401) {
+            console.log('waiterApi.getWaiterOrders - Ошибка авторизации (401), возвращаем пустой список заказов');
+            return [];
+          }
+          
+          throw new Error(`Ошибка запроса: ${response.status} ${errorText}`);
+        }
 
-      const data = await response.json();
-      console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
-      
-      if (!Array.isArray(data)) {
-        console.warn('waiterApi.getWaiterOrders - Получены данные не в формате массива:', data);
-        return data && typeof data === 'object' ? [data] : [];
+        const data = await response.json();
+        console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
+        
+        if (!Array.isArray(data)) {
+          console.warn('waiterApi.getWaiterOrders - Получены данные не в формате массива:', data);
+          return data && typeof data === 'object' ? [data] : [];
+        }
+        
+        return data;
+      } catch (fetchError) {
+        console.error('waiterApi.getWaiterOrders - Ошибка при выполнении запроса:', fetchError);
+        return [];
       }
-      
-      return data;
     } catch (error) {
       console.error('waiterApi.getWaiterOrders - Критическая ошибка:', error);
       return [];
@@ -195,9 +125,9 @@ export const waiterApi = {
   },
 
   /**
-   * Привязка заказа к официанту по коду заказа
+   * Привязка заказа к официанту по коду
    * @param orderCode Код заказа
-   * @returns Информация о результате привязки
+   * @returns Результат привязки
    */
   assignOrder: async (orderCode: string): Promise<{
     success: boolean; 
@@ -208,64 +138,43 @@ export const waiterApi = {
   }> => {
     console.log('waiterApi.assignOrder - Начало привязки заказа с кодом:', orderCode);
     
-    // Получаем информацию о пользователе и токен
-    const userInfo = getUserInfo();
-    const token = getAuthToken();
-    
-    if (!userInfo || !userInfo.id || !token) {
-      console.error('waiterApi.assignOrder - Недостаточно данных для привязки заказа');
-      throw new Error('Для привязки заказа необходимо авторизоваться');
-    }
-    
-    console.log('waiterApi.assignOrder - Данные пользователя:', {
-      id: userInfo.id,
-      role: userInfo.role
-    });
-    
-    // Используем каскадный подход с несколькими методами привязки
     try {
-      // Формируем URL для экстренной привязки
-      const apiUrl = `/api/waiter/emergency-assign`;
+      // Получаем информацию о пользователе
+      const userInfo = getUserInfo();
+      const token = getAuthToken();
+
+      if (!userInfo || !token) {
+        console.error('waiterApi.assignOrder - Отсутствуют данные пользователя или токен авторизации');
+        throw new Error('Необходима авторизация');
+      }
+
+      // Формируем URL запроса
+      const apiUrl = `/api/waiter/assign-order`;
       
-      console.log(`waiterApi.assignOrder - Отправка запроса на привязку на ${apiUrl}`);
-      
-      // Отправляем запрос на привязку
+      // Формируем заголовки
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      // Выполняем запрос
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          order_code: orderCode,
-          waiter_id: userInfo.id
-        })
+        headers: headers,
+        body: JSON.stringify({ order_code: orderCode })
       });
-      
-      // Обрабатываем ответ
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`waiterApi.assignOrder - Ошибка при привязке: ${errorText}`);
-        throw new Error(`Не удалось привязать заказ: ${errorText}`);
+        console.error(`waiterApi.assignOrder - Ошибка ${response.status}: ${errorText}`);
+        throw new Error(errorText || `Ошибка запроса: ${response.status}`);
       }
-      
-      // Парсим JSON ответа
-      const responseData = await response.json();
-      console.log(`waiterApi.assignOrder - Ответ сервера:`, responseData);
-      
-      // Проверяем успешность привязки
-      if (!responseData.success) {
-        console.error(`waiterApi.assignOrder - Сервер вернул ошибку:`, responseData.message);
-        throw new Error(responseData.message || 'Не удалось привязать заказ');
-      }
-      
-      // Формируем ответ
+
+      const data = await response.json();
       return {
         success: true,
-        order_id: responseData.order_id,
-        message: responseData.message || 'Заказ успешно привязан к официанту',
-        status: responseData.status || 'CONFIRMED',
-        waiter_id: userInfo.id
+        ...data
       };
     } catch (error: any) {
       console.error(`waiterApi.assignOrder - Критическая ошибка:`, error);
@@ -413,4 +322,41 @@ export const assignOrderByCode = async (orderCode: string): Promise<any> => {
   return waiterApi.assignOrder(orderCode);
 };
 
-export default waiterApi; 
+export default waiterApi;
+
+// Добавим функцию для получения улучшенного токена
+function getEnhancedToken(): string {
+  let token = null;
+  
+  // 1. Пробуем получить токен из localStorage
+  try {
+    token = localStorage.getItem('token');
+    if (token) return token;
+  } catch (e) {
+    console.error('getEnhancedToken - Ошибка при получении токена из localStorage:', e);
+  }
+  
+  // 2. Пробуем получить токен из sessionStorage
+  try {
+    token = sessionStorage.getItem('token');
+    if (token) return token;
+  } catch (e) {
+    console.error('getEnhancedToken - Ошибка при получении токена из sessionStorage:', e);
+  }
+  
+  // 3. Пробуем получить токен из cookie
+  try {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'auth_token' && value) {
+        return value;
+      }
+    }
+  } catch (e) {
+    console.error('getEnhancedToken - Ошибка при получении токена из cookie:', e);
+  }
+  
+  // Возвращаем пустую строку, если токен не найден
+  return '';
+}

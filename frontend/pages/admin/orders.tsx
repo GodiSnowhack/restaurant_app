@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import { ordersApi } from '../../lib/api';
-import { Order } from '../../types';
+import { Order } from '../../lib/api/types';
 import { 
   ArrowLeftIcon,
   CalendarIcon,
@@ -27,9 +27,23 @@ const AdminOrdersPage: NextPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+  const [dateRange, setDateRange] = useState(() => {
+    // Получаем текущую дату
+    const today = new Date();
+    
+    // Вычисляем дату 7 дней назад
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    // Форматируем даты в формате YYYY-MM-DD
+    const formatDate = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+    
+    return {
+      start: formatDate(sevenDaysAgo),
+      end: formatDate(today)
+    };
   });
   const [error, setError] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
@@ -48,16 +62,47 @@ const AdminOrdersPage: NextPage = () => {
       
       // Добавляем даты с учетом времени для корректного диапазона
       if (dateRange.start && dateRange.end) {
-        // Дата начала - начало дня (00:00:00)
-        const startDate = new Date(dateRange.start);
-        startDate.setHours(0, 0, 0, 0);
-        
-        // Дата окончания - конец дня (23:59:59)
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
-        
-        params.start_date = startDate.toISOString();
-        params.end_date = endDate.toISOString();
+        try {
+          // Дата начала - начало дня (00:00:00)
+          const startDate = new Date(dateRange.start);
+          startDate.setHours(0, 0, 0, 0);
+          
+          // Дата окончания - конец дня (23:59:59)
+          const endDate = new Date(dateRange.end);
+          endDate.setHours(23, 59, 59, 999);
+          
+          // Проверяем, что даты валидны и не в будущем
+          const now = new Date();
+          
+          // Если end дата в будущем, используем текущую дату
+          if (endDate > now) {
+            endDate.setTime(now.getTime());
+          }
+          
+          // Проверяем, что start дата не после end даты
+          if (startDate > endDate) {
+            // Если начальная дата после конечной, устанавливаем её на 7 дней до конечной
+            startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+          }
+          
+          console.log('Даты для запроса:', {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            now: now.toISOString()
+          });
+          
+          params.start_date = startDate.toISOString();
+          params.end_date = endDate.toISOString();
+        } catch (dateError) {
+          console.error('Ошибка при обработке дат:', dateError);
+          // В случае ошибки используем текущую дату и 7 дней назад
+          const now = new Date();
+          const sevenDaysAgo = new Date(now);
+          sevenDaysAgo.setDate(now.getDate() - 7);
+          
+          params.start_date = sevenDaysAgo.toISOString();
+          params.end_date = now.toISOString();
+        }
       }
       
       // Добавляем статус в параметры, если выбран конкретный статус
@@ -88,63 +133,109 @@ const AdminOrdersPage: NextPage = () => {
     }
   };
 
-  // Функция для получения статуса заказа
+  // Функция для получения русского названия статуса заказа
+  const getStatusText = (status: string | undefined): string => {
+    if (!status) return 'Неизвестен';
+    
+    const statusMap: Record<string, string> = {
+      'pending': 'Новый',
+      'confirmed': 'Подтвержден',
+      'preparing': 'Готовится',
+      'ready': 'Готов',
+      'completed': 'Завершен',
+      'cancelled': 'Отменен',
+      // Добавляем статусы из API на всякий случай
+      'PENDING': 'Новый',
+      'CONFIRMED': 'Подтвержден',
+      'PREPARING': 'Готовится',
+      'READY': 'Готов',
+      'COMPLETED': 'Завершен',
+      'CANCELLED': 'Отменен',
+    };
+    
+    return statusMap[status] || status;
+  };
+
+  // Функция для получения русского названия статуса оплаты
+  const getPaymentStatusText = (status: string | undefined): string => {
+    if (!status) return 'Неизвестен';
+    
+    const statusMap: Record<string, string> = {
+      'pending': 'Ожидает оплаты',
+      'paid': 'Оплачен',
+      'failed': 'Ошибка оплаты',
+      'refunded': 'Возврат средств',
+      // Добавляем статусы из API на всякий случай
+      'PENDING': 'Ожидает оплаты',
+      'PAID': 'Оплачен',
+      'FAILED': 'Ошибка оплаты',
+      'REFUNDED': 'Возврат средств',
+      'unpaid': 'Ожидает оплаты',
+      'UNPAID': 'Ожидает оплаты',
+    };
+    
+    return statusMap[status] || status;
+  };
+
+  // Обновляем функцию получения бейджа статуса заказа
   const getStatusBadge = (status: string | undefined) => {
     if (!status) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
           Неизвестен
         </span>
       );
     }
     
-    switch (status as OrderStatus) {
+    const statusLower = status.toLowerCase();
+    
+    switch (statusLower) {
       case 'pending':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
             <ClockIcon className="h-3 w-3 mr-1" />
-            Новый
+            {getStatusText(status)}
           </span>
         );
       case 'confirmed':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
             <CheckIcon className="h-3 w-3 mr-1" />
-            Подтвержден
+            {getStatusText(status)}
           </span>
         );
       case 'preparing':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
             <ClockIcon className="h-3 w-3 mr-1" />
-            Готовится
+            {getStatusText(status)}
           </span>
         );
       case 'ready':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 border border-teal-300">
             <CheckIcon className="h-3 w-3 mr-1" />
-            Готов
+            {getStatusText(status)}
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
             <CheckIcon className="h-3 w-3 mr-1" />
-            Завершен
+            {getStatusText(status)}
           </span>
         );
       case 'cancelled':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
             <XIcon className="h-3 w-3 mr-1" />
-            Отменен
+            {getStatusText(status)}
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            {status}
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+            {getStatusText(status)}
           </span>
         );
     }
@@ -154,51 +245,54 @@ const AdminOrdersPage: NextPage = () => {
   const getPaymentStatusIcon = (status: string | undefined) => {
     if (!status) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
           Неизвестен
         </span>
       );
     }
     
-    switch (status as PaymentStatus) {
+    const statusLower = status.toLowerCase();
+    
+    switch (statusLower) {
       case 'paid':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
             <CheckIcon className="h-3 w-3 mr-1" />
-            Оплачен
+            {getPaymentStatusText(status)}
           </span>
         );
       case 'pending':
+      case 'unpaid':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
             <ClockIcon className="h-3 w-3 mr-1" />
-            Ожидает оплаты
+            {getPaymentStatusText(status)}
           </span>
         );
       case 'failed':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
             <ExclamationIcon className="h-3 w-3 mr-1" />
-            Ошибка оплаты
+            {getPaymentStatusText(status)}
           </span>
         );
       case 'refunded':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
             <ArrowLeftIcon className="h-3 w-3 mr-1" />
-            Возврат
+            {getPaymentStatusText(status)}
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            {status}
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+            {getPaymentStatusText(status)}
           </span>
         );
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
     try {
       // Проверяем, что dateString существует и является строкой
       if (!dateString || typeof dateString !== 'string') {
@@ -436,13 +530,13 @@ const AdminOrdersPage: NextPage = () => {
                         {order.id}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {new Date(order.created_at).toLocaleString()}
+                        {formatDate(order.created_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {order.customer_name || order.user?.full_name || 'Гость'}
+                        {order.customer_name || 'Гость'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {formatPrice(order.total_amount)}
+                        {formatPrice(order.total_amount || order.total_price || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(order.status)}

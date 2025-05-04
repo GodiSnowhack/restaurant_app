@@ -42,12 +42,12 @@ const AdminPage: NextPage = () => {
         // Проверяем доступ к adminApi и получаем статистику
         if (adminApi && typeof adminApi.getDashboardStats === 'function') {
           try {
-            const data = await adminApi.getDashboardStats();
-            setStats(data);
+        const data = await adminApi.getDashboardStats();
+        setStats(data);
             console.log('AdminDashboard - Получена статистика:', data);
           } catch (adminError) {
             console.error('AdminDashboard - Ошибка при запросе статистики:', adminError);
-            setError('Ошибка при загрузке статистики');
+        setError('Ошибка при загрузке статистики');
           }
         } else {
           console.error('AdminDashboard - adminApi недоступен или метод getDashboardStats отсутствует');
@@ -58,10 +58,10 @@ const AdminPage: NextPage = () => {
         console.log('Проверка наличия заказов в базе данных...');
         try {
           if (ordersApi && typeof ordersApi.getOrders === 'function') {
-            const orders = await ordersApi.getOrders();
-            console.log('AdminDashboard - Заказы без фильтров:', orders);
-            console.log('AdminDashboard - Количество заказов:', orders.length);
-            console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
+          const orders = await ordersApi.getOrders();
+          console.log('AdminDashboard - Заказы без фильтров:', orders);
+          console.log('AdminDashboard - Количество заказов:', orders.length);
+          console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
           } else {
             console.error('AdminDashboard - ordersApi или метод getOrders недоступен');
           }

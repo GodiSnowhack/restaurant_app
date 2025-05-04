@@ -17,8 +17,10 @@ import {
   CheckCircleIcon, 
   ClipboardDocumentListIcon as ClipboardListIcon
 } from '@heroicons/react/24/outline';
-import {usersApi} from '../../lib/api';
 import {useTheme} from '../../lib/theme-context';
+
+// Импортируем API напрямую из файла API
+import { usersApi, UserData } from '../../lib/api/users-api';
 
 // Функция для отложенного запуска поиска
 const useDebounce = (value: any, delay: number) => {
@@ -97,20 +99,56 @@ const AdminUsersPage: NextPage = () => {
           query: debouncedSearchQuery || undefined
         });
         
-        // Загружаем пользователей из API с учетом фильтров
-        const response = await usersApi.getUsers({
-          role: showRoleFilter !== 'all' ? showRoleFilter : undefined,
-          query: debouncedSearchQuery || undefined
+        // Получаем токен авторизации из localStorage
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Отсутствует токен авторизации');
+        }
+        
+        // Формируем URL для запроса напрямую к API прокси
+        let apiUrl = '/api/v1/users';
+        const queryParams = new URLSearchParams();
+        if (showRoleFilter !== 'all') queryParams.append('role', showRoleFilter);
+        if (debouncedSearchQuery) queryParams.append('query', debouncedSearchQuery);
+        
+        if (queryParams.toString()) {
+          apiUrl += `?${queryParams.toString()}`;
+        }
+        
+        // Выполняем запрос напрямую к API прокси
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': 'admin',
+            'X-User-ID': '1'
+          }
         });
         
-        console.log('Получены пользователи:', response);
+        if (!response.ok) {
+          throw new Error(`Ошибка API прокси: ${response.status} ${response.statusText}`);
+        }
         
-        // Преобразуем полученные данные, чтобы age_group соответствовал типу AgeGroup
-        const typedUsers = response.map(user => ({
-          ...user,
-          age_group: (user.age_group === 'YOUNG' || user.age_group === 'MIDDLE' || user.age_group === 'OLD' || user.age_group === null) 
+        const data = await response.json();
+        
+        // Преобразуем полученные данные
+        const typedUsers = data.map((user: any) => ({
+          id: user.id || 0,
+          full_name: user.full_name || '',
+          email: user.email || '',
+          phone: user.phone || null,
+          role: user.role || 'client',
+          created_at: user.created_at || new Date().toISOString(),
+          updated_at: user.updated_at || new Date().toISOString(),
+          is_active: user.is_active ?? true,
+          birthday: user.birthday || null,
+          age_group: (user.age_group === 'YOUNG' || user.age_group === 'MIDDLE' || user.age_group === 'OLD') 
             ? user.age_group as AgeGroup 
-            : null
+            : null,
+          orders_count: user.orders_count,
+          reservations_count: user.reservations_count
         }));
         
         setUsers(typedUsers);
@@ -179,7 +217,7 @@ const AdminUsersPage: NextPage = () => {
   };
 
   // Фильтрация пользователей по заданным критериям
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users.filter((user: User) => {
     // Если задана роль для фильтрации и она не совпадает с ролью пользователя
     if (showRoleFilter !== 'all' && user.role !== showRoleFilter) {
       return false;

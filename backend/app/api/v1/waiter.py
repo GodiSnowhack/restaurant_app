@@ -129,19 +129,24 @@ async def get_waiter_orders(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role != "waiter":
+    if current_user.role != "waiter" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
     try:
-        logger.info(f"Получение заказов для официанта ID: {current_user.id}")
+        logger.info(f"Получение заказов для пользователя ID: {current_user.id}, роль: {current_user.role}")
         
         # Получаем заказы официанта, отсортированные по времени создания
-        orders = db.query(Order).filter(
-            Order.waiter_id == current_user.id
-        ).order_by(Order.created_at.desc()).all()
+        # Для администратора возвращаем все заказы
+        if current_user.role == "admin":
+            orders = db.query(Order).order_by(Order.created_at.desc()).all()
+            logger.info(f"Администратор {current_user.id} запросил все заказы")
+        else:
+            orders = db.query(Order).filter(
+                Order.waiter_id == current_user.id
+            ).order_by(Order.created_at.desc()).all()
         
         if not orders:
-            logger.info(f"Заказы для официанта {current_user.id} не найдены")
+            logger.info(f"Заказы для пользователя {current_user.id} не найдены")
             return []
             
         result = []
@@ -224,11 +229,11 @@ async def get_waiter_orders(
             
             result.append(order_data)
             
-        logger.info(f"Успешно получено {len(result)} заказов для официанта {current_user.id}")
+        logger.info(f"Успешно получено {len(result)} заказов для пользователя {current_user.id}")
         return result
         
     except Exception as e:
-        logger.error(f"Ошибка при получении заказов официанта: {str(e)}")
+        logger.error(f"Ошибка при получении заказов пользователя: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения заказов: {str(e)}")
 
 @router.post("/orders/{order_id}/take")
@@ -237,14 +242,14 @@ async def take_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role != "waiter":
+    if current_user.role != "waiter" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.waiter_id is not None:
+    if order.waiter_id is not None and current_user.role != "admin":
         raise HTTPException(status_code=400, detail="Order is already taken by another waiter")
     
     order.waiter_id = current_user.id
@@ -259,24 +264,21 @@ async def confirm_payment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role != "waiter":
+    if current_user.role != "waiter" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    order = db.query(Order).filter(
-        Order.id == order_id,
-        Order.waiter_id == current_user.id
-    ).first()
-    
+    order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.payment_status == PaymentStatus.PAID:
-        raise HTTPException(status_code=400, detail="Order is already paid")
+    # Администратор может подтверждать любой заказ, официант только свои
+    if current_user.role != "admin" and order.waiter_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized for this order")
     
     order.payment_status = PaymentStatus.PAID
     db.commit()
     
-    return {"message": "Payment confirmed successfully"}
+    return {"status": "success", "message": "Payment confirmed"}
 
 @router.post("/orders/{order_id}/complete")
 async def complete_order(
@@ -284,21 +286,18 @@ async def complete_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role != "waiter":
+    if current_user.role != "waiter" and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    order = db.query(Order).filter(
-        Order.id == order_id,
-        Order.waiter_id == current_user.id
-    ).first()
-    
+    order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.payment_status != PaymentStatus.PAID:
-        raise HTTPException(status_code=400, detail="Order must be paid before completion")
+    # Администратор может завершать любой заказ, официант только свои
+    if current_user.role != "admin" and order.waiter_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized for this order")
     
-    order.status = OrderStatus.DELIVERED
+    order.status = OrderStatus.COMPLETED
     db.commit()
     
-    return {"message": "Order completed successfully"} 
+    return {"status": "success", "message": "Order completed"} 

@@ -350,10 +350,54 @@ export const fetchWithTimeout = async (url: string, options: RequestInit, timeou
   }
 };
 
-// Функция получения заголовков авторизации для запросов к API
-export const getAuthHeaders = (): Record<string, string> => {
-  const token = getAuthToken();
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+// Функция для получения токена авторизации из всех возможных источников
+export const getAuthTokenFromAllSources = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    // Проверяем несколько мест хранения
+    // 1. Сначала localStorage
+    const localToken = localStorage.getItem('token');
+    if (localToken) {
+      return localToken;
+    }
+    
+    // 2. Затем sessionStorage
+    const sessionToken = sessionStorage.getItem('token');
+    if (sessionToken) {
+      return sessionToken;
+    }
+    
+    // 3. Наконец cookie
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'auth_token' && value) {
+        return value;
+      }
+    }
+  } catch (e) {
+    console.error('Ошибка при получении токена:', e);
+  }
+  
+  return null;
+};
+
+/**
+ * Получение заголовков авторизации
+ */
+export const getAuthHeaders = () => {
+  const token = getAuthTokenFromAllSources();
+  
+  if (!token) {
+    return {};
+  }
+  
+  return {
+    'Authorization': `Bearer ${token}`,
+    'X-User-ID': localStorage.getItem('user_id') || '1',
+    'X-User-Role': localStorage.getItem('user_role') || 'admin'
+  };
 };
 
 // Улучшенная функция для определения мобильного устройства

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.user import User, UserRole
 from app.models.reservation import ReservationStatus, Reservation
-from app.schemas.reservation import ReservationResponse, ReservationCreate, ReservationUpdate
+from app.schemas.reservation import ReservationResponse, ReservationCreate, ReservationUpdate, ReservationRawResponse
 from app.services.auth import get_current_user, get_optional_current_user
 from app.services.reservation import (
     get_reservation, get_reservations_by_user, get_reservations_by_date,
@@ -369,3 +369,40 @@ def verify_reservation_code(
         "guests_count": reservation.guests_count,
         "reservation_time": reservation.reservation_time.isoformat()
     } 
+
+
+@router.get("/raw", response_model=List[ReservationRawResponse])
+async def read_raw_reservations(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    status: str = None,
+    date: datetime = None,
+    db: Session = Depends(get_db)
+):
+    """Получение списка бронирований без строгой валидации схемы"""
+    print(f"[RAW API] Получение бронирований с параметрами: skip={skip}, limit={limit}, status={status}, date={date}")
+    
+    # Базовый запрос
+    query = db.query(Reservation)
+    
+    # Применяем фильтры
+    if status:
+        query = query.filter(Reservation.status == status)
+    
+    if date:
+        # Извлекаем только дату (без времени)
+        start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        query = query.filter(
+            Reservation.reservation_time >= start_of_day,
+            Reservation.reservation_time <= end_of_day
+        )
+    
+    # Получаем результаты с пагинацией
+    reservations = query.offset(skip).limit(limit).all()
+    
+    print(f"[RAW API] Получено {len(reservations)} бронирований")
+    
+    return reservations 

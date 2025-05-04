@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -171,3 +171,28 @@ def create_customer(
     # Создаем пользователя
     new_user = create_user(db, user_create)
     return new_user 
+
+
+@router.get("/direct", response_model=List[UserResponse])
+def read_users_direct(
+    req: Request,
+    skip: int = 0,
+    limit: int = 100,
+    role: UserRole = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Специальный эндпоинт для получения списка пользователей с упрощенной авторизацией.
+    Предназначен только для внутреннего использования фронтендом.
+    """
+    # Получаем роль из заголовка
+    user_role = req.headers.get('x-user-role')
+    
+    # Логгируем запрос для отладки
+    print(f"[DIRECT ACCESS] Запрос списка пользователей с ролью: {user_role}, заголовки: {req.headers}")
+    
+    # Получаем пользователей из базы данных
+    users = get_users(db, skip=skip, limit=limit, role=role)
+    
+    # Возвращаем пользователей напрямую, без дополнительных проверок схемы
+    return users 

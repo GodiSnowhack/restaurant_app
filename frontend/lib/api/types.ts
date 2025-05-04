@@ -110,6 +110,7 @@ export interface Order {
   order_type: string;
   items: OrderItem[];
   total_amount: number;
+  total_price?: number;
   special_instructions?: string;
   created_at?: string;
   updated_at?: string;

@@ -4,8 +4,9 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
 import Layout from '../../../components/Layout';
+import WaiterLayout from '../../../components/WaiterLayout';
 import useAuthStore from '../../../lib/auth-store';
-import { waiterApi } from '../../../lib/api';
+import { waiterApi } from '../../../lib/api/waiter-api';
 import { formatPrice } from '../../../utils/priceFormatter';
 import { 
   ClockIcon, 
@@ -19,6 +20,7 @@ import {
   HomeIcon,
   ArrowPathIcon as RefreshIcon
 } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
 
 // Создаем локальные компоненты для Material UI
 const Box = ({ sx, children }: { sx?: any, children: React.ReactNode }) => (
@@ -72,6 +74,7 @@ interface WaiterOrder {
   payment_status: string;
   payment_method: string;
   total_amount: number;
+  total_price?: number; // Добавлено для совместимости
   created_at: string;
   table_number?: number;
   customer_name?: string;
@@ -153,7 +156,8 @@ const WaiterOrdersPage: NextPage = () => {
               status: order.status || 'new',
               payment_status: order.payment_status || 'not_paid',
               payment_method: order.payment_method || 'cash',
-              total_amount: order.total_amount || 0,
+              total_amount: order.total_amount || order.total_price || 0, // Используем total_price в качестве запасного варианта
+              total_price: order.total_price || order.total_amount || 0, // Для обратной совместимости
               created_at: order.created_at || new Date().toISOString(),
               table_number: order.table_number,
               customer_name: order.customer_name,
@@ -170,7 +174,8 @@ const WaiterOrdersPage: NextPage = () => {
         }
       } catch (err: any) {
         console.error('WaiterOrders - Ошибка при загрузке заказов:', err);
-        setError(`Ошибка загрузки заказов: ${err.message || 'Неизвестная ошибка'}`);
+        // Устанавливаем более дружественное сообщение для пользователя
+        setError('У вас нет активных заказов. Возможно, требуется авторизация с ролью официанта.');
         setOrders([]);
       } finally {
         setLoading(false);
@@ -206,125 +211,69 @@ const WaiterOrdersPage: NextPage = () => {
       order.id === orderId ? { ...order, statusUpdating: true, status: newStatus } : order
     ));
     
-    const displayStatus = statusLabels[newStatus as keyof typeof statusLabels] || newStatus;
-    console.log(`Изменение статуса заказа #${orderId} на ${newStatus} (${displayStatus})`);
-    
     try {
-      // Получаем токен
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-      
-      // Пробуем все возможные способы обновления статуса заказа
-      let updateSuccessful = false;
-      
-      // ВАРИАНТ 1: API-маршрут update-status
-      try {
-        console.log(`Пробуем обновить статус через основной API-маршрут`);
-        const response = await fetch(`/api/orders/${orderId}/update-status`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ status: newStatus })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Результат обновления через основной маршрут:', data);
-          updateSuccessful = true;
-        } else {
-          console.warn(`Основной API-маршрут вернул код ${response.status}`);
-        }
-      } catch (error) {
-        console.error('Ошибка при использовании основного API-маршрута:', error);
-      }
-      
-      // ВАРИАНТ 2: Запасной API-маршрут
-      if (!updateSuccessful) {
-        try {
-          console.log(`Пробуем обновить статус через запасной API-маршрут`);
-          const response = await fetch(`/api/waiter/update-order/${orderId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ status: newStatus })
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('Результат обновления через запасной маршрут:', data);
-            updateSuccessful = true;
-          } else {
-            console.warn(`Запасной API-маршрут вернул код ${response.status}`);
-          }
-        } catch (error) {
-          console.error('Ошибка при использовании запасного API-маршрута:', error);
-        }
-      }
+      // Пытаемся обновить статус через API
+      const success = await waiterApi.updateOrderStatus(orderId, newStatus);
       
       // Обновляем UI, показывая, что загрузка завершена
       setOrders(prev => prev.map(order => 
         order.id === orderId ? { ...order, statusUpdating: false, status: newStatus } : order
       ));
       
-      // Показываем сообщение об успехе
-      if (updateSuccessful) {
-        alert(`Статус заказа #${orderId} успешно изменен на "${displayStatus}"`);
-        // Обновляем список заказов через 1 секунду
-        setTimeout(() => refreshOrders(), 1000);
+      // Показываем уведомление об успехе
+      const displayStatus = statusLabels[newStatus as keyof typeof statusLabels] || newStatus;
+      if (success) {
+        toast.success(`Статус заказа #${orderId} изменен на "${displayStatus}"`, {
+          duration: 3000,
+          position: 'top-center',
+        });
       } else {
-        alert(`Статус заказа #${orderId} изменен на "${displayStatus}" (только в интерфейсе)`);
-        // Пробуем обновить список заказов через 2 секунды
-        setTimeout(() => refreshOrders(), 2000);
+        toast.error(`Ошибка при обновлении статуса заказа`, {
+          duration: 3000,
+          position: 'top-center',
+        });
       }
     } catch (error: any) {
       console.error('Критическая ошибка при обновлении статуса заказа:', error);
       
       // Если произошла критическая ошибка, возвращаем старый статус
-      if (oldStatus) {
-        setOrders(prev => prev.map(order => 
-          order.id === orderId ? { ...order, statusUpdating: false, status: oldStatus } : order
-        ));
-        alert(`Ошибка: ${error.message || 'Не удалось обновить статус заказа'}`);
-      } else {
-        // Если не можем восстановить старый статус, оставляем новый, но показываем сообщение
-        setOrders(prev => prev.map(order => 
-          order.id === orderId ? { ...order, statusUpdating: false } : order
-        ));
-        alert(`Предупреждение: ${error.message || 'Возникла ошибка при обновлении статуса заказа, но интерфейс был обновлен'}`);
-      }
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, statusUpdating: false, status: oldStatus } : order
+      ));
+      
+      toast.error(`Ошибка: ${error.message || 'Не удалось обновить статус заказа'}`, {
+        duration: 3000,
+        position: 'top-center',
+      });
     }
   };
 
   if (!isAuthenticated || !user) {
     return (
-      <Layout title="Загрузка...">
+      <WaiterLayout title="Загрузка..." activeTab="orders">
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
         </div>
-      </Layout>
+      </WaiterLayout>
     );
   }
 
   return (
-    <Layout title="Заказы">
+    <WaiterLayout title="Заказы" activeTab="orders">
       <Head>
         <title>Заказы официанта</title>
       </Head>
       <MainContainer>
-        <PageTitle>Список ваших заказов</PageTitle>
+        <PageTitle>
+          {user?.role === 'admin' ? 'Все заказы ресторана (режим администратора)' : 'Список ваших заказов'}
+        </PageTitle>
         
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress />
           </Box>
         ) : error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
             {error}
             <Button 
               variant="outlined" 
@@ -396,7 +345,7 @@ const WaiterOrdersPage: NextPage = () => {
                     </div>
 
                     <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4">
-                      <div className="font-medium">Итого: {order.total_amount.toFixed(2)} ₸</div>
+                      <div className="font-medium">Итого: {(order.total_amount || order.total_price || 0).toFixed(2)} ₸</div>
                       
                       <div className="flex space-x-2">
                         <Link href={`/waiter/orders/${order.id}`} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm">
@@ -459,7 +408,7 @@ const WaiterOrdersPage: NextPage = () => {
           </>
         )}
       </MainContainer>
-    </Layout>
+    </WaiterLayout>
   );
 };
 

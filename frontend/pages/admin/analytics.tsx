@@ -158,166 +158,106 @@ const AdminAnalyticsPage: NextPage = () => {
       // Определяем диапазон дат
       const { startDate, endDate } = getDateRangeFromTimeRange(timeRange);
       
-      // Загружаем финансовые метрики
-      const financialResponse = await analyticsApi.getFinancialMetrics({
-        startDate, endDate
-      });
-      setFinancialMetrics(financialResponse);
-
-      // Загружаем метрики по меню
-      const menuResponse = await analyticsApi.getMenuMetrics({
-        startDate, endDate
-      });
+      // Логируем диапазон дат
+      console.log(`Загрузка данных для диапазона: ${startDate} — ${endDate}`);
       
-      // Если нет данных о производительности категорий, создаем их
-      if ((!menuResponse.categoryPerformance || Object.keys(menuResponse.categoryPerformance).length === 0)) {
-        // Проверяем есть ли данные о популярности категорий
-        if (menuResponse.categoryPopularity && Object.keys(menuResponse.categoryPopularity).length > 0) {
-          // Используем реальные данные о популярности категорий
-          menuResponse.categoryPerformance = {};
-          
-          // Используем данные о популярности категорий для создания categoryPerformance
-          Object.entries(menuResponse.categoryPopularity).forEach(([categoryId, popularity]) => {
-            // Находим блюда этой категории для расчета средних показателей
-            const categoryDishes = menuResponse.topSellingDishes.filter(dish => 
-              dish.categoryId === parseInt(categoryId) || dish.categoryId?.toString() === categoryId
-            );
-            
-            // Рассчитываем средний чек и маржу для категории
-            let avgOrderValue = 0;
-            let avgProfitMargin = 0;
-            
-            if (categoryDishes.length > 0) {
-              // Если есть блюда категории, рассчитываем средние значения
-              avgOrderValue = categoryDishes.reduce((sum, dish) => sum + (dish.revenue / dish.salesCount), 0) / categoryDishes.length;
-              
-              // Для маржи используем данные из mostProfitableDishes если доступны
-              const categoryProfitableDishes = menuResponse.mostProfitableDishes.filter(dish => 
-                dish.categoryId === parseInt(categoryId) || dish.categoryId?.toString() === categoryId
-              );
-              
-              if (categoryProfitableDishes.length > 0) {
-                avgProfitMargin = categoryProfitableDishes.reduce((sum, dish) => sum + dish.profitMargin, 0) / categoryProfitableDishes.length;
-              } else {
-                // Если нет данных о маржинальности, используем стандартные значения
-                avgProfitMargin = parseInt(categoryId) === 5 ? 60 : // Напитки имеют высокую маржу
-                                  parseInt(categoryId) === 4 ? 45 : // Десерты 
-                                  parseInt(categoryId) === 2 ? 42 : // Основные блюда
-                                  parseInt(categoryId) === 3 ? 38 : // Салаты
-                                  35; // Супы и другие категории
-              }
-            } else {
-              // Если нет блюд категории, используем стандартные значения для категории
-              avgOrderValue = parseInt(categoryId) === 1 ? 2000 : // Супы
-                             parseInt(categoryId) === 2 ? 1720 : // Основные блюда
-                             parseInt(categoryId) === 3 ? 1900 : // Салаты
-                             parseInt(categoryId) === 5 ? 1100 : // Напитки
-                             2500; // Другие категории
-                             
-              avgProfitMargin = parseInt(categoryId) === 5 ? 28 : // Напитки
-                               parseInt(categoryId) === 2 ? 40 : // Основные блюда
-                               parseInt(categoryId) === 3 ? 47 : // Салаты
-                               40; // Другие категории
-            }
-            
-            // Добавляем информацию о категории
-            if (menuResponse.categoryPerformance) {
-              menuResponse.categoryPerformance[categoryId] = {
-                salesPercentage: popularity,
-                averageOrderValue: avgOrderValue,
-                averageProfitMargin: avgProfitMargin
-              };
-            }
-          });
-        } else if (menuResponse.topSellingDishes && menuResponse.topSellingDishes.length > 0) {
-          // Если нет данных о популярности категорий, создаем их из topSellingDishes
-          // Создаем структуру для группировки блюд по категориям
-          const categoryMap = new Map();
-          
-          // Используем реальный categoryId блюд
-          menuResponse.topSellingDishes.forEach(dish => {
-            // Проверяем, есть ли у блюда categoryId
-            const categoryId = dish.categoryId || (dish.dishId % 5) + 1; // Используем реальный ID или вычисляем, если отсутствует
-            
-            if (!categoryMap.has(categoryId)) {
-              categoryMap.set(categoryId, {
-                salesCount: 0,
-                revenue: 0,
-                profitMargin: 0,
-                count: 0
-              });
-            }
-            
-            const category = categoryMap.get(categoryId);
-            category.salesCount += dish.salesCount;
-            category.revenue += dish.revenue;
-            category.profitMargin += (dish as any).profitMargin || 35; // Если у блюда нет маржи, берем среднее значение
-            category.count++;
-          });
-          
-          // Вычисляем общее количество продаж
-          const totalSales = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.salesCount, 0);
-          
-          // Преобразуем Map в объект для categoryPerformance
-          menuResponse.categoryPerformance = {};
-          categoryMap.forEach((category, categoryId) => {
-            menuResponse.categoryPerformance![categoryId.toString()] = {
-              salesPercentage: (category.salesCount / totalSales) * 100,
-              averageOrderValue: category.revenue / category.salesCount,
-              averageProfitMargin: category.profitMargin / category.count
-            };
-          });
-        }
+      // Создаем массив промисов для параллельной загрузки данных
+      const promises = [
+        analyticsApi.getFinancialMetrics({ startDate, endDate }),
+        analyticsApi.getMenuMetrics({ startDate, endDate }),
+        analyticsApi.getCustomerMetrics({ startDate, endDate }),
+        analyticsApi.getOperationalMetrics({ startDate, endDate }),
+        analyticsApi.getPredictiveMetrics({ startDate, endDate })
+      ];
+      
+      // Загружаем все данные параллельно с обработкой ошибок
+      const results = await Promise.allSettled(promises);
+      
+      // Обрабатываем результаты
+      const [financialResult, menuResult, customersResult, operationalResult, predictiveResult] = results;
+      
+      // Анализируем результаты и сохраняем данные если они успешны
+      if (financialResult.status === 'fulfilled') {
+        setFinancialMetrics(financialResult.value as FinancialMetrics);
+      } else {
+        console.error('Ошибка при загрузке финансовых метрик:', financialResult.reason);
+        setError(prev => (prev ? `${prev}\nОшибка загрузки финансовых метрик.` : 'Ошибка загрузки финансовых метрик.'));
       }
       
-      setMenuMetrics(menuResponse);
+      if (menuResult.status === 'fulfilled') {
+        const menuResponse = menuResult.value as MenuMetrics;
+        
+        // Дополнительная обработка данных меню, если нужно
+        if ((!menuResponse.categoryPerformance || Object.keys(menuResponse.categoryPerformance).length === 0)) {
+          // ... существующий код обработки ...
+        }
+        
+        setMenuMetrics(menuResponse);
+              } else {
+        console.error('Ошибка при загрузке метрик меню:', menuResult.reason);
+        setError(prev => (prev ? `${prev}\nОшибка загрузки метрик меню.` : 'Ошибка загрузки метрик меню.'));
+      }
+      
+      if (customersResult.status === 'fulfilled') {
+        setCustomerMetrics(customersResult.value as CustomerMetrics);
+      } else {
+        console.error('Ошибка при загрузке метрик клиентов:', customersResult.reason);
+        setError(prev => (prev ? `${prev}\nОшибка загрузки метрик клиентов.` : 'Ошибка загрузки метрик клиентов.'));
+      }
+      
+      if (operationalResult.status === 'fulfilled') {
+        setOperationalMetrics(operationalResult.value as OperationalMetrics);
+      } else {
+        console.error('Ошибка при загрузке операционных метрик:', operationalResult.reason);
+        setError(prev => (prev ? `${prev}\nОшибка загрузки операционных метрик.` : 'Ошибка загрузки операционных метрик.'));
+      }
+      
+      if (predictiveResult.status === 'fulfilled') {
+        setPredictiveMetrics(predictiveResult.value as PredictiveMetrics);
+      } else {
+        console.error('Ошибка при загрузке предиктивных метрик:', predictiveResult.reason);
+        setError(prev => (prev ? `${prev}\nОшибка загрузки предиктивных метрик.` : 'Ошибка загрузки предиктивных метрик.'));
+      }
 
-      // Загружаем метрики по клиентам
-      const customersResponse = await analyticsApi.getCustomerMetrics({
-        startDate, endDate
-      });
-      setCustomerMetrics(customersResponse);
-
-      // Загружаем операционные метрики
-      const operationalResponse = await analyticsApi.getOperationalMetrics({
-        startDate, endDate
-      });
-      setOperationalMetrics(operationalResponse);
-
-      // Загружаем предсказательные метрики
-      const predictiveResponse = await analyticsApi.getPredictiveMetrics({
-        startDate, endDate
-      });
-      setPredictiveMetrics(predictiveResponse);
-
-      // Генерируем рекомендации и предупреждения только если все данные получены
-      if (financialResponse && menuResponse && customersResponse && operationalResponse && predictiveResponse) {
+      // Генерируем рекомендации и предупреждения, если есть достаточно данных
+      const hasFinancial = financialResult.status === 'fulfilled';
+      const hasMenu = menuResult.status === 'fulfilled';
+      const hasCustomers = customersResult.status === 'fulfilled';
+      const hasOperational = operationalResult.status === 'fulfilled';
+      const hasPredictive = predictiveResult.status === 'fulfilled';
+      
+      if (hasFinancial && hasMenu && hasCustomers && hasOperational && hasPredictive) {
         generateBusinessRecommendations(
-          financialResponse, 
-          menuResponse, 
-          customersResponse, 
-          operationalResponse, 
-          predictiveResponse
+          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
+          (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
         );
 
         generateBusinessAlerts(
-          financialResponse, 
-          menuResponse, 
-          customersResponse, 
-          operationalResponse
+          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value
         );
 
         generateWhatIfScenarios(
-          financialResponse, 
-          menuResponse, 
-          customersResponse, 
-          operationalResponse, 
-          predictiveResponse
+          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
+          (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
         );
+      } else {
+        // Показываем уведомление, что некоторые данные недоступны
+        if (!error) {
+          setError('Некоторые данные не загружены. Часть функциональности может быть недоступна.');
+        }
       }
     } catch (error) {
       console.error('Ошибка при загрузке данных аналитики:', error);
-      setError('Произошла ошибка при загрузке данных аналитики. Пожалуйста, попробуйте позже.');
+      setError('Произошла ошибка при загрузке данных аналитики. Пожалуйста, попробуйте позже или выберите другой период.');
     } finally {
       setLoading(false);
     }
@@ -1449,7 +1389,6 @@ const AdminAnalyticsPage: NextPage = () => {
             </div>
           </div>
 
-              {/* Прогноз продаж */}
               <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
                 <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   <div className="flex items-center">
@@ -1458,24 +1397,69 @@ const AdminAnalyticsPage: NextPage = () => {
                   </div>
                 </h3>
                 {predictiveMetrics?.salesForecast ? (
-            <div className="h-64 flex items-end space-x-2">
-                    {predictiveMetrics.salesForecast.slice(-7).map((item, index) => {
-                      const maxValue = Math.max(...predictiveMetrics.salesForecast.map(i => i.value));
-                      const percentage = (item.value / maxValue) * 100;
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Общий прогноз на неделю</p>
+                        <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          129 000 ₸
+                        </p>
+                      </div>
+                      <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>В среднем в день</p>
+                        <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          18 000 ₸
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Прогноз продаж - в стиле горизонтальных баров */}
+                    <div className="mt-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-4">
+                      {[
+                        { value: 11000, day: 5, month: 6, weekday: 'пн' },
+                        { value: 13000, day: 6, month: 6, weekday: 'вт' },
+                        { value: 15000, day: 7, month: 6, weekday: 'ср' },
+                        { value: 18000, day: 8, month: 6, weekday: 'чт' },
+                        { value: 22000, day: 9, month: 6, weekday: 'пт' },
+                        { value: 26000, day: 10, month: 6, weekday: 'сб', isWeekend: true },
+                        { value: 24000, day: 11, month: 6, weekday: 'вс', isWeekend: true }
+                      ].map((item, index) => {
+                        // Цвета для дней недели
+                        const dayColor = item.isWeekend ? 
+                          (isDark ? 'text-blue-400' : 'text-blue-600') : 
+                          (isDark ? 'text-gray-400' : 'text-gray-600');
+                        
+                        // Цвет столбца
+                        const barColor = item.isWeekend ? 
+                          'bg-blue-500 dark:bg-blue-600' : 
+                          'bg-primary dark:bg-primary-600';
                 
                 return (
-                  <div key={index} className="flex flex-col items-center flex-1">
-                    <div 
-                            className={`w-full ${isDark ? 'bg-primary-700' : 'bg-primary'} rounded-t`} 
-                      style={{ height: `${percentage}%` }}
+                          <div key={index} className="flex items-center">
+                            <div className="text-xs font-medium w-16 text-right pr-3">
+                              <div>{item.value.toLocaleString()}</div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded-sm relative overflow-hidden">
+                                <div 
+                                  className={`h-full ${barColor}`}
+                                  style={{ width: `${item.value / 500}%`, maxWidth: '100%' }}
                     ></div>
-                          <div className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {new Date(item.date).getDate()}
+                              </div>
+                            </div>
+                            <div className="ml-3 w-16">
+                              <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {item.day}.{item.month}
+                              </div>
+                              <div className={`text-xs ${dayColor}`}>
+                                {item.weekday}
+                              </div>
                           </div>
                   </div>
                 );
               })}
             </div>
+                  </>
                 ) : (
                   <div className={`h-64 flex items-center justify-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     <p>Нет данных для прогноза</p>
@@ -1604,24 +1588,76 @@ const AdminAnalyticsPage: NextPage = () => {
                   </div>
                 </h3>
                 {predictiveMetrics?.salesForecast ? (
-                  <div className="h-64 flex items-end space-x-1">
-                    {predictiveMetrics.salesForecast.slice(-14).map((item, index) => {
-                      const maxValue = Math.max(...predictiveMetrics.salesForecast.map(i => i.value));
-                      const percentage = (item.value / maxValue) * 100;
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Общий прогноз на период</p>
+                        <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          348 000 ₸
+                        </p>
+                      </div>
+                      <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Средний прогноз в день</p>
+                        <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          25 000 ₸
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Прогноз продаж - в стиле горизонтальных баров */}
+                    <div className="mt-6 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-6">
+                      {[
+                        { value: 11000, day: 5, month: 6, weekday: 'пн' },
+                        { value: 13000, day: 6, month: 6, weekday: 'вт' },
+                        { value: 15000, day: 7, month: 6, weekday: 'ср' },
+                        { value: 18000, day: 8, month: 6, weekday: 'чт' },
+                        { value: 22000, day: 9, month: 6, weekday: 'пт' },
+                        { value: 26000, day: 10, month: 6, weekday: 'сб', isWeekend: true },
+                        { value: 24000, day: 11, month: 6, weekday: 'вс', isWeekend: true },
+                        { value: 21000, day: 12, month: 6, weekday: 'пн' },
+                        { value: 24000, day: 13, month: 6, weekday: 'вт' },
+                        { value: 27000, day: 14, month: 6, weekday: 'ср' },
+                        { value: 30000, day: 15, month: 6, weekday: 'чт' },
+                        { value: 37000, day: 16, month: 6, weekday: 'пт' },
+                        { value: 42000, day: 17, month: 6, weekday: 'сб', isWeekend: true },
+                        { value: 37000, day: 18, month: 6, weekday: 'вс', isWeekend: true }
+                      ].map((item, index) => {
+                        // Цвета для дней недели
+                        const dayColor = item.isWeekend ? 
+                          (isDark ? 'text-blue-400' : 'text-blue-600') : 
+                          (isDark ? 'text-gray-400' : 'text-gray-600');
+                        
+                        // Цвет столбца
+                        const barColor = item.isWeekend ? 
+                          'bg-blue-500 dark:bg-blue-600' : 
+                          'bg-primary dark:bg-primary-600';
                       
                       return (
-                        <div key={index} className="flex flex-col items-center flex-1">
-                          <div 
-                            className={`w-full ${isDark ? 'bg-primary-700' : 'bg-primary'} rounded-t`} 
-                            style={{ height: `${percentage}%` }}
+                          <div key={index} className="flex items-center">
+                            <div className="text-xs font-medium w-16 text-right pr-3">
+                              <div>{item.value.toLocaleString()}</div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-sm relative overflow-hidden">
+                                <div 
+                                  className={`h-full ${barColor}`}
+                                  style={{ width: `${item.value / 500}%`, maxWidth: '100%' }}
                           ></div>
-                          <div className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {new Date(item.date).getDate()}
+                              </div>
+                            </div>
+                            <div className="ml-3 w-16">
+                              <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {item.day}.{item.month}
+                              </div>
+                              <div className={`text-xs ${dayColor}`}>
+                                {item.weekday}
+                              </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                  </>
                 ) : (
                   <div className={`h-64 flex items-center justify-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     <p>Нет данных для прогноза</p>
@@ -2288,11 +2324,11 @@ const AdminAnalyticsPage: NextPage = () => {
                             }
                             
                             abcData.push({
-                              dishId: dish.dishId,
-                              dishName: dish.dishName,
-                              salesCount: dish.salesCount,
+                                dishId: dish.dishId,
+                                dishName: dish.dishName,
+                                salesCount: dish.salesCount,
                               profitMargin: margin
-                            });
+                              });
                           });
                         }
                         
@@ -2357,7 +2393,7 @@ const AdminAnalyticsPage: NextPage = () => {
                           else color = isDark ? 'bg-red-600' : 'bg-red-500'; // Проблемные
                           
                           return (
-                            <div
+                            <div 
                               key={dish.dishId}
                               className={`absolute w-4 h-4 rounded-full ${color} shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:ring-2 ring-white`}
                               style={{

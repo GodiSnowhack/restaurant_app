@@ -168,7 +168,10 @@ const AdminReservationsPage: NextPage = () => {
 
   // Загрузка данных при изменении параметров
   useEffect(() => {
-    if (isAuthenticated && (user?.role === 'admin')) {
+    // Проверяем, что мы находимся на странице администрирования бронирований
+    const isAdminReservationsPage = window.location.pathname.includes('/admin/reservations');
+    
+    if (isAuthenticated && (user?.role === 'admin') && isAdminReservationsPage) {
       loadReservations();
     }
   }, [isAuthenticated, user, lastRefresh, activeTab, selectedDate]);

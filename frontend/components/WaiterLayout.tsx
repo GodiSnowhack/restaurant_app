@@ -4,6 +4,7 @@ import Header from './Header';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ordersApi } from '../lib/api/';
+import { waiterApi } from '../lib/api/waiter';
 import { 
   HomeIcon, 
   ListBulletIcon,
@@ -43,15 +44,41 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
   useEffect(() => {
     const fetchAssignedOrdersCount = async () => {
       try {
+        // Получаем информацию о пользователе из localStorage
+        let isAdmin = false;
+        try {
+          const userStr = localStorage.getItem('user');
+          if (userStr) {
+            const user = JSON.parse(userStr);
+            isAdmin = user.role === 'admin';
+          }
+        } catch (e) {
+          console.error('Ошибка при получении информации о пользователе:', e);
+        }
+
+        // Загружаем заказы
         const orders = await ordersApi.getWaiterOrders();
-        // Подсчитываем только активные заказы (не завершенные и не отмененные)
+        
+        // Для администратора показываем количество всех активных заказов
+        // Для официанта - только его заказы (фильтрация уже на сервере)
         const activeOrders = orders.filter(
           order => !['completed', 'cancelled'].includes(order.status)
         );
+        
         setAssignedOrdersCount(activeOrders.length);
       } catch (error) {
         console.error('Ошибка при получении назначенных заказов:', error);
-        setAssignedOrdersCount(0);
+        // В случае ошибки пытаемся использовать запасной метод
+        try {
+          const waiterOrders = await waiterApi.getWaiterOrders();
+          const activeOrders = waiterOrders.filter(
+            order => !['completed', 'cancelled'].includes(order.status)
+          );
+          setAssignedOrdersCount(activeOrders.length);
+        } catch (backupError) {
+          console.error('Запасной метод тоже не сработал:', backupError);
+          setAssignedOrdersCount(0);
+        }
       }
     };
 
@@ -113,6 +140,57 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
       </div>
 
       <main className="flex-grow w-full">
+        {/* Индикатор режима администратора, если пользователь админ */}
+        {(() => {
+          // Проверяем, является ли текущий пользователь администратором
+          let isAdmin = false;
+          try {
+            // Проверяем различные источники информации о роли пользователя
+            
+            // 1. Проверка прямого ключа user_role
+            const userRole = localStorage.getItem('user_role');
+            if (userRole && (userRole === 'admin' || userRole.includes('admin'))) {
+              isAdmin = true;
+            }
+            
+            // 2. Проверка из объекта user
+            if (!isAdmin) {
+              const userObjStr = localStorage.getItem('user');
+              if (userObjStr) {
+                const user = JSON.parse(userObjStr);
+                if (user.role === 'admin' || String(user.role).includes('admin')) {
+                  isAdmin = true;
+                }
+              }
+            }
+            
+            // 3. Проверка из объекта user_profile
+            if (!isAdmin) {
+              const profileStr = localStorage.getItem('user_profile');
+              if (profileStr) {
+                const profile = JSON.parse(profileStr);
+                if (profile.role === 'admin' || String(profile.role).includes('admin')) {
+                  isAdmin = true;
+                }
+              }
+            }
+            
+            console.log('WaiterLayout - Статус администратора:', isAdmin);
+          } catch (e) {
+            console.error('WaiterLayout - Ошибка при проверке роли администратора:', e);
+          }
+          
+          // Показываем индикатор режима администратора
+          if (isAdmin) {
+            return (
+              <div className="bg-amber-50 text-amber-800 py-1 px-4 text-center text-sm border-b border-amber-200">
+                Вы находитесь в панели официанта в режиме администратора
+              </div>
+            );
+          }
+          return null;
+        })()}
+        
         {/* Заголовок страницы и кнопка возврата */}
         {(showBackButton || title) && (
           <div className="bg-white shadow-sm p-4 mb-4">

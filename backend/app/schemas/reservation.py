@@ -36,3 +36,16 @@ class ReservationResponse(ReservationBase):
 
     class Config:
         from_attributes = True 
+
+
+# Создаем специальную схему для обхода проблемы валидации
+class ReservationRawResponse(ReservationBase):
+    id: int
+    user_id: int
+    status: str  # В этой схеме используем строку вместо строгого перечисления
+    created_at: datetime
+    updated_at: datetime
+    reservation_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True 

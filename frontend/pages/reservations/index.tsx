@@ -21,7 +21,7 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
-import FloorPlan, { RestaurantTable } from '../../components/FloorPlan';
+import FloorPlan, { RestaurantTable as FloorPlanTable } from '../../components/FloorPlan';
 import { useTheme } from '@/lib/theme-context';
 
 // Генерируем время для выбора в выпадающем списке: от 11:00 до 22:00 с шагом 30 минут
@@ -122,8 +122,9 @@ const ReservationsPage: NextPage = () => {
     if (isAuthenticated) {
       const fetchReservations = async () => {
         try {
-          // Загружаем бронирования через стор
+          // Всегда запрашиваем бронирования при загрузке страницы
           await getReservations();
+          
           // Устанавливаем имя, телефон и email из профиля пользователя
           setFormData(prev => ({
             ...prev,
@@ -148,7 +149,7 @@ const ReservationsPage: NextPage = () => {
 
       fetchReservations();
     }
-  }, [isAuthenticated, getReservations, user, loadSettings]);
+  }, [isAuthenticated, getReservations, user, loadSettings, showForm]);
 
   // Функция для проверки, может ли пользователь сделать новую бронь
   const canCreateNewReservation = () => {
@@ -203,11 +204,25 @@ const ReservationsPage: NextPage = () => {
     const tables = settings.tables || [];
     return tables
       .filter(table => 
-        table.is_active && 
         table.status !== 'occupied' && 
         table.capacity >= formData.guests
       )
       .sort((a, b) => a.capacity - b.capacity);
+  };
+
+  // Получение доступных столов в правильном формате
+  const getFloorPlanTables = () => {
+    const tables = settings.tables || [];
+    return tables.map(table => ({
+      id: table.id || 0,
+      number: table.number,
+      name: `Стол ${table.number}`,
+      capacity: table.capacity,
+      is_active: true,
+      position_x: 100 + (table.number * 50),
+      position_y: 100 + (table.id || 0) * 30,
+      status: (table.status || 'available') as 'available' | 'reserved' | 'occupied'
+    })) as FloorPlanTable[];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -406,6 +421,7 @@ const ReservationsPage: NextPage = () => {
   };
 
   const availableTables = getAvailableTables();
+  const floorPlanTables = getFloorPlanTables();
 
   // Функция для выбора стола на схеме зала
   const handleTableSelect = (tableId: number) => {
@@ -622,7 +638,7 @@ const ReservationsPage: NextPage = () => {
                       <option value={0}>Любой подходящий стол</option>
                       {availableTables.map((table) => (
                         <option key={table.id} value={table.id}>
-                          {table.name} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
+                          Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
                         </option>
                       ))}
                     </select>
@@ -672,10 +688,7 @@ const ReservationsPage: NextPage = () => {
                         ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
                       `}>
                         <FloorPlan 
-                          tables={tables.map(table => ({
-                            ...table,
-                            number: table.id
-                          }))}
+                          tables={floorPlanTables}
                           selectedTableId={formData.tableId}
                           onTableSelect={handleTableSelect}
                           minGuestCount={formData.guests}
@@ -935,22 +948,19 @@ const ReservationsPage: NextPage = () => {
                           px-6 py-4 whitespace-nowrap text-sm
                           ${isDark ? 'text-gray-300' : 'text-gray-500'}
                         `}>
-                          {reservation.guests_count} чел.
+                          {reservation.guests_count}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className={`
+                          px-6 py-4 whitespace-nowrap text-sm
+                          ${isDark ? 'text-gray-300' : 'text-gray-500'}
+                        `}>
                           {getStatusBadge(reservation.status)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <Link 
-                            href={`/reservations/${reservation.id}`} 
-                            className={`
-                              inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md
-                              ${isDark 
-                                ? 'text-gray-100 bg-gray-700 hover:bg-gray-600' 
-                                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'}
-                              transition-colors duration-200
-                            `}
-                          >
+                        <td className={`
+                          px-6 py-4 whitespace-nowrap text-right text-sm font-medium
+                          ${isDark ? 'text-gray-300' : 'text-gray-500'}
+                        `}>
+                          <Link href={`/reservations/${reservation.id}`} className="text-primary hover:underline">
                             Подробнее
                           </Link>
                         </td>
@@ -962,46 +972,13 @@ const ReservationsPage: NextPage = () => {
             )
           ) : (
             <div className={`text-center p-12 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              У вас нет бронирований. Создайте новое бронирование.
+              Для просмотра ваших бронирований необходимо авторизоваться.
             </div>
           )}
         </div>
-
-        {/* Информация о кодах бронирования */}
-        <div className={`
-          mt-8 rounded-lg shadow-md p-6 border
-          ${isDark 
-            ? 'bg-blue-900/20 border-blue-800/50' 
-            : 'bg-blue-50 border-blue-100'}
-        `}>
-          <h2 className={`
-            text-xl font-semibold mb-4 flex items-center
-            ${isDark ? 'text-gray-100' : 'text-blue-800'}
-          `}>
-            <KeyIcon className={`h-5 w-5 mr-2 ${isDark ? 'text-blue-400' : 'text-blue-800'}`} />
-            Заказ блюд с бронированием столика
-          </h2>
-          <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
-            Вы можете заранее заказать блюда перед посещением ресторана. Для этого:
-          </p>
-          <ol className={`list-decimal list-inside space-y-2 ml-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
-            <li>Создайте бронирование столика и дождитесь его подтверждения</li>
-            <li>Используйте полученный код бронирования при оформлении заказа</li>
-            <li>Ваш заказ будет приготовлен к указанному в бронировании времени</li>
-          </ol>
-          <p className={`mt-4 ${isDark ? 'text-gray-300' : 'text-blue-700'}`}>
-            <strong>Обратите внимание:</strong> Предзаказ блюд возможен только при подтвержденном бронировании.
-          </p>
-        </div>
-
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
-          actionType="reservation" 
-        />
       </div>
     </Layout>
   );
 };
 
-export default ReservationsPage; 
+export default ReservationsPage;

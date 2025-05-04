@@ -521,6 +521,11 @@ const useAuthStore = create<AuthState>()(
                   console.log('AuthStore: Используем кэшированный профиль из-за предотвращения цикла запросов');
                   const profile = JSON.parse(cachedProfile);
                   set({ user: profile, isAuthenticated: true });
+                  
+                  // Убедимся, что роль пользователя сохранена под общим ключом
+                  localStorage.setItem('user_role', profile.role);
+                  localStorage.setItem('user', JSON.stringify(profile));
+                  
                   return;
                 } catch (e) {
                   console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
@@ -543,6 +548,11 @@ const useAuthStore = create<AuthState>()(
                 console.log('AuthStore: Используем кэшированный профиль при отсутствии токена');
                 const profile = JSON.parse(cachedProfile);
                 set({ user: profile, isAuthenticated: true });
+                
+                // Убедимся, что роль пользователя сохранена под общим ключом
+                localStorage.setItem('user_role', profile.role);
+                localStorage.setItem('user', JSON.stringify(profile));
+                
                 return;
               } catch (e) {
                 console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
@@ -564,6 +574,11 @@ const useAuthStore = create<AuthState>()(
               if (cachedProfile) {
                 const profile = JSON.parse(cachedProfile);
                 set({ user: profile, isAuthenticated: true });
+                
+                // Убедимся, что роль пользователя сохранена под общим ключом
+                localStorage.setItem('user_role', profile.role);
+                localStorage.setItem('user', JSON.stringify(profile));
+                
                 return;
               }
             } catch (e) {
@@ -601,7 +616,12 @@ const useAuthStore = create<AuthState>()(
                 localStorage.setItem('user_profile', JSON.stringify(data));
                 // Сохраняем временную метку получения профиля
                 localStorage.setItem('user_profile_timestamp', Date.now().toString());
-                console.log('AuthStore: Профиль успешно получен и сохранен в кэше');
+                // Явно сохраняем роль пользователя
+                localStorage.setItem('user_role', data.role);
+                // Сохраняем данные пользователя под ключом 'user'
+                localStorage.setItem('user', JSON.stringify(data));
+                
+                console.log('AuthStore: Профиль успешно получен и сохранен в кэше, роль:', data.role);
               } catch (e) {
                 console.error('AuthStore: Ошибка при кэшировании профиля:', e);
               }
@@ -628,6 +648,11 @@ const useAuthStore = create<AuthState>()(
                         console.log('AuthStore: Используем кэшированный профиль после предотвращения цикла обновления токена');
                         const profile = JSON.parse(cachedProfile);
                         set({ user: profile, isAuthenticated: true });
+                        
+                        // Убедимся, что роль пользователя сохранена под общим ключом
+                        localStorage.setItem('user_role', profile.role);
+                        localStorage.setItem('user', JSON.stringify(profile));
+                        
                         return;
                       } catch (e) {
                         console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
@@ -686,7 +711,10 @@ const useAuthStore = create<AuthState>()(
                           // Кэшируем обновленный профиль
                           localStorage.setItem('user_profile', JSON.stringify(profileData));
                           localStorage.setItem('user_profile_timestamp', Date.now().toString());
-                          console.log('AuthStore: Профиль успешно получен после обновления токена');
+                          // Явно сохраняем роль пользователя
+                          localStorage.setItem('user_role', profileData.role);
+                          localStorage.setItem('user', JSON.stringify(profileData));
+                          console.log('AuthStore: Профиль успешно получен после обновления токена, роль:', profileData.role);
                           return;
                         }
                       }
@@ -703,6 +731,11 @@ const useAuthStore = create<AuthState>()(
                   try {
                     const profile = JSON.parse(cachedProfile);
                     set({ user: profile, isAuthenticated: true });
+                    
+                    // Убедимся, что роль пользователя сохранена под общим ключом
+                    localStorage.setItem('user_role', profile.role);
+                    localStorage.setItem('user', JSON.stringify(profile));
+                    
                     return;
                   } catch (e) {
                     console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
@@ -722,6 +755,11 @@ const useAuthStore = create<AuthState>()(
                 if (cachedProfile) {
                   const profile = JSON.parse(cachedProfile);
                   set({ user: profile, isAuthenticated: true });
+                  
+                  // Убедимся, что роль пользователя сохранена под общим ключом
+                  localStorage.setItem('user_role', profile.role);
+                  localStorage.setItem('user', JSON.stringify(profile));
+                  
                   return;
                 }
               }
@@ -737,6 +775,11 @@ const useAuthStore = create<AuthState>()(
                 console.log('AuthStore: Используем кэшированный профиль из-за ошибки сети');
                 const profile = JSON.parse(cachedProfile);
                 set({ user: profile, isAuthenticated: true });
+                
+                // Убедимся, что роль пользователя сохранена под общим ключом
+                localStorage.setItem('user_role', profile.role);
+                localStorage.setItem('user', JSON.stringify(profile));
+                
                 return;
               } catch (e) {
                 console.error('AuthStore: Ошибка при чтении кэшированного профиля:', e);
@@ -753,6 +796,11 @@ const useAuthStore = create<AuthState>()(
               console.log('AuthStore: Используем кэшированный профиль из-за общей ошибки');
               const profile = JSON.parse(cachedProfile);
               set({ user: profile, isAuthenticated: true });
+              
+              // Убедимся, что роль пользователя сохранена под общим ключом
+              localStorage.setItem('user_role', profile.role);
+              localStorage.setItem('user', JSON.stringify(profile));
+              
               return;
             }
           } catch (e) {
@@ -896,6 +944,9 @@ const useAuthStore = create<AuthState>()(
           // Также обновляем в localStorage для сохранения между сессиями
           if (typeof window !== 'undefined') {
             localStorage.setItem('user_profile', JSON.stringify(userProfile));
+            localStorage.setItem('user_role', userProfile.role);
+            localStorage.setItem('user', JSON.stringify(userProfile));
+            console.log('AuthStore: Профиль обновлен, роль:', userProfile.role);
           }
         } catch (error) {
           console.error('Ошибка при обновлении профиля пользователя:', error);

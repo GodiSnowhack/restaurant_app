@@ -34,20 +34,37 @@ def parse_date(date_str: str = None) -> datetime:
         print(f"Ошибка: тип аргумента должен быть str, получен {type(date_str)}")
         return None
         
+    # Очистим строку от лишних пробелов
+    date_str = date_str.strip()
+    
+    # Защита от пустых строк
+    if not date_str:
+        return None
+        
     # Пробуем разные форматы
     try:
         # ISO формат с заменой Z на часовой пояс UTC
         if 'Z' in date_str:
             return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        
+        # Для формата YYYY-MM-DD
+        if len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-':
+            return datetime.strptime(date_str, "%Y-%m-%d")
+            
         # Стандартный ISO формат
         return datetime.fromisoformat(date_str)
-    except ValueError:
+    except ValueError as e:
+        print(f"Ошибка при преобразовании даты '{date_str}': {e}")
+        
         try:
             # Формат YYYY-MM-DD
             return datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
             print(f"Ошибка: невозможно преобразовать строку '{date_str}' в datetime")
             return None
+    except Exception as e:
+        print(f"Неожиданная ошибка при обработке даты '{date_str}': {e}")
+        return None
 
 
 @router.get("/sales", response_model=List[Dict[str, Any]])
@@ -316,12 +333,32 @@ def get_operational_metrics(
             end_datetime = datetime.now()
             print(f"Используем дату по умолчанию для конца: {end_datetime}")
         
+        # Проверяем, что начальная дата не позже конечной
+        if start_datetime > end_datetime:
+            print(f"Начальная дата ({start_datetime}) позже конечной ({end_datetime}), меняем местами")
+            start_datetime, end_datetime = end_datetime, start_datetime
+        
+        # Проверяем даты на будущее
+        now = datetime.now()
+        if end_datetime > now:
+            print(f"Конечная дата {end_datetime} в будущем, используем текущую дату {now}")
+            end_datetime = now
+        if start_datetime > now:
+            print(f"Начальная дата {start_datetime} в будущем, используем дату месяц назад")
+            start_datetime = now - timedelta(days=30)
+        
         # Используем новую функцию для получения комплексных операционных метрик
+        print(f"Запрашиваем операционные метрики с {start_datetime} по {end_datetime}")
         result = analytics.get_operational_metrics(db, start_datetime, end_datetime)
+        print(f"Успешно получены операционные метрики")
         return result
     except Exception as e:
-        # Логируем ошибку
+        # Логируем ошибку детально
+        import traceback
         print(f"Ошибка при получении операционных метрик: {e}")
+        print(traceback.format_exc())
+        
+        # Возвращаем ошибку клиенту
         raise HTTPException(status_code=500, detail=f"Ошибка при получении операционных метрик: {str(e)}")
 
 
@@ -358,10 +395,30 @@ def get_predictive_metrics(
             end_datetime = datetime.now()
             print(f"Используем дату по умолчанию для конца: {end_datetime}")
         
+        # Проверяем, что начальная дата не позже конечной
+        if start_datetime > end_datetime:
+            print(f"Начальная дата ({start_datetime}) позже конечной ({end_datetime}), меняем местами")
+            start_datetime, end_datetime = end_datetime, start_datetime
+        
+        # Проверяем даты на будущее
+        now = datetime.now()
+        if end_datetime > now:
+            print(f"Конечная дата {end_datetime} в будущем, используем текущую дату {now}")
+            end_datetime = now
+        if start_datetime > now:
+            print(f"Начальная дата {start_datetime} в будущем, используем дату месяц назад")
+            start_datetime = now - timedelta(days=30)
+        
         # Используем новую функцию для получения комплексных предиктивных метрик
+        print(f"Запрашиваем предиктивные метрики с {start_datetime} по {end_datetime}")
         result = analytics.get_predictive_metrics(db, start_datetime, end_datetime)
+        print(f"Успешно получены предиктивные метрики")
         return result
     except Exception as e:
-        # Логируем ошибку
+        # Логируем ошибку детально
+        import traceback
         print(f"Ошибка при получении предиктивных метрик: {e}")
+        print(traceback.format_exc())
+        
+        # Возвращаем ошибку клиенту
         raise HTTPException(status_code=500, detail=f"Ошибка при получении предиктивных метрик: {str(e)}") 

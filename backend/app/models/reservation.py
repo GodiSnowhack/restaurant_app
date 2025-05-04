@@ -11,6 +11,7 @@ class ReservationStatus(str, PyEnum):
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
     COMPLETED = "completed"
+    NO_SHOW = "no_show"
 
 
 class Reservation(Base):

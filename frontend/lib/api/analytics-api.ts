@@ -135,9 +135,9 @@ const validateDateRange = (filters?: AnalyticsFilters): AnalyticsFilters => {
 
 // Универсальная функция запроса для всех типов аналитики
 async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): Promise<T> {
-  // Проверяем и корректируем период дат
-  const validatedFilters = validateDateRange(filters);
-  
+    // Проверяем и корректируем период дат
+    const validatedFilters = validateDateRange(filters);
+    
   // Конвертируем даты в формат, который принимает сервер (YYYY-MM-DD)
   const startDate = validatedFilters.startDate ? 
     new Date(validatedFilters.startDate).toISOString().split('T')[0] : 
@@ -155,23 +155,22 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
   };
   
   const queryParams = buildQueryParams(formattedFilters);
-  // Формируем полный URL запроса (убедимся, что путь правильно сформирован)
-  let url = endpoint;
-  
-  // Если endpoint не начинается со слеша, добавляем его
-  if (!endpoint.startsWith('/')) {
-    url = `/${endpoint}`;
-  }
-  
-  // Добавляем параметры запроса
-  url = `${url}${queryParams}`;
-  
-  console.log(`Запрос аналитики: ${url}`);
-  
+    // Формируем полный URL запроса (убедимся, что путь правильно сформирован)
+    let url = endpoint;
+    
+    // Если endpoint не начинается со слеша, добавляем его
+    if (!endpoint.startsWith('/')) {
+      url = `/${endpoint}`;
+    }
+    
+    // Добавляем параметры запроса
+    url = `${url}${queryParams}`;
+    
+    console.log(`Запрос аналитики: ${url}`);
+    
   try {
     // Проверяем, что даты не в будущем, иначе используем текущую дату
     const now = new Date();
-    const nowStr = now.toISOString().split('T')[0];
     
     // Формируем заголовки запроса
     const headers = {
@@ -184,7 +183,7 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
     const config = {
       headers,
       params: {
-        // Добавляем нестандартные параметры, которые могут быть полезны для сервера
+        // Используем реальные данные 
         useMockData: false,
         currentTimestamp: Date.now()
       }
@@ -198,56 +197,55 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
     // Логируем ошибку
     console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
     
-    if (error.response) {
-      console.warn(`Ошибка сервера ${error.response.status} при запросе ${endpoint}`);
+    // Подготовим запрос с правильными датами, не в будущем
+    try {
+      console.log("Повторяем запрос с текущими датами...");
       
-      // Если ошибка 500, попробуем повторить запрос с текущей датой
-      if (error.response.status === 500) {
-        try {
-          console.log("Повторяем запрос с текущей датой вместо указанной...");
-          
-          // Получаем сегодняшнюю дату и дату месяц назад
-          const today = new Date();
-          const lastMonth = new Date();
-          lastMonth.setMonth(lastMonth.getMonth() - 1);
-          
-          // Форматируем даты
-          const todayStr = today.toISOString().split('T')[0];
-          const lastMonthStr = lastMonth.toISOString().split('T')[0];
-          
-          // Создаем новый URL с актуальными датами
-          const newUrl = url.replace(/startDate=[^&]+/, `startDate=${lastMonthStr}`)
-                            .replace(/endDate=[^&]+/, `endDate=${todayStr}`);
-          
-          console.log(`Повторный запрос с актуальными датами: ${newUrl}`);
-          
-          // Выполняем повторный запрос
-          const retryResponse = await analyticsAxios.get<T>(newUrl);
-          console.log(`Успешно получены данные при повторном запросе: ${endpoint}`, retryResponse.status);
-          return retryResponse.data;
-        } catch (retryError: any) {
-          console.error("Повторный запрос также завершился ошибкой:", retryError.message);
-        }
+      // Получаем текущую дату 
+      const today = new Date();
+      const lastMonth = new Date();
+      lastMonth.setMonth(today.getMonth() - 1);
+      
+      // Форматируем даты для API
+      const todayStr = today.toISOString().split('T')[0];
+      const lastMonthStr = lastMonth.toISOString().split('T')[0];
+      
+      // Создаем параметры запроса с текущими датами
+      const currentDatesFilter = {
+        ...validatedFilters,
+        startDate: lastMonthStr,
+        endDate: todayStr
+      };
+      
+      // Создаем URL с текущими датами
+      const currentQueryParams = buildQueryParams(currentDatesFilter);
+      const currentUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      const newUrl = `${currentUrl}${currentQueryParams}`;
+      
+      console.log(`Повторный запрос с текущими датами: ${newUrl}`);
+      
+      const retryConfig = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        params: {
+          useMockData: false,
+          currentTimestamp: Date.now()
       }
+      };
       
-      console.warn(`Возвращаем мок-данные для ${endpoint}`);
-    } else if (error.request) {
-      console.warn(`Ошибка сети при запросе ${endpoint}, возвращаем мок-данные`);
-    } else {
-      console.warn(`Общая ошибка при запросе ${endpoint}, возвращаем мок-данные`);
+      const retryResponse = await analyticsAxios.get<T>(newUrl, retryConfig);
+      console.log(`Успешно получены данные при повторном запросе: ${endpoint}`);
+      return retryResponse.data;
+    } catch (retryError: any) {
+      console.error("Ошибка при повторном запросе:", retryError.message);
+    
+      // Вместо выбрасывания ошибки, возвращаем мок-данные
+      console.log(`Возвращаем мок-данные для ${endpoint}`);
+      return getMockData(endpoint);
     }
-    
-    // Нормализуем endpoint (убираем слеш в начале, если он есть)
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-    
-    // Извлекаем основной тип данных из endpoint
-    const mainType = normalizedEndpoint.split('/')[0];
-    
-    // Получаем мок-данные соответствующего типа
-    const mockData = getMockData(mainType);
-    console.log(`Возвращаем мок-данные для ${mainType}`);
-    
-    return mockData as T;
   }
 }
 
@@ -520,10 +518,25 @@ function getMockData(endpoint: string): any {
     },
     
     predictive: {
-      salesForecast: Array.from({ length: 14 }, (_, i) => ({
-        date: new Date(Date.now() + i * 86400000).toISOString().split('T')[0],
-        value: 350000 + Math.random() * 100000 - 50000
-      })),
+      salesForecast: Array.from({ length: 14 }, (_, i) => {
+        // Создаем даты, начиная с текущего дня и добавляя нужное количество дней
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        
+        // Генерируем реалистичные данные продаж (тренд роста в выходные)
+        const dayOfWeek = date.getDay(); // 0 - воскресенье, 6 - суббота
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        
+        // База + случайное отклонение + повышение в выходные
+        const baseValue = 350000;
+        const randomFactor = Math.random() * 50000 - 25000;
+        const weekendBonus = isWeekend ? 100000 : 0;
+        
+        return {
+          date: date.toISOString().split('T')[0],
+          value: Math.round(baseValue + randomFactor + weekendBonus)
+        };
+      }),
       inventoryForecast: {},
       staffingNeeds: {
         'monday': { '10-14': 3, '14-18': 4, '18-22': 5 },

@@ -156,9 +156,9 @@ const EditDishPage: NextPage = () => {
         }
         
         // Если обновление успешно или это демо-режим
-        console.log('Блюдо успешно обновлено:', updatedDish);
-        
-        // Показываем сообщение об успехе
+      console.log('Блюдо успешно обновлено:', updatedDish);
+      
+      // Показываем сообщение об успехе
         setSuccess(updatedDish.message || 'Блюдо успешно обновлено');
       
         // Очищаем кэш блюд
@@ -173,11 +173,11 @@ const EditDishPage: NextPage = () => {
         if (updatedDish.demo) {
           setSuccess(`${updatedDish.message || 'Блюдо обновлено локально'}. Изменения сохранены только на вашем устройстве.`);
         }
-        
-        // Задержка перед перенаправлением
-        setTimeout(() => {
-          router.push('/admin/menu');
-        }, 1500);
+      
+      // Задержка перед перенаправлением
+      setTimeout(() => {
+      router.push('/admin/menu');
+      }, 1500);
       } catch (apiError: any) {
         console.error('Ошибка при обновлении блюда через API:', apiError);
         throw new Error(apiError.message || 'Ошибка при обновлении блюда через API');
