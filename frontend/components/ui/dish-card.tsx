@@ -45,8 +45,10 @@ export const DishCard: React.FC<DishCardProps> = ({
         <Image
           src={image_url || '/images/dishes/default.jpg'}
           alt={name}
-          layout="fill"
-          objectFit="cover"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          style={{ objectFit: 'cover' }}
           className="transition-transform duration-300 hover:scale-105"
         />
       </div>
@@ -68,7 +70,7 @@ export const DishCard: React.FC<DishCardProps> = ({
             font-bold whitespace-nowrap
             ${isDark ? 'text-primary-400' : 'text-primary'}
           `}>
-            {price} {settings.currency_symbol}
+            {typeof price === 'number' ? price.toLocaleString() : price} {settings?.currency_symbol || '₸'}
           </span>
           {cartItem ? (
             <div className="flex items-center space-x-2">

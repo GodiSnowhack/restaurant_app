@@ -8,299 +8,638 @@ import {
   AnalyticsFilters
 } from '../../types/analytics';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Функция для получения базового URL для API
+const getApiBaseUrl = () => {
+  // Используем URL из переменной окружения, если он задан
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return `${process.env.NEXT_PUBLIC_API_URL}/analytics`;
+  }
+  
+  // Если мы на клиенте, определим baseURL на основе текущего хоста
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    return `http://${host}:8000/api/v1/analytics`;
+  }
+  
+  // По умолчанию возвращаем стандартный URL для локальной разработки
+  return 'http://localhost:8000/api/v1/analytics';
+};
 
-// API сервис для аналитики ресторана
-export const analyticsApi = {
-  // Получение финансовых метрик
-  async getFinancialMetrics(filters?: AnalyticsFilters): Promise<FinancialMetrics> {
-    try {
-      const response = await axios.get(`${API_URL}/api/v1/analytics/financial`, { params: filters });
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении финансовых метрик:', error);
-      // Возвращаем мок-данные для демонстрации
-      return {
-        totalRevenue: 1250000,
-        totalCost: 750000,
-        grossProfit: 500000,
-        profitMargin: 40,
-        averageOrderValue: 1500,
-        revenueByCategory: {
-          1: 300000,
-          2: 450000,
-          3: 250000,
-          4: 150000,
-          5: 100000
-        },
-        revenueByTimeOfDay: {
-          '12-14': 250000,
-          '14-16': 150000,
-          '16-18': 200000,
-          '18-20': 350000,
-          '20-22': 300000
-        },
-        revenueByDayOfWeek: {
-          'Понедельник': 150000,
-          'Вторник': 120000,
-          'Среда': 180000,
-          'Четверг': 200000,
-          'Пятница': 250000,
-          'Суббота': 300000,
-          'Воскресенье': 250000
-        },
-        revenueTrend: generateTimeSeriesData(30, 10000, 20000)
-      };
-    }
+// Базовый URL для всех API аналитики
+const API_BASE_URL = getApiBaseUrl();
+
+// Настройка Axios для запросов аналитики
+const analyticsAxios = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
   },
+  timeout: 20000 // Увеличиваем таймаут до 20 сек
+});
 
-  // Получение метрик по меню
-  async getMenuMetrics(filters?: AnalyticsFilters): Promise<MenuMetrics> {
-    try {
-      const response = await axios.get(`${API_URL}/api/v1/analytics/menu`, { params: filters });
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении метрик меню:', error);
-      // Возвращаем мок-данные для демонстрации
-      return {
-        topSellingDishes: [
-          { dishId: 1, dishName: 'Борщ', salesCount: 350, revenue: 105000, percentage: 15 },
-          { dishId: 2, dishName: 'Стейк Рибай', salesCount: 280, revenue: 196000, percentage: 12 },
-          { dishId: 3, dishName: 'Цезарь с курицей', salesCount: 250, revenue: 75000, percentage: 10 },
-          { dishId: 4, dishName: 'Паста Карбонара', salesCount: 230, revenue: 69000, percentage: 9 },
-          { dishId: 5, dishName: 'Тирамису', salesCount: 200, revenue: 60000, percentage: 8 }
-        ],
-        mostProfitableDishes: [
-          { dishId: 2, dishName: 'Стейк Рибай', salesCount: 280, revenue: 196000, percentage: 12, costPrice: 98000, profit: 98000, profitMargin: 50 },
-          { dishId: 7, dishName: 'Устрицы', salesCount: 150, revenue: 90000, percentage: 6, costPrice: 36000, profit: 54000, profitMargin: 60 },
-          { dishId: 9, dishName: 'Лобстер на гриле', salesCount: 100, revenue: 110000, percentage: 4, costPrice: 55000, profit: 55000, profitMargin: 50 },
-          { dishId: 8, dishName: 'Утка по-пекински', salesCount: 120, revenue: 72000, percentage: 5, costPrice: 36000, profit: 36000, profitMargin: 50 },
-          { dishId: 12, dishName: 'Чизкейк Нью-Йорк', salesCount: 180, revenue: 54000, percentage: 7, costPrice: 16200, profit: 37800, profitMargin: 70 }
-        ],
-        leastSellingDishes: [
-          { dishId: 20, dishName: 'Суп Том Ям', salesCount: 50, revenue: 15000, percentage: 2 },
-          { dishId: 21, dishName: 'Паэлья', salesCount: 45, revenue: 18000, percentage: 1.8 },
-          { dishId: 22, dishName: 'Гаспачо', salesCount: 40, revenue: 12000, percentage: 1.6 },
-          { dishId: 23, dishName: 'Осьминог на гриле', salesCount: 35, revenue: 24500, percentage: 1.4 },
-          { dishId: 24, dishName: 'Запеченный камамбер', salesCount: 30, revenue: 12000, percentage: 1.2 }
-        ],
-        averageCookingTime: 18,
-        categoryPopularity: {
-          1: 25, // Супы
-          2: 30, // Основные блюда
-          3: 15, // Салаты
-          4: 20, // Десерты
-          5: 10  // Напитки
-        },
-        menuItemSalesTrend: {
-          1: generateTimeSeriesData(30, 8, 16),  // Борщ
-          2: generateTimeSeriesData(30, 6, 12),  // Стейк Рибай
-          3: generateTimeSeriesData(30, 5, 11),  // Цезарь с курицей
-          4: generateTimeSeriesData(30, 5, 10),  // Паста Карбонара
-          5: generateTimeSeriesData(30, 4, 9)    // Тирамису
+// Добавляем токен авторизации к каждому запросу
+analyticsAxios.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Получение текущего диапазона дат
+const getDefaultDateRange = () => {
+  const today = new Date();
+  const oneMonthAgo = new Date(today);
+  oneMonthAgo.setMonth(today.getMonth() - 1);
+  
+  return {
+    startDate: oneMonthAgo.toISOString().split('T')[0],
+    endDate: today.toISOString().split('T')[0]
+  };
+};
+
+// Функция для преобразования параметров фильтрации в строку запроса
+const buildQueryParams = (filters?: AnalyticsFilters): string => {
+  if (!filters) {
+    // Если фильтры не указаны, используем текущий период
+    const defaultDates = getDefaultDateRange();
+    const params = new URLSearchParams();
+    params.append('startDate', defaultDates.startDate);
+    params.append('endDate', defaultDates.endDate);
+    return `?${params.toString()}`;
+  }
+  
+  const params = new URLSearchParams();
+  
+  // Если дата начала не указана или некорректная, используем текущий период
+  if (!filters.startDate || isNaN(Date.parse(filters.startDate))) {
+    const defaultDates = getDefaultDateRange();
+    params.append('startDate', defaultDates.startDate);
+  } else {
+    params.append('startDate', filters.startDate);
+  }
+  
+  // Если дата окончания не указана или некорректная, используем текущий период
+  if (!filters.endDate || isNaN(Date.parse(filters.endDate))) {
+    const defaultDates = getDefaultDateRange();
+    params.append('endDate', defaultDates.endDate);
+  } else {
+    params.append('endDate', filters.endDate);
+  }
+  
+  // Добавляем остальные параметры
+  if (filters.categoryId) params.append('categoryId', filters.categoryId.toString());
+  if (filters.dishId) params.append('dishId', filters.dishId.toString());
+  if (filters.userId) params.append('userId', filters.userId.toString());
+  if (filters.orderStatus) params.append('orderStatus', filters.orderStatus);
+  if (filters.timeSlot) params.append('timeSlot', filters.timeSlot);
+  if (filters.dayOfWeek) params.append('dayOfWeek', filters.dayOfWeek);
+  if (filters.limit) params.append('limit', filters.limit.toString());
+  
+  return params.toString() ? `?${params.toString()}` : '';
+};
+
+// Проверка периода дат на валидность и корректировка
+const validateDateRange = (filters?: AnalyticsFilters): AnalyticsFilters => {
+  // Если фильтры не переданы, возвращаем текущий период
+  if (!filters) {
+    return getDefaultDateRange();
+  }
+  
+  const result = { ...filters };
+  const defaultDates = getDefaultDateRange();
+  
+  // Проверяем дату начала
+  if (!filters.startDate || isNaN(Date.parse(filters.startDate))) {
+    console.warn('Некорректная дата начала или не указана, используем текущий период');
+    result.startDate = defaultDates.startDate;
+  }
+  
+  // Проверяем дату окончания
+  if (!filters.endDate || isNaN(Date.parse(filters.endDate))) {
+    console.warn('Некорректная дата окончания или не указана, используем текущий период');
+    result.endDate = defaultDates.endDate;
+  }
+  
+  // Проверяем, что дата начала не позже даты окончания
+  if (result.startDate && result.endDate && 
+      new Date(result.startDate).getTime() > new Date(result.endDate).getTime()) {
+    console.warn('Дата начала позже даты окончания, меняем их местами');
+    const temp = result.startDate;
+    result.startDate = result.endDate;
+    result.endDate = temp;
+  }
+  
+  return result;
+};
+
+// Универсальная функция запроса для всех типов аналитики
+async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): Promise<T> {
+  // Проверяем и корректируем период дат
+  const validatedFilters = validateDateRange(filters);
+  
+  // Конвертируем даты в формат, который принимает сервер (YYYY-MM-DD)
+  const startDate = validatedFilters.startDate ? 
+    new Date(validatedFilters.startDate).toISOString().split('T')[0] : 
+    getDefaultDateRange().startDate;
+  
+  const endDate = validatedFilters.endDate ? 
+    new Date(validatedFilters.endDate).toISOString().split('T')[0] : 
+    getDefaultDateRange().endDate;
+  
+  // Создаем новый объект фильтров с правильным форматом дат
+  const formattedFilters = {
+    ...validatedFilters,
+    startDate,
+    endDate
+  };
+  
+  const queryParams = buildQueryParams(formattedFilters);
+  // Формируем полный URL запроса (убедимся, что путь правильно сформирован)
+  let url = endpoint;
+  
+  // Если endpoint не начинается со слеша, добавляем его
+  if (!endpoint.startsWith('/')) {
+    url = `/${endpoint}`;
+  }
+  
+  // Добавляем параметры запроса
+  url = `${url}${queryParams}`;
+  
+  console.log(`Запрос аналитики: ${url}`);
+  
+  try {
+    // Проверяем, что даты не в будущем, иначе используем текущую дату
+    const now = new Date();
+    const nowStr = now.toISOString().split('T')[0];
+    
+    // Формируем заголовки запроса
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    };
+    
+    // Устанавливаем дополнительные параметры запроса
+    const config = {
+      headers,
+      params: {
+        // Добавляем нестандартные параметры, которые могут быть полезны для сервера
+        useMockData: false,
+        currentTimestamp: Date.now()
+      }
+    };
+    
+    // Выполняем запрос с конфигурацией
+    const response = await analyticsAxios.get<T>(url, config);
+    console.log(`Успешно получены данные: ${endpoint}`, response.status);
+    return response.data;
+  } catch (error: any) {
+    // Логируем ошибку
+    console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
+    
+    if (error.response) {
+      console.warn(`Ошибка сервера ${error.response.status} при запросе ${endpoint}`);
+      
+      // Если ошибка 500, попробуем повторить запрос с текущей датой
+      if (error.response.status === 500) {
+        try {
+          console.log("Повторяем запрос с текущей датой вместо указанной...");
+          
+          // Получаем сегодняшнюю дату и дату месяц назад
+          const today = new Date();
+          const lastMonth = new Date();
+          lastMonth.setMonth(lastMonth.getMonth() - 1);
+          
+          // Форматируем даты
+          const todayStr = today.toISOString().split('T')[0];
+          const lastMonthStr = lastMonth.toISOString().split('T')[0];
+          
+          // Создаем новый URL с актуальными датами
+          const newUrl = url.replace(/startDate=[^&]+/, `startDate=${lastMonthStr}`)
+                            .replace(/endDate=[^&]+/, `endDate=${todayStr}`);
+          
+          console.log(`Повторный запрос с актуальными датами: ${newUrl}`);
+          
+          // Выполняем повторный запрос
+          const retryResponse = await analyticsAxios.get<T>(newUrl);
+          console.log(`Успешно получены данные при повторном запросе: ${endpoint}`, retryResponse.status);
+          return retryResponse.data;
+        } catch (retryError: any) {
+          console.error("Повторный запрос также завершился ошибкой:", retryError.message);
         }
-      };
+      }
+      
+      console.warn(`Возвращаем мок-данные для ${endpoint}`);
+    } else if (error.request) {
+      console.warn(`Ошибка сети при запросе ${endpoint}, возвращаем мок-данные`);
+    } else {
+      console.warn(`Общая ошибка при запросе ${endpoint}, возвращаем мок-данные`);
     }
-  },
+    
+    // Нормализуем endpoint (убираем слеш в начале, если он есть)
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    
+    // Извлекаем основной тип данных из endpoint
+    const mainType = normalizedEndpoint.split('/')[0];
+    
+    // Получаем мок-данные соответствующего типа
+    const mockData = getMockData(mainType);
+    console.log(`Возвращаем мок-данные для ${mainType}`);
+    
+    return mockData as T;
+  }
+}
 
-  // Получение метрик по клиентам
+// Экспортируем функцию для доступа к мок-данным из других модулей
+export function getMockDataForTesting(endpoint: string): any {
+  return getMockData(endpoint);
+}
+
+// Функция для получения мок-данных в случае ошибки API
+function getMockData(endpoint: string): any {
+  console.log(`Возвращаем заглушку для ${endpoint}`);
+  
+  const defaultDateRange = getDefaultDateRange();
+  
+  // Базовые заглушки для каждого типа данных
+  const mockData: Record<string, any> = {
+    dashboard: {
+      summary: {
+        totalRevenue: 1250000,
+        totalOrders: 357,
+        averageCheck: 3500,
+        customersCount: 320
+      },
+      period: defaultDateRange
+    },
+    
+    financial: {
+      totalRevenue: 1250000,
+      totalCost: 750000,
+      grossProfit: 500000,
+      profitMargin: 40,
+      averageOrderValue: 3500,
+      orderCount: 357,
+      revenueByCategory: {
+        1: 350000,
+        2: 280000,
+        3: 210000,
+        4: 170000,
+        5: 140000
+      },
+      revenueByMonth: {
+        'Январь': 290000,
+        'Февраль': 310000,
+        'Март': 350000,
+        'Апрель': 300000
+      },
+      expensesByMonth: {
+        'Январь': 190000,
+        'Февраль': 180000,
+        'Март': 200000,
+        'Апрель': 180000
+      },
+      averageOrderValueByDay: {
+        '2025-04-25': 3450,
+        '2025-04-26': 3520,
+        '2025-04-27': 3480,
+        '2025-04-28': 3550,
+        '2025-04-29': 3600,
+        '2025-04-30': 3520,
+        '2025-05-01': 3480,
+        '2025-05-02': 3520
+      },
+      revenueChange: 5.8,
+      profitChange: 7.2,
+      averageOrderValueChange: 3.5,
+      orderCountChange: 12.4,
+      previousRevenue: 1180000,
+      previousProfit: 480000,
+      previousAverageOrderValue: 3380,
+      previousOrderCount: 318,
+      period: defaultDateRange
+    },
+    
+    menu: {
+      topSellingDishes: [
+        { dishId: 1, dishName: "Бургер Классический", salesCount: 85, revenue: 212500, profitMargin: 40 },
+        { dishId: 2, dishName: "Пицца Маргарита", salesCount: 78, revenue: 195000, profitMargin: 38 },
+        { dishId: 3, dishName: "Карбонара", salesCount: 70, revenue: 175000, profitMargin: 36 },
+        { dishId: 4, dishName: "Цезарь с курицей", salesCount: 62, revenue: 155000, profitMargin: 34 },
+        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 },
+        { dishId: 6, dishName: "Борщ", salesCount: 46, revenue: 92000, profitMargin: 30 },
+        { dishId: 7, dishName: "Пельмени", salesCount: 42, revenue: 105000, profitMargin: 32 },
+        { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, profitMargin: 44 },
+        { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, profitMargin: 46 },
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, profitMargin: 40 }
+      ],
+      
+      mostProfitableDishes: [
+        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, percentage: 10.8, costPrice: 156600, profit: 113400, profitMargin: 42 },
+        { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, percentage: 3.5, costPrice: 47250, profit: 40250, profitMargin: 46 },
+        { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, percentage: 7.6, costPrice: 106400, profit: 83600, profitMargin: 44 },
+        { dishId: 1, dishName: "Бургер Классический", salesCount: 85, revenue: 212500, percentage: 8.5, costPrice: 127500, profit: 85000, profitMargin: 40 },
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, percentage: 3.2, costPrice: 48000, profit: 32000, profitMargin: 40 },
+      ],
+      
+      leastSellingDishes: [
+        { dishId: 15, dishName: "Окрошка", salesCount: 12, revenue: 24000, percentage: 0.96 },
+        { dishId: 16, dishName: "Тар-тар из говядины", salesCount: 15, revenue: 60000, percentage: 2.4 },
+        { dishId: 17, dishName: "Паста с морепродуктами", salesCount: 18, revenue: 72000, percentage: 2.88 },
+        { dishId: 18, dishName: "Фуа-гра", salesCount: 20, revenue: 120000, percentage: 4.8 },
+        { dishId: 19, dishName: "Устрицы", salesCount: 22, revenue: 132000, percentage: 5.28 },
+      ],
+      
+      averageCookingTime: 18,
+      
+      categoryPopularity: {
+        1: 30, // Супы
+        2: 40, // Основные блюда
+        3: 15, // Салаты
+        4: 10, // Десерты
+        5: 5   // Напитки
+      },
+      
+      menuItemSalesTrend: {
+        1: [
+          { date: '2023-04-25', value: 12 },
+          { date: '2023-04-26', value: 14 },
+          { date: '2023-04-27', value: 10 },
+          { date: '2023-04-28', value: 15 },
+          { date: '2023-04-29', value: 16 },
+          { date: '2023-04-30', value: 18 },
+        ],
+        2: [
+          { date: '2023-04-25', value: 10 },
+          { date: '2023-04-26', value: 12 },
+          { date: '2023-04-27', value: 14 },
+          { date: '2023-04-28', value: 11 },
+          { date: '2023-04-29', value: 9 },
+          { date: '2023-04-30', value: 15 },
+        ]
+      },
+      
+      // Добавляем данные для производительности элементов меню (для матрицы BCG)
+      menuItemPerformance: [
+        { dishId: 1, dishName: "Бургер Классический", salesCount: 85, revenue: 212500, profitMargin: 40 },
+        { dishId: 2, dishName: "Пицца Маргарита", salesCount: 78, revenue: 195000, profitMargin: 38 },
+        { dishId: 3, dishName: "Карбонара", salesCount: 70, revenue: 175000, profitMargin: 36 },
+        { dishId: 4, dishName: "Цезарь с курицей", salesCount: 62, revenue: 155000, profitMargin: 34 },
+        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 },
+        { dishId: 6, dishName: "Борщ", salesCount: 46, revenue: 92000, profitMargin: 30 },
+        { dishId: 7, dishName: "Пельмени", salesCount: 42, revenue: 105000, profitMargin: 32 },
+        { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, profitMargin: 44 },
+        { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, profitMargin: 46 },
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, profitMargin: 40 }
+      ],
+      
+      // Добавляем данные о производительности категорий
+      categoryPerformance: {
+        "1": { // Супы
+          salesPercentage: 18.5,
+          averageOrderValue: 2500,
+          averageProfitMargin: 35
+        },
+        "2": { // Основные блюда
+          salesPercentage: 35.2,
+          averageOrderValue: 5200,
+          averageProfitMargin: 42
+        },
+        "3": { // Салаты
+          salesPercentage: 15.7,
+          averageOrderValue: 2200,
+          averageProfitMargin: 38
+        },
+        "4": { // Десерты
+          salesPercentage: 12.3,
+          averageOrderValue: 1800,
+          averageProfitMargin: 45
+        },
+        "5": { // Напитки
+          salesPercentage: 18.3,
+          averageOrderValue: 1200,
+          averageProfitMargin: 60
+        }
+      },
+      period: defaultDateRange
+    },
+    
+    customers: {
+      totalCustomers: 1200,
+      newCustomers: 180,
+      returningCustomers: 420,
+      customerRetentionRate: 35,
+      returnRate: 35,
+      averageVisitsPerCustomer: 2.8,
+      customerSatisfaction: 4.2,
+      foodRating: 4.3,
+      serviceRating: 4.0,
+      customerSegmentation: {},
+      newCustomersChange: 12.5,
+      returnRateChange: 3.2,
+      averageOrderValueChange: 5.8,
+      customerDemographics: {
+        age: {
+          '18-24': 15,
+          '25-34': 35,
+          '35-44': 25,
+          '45-54': 15,
+          '55+': 10
+        },
+        gender: {
+          'Мужчины': 45,
+          'Женщины': 55
+        }
+      },
+      visitTimes: {
+        'Утро (8-12)': 20,
+        'Обед (12-16)': 40,
+        'Вечер (16-20)': 30,
+        'Ночь (20-24)': 10
+      },
+      topCustomers: [
+        { userId: 1, fullName: "Иван Петров", email: "ivan@example.com", totalSpent: 58000, ordersCount: 12, averageRating: 4.8, lastVisit: "2025-04-25" },
+        { userId: 2, fullName: "Анна Сидорова", email: "anna@example.com", totalSpent: 52000, ordersCount: 10, averageRating: 4.5, lastVisit: "2025-04-28" },
+        { userId: 3, fullName: "Сергей Иванов", email: "sergey@example.com", totalSpent: 48000, ordersCount: 8, averageRating: 4.2, lastVisit: "2025-04-22" },
+        { userId: 4, fullName: "Ольга Смирнова", email: "olga@example.com", totalSpent: 43000, ordersCount: 7, averageRating: 4.0, lastVisit: "2025-04-27" },
+        { userId: 5, fullName: "Николай Козлов", email: "nikolay@example.com", totalSpent: 40000, ordersCount: 6, averageRating: 4.7, lastVisit: "2025-04-26" }
+      ],
+      period: defaultDateRange
+    },
+    
+    operational: {
+      averageOrderPreparationTime: 20.5,
+      averageTableTurnoverTime: 62.0,
+      tablesCount: 15,
+      averageTableUtilization: 72,
+      averageOrdersPerTable: 24,
+      tableUtilization: {
+        1: 85,
+        2: 90,
+        3: 75,
+        4: 80,
+        5: 95,
+        6: 70,
+        7: 65,
+        8: 75,
+        9: 80,
+        10: 85,
+        11: 55,
+        12: 60,
+        13: 45,
+        14: 50,
+        15: 65
+      },
+      peakHours: {
+        '12:00': 100,
+        '13:00': 95,
+        '14:00': 90,
+        '19:00': 85,
+        '20:00': 80
+      },
+      staffEfficiency: {
+        1: { name: "Анна", role: "Официант", averageServiceTime: 12.5, customersServed: 35, rating: 4.8 },
+        2: { name: "Иван", role: "Официант", averageServiceTime: 14.8, customersServed: 28, rating: 4.5 },
+        3: { name: "Мария", role: "Официант", averageServiceTime: 11.2, customersServed: 32, rating: 4.9 },
+        4: { name: "Алексей", role: "Официант", averageServiceTime: 15.5, customersServed: 25, rating: 4.2 },
+        5: { name: "Елена", role: "Официант", averageServiceTime: 13.0, customersServed: 30, rating: 4.6 },
+        6: { name: "Дмитрий", role: "Повар", averageServiceTime: 18.5, dishesCooked: 60, rating: 4.7 },
+        7: { name: "Светлана", role: "Повар", averageServiceTime: 17.0, dishesCooked: 55, rating: 4.8 },
+        8: { name: "Николай", role: "Повар", averageServiceTime: 20.5, dishesCooked: 45, rating: 4.3 }
+      },
+      orderCompletionRates: {
+        'В ожидании': 15.2,
+        'В обработке': 22.8,
+        'Готовится': 18.5,
+        'Готов к выдаче': 12.0,
+        'Завершён': 26.3,
+        'Отменен': 5.2
+      },
+      period: defaultDateRange
+    },
+    
+    predictive: {
+      salesForecast: Array.from({ length: 14 }, (_, i) => ({
+        date: new Date(Date.now() + i * 86400000).toISOString().split('T')[0],
+        value: 350000 + Math.random() * 100000 - 50000
+      })),
+      inventoryForecast: {},
+      staffingNeeds: {
+        'monday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'tuesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'wednesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'thursday': { '10-14': 4, '14-18': 5, '18-22': 6 },
+        'friday': { '10-14': 5, '14-18': 6, '18-22': 7 },
+        'saturday': { '10-14': 6, '14-18': 7, '18-22': 8 },
+        'sunday': { '10-14': 5, '14-18': 6, '18-22': 6 }
+      },
+      peakTimePrediction: {},
+      suggestedPromotions: [
+        {
+          dishId: 5,
+          dishName: "Фирменный стейк",
+          suggestedDiscount: 15,
+          potentialRevenue: 45000
+        },
+        {
+          dishId: 12,
+          dishName: "Салат Греческий",
+          suggestedDiscount: 10,
+          potentialRevenue: 28000
+        }
+      ],
+      period: defaultDateRange
+    }
+  };
+  
+  // Пробуем получить данные по типу, иначе возвращаем финансовые данные как запасной вариант
+  return mockData[endpoint] || 
+         mockData['financial'] || 
+         mockData['menu'] || 
+         mockData['customers'] || 
+         mockData['operational'] || 
+         mockData['predictive'] || 
+         mockData['dashboard'];
+}
+
+// API для аналитики
+const analyticsApi = {
+  async getFinancialMetrics(filters?: AnalyticsFilters): Promise<FinancialMetrics> {
+    console.log('Запрашиваем финансовые метрики с фильтрами:', filters);
+    return fetchAnalytics<FinancialMetrics>('financial', filters);
+  },
+  
+  async getMenuMetrics(filters?: AnalyticsFilters): Promise<MenuMetrics> {
+    console.log('Запрашиваем метрики меню с фильтрами:', filters);
+    return fetchAnalytics<MenuMetrics>('menu', filters);
+  },
+  
   async getCustomerMetrics(filters?: AnalyticsFilters): Promise<CustomerMetrics> {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/analytics/customers`, { params: filters });
-      return response.data;
+      // Запрашиваем базовые метрики клиентов
+      const baseCustomerData = await fetchAnalytics<CustomerMetrics>('customers', filters);
+      
+      // Запрашиваем дополнительные данные из dashboard-stats
+      let dashboardData: any = {};
+      try {
+        const response = await fetch('/api/admin/dashboard-stats', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          dashboardData = await response.json();
+        }
+      } catch (dashboardError) {
+        console.error('Ошибка при получении данных dashboard-stats:', dashboardError);
+      }
+      
+      // Обогащаем данные клиентов демографической информацией из dashboard-stats
+      const enrichedCustomerData: CustomerMetrics = {
+        ...baseCustomerData,
+        customerDemographics: {
+          ...baseCustomerData.customerDemographics,
+          age: dashboardData.customerDemographics?.age || baseCustomerData.customerDemographics?.age,
+          gender: dashboardData.customerDemographics?.gender || baseCustomerData.customerDemographics?.gender
+        },
+        visitFrequency: dashboardData.visitFrequency || baseCustomerData.visitFrequency
+      };
+      
+      return enrichedCustomerData;
     } catch (error) {
       console.error('Ошибка при получении метрик клиентов:', error);
-      // Возвращаем мок-данные для демонстрации
-      return {
-        totalCustomers: 3500,
-        newCustomers: 450,
-        returningCustomers: 3050,
-        customerRetentionRate: 87,
-        averageVisitsPerCustomer: 3.5,
-        customerSegmentation: {
-          'Новые': 15,
-          'Случайные': 25,
-          'Регулярные': 45,
-          'Лояльные': 15
-        },
-        topCustomers: [
-          { userId: 101, fullName: 'Иван Петров', email: 'ivan@example.com', totalSpent: 45000, ordersCount: 25, averageRating: 4.8, lastVisit: '2023-05-10' },
-          { userId: 102, fullName: 'Анна Сидорова', email: 'anna@example.com', totalSpent: 38000, ordersCount: 20, averageRating: 4.9, lastVisit: '2023-05-12' },
-          { userId: 103, fullName: 'Петр Иванов', email: 'petr@example.com', totalSpent: 35000, ordersCount: 18, averageRating: 4.7, lastVisit: '2023-05-11' },
-          { userId: 104, fullName: 'Елена Смирнова', email: 'elena@example.com', totalSpent: 32000, ordersCount: 16, averageRating: 4.6, lastVisit: '2023-05-05' },
-          { userId: 105, fullName: 'Алексей Козлов', email: 'alexey@example.com', totalSpent: 30000, ordersCount: 15, averageRating: 4.8, lastVisit: '2023-05-08' }
-        ],
-        customerSatisfaction: 4.7
-      };
+      throw error;
     }
   },
-
-  // Получение операционных метрик
+  
   async getOperationalMetrics(filters?: AnalyticsFilters): Promise<OperationalMetrics> {
-    try {
-      const response = await axios.get(`${API_URL}/api/v1/analytics/operational`, { params: filters });
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении операционных метрик:', error);
-      // Возвращаем мок-данные для демонстрации
-      return {
-        averageOrderPreparationTime: 22,
-        averageTableTurnoverTime: 95,
-        peakHours: {
-          '12-13': 70,
-          '13-14': 85,
-          '14-15': 75,
-          '18-19': 80,
-          '19-20': 95,
-          '20-21': 90,
-          '21-22': 65
-        },
-        staffEfficiency: {
-          1: { userId: 1, userName: 'Сергей Иванов', ordersServed: 450, averageOrderValue: 1800, averageServiceTime: 35, customerRating: 4.8 },
-          2: { userId: 2, userName: 'Ольга Петрова', ordersServed: 420, averageOrderValue: 1750, averageServiceTime: 38, customerRating: 4.7 },
-          3: { userId: 3, userName: 'Алексей Сидоров', ordersServed: 410, averageOrderValue: 1950, averageServiceTime: 32, customerRating: 4.9 },
-          4: { userId: 4, userName: 'Мария Кузнецова', ordersServed: 380, averageOrderValue: 1700, averageServiceTime: 40, customerRating: 4.6 },
-          5: { userId: 5, userName: 'Дмитрий Соколов', ordersServed: 360, averageOrderValue: 1600, averageServiceTime: 42, customerRating: 4.5 }
-        },
-        tableUtilization: {
-          1: 85,
-          2: 80,
-          3: 75,
-          4: 90,
-          5: 95,
-          6: 70,
-          7: 65,
-          8: 85,
-          9: 80,
-          10: 70
-        },
-        orderCompletionRates: {
-          'Принят': 100,
-          'Готовится': 95,
-          'Готов': 92,
-          'Доставлен': 90,
-          'Оплачен': 88,
-          'Отменен': 12
-        }
-      };
-    }
+    console.log('Запрашиваем операционные метрики с фильтрами:', filters);
+    return fetchAnalytics<OperationalMetrics>('operational', filters);
   },
-
-  // Получение предиктивных метрик
+  
   async getPredictiveMetrics(filters?: AnalyticsFilters): Promise<PredictiveMetrics> {
-    try {
-      const response = await axios.get(`${API_URL}/api/v1/analytics/predictive`, { params: filters });
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении предиктивных метрик:', error);
-      // Возвращаем мок-данные для демонстрации
-      return {
-        salesForecast: generateTimeSeriesData(30, 15000, 25000),
-        inventoryForecast: {
-          101: 50,  // Говядина (кг)
-          102: 30,  // Свинина (кг)
-          103: 25,  // Курица (кг)
-          104: 20,  // Лосось (кг)
-          105: 15,  // Креветки (кг)
-          106: 40,  // Картофель (кг)
-          107: 25,  // Помидоры (кг)
-          108: 15   // Сыр (кг)
-        },
-        staffingNeeds: {
-          'Понедельник': {
-            '10-12': 3,
-            '12-14': 5,
-            '14-16': 4,
-            '16-18': 3,
-            '18-20': 6,
-            '20-22': 5
-          },
-          'Вторник': {
-            '10-12': 3,
-            '12-14': 4,
-            '14-16': 4,
-            '16-18': 3,
-            '18-20': 5,
-            '20-22': 4
-          },
-          'Среда': {
-            '10-12': 3,
-            '12-14': 5,
-            '14-16': 4,
-            '16-18': 3,
-            '18-20': 6,
-            '20-22': 5
-          },
-          'Четверг': {
-            '10-12': 4,
-            '12-14': 5,
-            '14-16': 4,
-            '16-18': 4,
-            '18-20': 7,
-            '20-22': 6
-          },
-          'Пятница': {
-            '10-12': 4,
-            '12-14': 6,
-            '14-16': 5,
-            '16-18': 5,
-            '18-20': 8,
-            '20-22': 7
-          },
-          'Суббота': {
-            '10-12': 5,
-            '12-14': 7,
-            '14-16': 6,
-            '16-18': 6,
-            '18-20': 9,
-            '20-22': 8
-          },
-          'Воскресенье': {
-            '10-12': 5,
-            '12-14': 7,
-            '14-16': 6,
-            '16-18': 5,
-            '18-20': 8,
-            '20-22': 7
-          }
-        },
-        peakTimePrediction: {
-          'Понедельник': ['13:00-14:00', '19:00-20:00'],
-          'Вторник': ['13:00-14:00', '19:00-20:00'],
-          'Среда': ['13:00-14:00', '19:00-20:00'],
-          'Четверг': ['13:00-14:00', '19:00-21:00'],
-          'Пятница': ['13:00-14:00', '19:00-22:00'],
-          'Суббота': ['13:00-15:00', '18:00-22:00'],
-          'Воскресенье': ['12:00-15:00', '18:00-21:00']
-        },
-        suggestedPromotions: [
-          { dishId: 20, dishName: 'Суп Том Ям', reason: 'Низкие продажи, высокая маржа', suggestedDiscount: 15, potentialRevenue: 25000 },
-          { dishId: 21, dishName: 'Паэлья', reason: 'Низкие продажи, высокая маржа', suggestedDiscount: 10, potentialRevenue: 22000 },
-          { dishId: 5, dishName: 'Тирамису', reason: 'Высокий спрос, возможность увеличения среднего чека', suggestedDiscount: 5, potentialRevenue: 35000 },
-          { dishId: 12, dishName: 'Чизкейк Нью-Йорк', reason: 'Высокая маржа, комплиментарное предложение', suggestedDiscount: 10, potentialRevenue: 28000 },
-          { dishId: 15, dishName: 'Домашнее вино', reason: 'Увеличение среднего чека', suggestedDiscount: 15, potentialRevenue: 40000 }
-        ]
-      };
-    }
+    console.log('Запрашиваем предиктивные метрики с фильтрами:', filters);
+    return fetchAnalytics<PredictiveMetrics>('predictive', filters);
+  },
+  
+  async getDashboardStats(): Promise<any> {
+    return fetchAnalytics<any>('dashboard');
+  },
+  
+  async getTopDishes(limit: number = 10): Promise<any> {
+    return fetchAnalytics<any>('menu/top', { limit });
+  },
+  
+  async getSalesStatistics(startDate?: string, endDate?: string): Promise<any> {
+    return fetchAnalytics<any>('sales', { startDate, endDate });
+  },
+  
+  async getRevenueByCategory(startDate?: string, endDate?: string): Promise<any> {
+    return fetchAnalytics<any>('revenue/category', { startDate, endDate });
   }
 };
 
-// Вспомогательная функция для генерации временных рядов
-function generateTimeSeriesData(days: number, min: number, max: number) {
-  const data = [];
-  const today = new Date();
-  
-  for (let i = 0; i < days; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - (days - i));
-    
-    const value = Math.floor(Math.random() * (max - min + 1)) + min;
-    
-    data.push({
-      date: date.toISOString().split('T')[0],
-      value
-    });
-  }
-  
-  return data;
-} 
+export default analyticsApi; 

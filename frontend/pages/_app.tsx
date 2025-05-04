@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import '../styles/globals.css';
 import useAuthStore from '../lib/auth-store';
 import useSettingsStore from '../lib/settings-store';
+import useReservationsStore from '../lib/reservations-store';
 import { SettingsProvider } from '../settings-context';
 import dynamic from 'next/dynamic';
 import { ThemeProvider } from '../lib/theme-context';
@@ -67,6 +68,18 @@ const getAppToken = (): string | null => {
   return null;
 };
 
+// Список публичных маршрутов для гостей (доступны без авторизации)
+export const PUBLIC_ROUTES = [
+  '/auth/login', 
+  '/auth/register', 
+  '/', 
+  '/menu', 
+  '/menu/[id]', 
+  '/cart',
+  '/reservations',
+  '/checkout'
+];
+
 // Указываем Next.js использовать динамический рендеринг для всего приложения
 export const renderMode = 'force-dynamic';
 
@@ -87,45 +100,64 @@ export default function App({ Component, pageProps }: AppProps) {
       const token = getAppToken();
       // Если есть токен, считаем пользователя предварительно авторизованным
       if (token) {
+        console.log('App: Токен найден, устанавливаем начальное состояние авторизации');
         setInitialAuthState(true, token);
+      } else {
+        console.log('App: Токен не найден');
       }
     }
   }, [setInitialAuthState]);
+  
+  // Отдельный эффект для загрузки профиля пользователя
+  useEffect(() => {
+    if (!isClient) return;
+    
+    // Загружаем профиль только если пользователь авторизован, но профиль еще не загружен
+    if (isAuthenticated && !user && typeof window !== 'undefined') {
+      const token = getAppToken();
+      if (token) {
+        console.log('App: Загружаем профиль пользователя');
+        fetchUserProfile();
+      }
+    }
+  }, [isClient, isAuthenticated, user, fetchUserProfile]);
   
   // Загрузка профиля и настроек без блокировки UI
   useEffect(() => {
     if (!isClient) return;
     
     const loadUserData = async () => {
-      const token = getAppToken();
-      
       // Загружаем настройки без ожидания
       loadSettings();
       
-      // Загружаем профиль пользователя, если есть токен
-      if (token) {
+      // Инициализируем хранилище бронирований с помощью getState().init()
+      if (typeof window !== 'undefined') {
         try {
-          await fetchUserProfile();
+          const reservationsStore = useReservationsStore.getState();
+          if (typeof reservationsStore.init === 'function') {
+            reservationsStore.init();
+          } else {
+            console.log('Метод init не найден в хранилище бронирований');
+          }
         } catch (error) {
-          console.error('Ошибка при загрузке профиля:', error);
-          // Не блокируем UI при ошибке
+          console.error('Ошибка при инициализации хранилища бронирований:', error);
         }
       }
     };
     
     loadUserData();
     
-    // Быстрая проверка каждые 30 секунд без блокировки UI
+    // Проверка профиля раз в 5 минут, а не каждые 30 секунд
     const intervalCheck = setInterval(() => {
-      if (getAppToken()) {
+      if (getAppToken() && isAuthenticated) {
         fetchUserProfile().catch(e => {
           console.error('Ошибка фоновой проверки профиля:', e);
         });
       }
-    }, 30000);
+    }, 300000); // 5 минут вместо 30 секунд
     
     return () => clearInterval(intervalCheck);
-  }, [isClient, fetchUserProfile, loadSettings]);
+  }, [isClient, isAuthenticated, fetchUserProfile, loadSettings]);
   
   // Проверяем, имеет ли пользователь роль админа для отображения отладчика
   useEffect(() => {
@@ -144,28 +176,30 @@ export default function App({ Component, pageProps }: AppProps) {
       setPreviousPath(router.pathname);
     };
     
+    // Перехватываем ошибки маршрутизации
+    const handleRouteError = (err: Error, url: string) => {
+      console.error(`Ошибка при навигации на ${url}:`, err);
+      
+      // Проверяем, является ли это ошибкой прерывания загрузки компонента
+      if (err.message.includes('Abort fetching component')) {
+        console.log('Перехвачена ошибка прерывания загрузки компонента. Продолжаем работу приложения.');
+        // Предотвращаем дальнейшее распространение ошибки
+        return;
+      }
+    };
+    
     router.events.on('routeChangeStart', handleRouteChange);
+    router.events.on('routeChangeError', handleRouteError);
     
     return () => {
       router.events.off('routeChangeStart', handleRouteChange);
+      router.events.off('routeChangeError', handleRouteError);
     };
   }, [router, isClient]);
   
   // Проверяем доступ к защищенным маршрутам
   useEffect(() => {
     if (!isClient) return;
-    
-    // Расширяем список публичных маршрутов для гостей
-    const publicRoutes = [
-      '/auth/login', 
-      '/auth/register', 
-      '/', 
-      '/menu', 
-      '/menu/[id]', 
-      '/cart',
-      '/reservations',
-      '/checkout'
-    ];
     
     const adminRoutes = ['/admin', '/admin/users', '/admin/orders', '/admin/settings', '/admin/menu', '/admin/reservations'];
     const waiterRoutes = ['/waiter', '/waiter/scan', '/waiter/orders', '/waiter/orders/[id]'];
@@ -192,7 +226,7 @@ export default function App({ Component, pageProps }: AppProps) {
     // Перенаправляем на авторизацию только если пользователь пытается открыть защищенный роут
     // и точно не авторизован (нет токена)
     if (!isAuthenticated && 
-        !publicRoutes.includes(path) && 
+        !PUBLIC_ROUTES.includes(path) && 
         !path.startsWith('/menu/') && 
         !getAppToken() && 
         path !== '/auth/login' && 
@@ -225,7 +259,10 @@ export default function App({ Component, pageProps }: AppProps) {
             <Head>
               <meta name="viewport" content="width=device-width, initial-scale=1" />
             </Head>
-            <Component {...pageProps} />
+            <div suppressHydrationWarning>
+              {/* В режиме SSR не рендерим компоненты, которые должны работать только на клиенте */}
+              {null}
+            </div>
           </SessionProvider>
         </ThemeProvider>
       </SettingsProvider>
@@ -239,9 +276,11 @@ export default function App({ Component, pageProps }: AppProps) {
           <Head>
             <meta name="viewport" content="width=device-width, initial-scale=1" />
           </Head>
-          <Component {...pageProps} />
-          {renderAuthDebugger()}
-          {isMobileDevice && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
+          <div suppressHydrationWarning>
+            <Component {...pageProps} />
+            {renderAuthDebugger()}
+            {isMobileDevice && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
+          </div>
         </SessionProvider>
       </ThemeProvider>
     </SettingsProvider>

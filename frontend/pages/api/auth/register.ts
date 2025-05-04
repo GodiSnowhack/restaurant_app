@@ -1,10 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import axios from 'axios';
 
 // Обработчик API запроса для регистрации пользователя
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Настройка CORS заголовков
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+  
+  // Обработка предварительных запросов OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Проверяем, что метод запроса - POST
   if (req.method !== 'POST') {
     return res.status(405).json({ detail: 'Метод не разрешен' });
@@ -12,16 +27,16 @@ export default async function handler(
 
   try {
     // Получаем данные из запроса
-    const { email, password, name } = req.body;
+    const { email, password, full_name, phone, role } = req.body;
 
     // Проверяем наличие всех необходимых полей
-    if (!email || !password || !name) {
+    if (!email || !password || !full_name) {
       return res.status(400).json({ 
         detail: 'Отсутствуют обязательные поля',
         errors: [
           { loc: ['body', 'email'], msg: 'Это поле обязательно', type: 'value_error.missing' },
           { loc: ['body', 'password'], msg: 'Это поле обязательно', type: 'value_error.missing' },
-          { loc: ['body', 'name'], msg: 'Это поле обязательно', type: 'value_error.missing' }
+          { loc: ['body', 'full_name'], msg: 'Это поле обязательно', type: 'value_error.missing' }
         ].filter(err => !req.body[err.loc[1]])
       });
     }
@@ -33,8 +48,9 @@ export default async function handler(
     const userData = {
       email,
       password,
-      full_name: name,
-      role: 'client'
+      full_name,
+      phone,
+      role: role || 'client'
     };
 
     console.log('Отправка данных для регистрации:', { 
@@ -42,65 +58,93 @@ export default async function handler(
       password: '********' // Маскируем пароль в логах
     });
     
-    // Отправляем POST запрос на бэкенд для создания пользователя
-    const response = await fetch(`${backendUrl}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
-
-    // Получаем результат в формате JSON
-    const data = await response.json();
-
-    // Проверяем статус ответа
-    if (!response.ok) {
-      // Логируем ошибку для отладки
-      console.error('Ошибка регистрации пользователя:', {
-        status: response.status,
-        statusText: response.statusText,
-        data
+    try {
+      // Отправляем POST запрос на бэкенд для создания пользователя
+      const response = await axios.post(`${backendUrl}/auth/register`, userData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' 
+        },
+        timeout: 10000, // Таймаут 10 секунд
       });
 
-      // Обрабатываем различные статусы ошибок
-      if (response.status === 422) {
-        // Ошибка валидации данных - возвращаем детали ошибки
-        return res.status(422).json({
-          detail: 'Ошибка валидации данных',
-          errors: Array.isArray(data.detail) ? data.detail : [data.detail]
+      // Успешный ответ с данными пользователя
+      return res.status(201).json({
+        id: response.data.id,
+        email: response.data.email,
+        full_name: response.data.full_name,
+        role: response.data.role,
+        message: 'Пользователь успешно зарегистрирован'
+      });
+    } catch (axiosError: any) {
+      // Расширенное логирование ошибки для отладки
+      console.error('Ошибка регистрации пользователя:', {
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data,
+        error: axiosError.message,
+        stack: axiosError.stack?.split('\n').slice(0, 3).join('\n'),
+        config: {
+          url: axiosError.config?.url,
+          method: axiosError.config?.method,
+          headers: axiosError.config?.headers
+        }
+      });
+
+      // Если есть ответ от сервера
+      if (axiosError.response) {
+        // Обрабатываем различные статусы ошибок
+        if (axiosError.response.status === 422) {
+          // Ошибка валидации данных - возвращаем детали ошибки
+          return res.status(422).json({
+            detail: 'Ошибка валидации данных',
+            errors: Array.isArray(axiosError.response.data.detail) 
+              ? axiosError.response.data.detail 
+              : [axiosError.response.data.detail],
+            original: axiosError.response.data
+          });
+        } else if (axiosError.response.status === 400 && axiosError.response.data.detail?.includes('уже существует')) {
+          // Пользователь с таким email уже существует
+          return res.status(409).json({
+            detail: 'Пользователь с таким email уже существует',
+            original: axiosError.response.data
+          });
+        } else if (axiosError.response.status === 503) {
+          // Сервер недоступен
+          return res.status(503).json({
+            detail: 'Сервер временно недоступен. Пожалуйста, попробуйте позже.',
+            original: axiosError.response.data
+          });
+        }
+
+        // Общая ошибка с сервера - возвращаем оригинальные данные и статус
+        return res.status(axiosError.response.status || 500).json({
+          detail: axiosError.response.data?.detail || 'Произошла ошибка при регистрации',
+          message: axiosError.message,
+          original: axiosError.response.data
         });
-      } else if (response.status === 400 && data.detail?.includes('уже существует')) {
-        // Пользователь с таким email уже существует
-        return res.status(409).json({
-          detail: 'Пользователь с таким email уже существует'
-        });
-      } else if (response.status === 503) {
-        // Сервер недоступен
+      } else if (axiosError.request) {
+        // Запрос был сделан, но не получен ответ
+        console.error('Нет ответа от сервера:', axiosError.request);
         return res.status(503).json({
-          detail: 'Сервер временно недоступен. Пожалуйста, попробуйте позже.'
+          detail: 'Нет ответа от сервера. Пожалуйста, проверьте подключение или повторите позже.',
+          message: axiosError.message
+        });
+      } else {
+        // Ошибка при настройке запроса
+        console.error('Ошибка при настройке запроса:', axiosError.message);
+        return res.status(500).json({
+          detail: 'Ошибка при отправке запроса: ' + axiosError.message,
+          message: axiosError.message,
+          stack: axiosError.stack?.split('\n').slice(0, 3).join('\n')
         });
       }
-
-      // Общая ошибка
-      return res.status(500).json({
-        detail: data.detail || 'Произошла ошибка при регистрации'
-      });
     }
-
-    // Успешный ответ с данными пользователя
-    return res.status(201).json({
-      id: data.id,
-      email: data.email,
-      full_name: data.full_name,
-      role: data.role,
-      message: 'Пользователь успешно зарегистрирован'
-    });
-  } catch (error) {
+  } catch (error: any) {
     // Обработка непредвиденных ошибок
     console.error('Непредвиденная ошибка при регистрации:', error);
     return res.status(500).json({
-      detail: 'Внутренняя ошибка сервера'
+      detail: 'Внутренняя ошибка сервера: ' + (error.message || 'Неизвестная ошибка')
     });
   }
 } 

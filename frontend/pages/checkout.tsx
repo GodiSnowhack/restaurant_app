@@ -7,8 +7,9 @@ import useCartStore from '../lib/cart-store';
 import useAuthStore from '../lib/auth-store';
 import {CheckCircleIcon, CreditCardIcon, BanknotesIcon as CashIcon, UserIcon, PhoneIcon, ClockIcon, KeyIcon, ExclamationTriangleIcon as ExclamationCircleIcon, InformationCircleIcon, MapPinIcon as LocationMarkerIcon} from '@heroicons/react/24/outline';
 import {formatPrice} from '../utils/priceFormatter';
-import { ordersApi, settingsApi, assignWaiterToOrder } from '../lib/api';
+import { ordersApi, settingsApi, assignWaiterToOrder } from '../lib/api/';
 import {toast} from 'react-hot-toast';
+import useReservationsStore from '../lib/reservations-store';
 
 // Тип для столов ресторана
 interface RestaurantTable {
@@ -25,6 +26,7 @@ const CheckoutPage: NextPage = () => {
   const router = useRouter();
   const { items, totalPrice, clearCart, reservationCode } = useCartStore();
   const { isAuthenticated, user } = useAuthStore();
+  const { verifyReservationCode } = useReservationsStore();
   const [orderType, setOrderType] = useState<'dine-in'>('dine-in');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -63,19 +65,6 @@ const CheckoutPage: NextPage = () => {
   // Добавим состояние для кода официанта
   const [waiterCode, setWaiterCode] = useState('');
   const [waiterAssigned, setWaiterAssigned] = useState(false);
-
-  // Добавляем локальную функцию для проверки кода резервации
-  const verifyReservationCode = async (code: string) => {
-    try {
-      // Проверяем код бронирования так же, как и на странице корзины
-      // Для простоты считаем код действительным, если его длина равна 7 или 8 символов
-      // Это имитирует поведение в корзине
-      return { valid: code.length >= 7 && code.length <= 8, tableNumber: 12, time: new Date() };
-    } catch (error) {
-      console.error('Ошибка при проверке кода бронирования:', error);
-      return { valid: false, tableNumber: null, time: null };
-    }
-  };
 
   useEffect(() => {
     // Проверка авторизации
@@ -139,13 +128,20 @@ const CheckoutPage: NextPage = () => {
     setIsReservationCodeValid(null);
     
     try {
-      const isValid = await verifyReservationCode(code);
-      setIsReservationCodeValid(isValid.valid);
-      if (isValid.valid) {
-        setTableNumber(isValid.tableNumber);
+      const result = await verifyReservationCode(code);
+      setIsReservationCodeValid(result.valid);
+      
+      if (result.valid) {
+        // Устанавливаем номер стола из бронирования
+        if (result.tableNumber) {
+          setTableNumber(result.tableNumber);
+          console.log(`Установлен номер стола из бронирования: ${result.tableNumber}`);
+        } else {
+          console.log('Для бронирования не указан номер стола');
+        }
         setReservationCodeError('');
       } else {
-        setReservationCodeError('Недействительный код бронирования');
+        setReservationCodeError(result.message || 'Недействительный код бронирования');
       }
     } catch (error) {
       setIsReservationCodeValid(false);
@@ -240,9 +236,10 @@ const CheckoutPage: NextPage = () => {
         orderData.reservation_code = reservationCode;
       }
       
-      // Добавляем номер столика, если он выбран
+      // Добавляем номер столика, если он выбран или получен из бронирования
       if (tableNumber) {
         orderData.table_number = tableNumber;
+        console.log(`Добавляем номер столика в заказ: ${tableNumber}`);
       }
       
       // Отправляем заказ на сервер

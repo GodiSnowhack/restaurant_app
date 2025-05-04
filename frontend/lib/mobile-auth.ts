@@ -109,6 +109,11 @@ export const directLogin = async (
           try {
             localStorage.setItem('token', data.access_token);
             sessionStorage.setItem('token', data.access_token);
+            // Сохраняем refresh_token, если он есть
+            if (data.refresh_token) {
+              localStorage.setItem('refresh_token', data.refresh_token);
+              console.log('MobileAuth: Сохранен refresh_token');
+            }
             localStorage.setItem('auth_timestamp', Date.now().toString());
             localStorage.setItem('auth_method', `direct_${i + 1}`);
           } catch (e) {
@@ -155,6 +160,11 @@ export const directLogin = async (
         try {
           localStorage.setItem('token', proxyData.access_token);
           sessionStorage.setItem('token', proxyData.access_token);
+          // Сохраняем refresh_token, если он есть
+          if (proxyData.refresh_token) {
+            localStorage.setItem('refresh_token', proxyData.refresh_token);
+            console.log('MobileAuth: Сохранен refresh_token из прокси');
+          }
           localStorage.setItem('auth_timestamp', Date.now().toString());
           localStorage.setItem('auth_method', 'proxy');
         } catch (e) {
@@ -205,6 +215,17 @@ export const checkServerAvailability = async (): Promise<boolean> => {
     
     const data = await response.json();
     console.log('MobileAuth: Результат проверки сервера:', data.success);
+    
+    // Проверяем, есть ли refresh_token в ответе и сохраняем его
+    if (data.refreshToken && data.refreshToken.generate && data.refreshToken.token) {
+      console.log('MobileAuth: Получен refresh_token из ping API');
+      
+      // Если в localStorage нет refresh_token, сохраняем полученный
+      if (!localStorage.getItem('refresh_token')) {
+        localStorage.setItem('refresh_token', data.refreshToken.token);
+        console.log('MobileAuth: Сохранен refresh_token из ping API');
+      }
+    }
     
     return !!data.success;
   } catch (error) {

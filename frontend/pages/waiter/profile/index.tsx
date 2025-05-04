@@ -10,8 +10,16 @@ import {
   EnvelopeIcon, 
   PhoneIcon,
   CalendarIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  StarIcon
 } from '@heroicons/react/24/outline';
+import dynamic from 'next/dynamic';
+
+// Динамически импортируем компонент с отзывами для лучшей производительности
+const WaiterReviews = dynamic(() => import('../../../components/waiter/WaiterReviews'), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-40 rounded-lg"></div>,
+  ssr: false
+});
 
 const WaiterProfilePage: NextPage = () => {
   const router = useRouter();
@@ -116,6 +124,18 @@ const WaiterProfilePage: NextPage = () => {
             Изменить пароль
           </Link>
         </div>
+      </div>
+
+      {/* Отзывы об официанте */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="flex items-center mb-4">
+          <StarIcon className="h-6 w-6 text-yellow-500 mr-2" />
+          <h2 className="text-xl font-semibold">Мои отзывы</h2>
+        </div>
+        
+        {user && user.id && (
+          <WaiterReviews waiterId={user.id} />
+        )}
       </div>
 
       <button

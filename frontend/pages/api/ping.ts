@@ -1,22 +1,38 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
 
 /**
- * API-эндпоинт для проверки соединения с сервером
- * Обеспечивает полную диагностику проблем соединения с бэкендом
+ * API-эндпоинт для проверки доступности сервера
  */
-export default async function pingHandler(req: NextApiRequest, res: NextApiResponse) {
-  // Разрешаем любые методы для этого простого эндпоинта
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Устанавливаем CORS заголовки
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-  // Если это предварительный запрос OPTIONS, возвращаем 200 OK
+  // Обрабатываем предварительные запросы CORS
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
-  // Для HEAD и GET запросов возвращаем простой статус
-  return res.status(200).json({ status: 'ok', message: 'pong' });
+  try {
+    // Отправляем ответ с информацией о статусе сервера
+    res.status(200).json({
+      success: true,
+      message: 'Сервер доступен',
+      timestamp: new Date().toISOString(),
+      server: 'NextJS API'
+    });
+  } catch (error) {
+    console.error('Ошибка при проверке сервера:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 } 

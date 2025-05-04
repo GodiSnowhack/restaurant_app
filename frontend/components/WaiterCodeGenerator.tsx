@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { generateWaiterCode } from '../lib/api';
+import { generateWaiterCode } from '../lib/api/';
 import { toast } from 'react-hot-toast';
 import { ClipboardIcon, CheckIcon, TrashIcon } from '@heroicons/react/24/outline';
 import useWaiterCodesStore, { WaiterCode } from '../lib/waiter-codes-store';

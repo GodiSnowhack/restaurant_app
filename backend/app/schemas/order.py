@@ -5,6 +5,8 @@ from enum import Enum
 
 from app.models.order import OrderStatus, PaymentStatus
 from app.schemas.menu import DishShortResponse
+from .order_item import OrderItem
+from .payment import Payment
 
 
 # Схемы для элементов заказа
@@ -44,18 +46,19 @@ class OrderBase(BaseModel):
     comment: Optional[str] = None
     is_urgent: Optional[bool] = False
     is_group_order: Optional[bool] = False
-    order_type: Optional[str] = "dine-in"
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     reservation_code: Optional[str] = None
     order_code: Optional[str] = None
+    customer_age_group: Optional[str] = None
+    customer_gender: Optional[str] = None
 
 
 class OrderCreate(OrderBase):
-    items: Optional[List[OrderItemCreate]] = []
+    items: Optional[List[OrderItemCreate]] = Field(default_factory=list, description="Список блюд в заказе")
 
 
-class OrderUpdate(BaseModel):
+class OrderUpdate(OrderBase):
     user_id: Optional[int] = None
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
@@ -66,7 +69,6 @@ class OrderUpdate(BaseModel):
     comment: Optional[str] = None
     is_urgent: Optional[bool] = None
     is_group_order: Optional[bool] = None
-    order_type: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     reservation_code: Optional[str] = None
@@ -96,17 +98,17 @@ class UserBasic(BaseModel):
 class Order(OrderBase):
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime
     completed_at: Optional[datetime] = None
     user: Optional[UserBasic] = None
-    items: Optional[List[OrderItemInDB]] = []
+    items: List[OrderItem] = []
+    payments: List[Payment] = []
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
     user_id: Optional[int] = None
 
     class Config:
-        from_attributes = True
-        extra = "allow"
+        orm_mode = True
 
 
 # Класс для обратной совместимости
@@ -156,9 +158,14 @@ class PaymentStatus(str, Enum):
 
 class OrderItem(OrderItemBase):
     id: int
-    order_id: int
-    dish_name: str
+    order_id: Optional[int] = None
+    dish_id: int
+    dish_name: Optional[str] = None
     dish_image: Optional[str] = None
+    price: float
+    quantity: int = 1
+    special_instructions: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -170,29 +177,21 @@ class OrderResponse(BaseModel):
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
     status: str = "pending"
-    order_status: Optional[str] = None
     payment_status: str = "pending"
     payment_method: Optional[str] = None
-    special_instructions: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    total_price: float = 0.0
-    total: Optional[float] = None
-    total_amount: Optional[float] = None
-    total_sum: Optional[float] = None
-    total_formatted: Optional[str] = None
-    total_price_formatted: Optional[str] = None
-    total_amount_formatted: Optional[str] = None
-    total_sum_formatted: Optional[str] = None
-    items: List[dict] = []
-    delivery_address: Optional[str] = None
+    total_amount: float = 0.0
+    comment: Optional[str] = None
+    is_urgent: Optional[bool] = False
+    is_group_order: Optional[bool] = False
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    is_delivery: Optional[bool] = False
-    order_type: Optional[str] = "dine-in"
-    user: Optional[dict] = None
+    reservation_code: Optional[str] = None
+    order_code: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    items: List[OrderItem] = []
+    user: Optional[UserBasic] = None
 
     class Config:
         from_attributes = True
@@ -212,7 +211,6 @@ class OrderResponse(BaseModel):
             "comment": obj.comment,
             "is_urgent": obj.is_urgent,
             "is_group_order": obj.is_group_order,
-            "order_type": obj.order_type,
             "customer_name": obj.customer_name,
             "customer_phone": obj.customer_phone,
             "reservation_code": obj.reservation_code,

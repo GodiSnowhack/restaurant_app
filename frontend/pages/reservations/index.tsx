@@ -65,6 +65,59 @@ const ReservationsPage: NextPage = () => {
     // Загружаем настройки ресторана, включая данные о столах
     loadSettings();
     
+    // Очистка старых кодов бронирования в localStorage
+    const clearOldReservationCodes = () => {
+      try {
+        // Собираем ключи, связанные с бронированием
+        const reservationKeys = Object.keys(localStorage).filter(key => 
+          key.includes('reservation_code') || 
+          key.includes('reservation-code') || 
+          key.includes('reservCode') || 
+          key.includes('booking_code') ||
+          (key.match(/[A-Z]{3}-[A-Z0-9]{3}/) !== null) // Формат RGZ-DBM
+        );
+        
+        console.log('[ФРОНТ] Очистка старых кодов бронирования...');
+        console.log(`[ФРОНТ] Найдено ${reservationKeys.length} кодов бронирования`);
+        
+        // Проверяем каждый ключ на срок действия
+        reservationKeys.forEach(key => {
+          const value = localStorage.getItem(key);
+          let shouldRemove = false;
+          
+          // Проверяем формат данных
+          try {
+            // Если значение содержит поле expiresAt, проверяем срок действия
+            if (value && value.includes('expiresAt')) {
+              const data = JSON.parse(value);
+              if (data.expiresAt) {
+                const expires = new Date(data.expiresAt).getTime();
+                const now = Date.now();
+                // Если срок действия истек, удаляем код
+                if (now > expires) {
+                  shouldRemove = true;
+                  console.log(`[ФРОНТ] Удален просроченный код: ${key}`);
+                }
+              }
+            }
+          } catch (e) {
+            // Если не удалось распарсить JSON, пропускаем
+          }
+          
+          if (shouldRemove) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        console.log('[ФРОНТ] Очистка завершена');
+      } catch (error) {
+        console.error('[ФРОНТ] Ошибка при очистке кодов бронирования:', error);
+      }
+    };
+    
+    // Выполняем очистку при загрузке страницы
+    clearOldReservationCodes();
+    
     // Если пользователь авторизован, загружаем его бронирования и данные профиля
     if (isAuthenticated) {
       const fetchReservations = async () => {
@@ -619,7 +672,10 @@ const ReservationsPage: NextPage = () => {
                         ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
                       `}>
                         <FloorPlan 
-                          tables={tables}
+                          tables={tables.map(table => ({
+                            ...table,
+                            number: table.id
+                          }))}
                           selectedTableId={formData.tableId}
                           onTableSelect={handleTableSelect}
                           minGuestCount={formData.guests}
@@ -730,40 +786,40 @@ const ReservationsPage: NextPage = () => {
                       }
                     `}
                   />
-              </div>
+                </div>
 
-              {error && (
+                {error && (
                   <div className="md:col-span-2">
                     <div className={`
                       p-4 rounded-md
                       ${isDark ? 'bg-red-900/50 text-red-200' : 'bg-red-50 text-red-800'}
                     `}>
-                  <div className="flex">
+                      <div className="flex">
                         <ExclamationCircleIcon className="h-5 w-5 text-red-400 mr-2" />
                         <span>{error}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {successMessage && (
+                {successMessage && (
                   <div className="md:col-span-2">
                     <div className={`
                       p-4 rounded-md
                       ${isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-50 text-green-800'}
                     `}>
-                  <div className="flex">
+                      <div className="flex">
                         <CheckCircleIcon className="h-5 w-5 text-green-400 mr-2" />
                         <span>{successMessage}</span>
                       </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
                 <div className="md:col-span-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || availableTables.length === 0}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || availableTables.length === 0}
                     className={`
                       inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white
                       transition-all duration-200
@@ -774,19 +830,19 @@ const ReservationsPage: NextPage = () => {
                           : 'bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary'
                       }
                     `}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Обработка...
-                    </>
-                  ) : (
-                    'Забронировать'
-                  )}
-                </button>
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Обработка...
+                      </>
+                    ) : (
+                      'Забронировать'
+                    )}
+                  </button>
                 </div>
               </div>
             </form>
@@ -864,16 +920,16 @@ const ReservationsPage: NextPage = () => {
                           <div className="flex items-center space-x-2">
                             <KeyIcon className="h-4 w-4 text-primary" />
                             <span>{reservation.reservation_code}</span>
-                            </div>
+                          </div>
                         </td>
                         <td className={`
                           px-6 py-4 whitespace-nowrap text-sm
                           ${isDark ? 'text-gray-300' : 'text-gray-500'}
                         `}>
-                            {reservation.reservation_date && reservation.reservation_time 
-                              ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
-                              : formatDateTime(reservation.reservation_time)
-                            }
+                          {reservation.reservation_date && reservation.reservation_time 
+                            ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
+                            : formatDateTime(reservation.reservation_time)
+                          }
                         </td>
                         <td className={`
                           px-6 py-4 whitespace-nowrap text-sm

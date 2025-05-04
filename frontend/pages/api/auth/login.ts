@@ -87,205 +87,71 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       console.warn('Auth API - Ошибка при проверке доступности сервера:', healthError.message);
       // Продолжаем работу, но запоминаем ошибку для диагностики
     }
-    
-    // Формируем конечные точки, которые нужно попробовать для авторизации
-    const endpoints = [
-      { name: 'стандартный', url: `${apiUrl}/auth/login`, contentType: 'application/json' },
-      { name: 'token', url: `${apiUrl}/token`, contentType: 'application/x-www-form-urlencoded' }
-    ];
-    
-    // Формируем различные форматы данных для запросов
-    let dataFormats = [
-      { 
-        name: 'json-username',
-        format: (u: string, p: string) => JSON.stringify({ username: u, password: p }),
-        contentType: 'application/json'
-      },
-      { 
-        name: 'json-email',
-        format: (u: string, p: string) => JSON.stringify({ email: u, password: p }),
-        contentType: 'application/json'
-      },
-      { 
-        name: 'form-username',
-        format: (u: string, p: string) => new URLSearchParams({ username: u, password: p }).toString(),
-        contentType: 'application/x-www-form-urlencoded'
-      },
-      { 
-        name: 'form-email',
-        format: (u: string, p: string) => new URLSearchParams({ email: u, password: p }).toString(),
-        contentType: 'application/x-www-form-urlencoded'
-      },
-      { 
-        name: 'oauth2',
-        format: (u: string, p: string) => new URLSearchParams({ 
-          grant_type: 'password',
-          username: u,
-          password: p
-        }).toString(),
-        contentType: 'application/x-www-form-urlencoded'
-      }
-    ];
-    
-    // Перемещаем форматы urlencoded в начало для мобильных устройств
-    if (isMobile) {
-      // Для мобильных устройств первым пробуем form-urlencoded формат, который работает с OAuth2PasswordRequestForm
-      dataFormats = [
-        // Выбираем работающие форматы первыми
-        ...dataFormats.filter(format => ['form-username', 'form-email', 'oauth2'].includes(format.name)),
-        // Оставшиеся форматы добавляем потом
-        ...dataFormats.filter(format => !['form-username', 'form-email', 'oauth2'].includes(format.name))
-      ];
-      console.log('Auth API - Оптимизирован порядок запросов для мобильного устройства');
-    }
-    
-    // Увеличенный таймаут для мобильных устройств
-    const timeout = isMobile ? 60000 : 15000;
-    
-    // Переменные для отслеживания результатов
-    let authSuccess = false;
-    let authResult: any = null;
-    let lastError: any = null;
-    let attempts = 0;
-    const maxAttempts = isMobile ? 6 : 3; // Больше попыток для мобильных устройств
-    
-    // Пробуем все комбинации endpoints и dataFormats
-    endpointLoop: for (const endpoint of endpoints) {
-      for (const dataFormat of dataFormats) {
-        if (attempts >= maxAttempts) break endpointLoop;
-        attempts++;
-        
-        try {
-          console.log(`Auth API - Попытка #${attempts}: ${endpoint.name} + ${dataFormat.name}`);
-          
-          const requestBody = dataFormat.format(username, password);
-          const useContentType = dataFormat.contentType;
-          
-          const response = await axios({
-            method: 'POST',
-            url: endpoint.url,
-            data: requestBody,
-            headers: {
-              'Content-Type': useContentType,
-              'Accept': 'application/json',
-              'User-Agent': userAgent,
-              'X-Client-Type': isMobile ? 'mobile' : 'desktop',
-              'X-Forwarded-For': String(clientIp),
-              'X-Attempt': String(attempts)
-            },
-            timeout,
-            validateStatus: (status) => status < 500 // Отклоняем только серверные ошибки 5xx
-          });
-          
-          console.log(`Auth API - Ответ от ${endpoint.name} (попытка #${attempts}): ${response.status}`);
-          
-          // Если получили успешный ответ
-          if (response.status === 200 && response.data && response.data.access_token) {
-            authSuccess = true;
-            authResult = response.data;
-            console.log(`Auth API - Успешная авторизация через ${endpoint.name} + ${dataFormat.name}`);
-            break endpointLoop;
-          }
-          
-          // Сохраняем данные последней ошибки
-          if (response.status !== 200) {
-            lastError = {
-              status: response.status,
-              data: response.data,
-              endpoint: endpoint.name,
-              format: dataFormat.name
-            };
-            
-            // Если получили 401 (неверные учетные данные), нет смысла пробовать другие форматы
-            if (response.status === 401) {
-              console.log('Auth API - Получен 401, прекращаем попытки');
-              break endpointLoop;
-            }
-          }
-        } catch (error: any) {
-          console.error(`Auth API - Ошибка при попытке ${attempts} (${endpoint.name} + ${dataFormat.name}):`, error.message);
-          
-          lastError = {
-            message: error.message,
-            code: error.code,
-            endpoint: endpoint.name,
-            format: dataFormat.name
-          };
-          
-          // Ждем перед следующей попыткой
-          if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-      }
-    }
-    
-    if (authSuccess && authResult) {
-      // Возвращаем токен клиенту
-      const duration = Date.now() - startTime;
-      console.log(`Auth API - Авторизация успешна, время: ${duration}ms`);
+
+    // Используем формат form-username (URL-encoded), который работает надежнее
+    try {
+      console.log('Auth API - Отправка запроса на авторизацию в формате form-username');
       
-      return res.status(200).json({
-        ...authResult,
-        auth_method: 'proxy',
-        duration
+      // Формируем URL-encoded данные
+      const requestBody = new URLSearchParams({ 
+        username, 
+        password 
+      }).toString();
+      
+      const endpoint = `${apiUrl}/auth/login`;
+      const response = await axios({
+        method: 'POST',
+        url: endpoint,
+        data: requestBody,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': userAgent,
+          'X-Client-Type': isMobile ? 'mobile' : 'desktop',
+          'X-Forwarded-For': String(clientIp)
+        },
+        timeout: isMobile ? 60000 : 15000,
+        validateStatus: (status) => status < 500 // Отклоняем только серверные ошибки 5xx
       });
-    } else {
-      // Формируем информативное сообщение об ошибке
-      console.error('Auth API - Не удалось авторизоваться после всех попыток');
       
-      // Определяем подходящий код состояния и сообщение об ошибке
-      let statusCode = 400;
-      let errorMessage = 'Неизвестная ошибка авторизации';
-      let errorDetail = 'Не удалось авторизоваться после нескольких попыток';
-      let fieldErrors = {};
+      console.log(`Auth API - Получен ответ от сервера: ${response.status}`);
       
-      if (lastError) {
-        if (lastError.status === 401) {
-          statusCode = 401;
-          errorMessage = 'Неверное имя пользователя или пароль';
-          errorDetail = 'Проверьте правильность введенных данных';
-        } else if (lastError.status === 403) {
-          statusCode = 403;
-          errorMessage = 'Доступ запрещен';
-          errorDetail = 'У вас нет прав доступа к системе';
-        } else if (lastError.status === 422) {
-          statusCode = 422;
-          errorMessage = 'Ошибка валидации данных';
-          errorDetail = 'Проверьте формат вводимых данных';
-          
-          if (lastError.data && lastError.data.detail) {
-            errorDetail = lastError.data.detail;
-          }
-          
-          if (lastError.data && lastError.data.validation_errors) {
-            fieldErrors = lastError.data.validation_errors;
-          }
-        } else if (lastError.code === 'ECONNABORTED') {
-          statusCode = 504;
-          errorMessage = 'Превышено время ожидания ответа от сервера';
-          errorDetail = 'Сервер не ответил в течение отведенного времени';
-        } else if (lastError.code === 'ECONNREFUSED') {
-          statusCode = 503;
-          errorMessage = 'Не удалось подключиться к серверу';
-          errorDetail = 'Сервер недоступен. Пожалуйста, попробуйте позже';
+      // Если получили успешный ответ
+      if (response.status === 200 && response.data && response.data.access_token) {
+        const authResult = response.data;
+        const duration = Date.now() - startTime;
+        console.log(`Auth API - Авторизация успешна, время: ${duration}ms`);
+        
+        // Добавляем refresh_token, если его нет в ответе
+        if (!authResult.refresh_token && authResult.access_token) {
+          console.log(`Auth API - Добавляем refresh_token`);
+          authResult.refresh_token = generateRefreshToken();
         }
+        
+        return res.status(200).json({
+          ...authResult,
+          auth_method: 'proxy',
+          duration
+        });
       }
       
-      return res.status(statusCode).json({
-        detail: errorDetail,
-        message: errorMessage,
-        status: statusCode,
-        isMobile,
-        field_errors: fieldErrors,
-        attempts,
-        last_error: process.env.NODE_ENV === 'development' ? lastError : undefined,
-        request_info: {
-          has_username: !!username,
-          username_length: username ? username.length : 0,
-          has_password: !!password,
-          client_ip: String(clientIp).slice(0, 15)
-        }
+      // Если ответ не 200 или нет токена, обрабатываем ошибку
+      console.error(`Auth API - Ошибка авторизации, статус: ${response.status}`);
+      
+      return res.status(response.status || 400).json({
+        detail: response.data?.detail || 'Ошибка авторизации',
+        message: 'Не удалось авторизоваться. Проверьте правильность учетных данных.',
+        status: response.status,
+        data: response.data
+      });
+    } catch (error: any) {
+      // Обрабатываем ошибки запроса
+      console.error('Auth API - Ошибка при отправке запроса на авторизацию:', error.message);
+      
+      return res.status(500).json({
+        detail: error.message,
+        message: 'Внутренняя ошибка сервера при авторизации',
+        timestamp: Date.now()
       });
     }
   } catch (error: any) {
@@ -297,4 +163,10 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       timestamp: Date.now()
     });
   }
+}
+
+// Добавляем функцию генерации refresh_token
+function generateRefreshToken(): string {
+  const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return `refresh_${random}_${Date.now()}`;
 } 

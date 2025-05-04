@@ -6,6 +6,7 @@ import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import { Order, OrderItem } from '../../types';
 import { ordersApi } from '../../lib/api';
+import waiterApi from '../../lib/api/waiter-api';
 import { formatPrice } from '../../utils/priceFormatter';
 import OrderCode from '../../components/OrderCode';
 import { 
@@ -25,11 +26,14 @@ import {
 import { 
   ExclamationTriangleIcon as ExclamationIcon
 } from '@heroicons/react/24/solid';
+import ReviewForm from '../../components/orders/ReviewForm';
+import { updateOrderPaymentStatus } from "../../lib/api/order-payment";
 
 // Расширяем тип Order с полем comment и special_instructions
 interface ExtendedOrder extends Order {
   comment?: string;
   special_instructions?: string;
+  waiter_id?: number | null;
 }
 
 const OrderDetailPage: NextPage = () => {
@@ -58,7 +62,47 @@ const OrderDetailPage: NextPage = () => {
       setIsLoading(true);
       setError('');
       console.log(`Запрос данных заказа ID: ${id}`);
-      const fetchedOrder = await ordersApi.getOrderById(Number(id));
+      
+      // Максимальное количество попыток загрузки
+      const maxRetries = 2; // Уменьшаем до 2 попыток
+      let attempt = 0;
+      let fetchedOrder = null;
+      
+      while (attempt < maxRetries && !fetchedOrder) {
+        attempt++;
+        try {
+          // Проверяем наличие токена перед запросом
+          const token = localStorage.getItem('token');
+          if (!token) {
+            console.error('Отсутствует токен авторизации. Перенаправление на страницу входа...');
+            router.push('/auth/login');
+            return;
+          }
+          
+          fetchedOrder = await ordersApi.getOrderById(Number(id));
+        } catch (apiError: any) {
+          console.error(`Попытка ${attempt}/${maxRetries} получения заказа не удалась:`, apiError);
+          
+          // Если ошибка связана с авторизацией
+          if (apiError.message && apiError.message.includes('401')) {
+            if (attempt === maxRetries) {
+              console.warn('Максимальное количество попыток авторизации исчерпано. Перенаправление на страницу входа...');
+              router.push('/auth/login');
+              return;
+            }
+          }
+          
+          // Если это последняя попытка, бросаем ошибку дальше
+          if (attempt === maxRetries) {
+            throw apiError;
+          }
+          
+          // Увеличиваем задержку с каждой попыткой
+          const delay = 2000 * attempt; // 2 секунды, затем 4 секунды
+          console.log(`Ожидание ${delay}мс перед следующей попыткой...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
       
       // Подробное логирование полученных данных для отладки
       console.log('Получены данные заказа:', fetchedOrder);
@@ -75,7 +119,14 @@ const OrderDetailPage: NextPage = () => {
         payment_status: fetchedOrder.payment_status || 'pending',
         payment_method: fetchedOrder.payment_method || '',
         total_amount: fetchedOrder.total_amount || 0,
-        items: Array.isArray(fetchedOrder.items) ? fetchedOrder.items : [],
+        items: Array.isArray(fetchedOrder.items) ? fetchedOrder.items.map((item: any) => ({
+          ...item,
+          dish_id: item.dish_id,
+          name: item.dish_name || item.name,
+          quantity: item.quantity || 1,
+          price: item.price || 0,
+          special_instructions: item.special_instructions || ''
+        })) : [],
         order_code: fetchedOrder.order_code || '',
         // Обработка ситуации, когда поле user отсутствует или имеет неверную структуру
         user: fetchedOrder.user && typeof fetchedOrder.user === 'object' ? {
@@ -93,8 +144,12 @@ const OrderDetailPage: NextPage = () => {
       
       // Проверяем тип ошибки и предоставляем понятное объяснение
       if (err.message) {
+        // Ошибка 401 - проблема авторизации
+        if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+          setError('Ошибка авторизации. Возможно, ваша сессия истекла. Попробуйте обновить страницу или войти снова.');
+        }
         // Ошибка 500 - внутренняя ошибка сервера
-        if (err.message.includes('500') || err.message.includes('Internal Server Error')) {
+        else if (err.message.includes('500') || err.message.includes('Internal Server Error')) {
           setError('Произошла внутренняя ошибка на сервере. Администратор уведомлен, пожалуйста, повторите попытку позже.');
         }
         // Ошибка 404 - заказ не найден
@@ -119,7 +174,7 @@ const OrderDetailPage: NextPage = () => {
       setIsLoadingDebug(true);
       setError('');
       console.log(`Запрос отладочных данных заказа ID: ${id}`);
-      const debugData = await ordersApi.getOrderByIdDebug(Number(id));
+      const debugData = await ordersApi.getOrderById(Number(id));
       
       console.log('Получены отладочные данные заказа:', debugData);
       setDebugData(debugData);
@@ -185,7 +240,11 @@ const OrderDetailPage: NextPage = () => {
     setError('');
     
     try {
-      await ordersApi.cancelOrder(order.id || 0);
+      const success = await waiterApi.updateOrderStatus(order.id, 'cancelled');
+      
+      if (!success) {
+        throw new Error('Не удалось отменить заказ');
+      }
       
       // Обновляем данные заказа после отмены
       const updatedOrder = await ordersApi.getOrderById(Number(id));
@@ -207,7 +266,7 @@ const OrderDetailPage: NextPage = () => {
     setError('');
     
     try {
-      await ordersApi.updateOrderPaymentStatus(order.id || 0, 'paid');
+      await updateOrderPaymentStatus(order.id || 0, 'paid');
       
       // Обновляем данные заказа после оплаты
       const updatedOrder = await ordersApi.getOrderById(Number(id));
@@ -216,7 +275,7 @@ const OrderDetailPage: NextPage = () => {
       alert('Заказ успешно оплачен');
     } catch (err) {
       console.error('Ошибка при обработке оплаты:', err);
-      alert('Не удалось обработать оплату. Пожалуйста, попробуйте позже.');
+      alert('Не удалось обработить оплату. Пожалуйста, попробуйте позже.');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -651,6 +710,18 @@ const OrderDetailPage: NextPage = () => {
                 )}
               </div>
             </div>
+            
+            {/* Добавляем форму отзывов о заказе и обслуживании */}
+            {order && order.id && (
+              <div className="p-6 border-t border-gray-200">
+                <h2 className="text-xl font-semibold mb-4">Оценить заказ</h2>
+                <ReviewForm 
+                  orderId={order.id} 
+                  waiterId={order.waiter_id || null} 
+                  onReviewSubmitted={() => fetchOrderData()}
+                />
+              </div>
+            )}
             
             {/* Отладочная информация для администратора */}
             {showDebug && debugData && (

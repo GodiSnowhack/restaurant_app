@@ -7,10 +7,122 @@ from app.models.user import User
 from app.models.order import Order, OrderStatus, PaymentStatus
 from app.schemas.order import OrderResponse
 import logging
+from sqlalchemy.sql import text
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+# Новый экстренный маршрут для принудительного обновления waiter_id
+@router.post("/emergency-assign", status_code=200)
+async def emergency_assign_order(
+    order_code: str,
+    waiter_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    ЭКСТРЕННЫЙ маршрут для принудительного обновления waiter_id.
+    Выполняет прямой SQL запрос, минуя ORM и ограничения.
+    """
+    logger.warning(f"ЭКСТРЕННОЕ обновление заказа с кодом {order_code}, waiter_id={waiter_id}")
+    
+    try:
+        # Получаем информацию о заказе
+        check_query = text("SELECT id, status, waiter_id FROM orders WHERE order_code = :code")
+        result = db.execute(check_query, {"code": order_code})
+        order_data = result.fetchone()
+        
+        if not order_data:
+            logger.error(f"Заказ с кодом {order_code} не найден")
+            return {"success": False, "message": "Заказ не найден"}
+        
+        order_id = order_data[0]
+        current_status = order_data[1]
+        current_waiter_id = order_data[2]
+        
+        logger.info(f"Найден заказ: ID={order_id}, статус={current_status}, текущий waiter_id={current_waiter_id}")
+        
+        # Если уже привязан к этому официанту
+        if current_waiter_id == waiter_id:
+            return {
+                "success": True, 
+                "message": f"Заказ уже привязан к официанту {waiter_id}",
+                "order_id": order_id,
+                "waiter_id": waiter_id
+            }
+        
+        # Определяем новый статус
+        new_status = "confirmed" if current_status.lower() == "pending" else current_status
+        
+        # Выполняем SQL запрос с LOCK TABLE
+        update_query = text("""
+        BEGIN;
+        LOCK TABLE orders IN EXCLUSIVE MODE;
+        UPDATE orders 
+        SET waiter_id = :waiter_id, 
+            status = :status, 
+            updated_at = NOW() 
+        WHERE id = :order_id;
+        COMMIT;
+        """)
+        
+        db.execute(update_query, {
+            "waiter_id": waiter_id,
+            "status": new_status,
+            "order_id": order_id
+        })
+        db.commit()
+        
+        # Проверяем результат
+        verify_query = text("SELECT waiter_id FROM orders WHERE id = :order_id")
+        verify_result = db.execute(verify_query, {"order_id": order_id})
+        verify_data = verify_result.fetchone()
+        
+        if verify_data and verify_data[0] == waiter_id:
+            logger.info(f"Заказ {order_id} успешно привязан к официанту {waiter_id}")
+            return {
+                "success": True,
+                "message": f"Заказ успешно привязан к официанту {waiter_id}",
+                "order_id": order_id,
+                "waiter_id": waiter_id,
+                "status": new_status
+            }
+        else:
+            current_value = verify_data[0] if verify_data else None
+            logger.error(f"Обновление не удалось! Текущее значение waiter_id = {current_value}")
+            
+            # Последняя отчаянная попытка
+            try:
+                logger.warning("Экстренная попытка через RAW SQL")
+                raw_query = f"""
+                UPDATE orders
+                SET waiter_id = {waiter_id},
+                    updated_at = NOW()
+                WHERE id = {order_id}
+                """
+                db.execute(raw_query)
+                db.commit()
+                
+                return {
+                    "success": True,
+                    "message": "Заказ привязан экстренным методом",
+                    "order_id": order_id,
+                    "waiter_id": waiter_id,
+                    "status": new_status
+                }
+            except Exception as raw_error:
+                logger.critical(f"Экстренная попытка не удалась: {str(raw_error)}")
+                
+            return {
+                "success": False,
+                "message": "Не удалось обновить заказ. Обратитесь к администратору.",
+                "current_value": current_value
+            }
+    
+    except Exception as e:
+        logger.error(f"Ошибка при экстренном обновлении: {str(e)}")
+        db.rollback()
+        return {"success": False, "message": f"Ошибка: {str(e)}"}
 
 @router.get("/orders", response_model=List[OrderResponse])
 async def get_waiter_orders(

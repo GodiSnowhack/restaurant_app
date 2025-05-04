@@ -1,8 +1,8 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models.user import UserRole
+from app.models.user import UserRole, AgeGroup
 
 
 # Базовая схема пользователя
@@ -12,6 +12,8 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     is_active: Optional[bool] = True
     role: Optional[UserRole] = UserRole.CLIENT
+    birthday: Optional[date] = None
+    age_group: Optional[AgeGroup] = None
 
 
 # Схема для создания пользователя
@@ -48,8 +50,9 @@ class TokenPayload(BaseModel):
     exp: int
 
 
-# Схема для аутентификации
+# Схема для запроса авторизации
 class LoginRequest(BaseModel):
+    """Схема для запроса авторизации"""
     email: EmailStr
     password: str
 

@@ -38,6 +38,7 @@ def create_admin(db: Session) -> None:
         user_in = UserCreate(
             email=admin_email,
             password=settings.FIRST_SUPERUSER_PASSWORD,
+            phone="87051543514",
             full_name="Admin User",
             role=UserRole.ADMIN
         )
@@ -100,7 +101,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Тарталетки с красной икрой",
             description="Хрустящие тарталетки с красной икрой и сливочным маслом",
-            price=450.0,
+            price=1500.0,
+            cost_price=1000.0,
             category_id=1,
             is_vegetarian=False,
             is_vegan=False,
@@ -110,7 +112,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Брускетта с томатами и базиликом",
             description="Поджаренный хлеб с томатами, базиликом и оливковым маслом",
-            price=350.0,
+            price=1400.0,
+            cost_price=800.0,
             category_id=1,
             is_vegetarian=True,
             is_vegan=True,
@@ -121,7 +124,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Цезарь с курицей",
             description="Классический салат с курицей, сыром пармезан и соусом цезарь",
-            price=420.0,
+            price=1300.0,
+            cost_price=600.0,
             category_id=2,
             is_vegetarian=False,
             is_vegan=False,
@@ -131,7 +135,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Греческий салат",
             description="Традиционный греческий салат с сыром фета и оливками",
-            price=380.0,
+            price=1500.0,
+            cost_price=800.0,
             category_id=2,
             is_vegetarian=True,
             is_vegan=False,
@@ -142,7 +147,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Борщ",
             description="Традиционный борщ со сметаной и гренками",
-            price=320.0,
+            price=2000.0,
+            cost_price=1200.0,
             category_id=3,
             is_vegetarian=False,
             is_vegan=False,
@@ -152,7 +158,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Грибной крем-суп",
             description="Нежный крем-суп из белых грибов",
-            price=350.0,
+            price=2300.0,
+            cost_price=1300.0,
             category_id=3,
             is_vegetarian=True,
             is_vegan=False,
@@ -163,7 +170,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Стейк Рибай",
             description="Сочный стейк из мраморной говядины",
-            price=950.0,
+            price=3000.0,
+            cost_price=1800.0,
             category_id=4,
             is_vegetarian=False,
             is_vegan=False,
@@ -173,7 +181,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Лосось на гриле",
             description="Филе лосося, приготовленное на гриле, с лимонным соусом",
-            price=820.0,
+            price=3500.0,
+            cost_price=2200.0,
             category_id=4,
             is_vegetarian=False,
             is_vegan=False,
@@ -184,7 +193,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Картофельное пюре",
             description="Нежное картофельное пюре со сливочным маслом",
-            price=180.0,
+            price=2000.0,
+            cost_price=1200.0,
             category_id=5,
             is_vegetarian=True,
             is_vegan=False,
@@ -194,7 +204,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Овощи на гриле",
             description="Ассорти из сезонных овощей, приготовленных на гриле",
-            price=220.0,
+            price=2200.0,
+            cost_price=1200.0,
             category_id=5,
             is_vegetarian=True,
             is_vegan=True,
@@ -205,7 +216,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Чизкейк Нью-Йорк",
             description="Классический чизкейк с ягодным соусом",
-            price=380.0,
+            price=1800.0,
+            cost_price=1000.0,
             category_id=6,
             is_vegetarian=True,
             is_vegan=False,
@@ -215,7 +227,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Тирамису",
             description="Традиционный итальянский десерт с кофейным вкусом",
-            price=350.0,
+            price=1900.0,
+            cost_price=1000.0,
             category_id=6,
             is_vegetarian=True,
             is_vegan=False,
@@ -226,7 +239,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Свежевыжатый апельсиновый сок",
             description="Натуральный сок из спелых апельсинов",
-            price=250.0,
+            price=900.0,
+            cost_price=500.0,
             category_id=7,
             is_vegetarian=True,
             is_vegan=True,
@@ -236,7 +250,8 @@ def create_test_data(db: Session) -> None:
         Dish(
             name="Капучино",
             description="Классический капучино с молочной пенкой",
-            price=180.0,
+            price=700.0,
+            cost_price=400.0,
             category_id=7,
             is_vegetarian=True,
             is_vegan=False,

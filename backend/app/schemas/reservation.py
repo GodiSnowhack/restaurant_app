@@ -16,7 +16,7 @@ class ReservationBase(BaseModel):
 
 
 class ReservationCreate(ReservationBase):
-    pass
+    reservation_code: Optional[str] = None
 
 
 class ReservationUpdate(ReservationBase):
@@ -32,6 +32,7 @@ class ReservationResponse(ReservationBase):
     status: ReservationStatus
     created_at: datetime
     updated_at: datetime
+    reservation_code: Optional[str] = None
 
     class Config:
         from_attributes = True 

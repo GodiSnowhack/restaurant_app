@@ -25,6 +25,7 @@ class Reservation(Base):
     guest_name = Column(String, nullable=True)
     guest_phone = Column(String, nullable=True)
     comment = Column(String, nullable=True)
+    reservation_code = Column(String, nullable=True, unique=True)
     
     # Время создания и обновления
     created_at = Column(DateTime, default=datetime.utcnow)

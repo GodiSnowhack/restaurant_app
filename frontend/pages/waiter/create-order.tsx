@@ -45,6 +45,15 @@ interface MenuResponse {
   items: MenuItem[];
 }
 
+// Функция для генерации уникального email и пароля для нового пользователя
+const generateUserCredentials = () => {
+  const randomNumber = Math.floor(10000 + Math.random() * 90000); // 5-значное число
+  const email = `user${randomNumber}@restaurant.com`;
+  const password = `user${randomNumber}`; // Используем тот же номер в качестве пароля
+  
+  return { email, password };
+};
+
 const CreateOrderPage: NextPage = () => {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
@@ -55,11 +64,13 @@ const CreateOrderPage: NextPage = () => {
   const [tableNumber, setTableNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [customerAgeGroup, setCustomerAgeGroup] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [tables, setTables] = useState<RestaurantTable[]>([]);
+  const [createdUserInfo, setCreatedUserInfo] = useState<{email: string, password: string} | null>(null);
   
   // Перенаправляем на страницу входа, если пользователь не авторизован
   useEffect(() => {
@@ -236,6 +247,16 @@ const CreateOrderPage: NextPage = () => {
       return;
     }
     
+    if (!customerName || customerName.trim() === '') {
+      setError('Укажите имя клиента');
+      return;
+    }
+    
+    if (!customerAgeGroup) {
+      setError('Выберите возрастную группу клиента');
+      return;
+    }
+    
     try {
       setSubmitting(true);
       setError(null);
@@ -274,8 +295,10 @@ const CreateOrderPage: NextPage = () => {
         order_type: string;
         total_amount: number;
         waiter_id?: number;
+        customer_id?: number;
         customer_name?: string;
         customer_phone?: string;
+        customer_age_group?: string;
       } = {
         table_number: tableNumberToSend,
         items: formattedItems,
@@ -293,6 +316,10 @@ const CreateOrderPage: NextPage = () => {
       
       if (customerPhone && customerPhone.trim()) {
         orderData.customer_phone = customerPhone.trim();
+      }
+      
+      if (customerAgeGroup && customerAgeGroup.trim()) {
+        orderData.customer_age_group = customerAgeGroup.trim();
       }
       
       // Добавляем ID официанта
@@ -324,7 +351,60 @@ const CreateOrderPage: NextPage = () => {
               await new Promise(resolve => setTimeout(resolve, delay));
             }
             
-            // Используем Next.js API прокси
+            // Генерируем данные для создания пользователя
+            const { email, password } = generateUserCredentials();
+            console.log(`Сгенерированы данные для нового пользователя: email=${email}`);
+            
+            // Сохраняем данные пользователя для отображения
+            setCreatedUserInfo({ email, password });
+            
+            // Создаем пользователя
+            const createUserResponse = await fetch('/api/v1/users/create-customer', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                name: customerName.trim(),
+                email: email,
+                password: password,
+                phone: customerPhone ? customerPhone.trim() : null,
+                age_group: customerAgeGroup,
+                role: 'client'
+              })
+            });
+            
+            console.log(`Отправленные данные пользователя:`, {
+              name: customerName.trim(),
+              age_group: customerAgeGroup,
+              role: 'client'
+            });
+            
+            // Обрабатываем ответ от сервера
+            if (!createUserResponse.ok) {
+              const errorText = await createUserResponse.text();
+              console.error(`Ошибка создания пользователя (${createUserResponse.status}):`, errorText);
+              throw new Error(`Ошибка создания пользователя: ${createUserResponse.status} ${createUserResponse.statusText}`);
+            }
+            
+            // Получаем данные созданного пользователя
+            const userData = await createUserResponse.json();
+            console.log('Пользователь успешно создан:', userData);
+            
+            // Получаем ID созданного пользователя
+            const customerId = userData.id || userData.user_id;
+            if (!customerId) {
+              throw new Error('Не удалось получить ID созданного пользователя');
+            }
+            
+            console.log(`Получен ID созданного пользователя: ${customerId}`);
+            
+            // Обновляем данные заказа, добавляя ID клиента
+            orderData.customer_id = customerId;
+            
+            // Используем Next.js API прокси для создания заказа
             const response = await fetch('/api/orders', {
               method: 'POST',
               headers: {
@@ -415,12 +495,14 @@ const CreateOrderPage: NextPage = () => {
       setTableNumber('');
       setCustomerName('');
       setCustomerPhone('');
+      setCustomerAgeGroup('');
       setSuccess(true);
       
-      // Через 3 секунды убираем уведомление об успехе
+      // Через 5 секунд убираем уведомление об успехе
       setTimeout(() => {
         setSuccess(false);
-      }, 3000);
+        setCreatedUserInfo(null);
+      }, 5000);
       
     } catch (err: any) {
       console.error('Ошибка при создании заказа:', err);
@@ -593,7 +675,7 @@ const CreateOrderPage: NextPage = () => {
               
               <div className="mb-3">
                 <label htmlFor="customerName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Имя клиента
+                  Имя клиента *
                 </label>
                 <input
                   type="text"
@@ -601,7 +683,8 @@ const CreateOrderPage: NextPage = () => {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   className="w-full p-2 border rounded focus:ring-primary focus:border-primary"
-                  placeholder="Необязательно"
+                  placeholder="Обязательное поле"
+                  required
                 />
               </div>
               
@@ -617,6 +700,27 @@ const CreateOrderPage: NextPage = () => {
                   className="w-full p-2 border rounded focus:ring-primary focus:border-primary"
                   placeholder="Необязательно"
                 />
+              </div>
+              
+              <div className="mt-3">
+                <label htmlFor="customerAgeGroup" className="block text-sm font-medium text-gray-700 mb-1">
+                  Возрастная группа *
+                </label>
+                <select
+                  id="customerAgeGroup"
+                  value={customerAgeGroup}
+                  onChange={(e) => setCustomerAgeGroup(e.target.value)}
+                  className="w-full p-2 border rounded focus:ring-primary focus:border-primary"
+                  required
+                >
+                  <option value="">Выберите возрастную группу</option>
+                  <option value="child">Дети (0-12 лет)</option>
+                  <option value="teenager">Подростки (13-17 лет)</option>
+                  <option value="young">Молодёжь (18-25 лет)</option>
+                  <option value="adult">Взрослые (26-45 лет)</option>
+                  <option value="middle">Средний возраст (46-65 лет)</option>
+                  <option value="senior">Пожилые (66+ лет)</option>
+                </select>
               </div>
             </div>
             
@@ -689,9 +793,19 @@ const CreateOrderPage: NextPage = () => {
               )}
               
               {success && (
-                <div className="mb-4 bg-green-50 text-green-700 p-3 rounded border border-green-200 flex items-center">
-                  <CheckCircleIcon className="h-5 w-5 mr-2" />
-                  Заказ успешно создан
+                <div className="mb-4 bg-green-50 text-green-700 p-3 rounded border border-green-200 flex flex-col">
+                  <div className="flex items-center mb-2">
+                    <CheckCircleIcon className="h-5 w-5 mr-2" />
+                    <span className="font-medium">Заказ успешно создан</span>
+                  </div>
+                  
+                  {createdUserInfo && (
+                    <div className="mt-2 pt-2 border-t border-green-200">
+                      <p className="text-sm font-medium mb-1">Создан аккаунт клиента:</p>
+                      <p className="text-sm">Логин: {createdUserInfo.email}</p>
+                      <p className="text-sm">Пароль: {createdUserInfo.password}</p>
+                    </div>
+                  )}
                 </div>
               )}
               

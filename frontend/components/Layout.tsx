@@ -1,16 +1,58 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
 import Header from './Header';
 import Footer from './Footer';
+import { useTheme } from '@/lib/theme-context';
+
+// Вспомогательная функция для безопасного получения URL изображений с обработкой ошибок 404
+export const getSafeImageUrl = (imageUrl: string | null | undefined): string => {
+  if (!imageUrl) return '/images/placeholder-user.jpg';
+  
+  // Если URL начинается с http или https, возвращаем как есть
+  if (imageUrl.startsWith('http:') || imageUrl.startsWith('https:')) {
+    return imageUrl;
+  }
+  
+  // Для относительных путей добавляем базовый URL
+  if (imageUrl.startsWith('/')) {
+    // Проверяем есть ли в URL имя пользователя (userX.jpg)
+    if (imageUrl.includes('user') && imageUrl.endsWith('.jpg')) {
+      // Заменяем на плейсхолдер, чтобы предотвратить ошибки 404
+      return '/images/placeholder-user.jpg';
+    }
+    return imageUrl;
+  }
+  
+  // Если URL не начинается с /, добавляем его
+  return `/${imageUrl}`;
+};
 
 interface LayoutProps {
   children: ReactNode;
   title?: string;
   section?: string;
+  showFooter?: boolean;
+  description?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан', section }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  title = 'Ресторан', 
+  section, 
+  showFooter = true, 
+  description = 'Лучший ресторан в городе'
+}) => {
+  const { isDark } = useTheme();
+  
+  useEffect(() => {
+    // Применяем dark mode в соответствии с настройками пользователя
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
   const getSectionStyles = () => {
     switch (section) {
       case 'admin':
@@ -25,23 +67,24 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Ресторан', s
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 dark:text-white">
+    <div className="flex flex-col min-h-screen">
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Система управления рестораном" />
+        <meta name="description" content={description} />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+        <meta name="theme-color" content={isDark ? '#1f2937' : '#f9fafb'} />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <Header />
 
-      <main className="flex-grow">
-        <div className={section ? getSectionStyles() : 'w-full'}>
-        {children}
+      <main className="flex-grow" suppressHydrationWarning>
+        <div className={section ? getSectionStyles() : 'w-full'} suppressHydrationWarning>
+          {children}
         </div>
       </main>
 
-      <Footer />
+      {showFooter && <Footer />}
     </div>
   );
 };

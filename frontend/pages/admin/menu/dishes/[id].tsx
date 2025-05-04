@@ -129,18 +129,59 @@ const EditDishPage: NextPage = () => {
       
       console.log('Отправляем данные для обновления:', dishData);
       
-      // Отправляем запрос на обновление блюда
-      const updatedDish = await menuApi.updateDish(parseInt(id), dishData);
+      // Используем прямой вызов API
+      try {
+        const dishId = parseInt(id);
+        
+        // Обновляем через API
+        const updatedDish = await menuApi.updateDish(dishId, dishData);
+        console.log('Ответ от API:', updatedDish);
+        
+        // Проверяем, успешно ли обновление
+        if (updatedDish.success === false || updatedDish.error) {
+          // Особая обработка ошибки авторизации
+          if (updatedDish.error === 'auth_error') {
+            setError('Ошибка авторизации. Пожалуйста, войдите в систему заново.');
+            
+            // Перенаправляем на страницу входа через 2 секунды
+            setTimeout(() => {
+              router.push('/auth/login');
+            }, 2000);
+            
+            return;
+          }
+          
+          // Отображаем сообщение об ошибке
+          throw new Error(updatedDish.message || 'Не удалось обновить блюдо');
+        }
+        
+        // Если обновление успешно или это демо-режим
+        console.log('Блюдо успешно обновлено:', updatedDish);
+        
+        // Показываем сообщение об успехе
+        setSuccess(updatedDish.message || 'Блюдо успешно обновлено');
       
-      console.log('Блюдо успешно обновлено:', updatedDish);
+        // Очищаем кэш блюд
+        localStorage.removeItem('cached_dishes');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('cached_dishes_')) {
+            localStorage.removeItem(key);
+          }
+        });
       
-      // Показываем сообщение об успехе
-      setSuccess('Блюдо успешно обновлено');
-      
-      // Задержка перед перенаправлением
-      setTimeout(() => {
-      router.push('/admin/menu');
-      }, 1500);
+        // Если это демо-режим, предупреждаем пользователя
+        if (updatedDish.demo) {
+          setSuccess(`${updatedDish.message || 'Блюдо обновлено локально'}. Изменения сохранены только на вашем устройстве.`);
+        }
+        
+        // Задержка перед перенаправлением
+        setTimeout(() => {
+          router.push('/admin/menu');
+        }, 1500);
+      } catch (apiError: any) {
+        console.error('Ошибка при обновлении блюда через API:', apiError);
+        throw new Error(apiError.message || 'Ошибка при обновлении блюда через API');
+      }
     } catch (error: any) {
       console.error('Ошибка при обновлении блюда:', error);
       setError(error.message || 'Не удалось обновить блюдо. Пожалуйста, проверьте введенные данные и попробуйте снова.');

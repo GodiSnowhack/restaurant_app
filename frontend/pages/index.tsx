@@ -13,7 +13,7 @@ import { EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon } from '@her
 import { Spinner } from '@/components/ui/spinner';
 import useCartStore from '../lib/cart-store';
 import {useSettings} from '../settings-context';
-import { menuApi } from '../lib/api';
+import { menuApi } from '../lib/api/';
 import type { Dish } from '../types';
 
 interface Restaurant {
@@ -151,14 +151,39 @@ const HomePageContent = () => {
       // Получаем популярные блюда
       const getDishesForMainPage = async () => {
         try {
-          // Получаем все блюда и отбираем популярные (помеченные как featured или с высоким рейтингом)
+          // Получаем все блюда и отбираем популярные
           const allDishesResponse = await menuApi.getDishes();
-          return allDishesResponse.dishes.filter((dish: ExtendedDish) => 
-            dish.featured || (dish.rating && dish.rating > 4.5)
-          ).slice(0, 6); // Берем только первые 6 блюд
+          
+          // Временное решение для преобразования ответа API в нужный формат
+          let dishes: any[] = [];
+          
+          if (allDishesResponse && Array.isArray(allDishesResponse)) {
+            dishes = allDishesResponse;
+          } else if (allDishesResponse && typeof allDishesResponse === 'object') {
+            // Проверяем наличие свойства dishes в ответе
+            if ('dishes' in allDishesResponse && Array.isArray((allDishesResponse as any).dishes)) {
+              dishes = (allDishesResponse as any).dishes;
+            }
+          }
+          
+          // Фильтруем и типизируем данные как ExtendedDish
+          const popularDishes = dishes
+            .filter(dish => {
+              if (!dish) return false;
+              
+              // Проверяем наличие свойств featured или rating
+              const asDish = dish as any;
+              return (
+                asDish.featured === true || 
+                (asDish.rating !== undefined && asDish.rating > 4.5)
+              );
+            })
+            .slice(0, 6) as ExtendedDish[];
+          
+          return popularDishes;
         } catch (error) {
           console.error('Ошибка при получении популярных блюд:', error);
-          return [];
+          return []; // Возвращаем пустой массив в случае ошибки
         }
       };
       
@@ -503,9 +528,23 @@ const HomePageContent = () => {
 };
 
 export default function HomePage() {
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   return (
     <Layout title="Главная - Ресторан">
-      <HomePageContent />
+      <div suppressHydrationWarning>
+        {mounted && <HomePageContent />}
+        {!mounted && (
+          <div className="min-h-screen flex flex-col items-center justify-center dark:text-white">
+            <Spinner className="w-12 h-12 text-primary" />
+            <p className="mt-4 text-lg">Загрузка данных...</p>
+          </div>
+        )}
+      </div>
     </Layout>
   );
 } 

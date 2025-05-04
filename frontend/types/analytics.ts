@@ -45,6 +45,8 @@ export interface MenuMetrics {
   topSellingDishes: {
     dishId: number;
     dishName: string;
+    categoryId?: number;
+    categoryName?: string;
     salesCount: number;
     revenue: number;
     percentage: number; // Процент от общих продаж
@@ -54,6 +56,8 @@ export interface MenuMetrics {
   mostProfitableDishes: {
     dishId: number;
     dishName: string;
+    categoryId?: number;
+    categoryName?: string;
     salesCount: number;
     revenue: number;
     percentage: number;
@@ -66,6 +70,8 @@ export interface MenuMetrics {
   leastSellingDishes: {
     dishId: number;
     dishName: string;
+    categoryId?: number;
+    categoryName?: string;
     salesCount: number;
     revenue: number;
     percentage: number;
@@ -79,6 +85,22 @@ export interface MenuMetrics {
   
   // Тренды продаж по отдельным блюдам
   menuItemSalesTrend: Record<number, { date: string; value: number }[]>;
+  
+  // Данные о производительности элементов меню для матрицы BCG
+  menuItemPerformance?: {
+    dishId: number;
+    dishName: string;
+    salesCount: number;
+    revenue: number;
+    profitMargin: number;
+  }[];
+  
+  // Анализ производительности категорий
+  categoryPerformance?: Record<string, {
+    salesPercentage: number;
+    averageOrderValue: number;
+    averageProfitMargin: number;
+  }>;
 }
 
 // Метрики по клиентам
@@ -106,6 +128,10 @@ export interface CustomerMetrics {
   
   // Уровень удовлетворенности клиентов (средний рейтинг)
   customerSatisfaction: number;
+  // Средний рейтинг еды (из таблицы reviews, колонка food_rating)
+  foodRating: number;
+  // Средний рейтинг обслуживания (из таблицы reviews, колонка service_rating)
+  serviceRating: number;
   
   // Изменения в метриках (в процентах)
   newCustomersChange?: number;
@@ -124,6 +150,9 @@ export interface CustomerMetrics {
   
   // Распределение по времени посещений
   visitTimes?: Record<string, number>;
+  
+  // Частота посещений клиентов
+  visitFrequency?: Record<string, number>;
 }
 
 // Операционные метрики
@@ -189,4 +218,11 @@ export interface AnalyticsFilters {
   timeSlot?: string;
   dayOfWeek?: string;
   limit?: number;
+  useMockData?: boolean;
 } 
+
+// Типы периодов времени для фильтрации
+export type TimeRangeFilter = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+
+// Типы вкладок в аналитике
+export type AnalyticsTab = 'financial' | 'menu' | 'customers' | 'operational' | 'predictive'; 

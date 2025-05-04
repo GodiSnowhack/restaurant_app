@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {NextPage} from 'next';
 import {useRouter} from 'next/router';
 import Link from 'next/link';
@@ -12,9 +12,9 @@ import {
   LockClosedIcon, 
   UserGroupIcon, 
   CheckIcon, 
-  XMarkIcon
+  XMarkIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/solid';
-import {usersApi, authApi} from '../../../lib/api';
 
 // Типы ролей
 type Role = 'client' | 'admin' | 'waiter';
@@ -26,12 +26,66 @@ const roleOptions = [
   { id: 'waiter', name: 'Официант', description: 'Обслуживание столиков, прием заказов' }
 ];
 
+// Функция для проверки соединения с бэкендом через тестовый запрос
+const checkBackendConnection = async (): Promise<boolean> => {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    
+    // Делаем простой GET запрос к API, используя существующий эндпоинт users
+    console.log('Проверка соединения с бэкендом через запрос пользователей');
+    const response = await fetch(`${apiUrl}/users?limit=1`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    // 401 тоже считаем успешным соединением, т.к. это значит что сервер работает,
+    // просто требует авторизацию
+    const isAvailable = response.ok || response.status === 401;
+    console.log(`Соединение с бэкендом: ${isAvailable ? 'доступно' : 'недоступно'}, статус: ${response.status}`);
+    return isAvailable;
+  } catch (error) {
+    console.warn('Ошибка при проверке соединения с бэкендом:', error);
+    return false;
+  }
+};
+
+// Функция для прямого создания пользователя без использования API клиента
+const createUserDirectly = async (userData: any): Promise<any> => {
+  console.log('Прямое создание пользователя через fetch');
+  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  const response = await fetch(`${apiUrl}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(userData)
+  });
+  
+  const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('Ошибка при прямом создании пользователя:', {
+      status: response.status,
+      data
+    });
+    throw new Error(data.detail || 'Ошибка при создании пользователя');
+  }
+  
+  console.log('Пользователь успешно создан напрямую:', data);
+  return data;
+};
+
 const CreateUserPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   
   // Состояние формы
   const [formData, setFormData] = useState({
@@ -51,6 +105,17 @@ const CreateUserPage: NextPage = () => {
     full_name: '',
     phone: ''
   });
+
+  // Проверяем доступность бэкенда при загрузке компонента
+  useEffect(() => {
+    const checkConnection = async () => {
+      const isAvailable = await checkBackendConnection();
+      setBackendAvailable(isAvailable);
+      console.log('Бэкенд доступен:', isAvailable);
+    };
+    
+    checkConnection();
+  }, []);
   
   // Проверка прав администратора
   if (!isAuthenticated || user?.role !== 'admin') {
@@ -119,11 +184,22 @@ const CreateUserPage: NextPage = () => {
     return isValid;
   };
   
-  // Отправка формы
+  // Отправка формы напрямую через fetch
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
+    
+    // Предупреждение если бэкенд недоступен
+    if (backendAvailable === false) {
+      const confirmContinue = window.confirm(
+        'Сервер, похоже, недоступен. Хотите все равно попробовать создать пользователя?'
+      );
+      
+      if (!confirmContinue) {
+        return;
+      }
+    }
     
     try {
       setIsSubmitting(true);
@@ -132,27 +208,98 @@ const CreateUserPage: NextPage = () => {
       // Подготавливаем данные для API
       const userData = {
         email: formData.email,
-        password: formData.password,
+        password: formData.password, // передаем реальный пароль!
         full_name: formData.full_name,
         phone: formData.phone || undefined,
         role: formData.role
       };
       
-      // Вызываем API для создания пользователя
-      const response = await authApi.register(userData);
+      console.log('Создание пользователя с данными:', {
+        email: userData.email,
+        full_name: userData.full_name,
+        role: userData.role,
+        phone: userData.phone,
+        // НЕ выводим пароль в логи!
+      });
       
-      setIsSubmitting(false);
-      setSuccess(true);
-      
-      // Перенаправляем на страницу списка пользователей через 2 секунды
-      setTimeout(() => {
-        router.push('/admin/users');
-      }, 2000);
-      
+      // Пробуем создать пользователя напрямую
+      try {
+        // Прямой запрос к бэкенду
+        console.log('1. Попытка создания пользователя напрямую через бэкенд');
+        const data = await createUserDirectly(userData);
+        
+        // Успешное создание
+        setIsSubmitting(false);
+        setSuccess(true);
+        
+        console.log('Пользователь успешно создан, данные:', {
+          id: data.id,
+          email: data.email,
+          role: data.role,
+        });
+        
+        // Перенаправляем на страницу списка пользователей через 2 секунды
+        setTimeout(() => {
+          router.push('/admin/users');
+        }, 2000);
+        
+        return;
+      } catch (directError: any) {
+        console.error('Ошибка при прямом создании пользователя:', directError);
+        
+        // Пробуем через API прокси
+        try {
+          console.log('2. Попытка создания через прокси /api/admin/users/create');
+          const proxyResponse = await fetch('/api/admin/users/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData),
+          });
+          
+          const proxyData = await proxyResponse.json();
+          
+          if (!proxyResponse.ok) {
+            console.error('Ошибка в прокси:', proxyData);
+            throw new Error(proxyData.detail || 'Ошибка при создании пользователя через прокси');
+          }
+          
+          console.log('Пользователь успешно создан через прокси:', proxyData);
+          
+          setIsSubmitting(false);
+          setSuccess(true);
+          
+          // Перенаправляем на страницу списка пользователей
+          setTimeout(() => {
+            router.push('/admin/users');
+          }, 2000);
+          
+          return;
+        } catch (proxyError: any) {
+          console.error('Ошибка при создании через прокси:', proxyError);
+
+          // Формируем понятное сообщение об ошибке
+          let errorMessage = 'Не удалось создать пользователя';
+          
+          // Первое приоритетное сообщение - от ошибки прокси
+          if (proxyError.message && proxyError.message.includes('уже существует')) {
+            errorMessage = `Пользователь с email ${userData.email} уже существует`;
+          } else if (directError.message && directError.message.includes('уже существует')) {
+            errorMessage = `Пользователь с email ${userData.email} уже существует`;
+          } else {
+            errorMessage = proxyError.message || directError.message || 'Произошла ошибка при создании пользователя';
+          }
+          
+          setIsSubmitting(false);
+          setError(errorMessage);
+        }
+      }
     } catch (err: any) {
       setIsSubmitting(false);
-      setError(err.response?.data?.detail || 'Произошла ошибка при создании пользователя');
-      console.error('Ошибка создания пользователя:', err);
+      const errorMessage = err.message || 'Произошла непредвиденная ошибка при создании пользователя';
+      setError(errorMessage);
+      console.error('Общая ошибка создания пользователя:', err);
     }
   };
   
@@ -165,6 +312,17 @@ const CreateUserPage: NextPage = () => {
           </Link>
           <h1 className="text-3xl font-bold">Добавление пользователя</h1>
         </div>
+        
+        {/* Сообщение о доступности бэкенда */}
+        {backendAvailable === false && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+              <span className="font-bold">Предупреждение!</span>
+            </div>
+            <span className="block sm:inline">Сервер недоступен. Создание пользователя может не сработать.</span>
+          </div>
+        )}
         
         {success ? (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
@@ -181,6 +339,7 @@ const CreateUserPage: NextPage = () => {
                 <button 
                   className="absolute top-0 bottom-0 right-0 px-4 py-3"
                   onClick={() => setError('')}
+                  type="button"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>

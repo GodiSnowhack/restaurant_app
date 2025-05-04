@@ -1,6 +1,26 @@
 import axios, { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 // Импортируем модуль API бронирований
 import { reservationsApi } from './api/reservations-api';
+// Импортируем API для заказов и админ-панели
+import { ordersApi } from './api/orders';
+import adminApi from './api/admin-api';
+// Импортируем список публичных маршрутов
+import { PUBLIC_ROUTES } from '../pages/_app';
+
+// Интерфейс для типа пользователя
+export interface User {
+  id: number;
+  full_name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_login?: string;
+  orders_count?: number;
+  reservations_count?: number;
+}
 
 // Функция для определения правильного baseURL для API
 const getApiBaseUrl = () => {
@@ -73,7 +93,8 @@ const isTokenExpired = (token: string): boolean => {
     
     return expired;
   } catch (e) {
-    return false; // Если ошибка при декодировании, считаем что токен не истёк
+    console.error('Ошибка при декодировании токена:', e);
+    return true; // Если ошибка при декодировании, считаем что токен истёк для безопасности
   }
 };
 
@@ -106,11 +127,29 @@ const getAuthToken = (): string | null => {
 
 // Interceptor для добавления токена в заголовки
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const token = getAuthToken();
     
-    if (token && !isTokenExpired(token)) {
+    // Проверяем, есть ли токен
+    if (token) {
+      // Добавляем токен в заголовок авторизации без проверки истечения срока
       config.headers.Authorization = `Bearer ${token}`;
+      
+      // Также пробуем добавить ID пользователя из токена
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        const { sub } = JSON.parse(jsonPayload);
+        if (sub) {
+          config.headers['X-User-ID'] = sub;
+        }
+      } catch (e) {
+        console.error('Ошибка при добавлении ID пользователя из токена:', e);
+      }
     }
     
     // Проверяем, является ли запрос регистрацией
@@ -138,10 +177,17 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    const isMobile = typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+  async (error) => {
+    // Проверяем, является ли этот запрос повторным
+    const isRetry = error.config && error.config._isRetry;
     
-    // Сохраняем информацию о последней ошибке для диагностики
+    // Если это повторный запрос, не пытаемся снова обновить токен
+    if (isRetry) {
+      console.log('API: Ошибка при повторном запросе после обновления токена');
+      return Promise.reject(error);
+    }
+    
+    // Логируем информацию об ошибке
     if (typeof window !== 'undefined') {
       try {
         const lastErrors = JSON.parse(localStorage.getItem('api_last_errors') || '[]');
@@ -151,9 +197,7 @@ api.interceptors.response.use(
           method: error.config?.method?.toUpperCase(),
           status: error.response?.status,
           data: error.response?.data,
-          message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-          isMobile
+          message: error.message
         };
         
         // Сохраняем последние 5 ошибок
@@ -166,121 +210,107 @@ api.interceptors.response.use(
       }
     }
     
-    if (error.response) {
-      // Сервер вернул статус отличный от 2xx
-      console.error('API Response Error:', {
-        message: error.message,
-        status: error.response.status,
-        data: error.response.data
-      });
+    // Если у нас ошибка авторизации (401), попробуем обновить токен
+    if (error.response && error.response.status === 401) {
+      console.log('API: Получена ошибка 401, пробуем обновить токен');
       
-      // Преобразуем ошибку в строку, если это объект
-      if (error.response.data && typeof error.response.data === 'object') {
-        if (error.response.data.detail) {
-          if (typeof error.response.data.detail === 'string') {
-            error.response.data.detail = error.response.data.detail;
-          } else if (Array.isArray(error.response.data.detail)) {
-            error.response.data.detail = error.response.data.detail.map((err: any) => {
-              if (err.loc && err.msg) {
-                const field = err.loc.slice(1).join('.') || 'значение';
-                return `Поле "${field}": ${err.msg}`;
-              }
-              return typeof err === 'string' ? err : JSON.stringify(err);
-            }).join('\n');
-          } else {
-            error.response.data.detail = JSON.stringify(error.response.data.detail);
-          }
-        } else {
-          error.response.data.detail = JSON.stringify(error.response.data);
+      // Предотвращаем частое обновление токена
+      const tokenRefreshKey = 'token_refresh_attempt_timestamp';
+      const lastRefreshAttempt = localStorage.getItem(tokenRefreshKey);
+      
+      if (lastRefreshAttempt) {
+        const timeSinceLastRefresh = Date.now() - parseInt(lastRefreshAttempt);
+        if (timeSinceLastRefresh < 10000) { // 10 секунд
+          console.log(`API: Предотвращение цикла обновления токена (прошло ${Math.round(timeSinceLastRefresh/1000)}с)`);
+          return Promise.reject(error);
         }
       }
       
-      // Обрабатываем ошибку авторизации
-      if (error.response.status === 401) {
-        console.warn('Получена ошибка 401, возможно токен истек');
-        
-        // На мобильных устройствах не удаляем токен и не перенаправляем сразу,
-        // чтобы дать возможность обработать ошибку и повторить запрос
-        if (!isMobile) {
-        localStorage.removeItem('token');
+      // Сохраняем временную метку попытки обновления токена
+      localStorage.setItem(tokenRefreshKey, Date.now().toString());
+      
+      // Пробуем обновить токен
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        try {
+          console.log('API: Отправляем запрос на обновление токена');
           
-        // Если не находимся на странице авторизации, перенаправляем
-        if (typeof window !== 'undefined' && window.location.pathname !== '/auth/login') {
-          window.location.href = '/auth/login';
+          // Отправляем запрос на обновление токена
+          const refreshResponse = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+          });
+          
+          if (refreshResponse.ok) {
+            const tokenData = await refreshResponse.json();
+            
+            if (tokenData.access_token) {
+              console.log('API: Токен успешно обновлен, повторяем исходный запрос');
+              
+              // Сохраняем новый токен
+              localStorage.setItem('token', tokenData.access_token);
+              
+              // Сохраняем новый refresh_token, если он есть
+              if (tokenData.refresh_token) {
+                localStorage.setItem('refresh_token', tokenData.refresh_token);
+              }
+              
+              // Обновляем заголовок Authorization
+              error.config.headers.Authorization = `Bearer ${tokenData.access_token}`;
+              
+              // Помечаем запрос как повторный
+              error.config._isRetry = true;
+              
+              // Повторяем исходный запрос с новым токеном
+              return api(error.config);
+            }
+          } else {
+            console.log('API: Ошибка при обновлении токена:', refreshResponse.status);
+            
+            // Очищаем токены при ошибке обновления
+            localStorage.removeItem('token');
+            localStorage.removeItem('refresh_token');
           }
-        } else {
-          console.log('Мобильное устройство: ошибка 401 будет обработана локально');
+        } catch (refreshError) {
+          console.error('API: Ошибка при обновлении токена:', refreshError);
         }
-      }
-    } else if (error.request) {
-      // Запрос был создан, но ответ не получен (ошибка сети)
-      console.error('API Response Error:', {
-        message: error.message,
-        response: 'No response',
-        request: 'Request was sent',
-      });
-      
-      // Для мобильных устройств отображаем более подробную ошибку
-      if (isMobile) {
-        const networkDiagnostics = {
-          timestamp: new Date().toISOString(),
-          online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
-          userAgent: navigator.userAgent,
-          url: error.config?.url,
-          method: error.config?.method
-        };
-        
-        console.log('Мобильное устройство: диагностика сети', networkDiagnostics);
-        
-        try {
-          localStorage.setItem('network_diagnostics', JSON.stringify(networkDiagnostics));
-        } catch (e) {
-          console.error('Не удалось сохранить диагностику сети:', e);
-        }
-        
-        error.response = { 
-          data: { 
-            detail: `Ошибка сети: ${error.message}. Проверьте подключение к интернету и повторите попытку.` 
-          } 
-        };
       } else {
-      error.response = { data: { detail: 'Ошибка сети. Пожалуйста, проверьте подключение к интернету.' } };
+        console.log('API: Отсутствует refresh_token');
       }
-    } else {
-      // Произошла ошибка во время создания запроса
-      console.error('API Error:', error.message);
-      error.response = { data: { detail: error.message } };
     }
     
-    // Дополнительное логирование для сетевых ошибок
-    if (error.code === 'ECONNABORTED' || error.message.includes('Network Error')) {
-      console.error('Ошибка сети или таймаут запроса', error);
-      
-      // Для мобильных устройств пытаемся сохранить информацию о сети
-      if (isMobile && typeof navigator !== 'undefined') {
-        const connectionInfo = {
-          online: navigator.onLine,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          url: error.config?.url,
-          method: error.config?.method
-        };
-        
-        console.log('Информация о подключении:', connectionInfo);
-        
-        try {
-          localStorage.setItem('last_connection_error', JSON.stringify(connectionInfo));
-        } catch (e) {
-          console.error('Не удалось сохранить информацию о подключении:', e);
-        }
-      }
-      
-      error.response = { data: { detail: 'Ошибка сети или таймаут запроса. Пожалуйста, попробуйте позже.' } };
-    }
-    
+    // Для всех остальных ошибок просто возвращаем reject
     return Promise.reject(error);
   }
 );
+
+// Функция для очистки данных авторизации
+const clearAuth = () => {
+  console.log('API: Очистка данных авторизации');
+  
+  try {
+    // Сохраняем копии для диагностики
+    const token = localStorage.getItem('token');
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    if (token || refreshToken) {
+      localStorage.setItem('last_cleared_token', token || '');
+      localStorage.setItem('last_cleared_refresh_token', refreshToken || '');
+      localStorage.setItem('auth_cleared_timestamp', Date.now().toString());
+    }
+    
+    // Удаляем токены
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    
+    // Также сбрасываем состояние
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+  } catch (e) {
+    console.error('API: Ошибка при очистке данных авторизации:', e);
+  }
+};
 
 // Типы для API запросов
 export interface LoginCredentials {
@@ -308,6 +338,8 @@ export interface UserProfile {
   phone?: string;
   role: string;
   is_active: boolean;
+  birthday?: string; // в формате YYYY-MM-DD
+  age_group?: string; // 'child', 'teenager', 'young', 'adult', 'middle', 'senior'
   created_at: string;
   updated_at: string;
 }
@@ -646,10 +678,113 @@ export const authApi = {
   },
   
   register: async (credentials: RegisterCredentials) => {
-    console.log('API: Отправляем запрос на регистрацию с данными:', credentials);
-    const response = await api.post<UserProfile>('/auth/register', credentials);
-    console.log('API: Получен ответ на регистрацию:', response.data);
-    return response.data;
+    console.log('API: Отправляем запрос на регистрацию с данными:', {
+      ...credentials,
+      password: '********' // Маскируем пароль в логах
+    });
+    try {
+      // Попробуем сначала через прямой прокси - самый надежный вариант
+      try {
+        console.log('API: Отправка запроса через прямой прокси /api/auth/register-direct');
+        const directResponse = await fetch('/api/auth/register-direct', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(credentials),
+        });
+        
+        const data = await directResponse.json();
+        
+        if (!directResponse.ok) {
+          console.error('API: Ошибка при регистрации через прямой прокси:', data);
+          throw new Error(data.detail || 'Ошибка при регистрации');
+        }
+        
+        console.log('API: Получен ответ от прямого прокси:', data);
+        return data;
+      } catch (directError) {
+        console.error('API: Ошибка при регистрации через прямой прокси:', directError);
+        
+        // Если прямой прокси не сработал, пробуем через обычный прокси
+        try {
+          console.log('API: Пробуем обычный прокси /api/auth/register');
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(credentials),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('API: Ошибка при регистрации через обычный прокси:', data);
+            throw new Error(data.detail || 'Ошибка при регистрации');
+          }
+          
+          console.log('API: Получен ответ от обычного прокси:', data);
+          return data;
+        } catch (primaryError) {
+          console.error('API: Ошибка при регистрации через обычный прокси:', primaryError);
+          
+          // Если и обычный прокси не сработал, перепробуем оставшиеся варианты
+          // Резервный прокси и прямой запрос к бэкенду
+          try {
+            console.log('API: Пробуем резервный прокси-эндпоинт /api/v1/auth/register');
+            const fallbackResponse = await fetch('/api/v1/auth/register', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(credentials),
+            });
+            
+            const fallbackData = await fallbackResponse.json();
+            
+            if (!fallbackResponse.ok) {
+              console.error('API: Ошибка при регистрации через резервный прокси:', fallbackData);
+              throw new Error(fallbackData.detail || 'Ошибка при регистрации');
+            }
+            
+            console.log('API: Получен ответ от резервного прокси:', fallbackData);
+            return fallbackData;
+          } catch (fallbackError: any) {
+            console.error('API: Ошибка при использовании резервного прокси:', fallbackError);
+            
+            // Последняя попытка - прямой вызов к бэкенду (может не сработать из-за CORS)
+            console.log('API: Последняя попытка - прямой вызов к бэкенду');
+            try {
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+              const directResponse = await fetch(`${apiUrl}/auth/register`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentials),
+              });
+              
+              const directData = await directResponse.json();
+              
+              if (!directResponse.ok) {
+                console.error('API: Ошибка при прямом вызове бэкенда:', directData);
+                throw new Error(directData.detail || 'Ошибка при регистрации');
+              }
+              
+              console.log('API: Прямой вызов бэкенда успешен:', directData);
+              return directData;
+            } catch (directError: any) {
+              console.error('API: Все попытки регистрации завершились неудачей:', directError);
+              throw directError || fallbackError || primaryError || directError;
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('API: Критическая ошибка при регистрации:', error);
+      throw new Error(error.message || 'Произошла непредвиденная ошибка при регистрации пользователя');
+    }
   },
   
   logout: () => {
@@ -1885,1820 +2020,203 @@ export const menuApi = {
         throw new Error('Отсутствуют обязательные поля: название, цена или категория');
       }
       
-      // Добавляем timestamp для проверки кэширования
-      const timestamp = new Date().getTime();
-      const url = `/menu/dishes/${id}?_=${timestamp}`;
-      
-      // Отправляем запрос с дополнительными настройками
-      const response = await api.put(url, dishData, {
-        timeout: 30000, // увеличенный таймаут
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      console.log(`API updateDish - Блюдо с ID ${id} успешно обновлено:`, response.data);
-      
-      // Гарантированно инвалидируем кэш
-      menuApi._cachedDishes = null;
-      menuApi._lastDishesUpdate = 0;
-      
-      // Также очищаем localStorage кэш
-      try {
-        localStorage.removeItem('cached_dishes');
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('cached_dishes_')) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (e) {
-        console.error('API updateDish - Ошибка при очистке локального кэша:', e);
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при обновлении блюда с ID ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  deleteDish: async (id: number) => {
-    try {
-      const response = await api.delete(`/menu/dishes/${id}`);
-      // Инвалидируем кэш блюд
-      menuApi._cachedDishes = null;
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при удалении блюда с ID ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  createCategory: async (categoryData: any) => {
-    const response = await api.post('/menu/categories', categoryData);
-    return response.data;
-  },
-  
-  updateCategory: async (id: number, categoryData: any) => {
-    const response = await api.put(`/menu/categories/${id}`, categoryData);
-    return response.data;
-  },
-  
-  deleteCategory: async (id: number) => {
-    const response = await api.delete(`/menu/categories/${id}`);
-    return response.data;
-  },
-  
-  uploadDishImage: async (file: File) => {
-    try {
-      console.log('API uploadDishImage - Загрузка изображения:', file.name);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Ошибка загрузки изображения: ${response.statusText}`);
-      }
-      
-      const data = await response.json() as FileUploadResponse;
-      console.log('API uploadDishImage - Успешный ответ:', data);
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Неизвестная ошибка при загрузке изображения');
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('API uploadDishImage - Ошибка:', error);
-      throw error;
-    }
-  },
-  
-  deleteDishImage: async (filename: string) => {
-    try {
-      console.log('API deleteDishImage - Удаление изображения:', filename);
-      
-      // Извлекаем только имя файла из URL, если передан полный URL
-      const filenamePart = filename.includes('/') 
-        ? filename.split('/').pop() 
-        : filename;
-        
-      if (!filenamePart) {
-        throw new Error('Невозможно определить имя файла из URL');
-      }
-      
-      const response = await fetch(`/api/delete-image?filename=${encodeURIComponent(filenamePart)}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Ошибка удаления изображения: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('API deleteDishImage - Успешный ответ:', data);
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Неизвестная ошибка при удалении изображения');
-      }
-      
-      return true;
-    } catch (error: any) {
-      console.error('API deleteDishImage - Ошибка:', error);
-      throw error;
-    }
-  }
-};
-
-// Функция получения заголовков авторизации для запросов к API
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAuthToken();
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-};
-
-// Универсальная функция для выполнения fetch с таймаутом
-const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
-  const controller = new AbortController();
-  const { signal } = controller;
-  
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, { ...options, signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-};
-
-export const ordersApi = {
-  _cachedOrders: null as any[] | null,
-  _lastOrdersUpdate: 0,
-  
-  getOrders: async (params?: any): Promise<any[]> => {
-    const startTime = Date.now();
-    const requestInfo = {
-      method: 'getOrders',
-      isMobile: false,
-      fromCache: false,
-      successPath: 'unknown',
-      duration: 0,
-      error: null as string | null
-    };
-    
-    try {
-      const isMobile = isMobileDevice();
-      requestInfo.isMobile = isMobile;
-      
-      // Проверяем кэш
-      const now = Date.now();
-      if (ordersApi._cachedOrders && (now - ordersApi._lastOrdersUpdate) < 2 * 60 * 1000) {
-        console.log('API getOrders - Используем кэшированные заказы');
-        requestInfo.fromCache = true;
-        requestInfo.successPath = 'memory-cache';
-        return ordersApi._cachedOrders;
-      }
-      
-      // Проверяем сетевое подключение
+      // Проверяем соединение перед запросом
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        console.warn('API getOrders - Нет подключения к сети');
-        requestInfo.error = 'no-network-connection';
-        
-        // Проверяем кэш
-        if (ordersApi._cachedOrders) {
-          requestInfo.successPath = 'memory-cache-offline';
-          return ordersApi._cachedOrders;
-        }
-        
-        // Проверяем локальный кэш
-        try {
-          const cachedData = localStorage.getItem('cached_orders');
-          if (cachedData) {
-            const parsed = JSON.parse(cachedData);
-            ordersApi._cachedOrders = parsed;
-            requestInfo.successPath = 'localStorage-offline';
-            return parsed;
-          }
-        } catch (e) {
-          console.error('API getOrders - Ошибка при чтении локального кэша:', e);
-          requestInfo.error = 'localStorage-error';
-        }
-        
-        return [];
+        console.warn('API updateDish - Отсутствует подключение к интернету, возвращаем демо-ответ');
+        return {
+          id,
+          ...dishData,
+          updated: true,
+          message: 'Блюдо обновлено локально (нет подключения к интернету)',
+          demo: true
+        };
       }
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      // Получаем токен для запроса
       const token = localStorage.getItem('token');
-      
       if (!token) {
-        throw new Error('Токен авторизации отсутствует');
-      }
-      
-      // Формируем URL для запроса
-      let url = '';
-      let fetchOptions: RequestInit = {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        cache: 'no-store',
-        credentials: 'include'
-      };
-      
-      if (isMobile) {
-        // Прямой запрос к API для мобильных устройств
-        url = `${apiUrl}/orders`;
-        fetchOptions.mode = 'cors';
-        fetchOptions.headers = {
-          ...fetchOptions.headers,
-          'X-Mobile-Request': 'true'
+        console.warn('API updateDish - Отсутствует токен авторизации, возвращаем демо-ответ');
+        return {
+          id,
+          ...dishData,
+          updated: true,
+          message: 'Блюдо обновлено локально (нет токена авторизации)',
+          demo: true
         };
-      } else {
-        // Запрос через прокси для десктопа
-        url = typeof window !== 'undefined' 
-          ? `${window.location.origin}/api/orders?_=${Date.now()}` 
-          : '/api/orders';
       }
       
-      console.log(`API getOrders - Отправка запроса на ${url}`);
+      // Добавляем timestamp для предотвращения кэширования
+      const timestamp = new Date().getTime() + Math.floor(Math.random() * 1000);
       
-      // Используем fetch с таймаутом
-      const controller = new AbortController();
-      const { signal } = controller;
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
+      // ИСПОЛЬЗУЕМ НОВЫЙ ПРОКСИ: /api/menu/dishes/[id]
       try {
-        const response = await fetch(url, { ...fetchOptions, signal });
-        clearTimeout(timeoutId);
+        console.log('API updateDish - Используем оптимизированный локальный прокси для обновления блюда');
         
-        if (!response.ok) {
-          throw new Error(`Ошибка при получении заказов: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('API getOrders - Успешно получены заказы');
-        
-        // Кэшируем результаты
-        ordersApi._cachedOrders = data;
-        ordersApi._lastOrdersUpdate = now;
-        
-        // Сохраняем в localStorage для офлайн-доступа
-        try {
-          localStorage.setItem('cached_orders', JSON.stringify(data));
-          localStorage.setItem('orders_update_time', String(now));
-        } catch (e) {
-          console.error('API getOrders - Ошибка при сохранении кэша:', e);
-        }
-        
-        requestInfo.successPath = 'fetch-success';
-        return data;
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        console.error('API getOrders - Ошибка запроса:', fetchError);
-        requestInfo.error = `fetch-error: ${fetchError.message}`;
-        
-        // Пробуем восстановить из localStorage в случае ошибки
-        try {
-          const cachedData = localStorage.getItem('cached_orders');
-          if (cachedData) {
-            console.log('API getOrders - Восстановление из localStorage после ошибки');
-            const parsed = JSON.parse(cachedData);
-            requestInfo.successPath = 'localStorage-after-error';
-            return parsed;
-          }
-        } catch (e) {
-          console.error('API getOrders - Ошибка чтения из localStorage:', e);
-        }
-        
-        // Возвращаем кэшированные данные в случае ошибки
-        if (ordersApi._cachedOrders) {
-          requestInfo.successPath = 'memory-cache-after-error';
-          return ordersApi._cachedOrders;
-        }
-        
-        throw fetchError;
-      }
-    } catch (error: any) {
-      console.error('API getOrders - Ошибка при получении заказов:', error);
-      requestInfo.error = `final-error: ${error.message}`;
-      
-      // Если все методы не удались, возвращаем пустой массив
-      return [];
-    } finally {
-      // Завершаем замер времени
-      requestInfo.duration = Date.now() - startTime;
-      console.log('API getOrders - Диагностика:', requestInfo);
-    }
-  },
-  
-  getOrderById: async (id: number): Promise<any> => {
-    try {
-      const isMobile = isMobileDevice();
-        const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Токен авторизации отсутствует');
-      }
-      
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      
-      // Формируем URL для запроса
-      let url = '';
-      let fetchOptions: RequestInit = {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        cache: 'no-store',
-        credentials: 'include'
-      };
-      
-      if (isMobile) {
-        // Прямой запрос к API для мобильных устройств
-        url = `${apiUrl}/orders/${id}`;
-        fetchOptions.mode = 'cors';
-        fetchOptions.headers = {
-          ...fetchOptions.headers,
-          'X-Mobile-Request': 'true'
-        };
-      } else {
-        // Запрос через прокси для десктопа
-        url = typeof window !== 'undefined' 
-          ? `${window.location.origin}/api/orders/${id}?_=${Date.now()}` 
-          : `/api/orders/${id}`;
-      }
-      
-      console.log(`API getOrderById - Отправка запроса на ${url}`);
-      
-      // Используем fetch с таймаутом
-      const controller = new AbortController();
-      const { signal } = controller;
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      try {
-        const response = await fetch(url, { ...fetchOptions, signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`Ошибка при получении заказа: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('API getOrderById - Успешно получен заказ');
-        
-        return data;
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        console.error('API getOrderById - Ошибка запроса:', fetchError);
-        throw fetchError;
-      }
-    } catch (error) {
-      console.error(`API getOrderById - Ошибка при получении заказа с ID ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  createOrder: async (orderData: any): Promise<any> => {
-    const startTime = Date.now();
-    const requestInfo = {
-      startTime,
-      method: 'createOrder',
-      device: isMobileDevice() ? 'mobile' : 'desktop', 
-      attempts: 0,
-      successPath: '',
-      networkError: false,
-      timeoutError: false,
-      error: null as any,
-      errorType: '',
-      duration: 0
-    };
-    
-    try {
-      console.log('API createOrder - Создание заказа:', orderData);
-      requestInfo.attempts++;
-      
-      let endpoint = '/api/orders';
-      
-      // На мобильных устройствах используем прямой запрос к API
-      if (isMobileDevice()) {
-        endpoint = `${API_URL}/api/v1/orders`;
-      }
-      
-      const response = await fetchWithTimeout(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          ...getAuthHeaders()
-          },
-          body: JSON.stringify(orderData)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-        console.error('API createOrder - Ошибка при создании заказа:', errorData);
-        requestInfo.errorType = 'server';
-        requestInfo.error = errorData;
-        throw new Error(errorData.detail || 'Ошибка при создании заказа');
-        }
-        
-        const data = await response.json();
-      console.log('API createOrder - Заказ успешно создан:', data);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      requestInfo.successPath = 'api-success';
-      requestInfo.duration = Date.now() - startTime;
-      
-        return data;
-    } catch (error: any) {
-      console.error('API createOrder - Ошибка при создании заказа:', error);
-      requestInfo.error = `final-error: ${error.message}`;
-      requestInfo.errorType = 'client';
-      requestInfo.duration = Date.now() - startTime;
-      return requestInfo;
-    }
-  },
-  
-  updateOrder: async (orderId: string, updateData: any): Promise<any> => {
-    const startTime = Date.now();
-    const requestInfo = {
-      startTime,
-      method: 'updateOrder',
-      device: isMobileDevice() ? 'mobile' : 'desktop',
-      attempts: 0,
-      successPath: '',
-      networkError: false,
-      timeoutError: false,
-      error: null as any,
-      errorType: '',
-      duration: 0,
-      orderId: orderId
-    };
-    
-    try {
-      console.log(`API updateOrder - Обновление заказа ${orderId}:`, updateData);
-      requestInfo.attempts++;
-      
-      let endpoint = `/api/orders/${orderId}`;
-      
-      // На мобильных устройствах используем прямой запрос к API
-      if (isMobileDevice()) {
-        endpoint = `${API_URL}/api/v1/orders/${orderId}`;
-      }
-      
-      // Изменяем метод с PATCH на PUT для соответствия серверному API
-      const response = await fetchWithTimeout(endpoint, {
-        method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          ...getAuthHeaders()
-        },
-        body: JSON.stringify(updateData)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-        console.error(`API updateOrder - Ошибка при обновлении заказа ${orderId}:`, errorData);
-        requestInfo.errorType = 'server';
-        requestInfo.error = errorData;
-        throw new Error(errorData.detail || 'Ошибка при обновлении заказа');
-        }
-        
-        const data = await response.json();
-      console.log(`API updateOrder - Заказ ${orderId} успешно обновлен:`, data);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      requestInfo.successPath = 'api-success';
-      requestInfo.duration = Date.now() - startTime;
-      
-        return data;
-    } catch (error: any) {
-      console.error('API updateOrder - Ошибка при обновлении заказа:', error);
-      requestInfo.error = `final-error: ${error.message}`;
-      requestInfo.errorType = 'client';
-      requestInfo.duration = Date.now() - startTime;
-      return requestInfo;
-    }
-  },
-  
-  deleteOrder: async (id: string): Promise<any> => {
-    const startTime = Date.now();
-    const requestInfo = {
-      startTime,
-      method: 'deleteOrder',
-      device: isMobileDevice() ? 'mobile' : 'desktop',
-      attempts: 0,
-      successPath: '',
-      networkError: false,
-      timeoutError: false,
-      error: null as any,
-      errorType: '',
-      duration: 0,
-      orderId: id
-    };
-    
-    try {
-      console.log(`API deleteOrder - Удаление заказа ${id}:`);
-      requestInfo.attempts++;
-      
-      let endpoint = `/api/orders/${id}`;
-      
-      // На мобильных устройствах используем прямой запрос к API
-      if (isMobileDevice()) {
-        endpoint = `${API_URL}/api/v1/orders/${id}`;
-      }
-      
-      const response = await fetchWithTimeout(endpoint, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-        console.error(`API deleteOrder - Ошибка при удалении заказа ${id}:`, errorData);
-        requestInfo.errorType = 'server';
-        requestInfo.error = errorData;
-        throw new Error(errorData.detail || 'Ошибка при удалении заказа');
-        }
-        
-        const data = await response.json();
-      console.log(`API deleteOrder - Заказ ${id} успешно удален:`, data);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      requestInfo.successPath = 'api-success';
-      requestInfo.duration = Date.now() - startTime;
-      
-        return data;
-    } catch (error: any) {
-      console.error('API deleteOrder - Ошибка при удалении заказа:', error);
-      requestInfo.error = `final-error: ${error.message}`;
-      requestInfo.errorType = 'client';
-      requestInfo.duration = Date.now() - startTime;
-      return requestInfo;
-    }
-  },
-  
-  // Метод для привязки заказа к официанту
-  assignOrderToWaiter: async (orderId: number, orderCode: string): Promise<any> => {
-    try {
-      const isMobile = isMobileDevice();
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Токен авторизации отсутствует');
-      }
-      
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      
-      // Формируем URL для запроса
-      let url = '';
-      let fetchOptions: RequestInit = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({ order_code: orderCode }),
-        cache: 'no-store',
-        credentials: 'include'
-      };
-      
-      if (isMobile) {
-        // Прямой запрос к API для мобильных устройств
-        url = `${apiUrl}/orders/${orderId}/assign`;
-        fetchOptions.mode = 'cors';
-        fetchOptions.headers = {
-          ...fetchOptions.headers,
-          'X-Mobile-Request': 'true'
-        };
-      } else {
-        // Запрос через прокси для десктопа
-        url = typeof window !== 'undefined' 
-          ? `${window.location.origin}/api/orders/${orderId}/assign` 
-          : `/api/orders/${orderId}/assign`;
-      }
-      
-      console.log(`API assignOrderToWaiter - Отправка запроса на ${url}`);
-      
-      const response = await fetch(url, fetchOptions);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Ошибка при привязке заказа: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('API assignOrderToWaiter - Заказ успешно привязан:', data);
-      
-      return data;
-    } catch (error: any) {
-      console.error('API assignOrderToWaiter - Ошибка при привязке заказа:', error);
-      throw new Error(error.message || 'Не удалось привязать заказ к официанту');
-    }
-  },
-  
-  // Метод для получения заказов, назначенных официанту
-  getWaiterOrders: async (): Promise<any[]> => {
-    try {
-      console.log('API getWaiterOrders - Начало запроса');
-      
-      // Получаем токен и проверяем роль пользователя
-      const token = getAuthToken();
-      
-      if (!token) {
-        console.error('API getWaiterOrders - Отсутствует токен авторизации');
-        throw new Error('Необходимо авторизоваться');
-      }
-      
-      // Проверяем сохраненную информацию о пользователе
-      let userRole = 'unknown';
-      let userId = null;
-      try {
-        const userInfo = localStorage.getItem('user');
-        if (userInfo) {
-          const user = JSON.parse(userInfo);
-          userRole = user.role || 'unknown';
-          userId = user.id;
-          console.log(`API getWaiterOrders - Роль пользователя: ${userRole}, ID: ${userId}`);
-        }
-      } catch (e) {
-        console.warn('API getWaiterOrders - Не удалось получить информацию о пользователе', e);
-    }
-      
-      // Разрешаем доступ для ролей waiter и admin
-      const allowedRoles = ['waiter', 'admin'];
-      const hasAccess = allowedRoles.includes(userRole);
-      
-      // Используем разные подходы для получения заказов
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      
-      // Первый вариант: используем прокси API
-      try {
-        // Используем локальный прокси для обхода CORS и проблем с авторизацией
+        // Формируем URL для запроса через прокси
         const proxyUrl = typeof window !== 'undefined' 
-          ? `${window.location.origin}/api/waiter/simple-orders${userRole === 'admin' ? '?role=admin' : ''}` 
-          : `/api/waiter/simple-orders${userRole === 'admin' ? '?role=admin' : ''}`;
+          ? `${window.location.origin}/api/menu/dishes/${id}?_=${timestamp}` 
+          : `/api/menu/dishes/${id}?_=${timestamp}`;
       
-        console.log(`API getWaiterOrders - Отправка запроса через прокси: ${proxyUrl}`);
+        console.log(`API updateDish - Отправляем запрос на: ${proxyUrl}`);
       
+        // Отправляем запрос через прокси с обязательным токеном авторизации
         const proxyResponse = await fetch(proxyUrl, {
-        method: 'GET',
+          method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole, // Добавляем роль в заголовок
-            'X-User-ID': userId ? userId.toString() : '' // Добавляем ID пользователя
+            'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
           },
-          cache: 'no-store'
-      });
-      
+          body: JSON.stringify(dishData)
+        });
+        
+        // Получаем ответ
+        const responseData = await proxyResponse.json();
+        
+        // Проверяем успешность обновления
         if (proxyResponse.ok) {
-          const data = await proxyResponse.json();
-          console.log(`API getWaiterOrders - Получено ${Array.isArray(data) ? data.length : 0} заказов через прокси`);
+          console.log(`API updateDish - Блюдо с ID ${id} успешно обновлено:`, responseData);
+      
+          // Гарантированно инвалидируем кэш
+          menuApi._cachedDishes = null;
+          menuApi._lastDishesUpdate = 0;
           
-          // Проверяем, что данные являются массивом
-          if (!Array.isArray(data)) {
-            console.warn('API getWaiterOrders - Данные не являются массивом:', data);
-            return data ? [data] : [];
+          // Также очищаем localStorage кэш
+          try {
+            localStorage.removeItem('cached_dishes');
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('cached_dishes_')) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (e) {
+            console.error('API updateDish - Ошибка при очистке локального кэша:', e);
           }
+      } else {
+          console.error(`API updateDish - Ошибка при обновлении блюда: ${proxyResponse.status}`, responseData);
           
-      return data;
-        } else {
-          console.warn(`API getWaiterOrders - Прокси вернул ошибку: ${proxyResponse.status}`);
-        }
-      } catch (proxyError) {
-        console.error('API getWaiterOrders - Ошибка при использовании прокси:', proxyError);
-    }
-      
-      // Второй вариант: прямой запрос через waiter/orders (для ролей waiter и admin)
-      if (hasAccess) {
-        try {
-          const url = `${apiUrl}/waiter/orders`;
-          console.log(`API getWaiterOrders - Прямой запрос на ${url}`);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'X-User-Role': userRole
-        },
-        cache: 'no-store'
-      });
-      
-          if (response.ok) {
-      const data = await response.json();
-            console.log(`API getWaiterOrders - Получено ${Array.isArray(data) ? data.length : 0} заказов через /waiter/orders`);
-            return Array.isArray(data) ? data : data ? [data] : [];
-          } else {
-            console.warn(`API getWaiterOrders - /waiter/orders вернул ошибку: ${response.status}`);
-      }
-        } catch (directError) {
-          console.error('API getWaiterOrders - Ошибка при прямом запросе на /waiter/orders:', directError);
-        }
-      }
-      
-      // Третий вариант: запрос к /orders/waiter
-      try {
-        const fallbackUrl = `${apiUrl}/orders/waiter`;
-        console.log(`API getWaiterOrders - Отправка запроса на ${fallbackUrl}`);
-        
-        const fallbackResponse = await fetch(fallbackUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole
-          },
-          cache: 'no-store'
-        });
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          console.log(`API getWaiterOrders - Получено ${Array.isArray(fallbackData) ? fallbackData.length : 0} заказов через /orders/waiter`);
-          return Array.isArray(fallbackData) ? fallbackData : fallbackData ? [fallbackData] : [];
-        } else {
-          console.warn(`API getWaiterOrders - /orders/waiter вернул ошибку: ${fallbackResponse.status}`);
-          
-          // Информативная диагностика
-          if (fallbackResponse.status === 422) {
-            const errorText = await fallbackResponse.text();
-            console.error('API getWaiterOrders - Подробности ошибки 422:', errorText);
-          }
-        }
-      } catch (fallbackError) {
-        console.error('API getWaiterOrders - Ошибка при запросе через /orders/waiter:', fallbackError);
-      }
-      
-      // Четвертый вариант: опция отладки в fallback-режиме
-      console.log('API getWaiterOrders - Все методы получения заказов не удались, возвращаем тестовые данные');
-      
-      // Возвращаем пустой список заказов вместо ошибки для лучшего UX
-      return [];
-    } catch (error: any) {
-      console.error('API getWaiterOrders - Критическая ошибка:', error);
-      return [];
-    }
-  },
-  
-  getOrders: async (): Promise<Order[]> => {
-    return waiterApi.getWaiterOrders();
-  },
-
-  updateOrder: async (orderId: string, updateData: {status?: string}): Promise<Order> => {
-    try {
-      console.log(`waiterApi.updateOrder - Обновление заказа ${orderId}`, updateData);
-      
-      // Получаем токен
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-      
-      // Формируем URL для запроса
-      const url = `${getApiBaseUrl()}/orders/${orderId}`;
-      
-      // Прямой запрос через Fetch API с кастомной обработкой ошибок
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      });
-      
-      // Обрабатываем ответ
-      const contentType = response.headers.get('content-type');
-      const isJson = contentType && contentType.includes('application/json');
-      
-      if (!response.ok) {
-        // Если сервер вернул ошибку, пробуем прочитать сообщение
-        const errorData = isJson ? await response.json() : await response.text();
-        console.error(`waiterApi.updateOrder - Ошибка сервера при обновлении заказа ${orderId}:`, errorData);
-        
-        // Пробуем запасной путь через прокси
-        console.log(`waiterApi.updateOrder - Попытка обновления через прокси-эндпоинт`);
-        const proxyUrl = `/api/waiter/update-order/${orderId}`;
-        
-        const proxyResponse = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(updateData)
-        });
-        
-        if (!proxyResponse.ok) {
-          const proxyErrorData = await proxyResponse.text();
-          console.error(`waiterApi.updateOrder - Ошибка прокси при обновлении заказа ${orderId}:`, proxyErrorData);
-          throw new Error('Не удалось обновить заказ. Пожалуйста, попробуйте позже.');
-        }
-        
-        const proxyData = await proxyResponse.json();
-        return proxyData;
-      }
-      
-      // Успешный ответ
-      const data = await response.json();
-      console.log(`waiterApi.updateOrder - Заказ ${orderId} успешно обновлен`);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      return data;
-    } catch (error: any) {
-      console.error(`waiterApi.updateOrder - Критическая ошибка при обновлении заказа ${orderId}:`, error);
-      throw new Error('Не удалось обновить статус заказа: ' + (error.message || 'Неизвестная ошибка'));
-    }
-  },
-
-  takeOrder: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/take`);
-  },
-
-  confirmPayment: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/confirm-payment`);
-  },
-
-  completeOrder: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/complete`);
-  },
-  
-  assignOrderByCode: async (orderCode: string): Promise<any> => {
-    try {
-      console.log('API assignOrderByCode - Вызов с кодом:', orderCode);
-      
-      if (!orderCode || orderCode.trim() === '') {
-        throw new Error('Необходимо указать код заказа');
-      }
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-      
-      // Определяем URL для запроса
-      const endpointUrl = '/api/waiter/assign-by-code';
-      
-      // Отправляем запрос
-      const response = await fetch(endpointUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ order_code: orderCode })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API assignOrderByCode - Ошибка:', errorData);
-        throw new Error(errorData.detail || errorData.message || 'Ошибка при привязке заказа');
-      }
-      
-      const data = await response.json();
-      console.log('API assignOrderByCode - Успех:', data);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      return data;
-    } catch (error: any) {
-      console.error('API assignOrderByCode - Критическая ошибка:', error);
-      throw error;
-    }
-  },
-  
-  updateOrderPaymentStatus: async (orderId: number | string, paymentStatus: string): Promise<any> => {
-    try {
-      console.log(`API updateOrderPaymentStatus - Обновление статуса оплаты заказа ${orderId} на ${paymentStatus}`);
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-      
-      // Статус оплаты может быть только 'paid' при использовании эндпоинта подтверждения оплаты
-      if (paymentStatus.toLowerCase() !== 'paid') {
-        throw new Error(`Для смены статуса на ${paymentStatus} используйте другой метод. Этот метод поддерживает только подтверждение оплаты.`);
-      }
-      
-      // Используем специальный эндпоинт для подтверждения оплаты официантом
-      const url = `/api/waiter/orders/${orderId}/confirm-payment`;
-      
-      // Отправляем запрос с изменением payment_status на "paid"
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`API updateOrderPaymentStatus - Ошибка при подтверждении оплаты заказа ${orderId}:`, errorData);
-        throw new Error(errorData.detail || errorData.message || 'Ошибка при подтверждении оплаты');
-      }
-      
-      const data = await response.json();
-      console.log(`API updateOrderPaymentStatus - Оплата заказа ${orderId} успешно подтверждена`);
-      
-      // Сбрасываем кэш заказов
-      ordersApi._cachedOrders = null;
-      ordersApi._lastOrdersUpdate = 0;
-      
-      return { success: true, data };
-    } catch (error: any) {
-      console.error(`API updateOrderPaymentStatus - Критическая ошибка при обновлении статуса оплаты заказа ${orderId}:`, error);
-      throw error;
-    }
-  },
-};
-
-// API функции для работы с настройками ресторана
-export const settingsApi = {
-  // Получение настроек по умолчанию для первоначальной инициализации
-  getDefaultSettings: () => {
-    const defaultSettings = {
-      restaurant_name: 'Ресторан',
-      email: 'info@restaurant.com',
-      phone: '+7 (777) 777-77-77',
-      address: 'Адрес ресторана',
-      website: 'restaurant.com',
-      working_hours: {
-        monday: { open: '09:00', close: '22:00', is_closed: false },
-        tuesday: { open: '09:00', close: '22:00', is_closed: false },
-        wednesday: { open: '09:00', close: '22:00', is_closed: false },
-        thursday: { open: '09:00', close: '22:00', is_closed: false },
-        friday: { open: '09:00', close: '23:00', is_closed: false },
-        saturday: { open: '10:00', close: '23:00', is_closed: false },
-        sunday: { open: '10:00', close: '22:00', is_closed: false }
-      },
-      currency: 'KZT',
-      currency_symbol: '₸',
-      tax_percentage: 12,
-      min_order_amount: 1000,
-      delivery_fee: 500,
-      free_delivery_threshold: 5000,
-      table_reservation_enabled: true,
-      delivery_enabled: true,
-      pickup_enabled: true,
-      privacy_policy: 'Политика конфиденциальности ресторана',
-      terms_of_service: 'Условия использования сервиса',
-      tables: [
-        { id: 1, number: 1, capacity: 2, status: 'available' },
-        { id: 2, number: 2, capacity: 4, status: 'available' },
-        { id: 3, number: 3, capacity: 6, status: 'available' }
-      ]
-    };
-    
-    return defaultSettings;
-  },
-  
-  // Получение настроек с сервера
-  getSettings: async () => {
-    try {
-      const response = await fetch('/api/settings');
-        
-      if (!response.ok) {
-        throw new Error(`Ошибка при получении настроек: ${response.status}`);
-        }
-        
-      const data = await response.json();
-        return data;
-    } catch (error) {
-      console.error('Ошибка при получении настроек:', error);
-      // Возвращаем настройки по умолчанию в случае ошибки
-      return settingsApi.getLocalSettings() || settingsApi.getDefaultSettings();
-    }
-  },
-
-  // Обновление настроек на сервере
-  updateSettings: async (settings: any) => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Ошибка при обновлении настроек: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      // Сохраняем обновленные настройки локально
-      settingsApi.saveSettingsLocally(data);
-      return data;
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      throw error;
-    }
-  },
-  
-  // Принудительное обновление настроек с сервера (игнорируя кеш)
-  forceRefreshSettings: async () => {
-    try {
-      const response = await fetch('/api/settings?force=1');
-        
-      if (!response.ok) {
-        throw new Error(`Ошибка при обновлении настроек: ${response.status}`);
-        }
-        
-      const data = await response.json();
-      // Сохраняем обновленные настройки локально
-      settingsApi.saveSettingsLocally(data);
-        return data;
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      throw error;
-    }
-  },
-  
-  // Получение настроек из localStorage
-  getLocalSettings: () => {
-    if (typeof window !== 'undefined') {
-      try {
-        const localSettings = localStorage.getItem('restaurant_settings');
-        if (localSettings) {
-          return JSON.parse(localSettings);
-      }
-    } catch (error) {
-        console.error('Ошибка при чтении настроек из localStorage:', error);
-      }
-    }
-      return null;
-  },
-  
-  // Сохранение настроек в localStorage
-  saveSettingsLocally: (settings: any) => {
-        if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('restaurant_settings', JSON.stringify(settings));
-      } catch (error) {
-        console.error('Ошибка при сохранении настроек в localStorage:', error);
-      }
-    }
-  }
-};
-
-// Список эндпоинтов, для которых доступны прокси в Pages API
-const proxyEndpoints = ['order-codes', 'auth/login', 'auth/profile', 'waiter'];
-
-// Проверка, является ли текущее устройство мобильным или используется доступ по IP
-const shouldUseProxy = () => {
-  // На сервере всегда используем прямые запросы
-  if (typeof window === 'undefined') return false;
-  
-  // На мобильных устройствах используем прокси
-  if (isMobileDevice()) return true;
-  
-  // Если доступ по IP, а не localhost, тоже используем прокси
-  const hostname = window.location.hostname;
-  return hostname !== 'localhost' && hostname !== '127.0.0.1';
-};
-
-// Функция обработки ошибок API
-const handleApiError = (error: any) => {
-  console.error('API Error:', error);
-  if (error.response) {
-    console.error('Response data:', error.response.data);
-  }
-};
-
-// Функция извлечения сообщения об ошибке
-const extractErrorMessage = (error: any): string => {
-  if (error.response && error.response.data) {
-    if (typeof error.response.data === 'string') {
-      return error.response.data;
-    }
-    if (error.response.data.message) {
-      return error.response.data.message;
-    }
-    if (error.response.data.detail) {
-      return error.response.data.detail;
-    }
-    return JSON.stringify(error.response.data);
-  }
-  return error.message || 'Произошла ошибка при обработке запроса';
-};
-
-// Создаем экземпляр для прямых запросов к API
-const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-});
-
-// Добавляем интерсептор запросов для включения токена
-apiClient.interceptors.request.use((config) => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-/**
- * Привязывает заказ к официанту по коду заказа
- * @param order_code - Код заказа
- * @returns Ответ от API с информацией о привязанном заказе
- */
-export const assignOrderByCode = async (order_code: string) => {
-  console.log('assignOrderByCode - Начало выполнения функции с кодом:', order_code);
-  
-  // Проверяем наличие токена для запроса
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('assignOrderByCode - Ошибка: Не удалось получить токен');
-    throw new Error('Не удалось получить токен. Пожалуйста, авторизуйтесь снова');
-  }
-  
-  try {
-    console.log('assignOrderByCode - Определение URL для запроса');
-    let apiUrl;
-    
-    if (typeof window !== 'undefined') {
-      console.log('assignOrderByCode - Клиентская среда');
-      // Frontend: используем клиентский API путь
-      apiUrl = '/api/orders/assign-by-code';
-    } else {
-      console.log('assignOrderByCode - Серверная среда');
-      // Server-side: используем прямой API путь
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      apiUrl = `${baseUrl}/orders/assign-by-code`;
-    }
-    
-    console.log(`assignOrderByCode - Отправка запроса на ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ order_code }),
-    });
-
-    console.log(`assignOrderByCode - Получен ответ со статусом:`, response.status);
-    
-    const data = await response.json();
-    console.log('assignOrderByCode - Данные ответа:', data);
-    
-    if (!response.ok) {
-      console.error('assignOrderByCode - Ошибка API:', data);
-      throw new Error(data.message || 'Не удалось привязать заказ');
-    }
-    
-    console.log('assignOrderByCode - Успешное выполнение функции');
-    return data;
-  } catch (error: any) {
-    console.error('assignOrderByCode - Ошибка выполнения функции:', error);
-    throw new Error(error.message || 'Произошла ошибка при привязке заказа');
-  }
-}; 
-
-/**
- * Генерирует новый код официанта для использования клиентами
- * @returns Ответ от API с созданным кодом
- */
-export const generateWaiterCode = async (): Promise<{success: boolean, code?: string, expiresAt?: Date, message?: string}> => {
-  try {
-    console.log('generateWaiterCode - Начало генерации кода официанта');
-    
-    // Определяем URL для запроса
-    const apiUrl = '/api/waiter/generate-code';
-    console.log(`generateWaiterCode - Отправка запроса на ${apiUrl}`);
-    
-    // Отправляем запрос без проверки токена - работаем в демо-режиме
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    console.log(`generateWaiterCode - Получен ответ со статусом:`, response.status);
-    
-    // Проверяем статус ответа
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('generateWaiterCode - Ошибка API:', errorData);
-      
-      // Для демонстрации в случае ошибки генерируем код на стороне клиента
-      if (response.status === 401) {
-        console.log('generateWaiterCode - Ошибка авторизации, генерируем резервный код на клиенте');
-        
-        // Генерируем код на клиенте в крайнем случае
-        const code = generateRandomCode();
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
-        
-        console.log(`generateWaiterCode - Сгенерирован резервный код: ${code}`);
-        
-        return {
-          success: true,
-          code,
-          expiresAt,
-          message: 'Код сгенерирован локально (демо-режим)'
-        };
-      }
-      
-      throw new Error(errorData.message || 'Не удалось сгенерировать код официанта');
-    }
-    
-    const data = await response.json();
-    console.log('generateWaiterCode - Данные ответа:', data);
-    
-    console.log('generateWaiterCode - Успешное выполнение функции');
-    return {
-      success: true, 
-      code: data.code, 
-      expiresAt: new Date(data.expiresAt),
-    };
-  } catch (error: any) {
-    console.error('generateWaiterCode - Ошибка выполнения функции:', error);
-    
-    // Для демонстрации в случае любой ошибки генерируем код на стороне клиента
-    console.log('generateWaiterCode - Генерируем резервный код на клиенте из-за ошибки');
-    
-    // Генерируем код на клиенте в крайнем случае
-    const code = generateRandomCode();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
-    
-    console.log(`generateWaiterCode - Сгенерирован резервный код: ${code}`);
-    
-    return {
-      success: true,
-      code,
-      expiresAt,
-      message: 'Код сгенерирован локально (демо-режим)'
-    };
-  }
-};
-
-// Функция для генерации случайного кода на клиенте (резервный вариант)
-function generateRandomCode(length: number = 6): string {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-}
-
-/**
- * Привязывает официанта к заказу по коду официанта
- * @param orderId - ID заказа
- * @param waiterCode - Код официанта
- * @param customerName - Имя клиента (необязательно)
- * @returns Ответ от API с информацией о привязке
- */
-export const assignWaiterToOrder = async (
-  orderId: number, 
-  waiterCode: string, 
-  customerName?: string
-): Promise<{success: boolean, message: string, waiterId?: string, waiterCode?: string}> => {
-  try {
-    console.log('assignWaiterToOrder - Начало выполнения функции');
-    console.log(`assignWaiterToOrder - Параметры: orderId=${orderId}, waiterCode=${waiterCode}, customerName=${customerName || 'не указано'}`);
-    
-    // Определяем URL для запроса
-    const apiUrl = '/api/customer/assign-waiter';
-    console.log(`assignWaiterToOrder - Отправка запроса на ${apiUrl}`);
-    
-    // Отправляем запрос
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ orderId, waiterCode, customerName }),
-    });
-    
-    console.log(`assignWaiterToOrder - Получен ответ со статусом:`, response.status);
-    
-    const data = await response.json();
-    console.log('assignWaiterToOrder - Данные ответа:', data);
-    
-    if (!response.ok) {
-      console.error('assignWaiterToOrder - Ошибка API:', data);
-      return {
-        success: false,
-        message: data.message || 'Не удалось привязать заказ к официанту'
-      };
-    }
-    
-    console.log('assignWaiterToOrder - Успешное выполнение функции');
-    return {
-      success: true,
-      message: data.message || 'Заказ успешно привязан к официанту',
-      waiterId: data.waiterId,
-      waiterCode: data.waiterCode
-    };
-  } catch (error: any) {
-    console.error('assignWaiterToOrder - Ошибка выполнения функции:', error);
-    return {
-      success: false,
-      message: error.message || 'Произошла ошибка при привязке заказа к официанту'
-    };
-  }
-};
-
-/**
- * Получает информацию о коде официанта
- * @param code Код официанта
- * @returns Информация о коде официанта
- */
-export const getWaiterCodeInfo = async (code: string): Promise<{
-  success: boolean;
-  waiterCode?: string;
-  orderId?: number;
-  customerName?: string;
-  assigned?: boolean;
-  waiterId?: string;
-  message?: string;
-}> => {
-  try {
-    console.log('getWaiterCodeInfo - Начало получения информации о коде', code);
-    
-    // Определяем URL для запроса
-    const apiUrl = `/api/customer/assign-waiter?code=${encodeURIComponent(code)}`;
-    console.log(`getWaiterCodeInfo - Отправка запроса на ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    console.log(`getWaiterCodeInfo - Получен ответ со статусом:`, response.status);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('getWaiterCodeInfo - Ошибка API:', errorData);
-      return {
-        success: false,
-        message: errorData.message || 'Не удалось получить информацию о коде'
-      };
-    }
-    
-    const data = await response.json();
-    console.log('getWaiterCodeInfo - Данные ответа:', data);
-    
-    return {
-      success: true,
-      ...data
-    };
-  } catch (error: any) {
-    console.error('getWaiterCodeInfo - Ошибка выполнения функции:', error);
-    return {
-      success: false,
-      message: error.message || 'Произошла ошибка при получении информации о коде'
-    };
-  }
-};
-
-// Экспортируем API для бронирований
-export { reservationsApi };
-
-// Исправляем waiterApi, добавляя функцию getWaiterOrders и другие методы
-export const waiterApi = {
-  getWaiterOrders: async (): Promise<Order[]> => {
-    return getWaiterOrdersData();
-  },
-  
-  // Метод для совместимости с существующим кодом
-  getOrders: async (): Promise<Order[]> => {
-    return getWaiterOrdersData();
-  },
-  
-  // Метод для совместимости с существующим кодом
-  updateOrder: async (orderId: string, updateData: {status?: string}): Promise<Order> => {
-    try {
-      console.log(`waiterApi.updateOrder - Обновление заказа ${orderId}`, updateData);
-      const url = `${getApiBaseUrl()}/orders/${orderId}`;
-      
-      // Пробуем обновить заказ на бэкенде
-      try {
-        const response = await api.put(url, updateData);
-        return response.data;
-      } catch (backendError) {
-        console.error(`waiterApi.updateOrder - Ошибка бэкенда при обновлении заказа ${orderId}:`, backendError);
-        
-        // Для отладки: возвращаем локальный ответ, чтобы интерфейс продолжал работать
-        // имитируя успешное обновление
-        return {
-          id: parseInt(orderId),
-          status: updateData.status || 'new',
-          payment_status: 'pending',
-          payment_method: 'cash',
-          order_type: 'dine-in',
-          total_amount: 0,
-          items: [],
-          created_at: new Date().toISOString()
-        };
-      }
-    } catch (error) {
-      console.error(`waiterApi.updateOrder - Критическая ошибка при обновлении заказа ${orderId}:`, error);
-      throw error;
-    }
-  },
-
-  takeOrder: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/take`);
-  },
-
-  confirmPayment: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/confirm-payment`);
-  },
-
-  completeOrder: async (orderId: number): Promise<void> => {
-    await api.post(`/waiter/orders/${orderId}/complete`);
-  }
-};
-
-// Функция для получения информации о пользователе из localStorage и JWT токена
-const getUserInfo = (): { role: string, id?: number | null } => {
-  try {
-    // Сначала пытаемся получить токен и извлечь из него информацию
-    const token = getAuthToken();
-    if (token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = parts[1];
-          // Правильно декодируем base64url формат токена
-          const decodedPayload = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
-          
-          const tokenData = JSON.parse(decodedPayload);
-          console.log('getUserInfo - Данные из токена:', tokenData);
-          
-          // Если в токене есть ID пользователя, считаем это главным источником
-          if (tokenData.sub) {
-            // Если в токене есть поле role, используем его
-            if (tokenData.role) {
-              console.log(`getUserInfo - Роль из токена: ${tokenData.role}, ID: ${tokenData.sub}`);
-              // Приводим роль к нижнему регистру для единообразия
-              const normalizedRole = String(tokenData.role).toLowerCase();
-              // Проверяем, содержит ли роль слово "admin" или явно указана как "admin"
-              const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-              return {
-                role: isAdmin ? 'admin' : normalizedRole,
-                id: parseInt(tokenData.sub)
-              };
+          // Обрабатываем ошибку авторизации
+          if (proxyResponse.status === 401) {
+            console.warn('API updateDish - Ошибка авторизации. Возможно, истек токен.');
+            
+            // Записываем информацию об ошибке
+            try {
+              localStorage.setItem('auth_error', JSON.stringify({
+                timestamp: new Date().toISOString(),
+                error: 'token_expired',
+                message: 'Токен авторизации истек или недействителен'
+              }));
+            } catch (e) {
+              console.error('API updateDish - Не удалось сохранить информацию об ошибке:', e);
             }
             
-            // Если пользователь с ID 1, то по умолчанию считаем его админом
-            if (tokenData.sub === 1 || tokenData.sub === "1") {
-              console.log('getUserInfo - Пользователь с ID 1, определен как админ');
-              return { 
-                role: 'admin', 
-                id: 1 
-              };
-            }
-            
-            // Для остальных пользователей с ID в токене устанавливаем роль waiter
-            return { 
-              role: 'waiter', 
-              id: parseInt(tokenData.sub) 
+            // Возвращаем особое сообщение об ошибке авторизации
+    return {
+              id,
+              ...dishData,
+              updated: false,
+              success: false,
+              message: 'Ошибка авторизации. Пожалуйста, перезайдите в систему.',
+              error: 'auth_error',
+              demo: true
             };
           }
+          
+          // Если это демо-ответ от прокси, отображаем соответствующее сообщение
+          if (responseData.demo) {
+            console.warn('API updateDish - Получен демо-ответ от прокси (блюдо не обновлено на сервере)');
+          }
         }
-      } catch (tokenError) {
-        console.warn('getUserInfo - Ошибка декодирования токена:', tokenError);
+        
+        return responseData;
+      } catch (proxyError) {
+        console.error('API updateDish - Ошибка при использовании прокси:', proxyError);
+        throw proxyError;
       }
-    }
-    
-    // Проверяем localStorage на наличие данных пользователя
-    const localUserStr = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-    if (localUserStr) {
-      try {
-        const localUser = JSON.parse(localUserStr);
-        console.log('getUserInfo - Данные из localStorage:', localUser);
-        if (localUser && localUser.role) {
-          // Проверяем, является ли пользователь админом
-          const normalizedRole = String(localUser.role).toLowerCase();
-          const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-          return { 
-            role: isAdmin ? 'admin' : normalizedRole,
-            id: localUser.id || null
-          };
-        }
-      } catch (parseError) {
-        console.warn('getUserInfo - Ошибка при парсинге данных из localStorage:', parseError);
-      }
-    }
-    
-    // Если не получилось, пробуем из sessionStorage
-    const sessionUserStr = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('user') : null;
-    if (sessionUserStr) {
-      try {
-        const sessionUser = JSON.parse(sessionUserStr);
-        console.log('getUserInfo - Данные из sessionStorage:', sessionUser);
-        if (sessionUser && sessionUser.role) {
-          const normalizedRole = String(sessionUser.role).toLowerCase();
-          const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-          return { 
-            role: isAdmin ? 'admin' : normalizedRole,
-            id: sessionUser.id || null
-          };
-        }
-      } catch (parseError) {
-        console.warn('getUserInfo - Ошибка при парсинге данных из sessionStorage:', parseError);
-      }
-    }
-
-    // Проверяем еще userData в localStorage
-    const userDataStr = typeof localStorage !== 'undefined' ? localStorage.getItem('userData') : null;
-    if (userDataStr) {
-      try {
-        const userData = JSON.parse(userDataStr);
-        console.log('getUserInfo - Данные из userData localStorage:', userData);
-        if (userData && userData.role) {
-          const normalizedRole = String(userData.role).toLowerCase();
-          const isAdmin = normalizedRole === 'admin' || normalizedRole.includes('admin');
-          return {
-            role: isAdmin ? 'admin' : normalizedRole,
-            id: userData.id || null
-          };
-        }
-      } catch (parseError) {
-        console.warn('getUserInfo - Ошибка при парсинге userData из localStorage:', parseError);
-      }
-    }
-    
-    // Проверяем localStorage на явное указание админского доступа
-    const isAdminFlag = typeof localStorage !== 'undefined' ? localStorage.getItem('isAdmin') : null;
-    if (isAdminFlag && (isAdminFlag === 'true' || isAdminFlag === '1')) {
-      console.log('getUserInfo - Найден флаг админа в localStorage');
-      return { role: 'admin', id: null };
-    }
-    
-    // Если есть какой-то токен, но из него не удалось получить роль, 
-    // предполагаем что это официант (для работы приложения)
-    if (token) {
-      console.log('getUserInfo - Используем роль официанта по умолчанию для пользователя с токеном');
-      return { role: 'waiter', id: null };
-    }
-  } catch (e) {
-    console.error('Ошибка при получении информации о пользователе:', e);
-  }
-  
-  console.warn('getUserInfo - Не удалось получить данные пользователя, возвращаем unknown');
-  return { role: 'unknown', id: null };
-};
-
-// Функция для получения заказов официанта (работает также для админов)
-export const getWaiterOrdersData = async (): Promise<Order[]> => {
-  try {
-    console.log('API getWaiterOrders - Начало запроса');
-    
-    // Получаем информацию о пользователе
-    const userInfo = getUserInfo();
-    const token = getAuthToken();
-
-    console.log(`API getWaiterOrders - Информация о пользователе:`, userInfo);
-
-    if (!userInfo || !token) {
-      console.error('API getWaiterOrders - Отсутствуют данные пользователя или токен авторизации');
-      return [];
-    }
-
-    // Получаем ID пользователя и его роль
-    let userId = userInfo.id;
-    let userRole = userInfo.role;
-    
-    // Логируем полученные данные для отладки
-    console.log(`API getWaiterOrders - ID пользователя: ${userId}, роль: ${userRole}`);
-    
-    if (!userId) {
-      console.error('API getWaiterOrders - Не удалось определить ID пользователя');
-      return [];
-    }
-
-    // Определяем роль администратора
-    const isAdmin = userRole === 'admin';
-    console.log(`API getWaiterOrders - Итоговая роль: ${userRole}, ID: ${userId}, isAdmin: ${isAdmin}`);
-
-    // Формируем URL запроса
-    const apiUrl = '/api/waiter/simple-orders';
-    const queryParams = isAdmin 
-      ? `?role=admin&waiter_id=${userId}` 
-      : `?waiter_id=${userId}`;
-    
-    const proxyUrl = typeof window !== 'undefined' 
-      ? `${window.location.origin}${apiUrl}${queryParams}` 
-      : `${apiUrl}${queryParams}`;
-    
-    console.log(`API getWaiterOrders - Отправка запроса на: ${proxyUrl}`);
-
-    // Формируем заголовки с явным указанием роли и ID
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-User-Role': userRole,
-      'X-User-ID': userId ? String(userId) : ''
-    };
-
-    // Специальные заголовки для админа
-    if (isAdmin) {
-      headers['X-Is-Admin'] = 'true';
-    }
-
-    // Маскируем токен для вывода в консоль
-    const maskedToken = token.substring(0, 5) + '...' + token.substring(token.length - 5);
-    
-    // Создаем новый объект для логирования, копируя все свойства кроме Authorization
-    const headersForLog: Record<string, string> = {};
-    Object.entries(headers).forEach(([key, value]) => {
-      if (key === 'Authorization') {
-        headersForLog[key] = `Bearer ${maskedToken}`;
-      } else {
-        headersForLog[key] = value;
-      }
-    });
-    
-    console.log('API getWaiterOrders - Заголовки:', headersForLog);
-
-    // Выполняем запрос
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: headers,
-      cache: 'no-store'
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API getWaiterOrders - Ошибка ${response.status}: ${errorText}`);
-      throw new Error(`Ошибка запроса: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log(`API getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
-    
-    if (!Array.isArray(data)) {
-      console.warn('API getWaiterOrders - Получены данные не в формате массива:', data);
-      return data && typeof data === 'object' ? [data] : [];
-    }
-    
-    // Для безопасности делаем дополнительную фильтрацию на стороне клиента
-    const filteredData = userRole === 'waiter' 
-      ? data.filter(order => 
-          (typeof order.waiter_id === 'number' && order.waiter_id === userId) || 
-          (typeof order.waiter_id === 'string' && order.waiter_id === String(userId)))
-      : data;
-    
-    console.log(`API getWaiterOrders - Отфильтровано заказов: ${filteredData.length} из ${data.length}`);
-    
-    // Дополнительно проверяем поля данных для отладки
-    if (filteredData.length > 0) {
-      console.log('API getWaiterOrders - Пример данных заказа:', JSON.stringify(filteredData[0]));
-    }
-    
-    return filteredData;
-  } catch (error) {
-    console.error('API getWaiterOrders - Критическая ошибка:', error);
-    // В продакшене можно использовать уведомления для пользователя
-    // toast.error('Ошибка при получении заказов. Попробуйте обновить страницу.');
-    return [];
-  }
-};
-
-// Добавим usersApi перед объектом adminApi
-// API функции для работы с пользователями
-export const usersApi = {
-  // Получение списка пользователей с возможностью фильтрации
-  getUsers: async (params?: { role?: string, query?: string }) => {
-    try {
-      console.log('usersApi.getUsers - Начало запроса с параметрами:', params);
-      const queryParams = new URLSearchParams();
-      if (params?.role) queryParams.append('role', params.role);
-      if (params?.query) queryParams.append('query', params.query);
+  } catch (error: any) {
+      console.error(`Ошибка при обновлении блюда с ID ${id}:`, error);
       
-      const response = await api.get(`/users?${queryParams.toString()}`);
-      console.log('usersApi.getUsers - Получено пользователей:', response.data.length);
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении списка пользователей:', error);
-      throw error;
-    }
-  },
-  
-  // Получение данных пользователя по ID
-  getUser: async (userId: number) => {
-    try {
-      const response = await api.get(`/users/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при получении данных пользователя #${userId}:`, error);
-      throw error;
-    }
-  },
-  
-  // Обновление данных пользователя
-  updateUser: async (userId: number, userData: any) => {
-    try {
-      const response = await api.put(`/users/${userId}`, userData);
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при обновлении данных пользователя #${userId}:`, error);
-      throw error;
-    }
-  },
-  
-  // Изменение статуса пользователя (активация/деактивация)
-  toggleUserStatus: async (userId: number, isActive: boolean) => {
-    try {
-      const response = await api.put(`/users/${userId}/status`, { is_active: isActive });
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при изменении статуса пользователя #${userId}:`, error);
-      throw error;
-    }
-  },
-  
-  // Удаление пользователя
-  deleteUser: async (userId: number) => {
-    try {
-      await api.delete(`/users/${userId}`);
-      return true;
-    } catch (error) {
-      console.error(`Ошибка при удалении пользователя #${userId}:`, error);
-      throw error;
-    }
-  },
-  
-  // Создание нового пользователя
-  createUser: async (userData: any) => {
-    try {
-      const response = await api.post('/users', userData);
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при создании пользователя:', error);
-      throw error;
-    }
-  }
-};
-
-// Прямо перед определением функции getUserInfo добавим объект adminApi
-// Добавляем API для админ-панели
-export const adminApi = {
-  getDashboardStats: async (): Promise<DashboardStats> => {
-    try {
-      console.log('adminApi.getDashboardStats - Начало запроса');
-      const response = await api.get<DashboardStats>('/admin/dashboard/stats');
-      console.log('adminApi.getDashboardStats - Успешный ответ:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('adminApi.getDashboardStats - Ошибка:', error);
-      // В случае ошибки возвращаем заглушку с нулевыми данными
+      // Возвращаем локальный демо-ответ для сохранения работоспособности интерфейса
       return {
-        ordersToday: 0,
-        ordersTotal: 0,
-        revenue: 0,
-        reservationsToday: 0,
-        users: 0,
-        dishes: 0
+        id,
+        ...dishData,
+        updated: false,
+        success: false,
+        message: `Ошибка обновления: ${error.message}`,
+        demo: true,
+        error: error.message
       };
     }
+  },
+};
+
+
+// API функции для работы с пользователями
+export interface User {
+  id: number;
+  full_name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_login?: string;
+  orders_count?: number;
+  reservations_count?: number;
+}
+
+// Реэкспортируем API
+export { ordersApi, adminApi, reservationsApi };
+
+// Определения для admin-api.ts
+export class ApiError extends Error {
+  status: number;
+  
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'ApiError';
   }
+}
+
+export const handleApiResponse = async (response: Response) => {
+    if (!response.ok) {
+      const errorText = await response.text();
+    let errorMessage;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.detail || errorJson.message || 'Ошибка запроса';
+    } catch {
+      errorMessage = errorText || `Ошибка HTTP: ${response.status}`;
+    }
+    throw new ApiError(response.status, errorMessage);
+  }
+  return await response.json();
+};
+
+export const getBaseApiOptions = (method: string, body?: any) => {
+  const options: RequestInit = {
+    method,
+        headers: {
+          'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    credentials: 'include' // Для поддержки авторизации с помощью куки
+  };
+
+  // Добавляем токен авторизации, если он есть
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  if (token) {
+    options.headers = {
+      ...options.headers,
+          'Authorization': `Bearer ${token}`
+    };
+  }
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  return options;
 };

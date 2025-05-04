@@ -1,0 +1,38 @@
+Инструкции по исправлению файла api.ts:
+
+1. В файле api.ts есть две ошибки из-за дублирующихся свойств объекта:
+   - Строка 2783: Дублирующийся метод "getOrders"
+   - Строка 2787: Дублирующийся метод "updateOrder"
+
+2. Необходимо удалить или переименовать эти методы:
+
+   Найдите строки начиная с 2783:
+   ```
+   getOrders: async (): Promise<Order[]> => {
+     return waiterApi.getWaiterOrders();
+   },
+
+   updateOrder: async (orderId: string, updateData: {status?: string}): Promise<Order> => {
+     try {
+       ...
+   ```
+
+   И замените их на:
+   ```
+   getWaiterOrderList: async (): Promise<Order[]> => {
+     return waiterApi.getWaiterOrders();
+   },
+
+   processOrderUpdate: async (orderId: string, updateData: {status?: string}): Promise<Order> => {
+     try {
+       ...
+   ```
+
+3. Или вы можете просто полностью удалить эти два метода, если они дублируют функциональность уже существующих методов.
+
+4. После исправления выполните перезапуск разработки:
+   ```
+   npm run dev
+   ```
+
+Эти изменения должны устранить ошибки TypeScript, связанные с дублирующимися свойствами в объекте. 

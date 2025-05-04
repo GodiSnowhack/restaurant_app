@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models.user import User, UserRole
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import UserResponse, UserUpdate, UserCreate
 from app.services.auth import get_current_user
-from app.services.user import get_user, get_users, update_user, delete_user
+from app.services.user import get_user, get_users, update_user, delete_user, create_user, get_user_by_email
 
 router = APIRouter()
 
@@ -134,4 +134,40 @@ def delete_user_by_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Пользователь не найден",
-        ) 
+        )
+
+
+@router.post("/customer", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_customer(
+    user_in: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Создание нового пользователя с ролью клиента"""
+    # Проверяем права доступа
+    if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для создания клиентов",
+        )
+    
+    # Проверяем, нет ли уже пользователя с таким email
+    existing_user = get_user_by_email(db, user_in.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Пользователь с email {user_in.email} уже существует",
+        )
+    
+    # Устанавливаем роль клиента
+    user_data = user_in.model_dump()
+    user_data["role"] = UserRole.CLIENT
+    
+    # Проверяем наличие возрастной группы
+    print(f"Полученная возрастная группа: {user_in.age_group}")
+    
+    user_create = UserCreate(**user_data)
+    
+    # Создаем пользователя
+    new_user = create_user(db, user_create)
+    return new_user 

@@ -29,7 +29,7 @@ const directLogin = async (email: string, password: string): Promise<{success: b
 export default function LoginPage() {
   const router = useRouter();
   const { returnUrl } = router.query;
-  const { login, isLoading, error, isMobileDevice, fetchUserProfile } = useAuthStore();
+  const { login, isLoading, error, isMobileDevice, fetchUserProfile, isAuthenticated } = useAuthStore();
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitAttempts, setSubmitAttempts] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,15 +66,22 @@ export default function LoginPage() {
   
   // Перенаправляем авторизованных пользователей на главную страницу
   useEffect(() => {
-    // Проверяем, авторизован ли пользователь
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const checkAuth = async () => {
+      // Проверяем, авторизован ли пользователь
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      // Если пользователь уже авторизован, перенаправляем на главную
+      if (token && isAuthenticated) {
+        console.log('Пользователь уже авторизован, перенаправление...');
+        router.push('/');
+      }
+    };
     
-    // Если пользователь уже авторизован, перенаправляем на главную
-    if (token) {
-      console.log('Пользователь уже авторизован, перенаправление...');
-      router.push('/');
+    // Проверяем авторизацию только после монтирования компонента
+    if (typeof window !== 'undefined') {
+      checkAuth();
     }
-  }, [router]);
+  }, [router, isAuthenticated]);
   
   // Мониторим состояние загрузки
   useEffect(() => {
@@ -91,7 +98,11 @@ export default function LoginPage() {
     // Обновляем статус для более подробной обратной связи
     setLoginStatus('Отправка данных на сервер...');
     
-    console.log(`Login Page - Попытка входа #${submitAttempts + 1}`, { email: data.email, isMobile: isMobileDevice });
+    console.log(`Login Page - Попытка входа #${submitAttempts + 1}`, { 
+      email: data.email, 
+      hasPassword: !!data.password,
+      isMobile: isMobileDevice 
+    });
     
     try {
       if (typeof window !== 'undefined') {

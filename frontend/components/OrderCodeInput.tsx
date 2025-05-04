@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ordersApi } from '../lib/api';
+import { ordersApi } from '../lib/api/';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 

@@ -12,6 +12,21 @@ import Image from 'next/image';
 import {UserCircleIcon} from '@heroicons/react/24/outline';
 import ThemeToggle from './ui/theme-toggle';
 
+// Определение типа для данных пользователя
+interface UserType {
+  id?: number;
+  full_name?: string;
+  email?: string;
+  role?: string;
+  is_staff?: boolean;
+}
+
+// Определение типа для состояния авторизации
+interface AuthStateType {
+  isAuthenticated: boolean;
+  user: UserType | null;
+}
+
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -24,11 +39,31 @@ const Header = () => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const [authState, setAuthState] = useState<AuthStateType>({ isAuthenticated: false, user: null });
 
-  // Устанавливаем флаг клиентского рендеринга
+  // Устанавливаем флаг клиентского рендеринга и инициализируем состояние авторизации
   useEffect(() => {
     setIsMounted(true);
+    
+    // Проверяем наличие токена вручную
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
+    
+    // Устанавливаем состояние авторизации только после монтирования компонента
+    if (hasToken) {
+      setAuthState({ isAuthenticated: true, user: user as UserType });
+    } else {
+      setAuthState({ isAuthenticated: false, user: null });
+    }
+    
+    console.log('Header: состояние аутентификации:', { isAuthenticated, user });
   }, []);
+  
+  // Обновляем состояние авторизации при изменении isAuthenticated или user
+  useEffect(() => {
+    if (isMounted) {
+      setAuthState({ isAuthenticated, user: user as UserType });
+    }
+  }, [isAuthenticated, user, isMounted]);
 
   // Обновляем количество товаров в корзине
   useEffect(() => {
@@ -62,11 +97,11 @@ const Header = () => {
   ];
 
   // Дополнительные пункты меню в зависимости от роли пользователя
-  if (isMounted && isAuthenticated && user) {
-    if (user.role === 'waiter' || user.role === 'admin') {
+  if (isMounted && authState.isAuthenticated && authState.user) {
+    if (authState.user.role === 'waiter' || authState.user.role === 'admin') {
       navItems.push({ label: 'Панель официанта', href: '/waiter' });
     }
-    if (user.role === 'admin') {
+    if (authState.user.role === 'admin') {
       navItems.push({ label: 'Администрирование', href: '/admin' });
     }
   }
@@ -118,89 +153,93 @@ const Header = () => {
               className="relative p-1 text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
             >
               <ShoppingCartIcon className="h-6 w-6" />
-              {isMounted && cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center transition-all duration-200">
-                  {cartCount}
-                </span>
-              )}
+              <span suppressHydrationWarning>
+                {isMounted && cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center transition-all duration-200">
+                    {cartCount}
+                  </span>
+                )}
+              </span>
             </Link>
             
-            {isAuthenticated ? (
-              <div className="relative" ref={profileDropdownRef}>
-                <button
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className="flex items-center text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-800 rounded-full"
-                >
-                  <span className="hidden sm:block mr-1">{user?.full_name}</span>
-                  <UserCircleIcon className="h-8 w-8 text-gray-400 dark:text-gray-300" />
-                </button>
-                
-                {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 transition-all duration-200">
-                    {/* Профиль */}
-                    <Link
-                      href="/profile"
-                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      <UserIcon className="mr-3 h-5 w-5" />
-                      Профиль
-                    </Link>
-                    
-                    {/* Заказы */}
-                    <Link
-                      href="/orders"
-                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      <ClipboardIcon className="mr-3 h-5 w-5" />
-                      Мои заказы
-                    </Link>
-                    
-                    {/* Бронирования */}
-                    <Link
-                      href="/reservations"
-                      className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      <CalendarIcon className="mr-3 h-5 w-5" />
-                      Бронирования
-                    </Link>
-
-                    {/* Администрирование (если пользователь админ) */}
-                    {user?.is_staff && (
+            <div suppressHydrationWarning>
+              {isMounted && authState.isAuthenticated ? (
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                    className="flex items-center text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-800 rounded-full"
+                  >
+                    <span className="hidden sm:block mr-1">{authState.user?.full_name}</span>
+                    <UserCircleIcon className="h-8 w-8 text-gray-400 dark:text-gray-300" />
+                  </button>
+                  
+                  {isProfileDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 transition-all duration-200">
+                      {/* Профиль */}
                       <Link
-                        href="/admin"
+                        href="/profile"
                         className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
                         onClick={() => setIsProfileDropdownOpen(false)}
                       >
-                        <CogIcon className="mr-3 h-5 w-5" />
-                        Администрирование
+                        <UserIcon className="mr-3 h-5 w-5" />
+                        Профиль
                       </Link>
-                    )}
-                    
-                    {/* Разделитель */}
-                    <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                      
+                      {/* Заказы */}
+                      <Link
+                        href="/orders"
+                        className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <ClipboardIcon className="mr-3 h-5 w-5" />
+                        Мои заказы
+                      </Link>
+                      
+                      {/* Бронирования */}
+                      <Link
+                        href="/reservations"
+                        className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      >
+                        <CalendarIcon className="mr-3 h-5 w-5" />
+                        Бронирования
+                      </Link>
 
-                    {/* Выход */}
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
-                    >
-                      <LogoutIcon className="mr-3 h-5 w-5" />
-                      Выйти
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                href="/auth/login"
-                className="text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
-              >
-                Войти
-              </Link>
-            )}
+                      {/* Администрирование (если пользователь админ) */}
+                      {authState.user?.is_staff && (
+                        <Link
+                          href="/admin"
+                          className="flex px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                        >
+                          <CogIcon className="mr-3 h-5 w-5" />
+                          Администрирование
+                        </Link>
+                      )}
+                      
+                      {/* Разделитель */}
+                      <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+
+                      {/* Выход */}
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 items-center"
+                      >
+                        <LogoutIcon className="mr-3 h-5 w-5" />
+                        Выйти
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-200 dark:hover:text-primary transition-colors duration-200"
+                >
+                  Войти
+                </Link>
+              )}
+            </div>
           </div>
         </div>
         
@@ -216,29 +255,31 @@ const Header = () => {
           )}
         </button>
 
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 pt-2 pb-3 space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                  router.pathname === item.href
-                    ? 'bg-primary-light text-primary dark:bg-primary/20 dark:text-primary'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-primary'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-            
-            {/* Переключатель темы в мобильном меню */}
-            <div className="px-3 py-2">
-              <ThemeToggle withText={true} className="flex items-center w-full text-gray-600 dark:text-gray-200" />
+        <div suppressHydrationWarning>
+          {isMobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-200 dark:border-gray-700 pt-2 pb-3 space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                    router.pathname === item.href
+                      ? 'bg-primary-light text-primary dark:bg-primary/20 dark:text-primary'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-primary'
+                  }`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              
+              {/* Переключатель темы в мобильном меню */}
+              <div className="px-3 py-2">
+                <ThemeToggle withText={true} className="flex items-center w-full text-gray-600 dark:text-gray-200" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

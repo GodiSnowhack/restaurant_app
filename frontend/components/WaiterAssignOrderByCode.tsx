@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ordersApi } from '../lib/api';
+import { waiterApi } from '../lib/api/';
 import { toast } from 'react-hot-toast';
 import { ArrowPathIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
@@ -35,13 +35,14 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
     
     try {
       // Вызываем метод API для привязки заказа по коду
-      const result = await ordersApi.assignOrderByCode(orderCode);
+      const result = await waiterApi.assignOrderByCode(orderCode);
       
       console.log('Результат привязки заказа по коду:', result);
       
       // Считаем операцию успешной при любом успешном ответе от сервера
-      if (result) {
-        const orderId = result.id ? `#${result.id}` : (result.order_code ? `с кодом ${result.order_code}` : '');
+      // или если получены какие-либо данные о заказе (даже с ошибкой API)
+      if (result && (result.success || result.orderId || result.order_id)) {
+        const orderId = result.order_id || result.orderId || `с кодом ${orderCode}`;
         const successMessage = `Заказ ${orderId} успешно привязан к вам`;
         
         setSuccess(successMessage);
@@ -53,11 +54,51 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
           onOrderAssigned(result);
         }
       } else {
-        setError('Не удалось привязать заказ. Проверьте код и попробуйте снова.');
-        toast.error('Ошибка при привязке заказа');
+        setError(result?.message || 'Не удалось привязать заказ. Проверьте код и попробуйте снова.');
+        toast.error(result?.message || 'Ошибка при привязке заказа');
       }
     } catch (err: any) {
       console.error('Ошибка при привязке заказа по коду:', err);
+      
+      // Проверяем, не произошла ли ошибка после успешного обновления БД
+      if (err.message && (
+          err.message.includes('неудачно') || 
+          err.message.includes('обновления') ||
+          err.message.includes('завершились')
+        )) {
+        // Пытаемся получить список активных заказов для проверки
+        try {
+          // Используем getWaiterOrders вместо getActiveOrders
+          const waiterOrders = await waiterApi.getWaiterOrders();
+          
+          // Добавляем тип для order
+          const foundOrder = waiterOrders.find((order: any) => 
+            order.order_code === orderCode || order.display_code === orderCode
+          );
+          
+          if (foundOrder) {
+            // Заказ был успешно привязан, несмотря на ошибку API
+            const successMessage = `Заказ #${foundOrder.id} был привязан, перезагрузите страницу`;
+            setSuccess(successMessage);
+            toast.success(successMessage);
+            setOrderCode('');
+            
+            // Вызываем callback
+            if (onOrderAssigned) {
+              onOrderAssigned({
+                success: true,
+                order_id: foundOrder.id,
+                message: successMessage
+              });
+            }
+            
+            return;
+          }
+        } catch (checkError) {
+          console.error('Ошибка при проверке списка заказов:', checkError);
+        }
+      }
+      
       setError(err.message || 'Произошла ошибка при привязке заказа');
       toast.error(err.message || 'Произошла ошибка при привязке заказа');
     } finally {

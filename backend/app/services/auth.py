@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -12,7 +13,21 @@ from app.database.session import get_db
 from app.models.user import User
 from app.schemas.user import TokenPayload
 
+# Опциональная схема OAuth2, которая не выбрасывает исключение если токен отсутствует
+class OptionalOAuth2PasswordBearer(OAuth2PasswordBearer):
+    async def __call__(self, request: Request) -> Optional[str]:
+        authorization = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(authorization)
+        if not authorization or scheme.lower() != "bearer":
+            return None  # Вместо исключения возвращаем None
+        return param
+
+# Стандартная схема OAuth2 для обязательной авторизации
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
+# Используем обычную схему для обязательной авторизации и опциональную для случаев,
+# когда можно использовать ID из заголовка
+optional_oauth2_scheme = OptionalOAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -108,4 +123,62 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     if not verify_password(password, user.hashed_password):
         return None
     
-    return user 
+    return user
+
+
+# Новая функция для получения пользователя по ID из заголовка
+async def get_user_by_header(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Получение пользователя из заголовка X-User-ID (для API без JWT)"""
+    # Получаем ID пользователя из заголовка
+    user_id = request.headers.get("X-User-ID")
+    
+    if not user_id:
+        return None
+    
+    try:
+        # Пытаемся преобразовать ID в число
+        user_id_int = int(user_id)
+        # Ищем пользователя в базе
+        user = db.query(User).filter(User.id == user_id_int).first()
+        return user
+    except (ValueError, TypeError):
+        return None
+
+
+# Функция для получения пользователя с опциональной проверкой (не выбрасывает исключения)
+async def get_optional_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(optional_oauth2_scheme),
+) -> Optional[User]:
+    """
+    Пытается получить пользователя через JWT токен, 
+    если не получается, пытается через X-User-ID заголовок.
+    В случае неудачи возвращает None, а не выбрасывает исключение.
+    """
+    # Пытаемся получить пользователя по токену
+    if token:
+        try:
+            payload = jwt.decode(
+                token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+            )
+            user_id = payload.get("sub")
+            
+            if user_id:
+                # Проверяем срок действия токена
+                token_data = TokenPayload(sub=int(user_id), exp=payload.get("exp"))
+                if datetime.fromtimestamp(token_data.exp) >= datetime.now():
+                    # Токен действителен, ищем пользователя
+                    user = db.query(User).filter(User.id == token_data.sub).first()
+                    if user and user.is_active:
+                        return user
+        except (JWTError, ValueError, TypeError):
+            # Любая ошибка при работе с токеном - переходим к проверке заголовка
+            pass
+    
+    # Если токен не сработал, пробуем через заголовок
+    header_user = await get_user_by_header(request, db)
+    return header_user 

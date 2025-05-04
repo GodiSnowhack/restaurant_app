@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, menu, orders, reservations, order_codes, settings, analytics, admin, waiter
+from app.api.v1 import auth, users, menu, orders, reservations, order_codes, settings, analytics, admin, waiter, reviews, token
 
 api_router = APIRouter()
 
@@ -13,7 +13,9 @@ api_router.include_router(order_codes.router, prefix="/order-codes", tags=["orde
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
-api_router.include_router(waiter.router, prefix="/waiter", tags=["waiter"]) 
+api_router.include_router(waiter.router, prefix="/waiter", tags=["waiter"])
+api_router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
+api_router.include_router(token.router, prefix="/token", tags=["token"])
 
 @api_router.get("/health", tags=["system"])
 async def health_check():

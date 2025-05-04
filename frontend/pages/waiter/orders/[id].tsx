@@ -38,6 +38,8 @@ type Payment = {
 type Order = OrderType & {
   payment?: Payment;
   special_requests?: string;
+  customer_age_group?: string;  // Добавляем поле возрастной группы клиента
+  customer_gender?: string;     // Добавляем поле пола клиента
 }
 
 type StatusButtonProps = {
@@ -66,6 +68,10 @@ const StatusButton = ({ status, currentStatus, onClick, disabled = false }: Stat
   );
 };
 
+// Добавляем типы для возрастных групп и пола
+type AgeGroup = 'teen' | 'young' | 'adult' | 'elderly';
+type Gender = 'male' | 'female' | 'other';
+
 const WaiterOrderDetailPage: NextPage = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -91,20 +97,55 @@ const WaiterOrderDetailPage: NextPage = () => {
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
-      const fetchedOrder = await ordersApi.getOrderById(Number(id));
+      setError('');
+      console.log(`Запрашиваем заказ с ID ${id}...`);
+      
+      // Добавляем дополнительную обработку ошибок
+      let fetchedOrder = null;
+      try {
+        fetchedOrder = await ordersApi.getOrderById(Number(id));
+      } catch (apiError) {
+        console.error(`Ошибка API при получении заказа ${id}:`, apiError);
+        
+        // Создаем минимальную структуру заказа при ошибке
+        fetchedOrder = {
+          id: Number(id),
+          status: "pending",
+          payment_status: "pending",
+          payment_method: "cash",
+          created_at: new Date().toISOString(),
+          total_amount: 0,
+          customer_name: "",
+          customer_phone: "",
+          items: []
+        };
+      }
+      
+      // Проверка на null или undefined
+      if (!fetchedOrder) {
+        throw new Error(`Не удалось получить заказ с ID ${id}`);
+      }
       
       // Проверяем и нормализуем данные заказа
       const normalizedOrder = {
         ...fetchedOrder,
+        // Обязательные поля - устанавливаем значения по умолчанию
+        id: fetchedOrder.id || Number(id),
+        status: fetchedOrder.status || "pending",
         // Нормализуем платежные данные
         payment_method: fetchedOrder.payment_method || 
                          fetchedOrder.payment_details?.method || 
                          fetchedOrder.payment?.method || 
-                         'unknown',
+                         'cash',
         payment_status: fetchedOrder.payment_status || 
                         fetchedOrder.payment_details?.status || 
                         fetchedOrder.payment?.status || 
-                        'pending'
+                        'pending',
+        // Устанавливаем другие значения по умолчанию
+        total_amount: fetchedOrder.total_amount || 0,
+        customer_name: fetchedOrder.customer_name || "",
+        customer_phone: fetchedOrder.customer_phone || "",
+        items: Array.isArray(fetchedOrder.items) ? fetchedOrder.items : []
       };
       
       console.log('Нормализованный заказ:', normalizedOrder);
@@ -112,6 +153,19 @@ const WaiterOrderDetailPage: NextPage = () => {
     } catch (err) {
       console.error('Ошибка при загрузке данных заказа:', err);
       setError('Не удалось загрузить данные заказа. Пожалуйста, попробуйте позже.');
+      
+      // Устанавливаем пустой заказ вместо null
+      setOrder({
+        id: Number(id),
+        status: "pending",
+        payment_status: "pending",
+        payment_method: "cash",
+        created_at: new Date().toISOString(),
+        total_amount: 0,
+        customer_name: "",
+        customer_phone: "",
+        items: []
+      });
     } finally {
       setIsLoading(false);
     }
@@ -455,6 +509,26 @@ const WaiterOrderDetailPage: NextPage = () => {
     }
   };
 
+  // Добавляем функции для получения текстовых значений
+  const getAgeGroupLabel = (group: AgeGroup): string => {
+    const labels: Record<AgeGroup, string> = {
+      'teen': 'Подросток (13-17)',
+      'young': 'Молодой (18-30)',
+      'adult': 'Взрослый (31-60)',
+      'elderly': 'Пожилой (60+)'
+    };
+    return labels[group] || group;
+  };
+
+  const getGenderLabel = (gender: Gender): string => {
+    const labels: Record<Gender, string> = {
+      'male': 'Мужской',
+      'female': 'Женский',
+      'other': 'Другой'
+    };
+    return labels[gender] || gender;
+  };
+
   if (isLoading) {
     return (
       <WaiterLayout title="Детали заказа" activeTab="orders">
@@ -600,6 +674,22 @@ const WaiterOrderDetailPage: NextPage = () => {
                         {order.customer_phone || order.user?.phone || 'Не указано'}
                       </p>
                     </div>
+                    {order.customer_age_group && (
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Возрастная группа</p>
+                        <p className="font-medium">
+                          {getAgeGroupLabel(order.customer_age_group as AgeGroup)}
+                        </p>
+                      </div>
+                    )}
+                    {order.customer_gender && (
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Пол</p>
+                        <p className="font-medium">
+                          {getGenderLabel(order.customer_gender as Gender)}
+                        </p>
+                      </div>
+                    )}
                     {order.user && (
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Email</p>
@@ -638,7 +728,7 @@ const WaiterOrderDetailPage: NextPage = () => {
                     {order.items && order.items.map((item: OrderItem, index) => (
                       <tr key={item.dish_id || index} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.name || `Блюдо #${item.dish_id}`}</div>
+                          <div className="text-sm font-medium text-gray-900">{item.dish_name || item.name || `Блюдо #${item.dish_id}`}</div>
                           {item.special_instructions && (
                             <div className="text-xs text-gray-500 mt-1 italic">{item.special_instructions}</div>
                           )}

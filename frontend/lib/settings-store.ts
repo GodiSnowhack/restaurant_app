@@ -1,45 +1,6 @@
 import { create } from 'zustand';
-import { settingsApi } from './api';
-
-export interface RestaurantTable {
-  id: number;
-  name: string;
-  capacity: number;
-  is_active: boolean;
-  position_x: number;
-  position_y: number;
-  status: 'available' | 'reserved' | 'occupied';
-}
-
-export interface RestaurantSettings {
-  restaurant_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  website: string;
-  working_hours: {
-    monday: { open: string; close: string; is_closed: boolean };
-    tuesday: { open: string; close: string; is_closed: boolean };
-    wednesday: { open: string; close: string; is_closed: boolean };
-    thursday: { open: string; close: string; is_closed: boolean };
-    friday: { open: string; close: string; is_closed: boolean };
-    saturday: { open: string; close: string; is_closed: boolean };
-    sunday: { open: string; close: string; is_closed: boolean };
-  };
-  currency: string;
-  currency_symbol: string;
-  tax_percentage: number;
-  min_order_amount: number;
-  delivery_fee: number;
-  free_delivery_threshold: number;
-  table_reservation_enabled: boolean;
-  delivery_enabled: boolean;
-  pickup_enabled: boolean;
-  privacy_policy: string;
-  terms_of_service: string;
-  tables: RestaurantTable[];
-  [key: string]: any;
-}
+import { settingsApi } from './api/settings';
+import { RestaurantTable, RestaurantSettings } from './api/types';
 
 interface SettingsState {
   settings: RestaurantSettings;
@@ -51,7 +12,7 @@ interface SettingsState {
   updateTables: (tables: RestaurantTable[]) => Promise<void>;
   addTable: (table: Omit<RestaurantTable, 'id'>) => Promise<void>;
   removeTable: (tableId: number) => Promise<void>;
-  updateTableStatus: (tableId: number, status: RestaurantTable['status']) => Promise<void>;
+  updateTableStatus: (tableId: number, status: string) => Promise<void>;
   checkForUpdates: () => Promise<void>;
 }
 
@@ -95,9 +56,6 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
         const intervalId = setInterval(() => {
           get().checkForUpdates();
         }, AUTO_UPDATE_INTERVAL);
-        
-        // Очистка при размонтировании
-        return () => clearInterval(intervalId);
       }
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
@@ -211,7 +169,7 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
     
     // Генерируем id для нового стола
     const newId = tables.length > 0 
-      ? Math.max(...tables.map(t => t.id)) + 1 
+      ? Math.max(...tables.map(t => t.id || 0)) + 1 
       : 1;
     
     const newTable = { 
@@ -233,7 +191,7 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   // Обновление статуса стола
-  updateTableStatus: async (tableId: number, status: RestaurantTable['status']) => {
+  updateTableStatus: async (tableId: number, status: string) => {
     const { settings } = get();
     const tables = settings.tables || [];
     const updatedTables = tables.map(table => 

@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum as PyEnum
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Boolean, Table, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Boolean, Table, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -9,9 +9,9 @@ from app.database.session import Base
 
 
 class OrderStatus(str, PyEnum):
-    PENDING = "pending"
+    NEW = "new"
     CONFIRMED = "confirmed"
-    PREPARING = "preparing"
+    IN_PROGRESS = "in_progress"
     READY = "ready"
     DELIVERED = "delivered"
     COMPLETED = "completed"
@@ -29,6 +29,12 @@ class PaymentMethod(str, PyEnum):
     CASH = "cash"
     CARD = "card"
     ONLINE = "online"
+
+
+class OrderType(str, PyEnum):
+    DINE_IN = "dine_in"
+    TAKEAWAY = "takeaway"
+    DELIVERY = "delivery"
 
 
 class OrderDish(Base):
@@ -61,12 +67,16 @@ class Order(Base):
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
     
-    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
+    status = Column(Enum(OrderStatus), default=OrderStatus.NEW)
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     total_amount = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
     is_urgent = Column(Boolean, default=False)
     is_group_order = Column(Boolean, default=False)
+    
+    # Информация о клиенте
+    customer_age_group = Column(String, nullable=True)  # teen, young, adult, elderly
+    customer_gender = Column(String, nullable=True)  # male, female, other
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -77,6 +87,8 @@ class Order(Base):
     waiter = relationship("User", foreign_keys=[waiter_id], back_populates="served_orders")
     items = relationship("app.models.menu.Dish", secondary="order_dish", back_populates="orders", overlaps="order_dishes,dish")
     order_dishes = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan", overlaps="items")
+    payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
+    review = relationship("Review", back_populates="order", uselist=False)
     
     def to_dict(self):
         from datetime import datetime

@@ -1,14 +1,20 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.security import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_access_token,
+    authenticate_user,
+    get_current_active_user,
+    get_password_hash
+)
 from app.database.session import get_db
 from app.models.user import User
-from app.schemas.user import Token, UserCreate, UserResponse
-from app.services.auth import authenticate_user, create_access_token
-from app.services.user import get_user_by_email, create_user
-from app.core.config import settings
+from app.schemas.token import Token
+from app.schemas.user import UserCreate, UserResponse, LoginRequest
 
 router = APIRouter()
 
@@ -28,45 +34,117 @@ async def auth_info():
 
 
 @router.post("/login", response_model=Token)
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    """Аутентификация пользователя и получение токена"""
-    user = authenticate_user(db, form_data.username, form_data.password)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный email или пароль",
-            headers={"WWW-Authenticate": "Bearer"},
+async def login(
+    db: Session = Depends(get_db),
+    login_data: LoginRequest = None,
+    form_data: OAuth2PasswordRequestForm = Depends(None)
+) -> Any:
+    """
+    Аутентификация пользователя и получение токена.
+    Поддерживает как JSON, так и form-data формат.
+    """
+    try:
+        # Определяем, какой формат данных используется
+        username = login_data.email if login_data else form_data.username if form_data else None
+        password = login_data.password if login_data else form_data.password if form_data else None
+        
+        if not username or not password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Необходимо предоставить email и пароль"
+            )
+        
+        # Аутентифицируем пользователя
+        user = authenticate_user(db, username, password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный email или пароль",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Проверяем что пользователь активен
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Пользователь неактивен"
+            )
+        
+        # Создаем токен доступа
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(user.id), "role": user.role},
+            expires_delta=access_token_expires
         )
-    
-    # Создаем токен доступа
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        subject=user.id, expires_delta=access_token_expires
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+        
+        # Создаем refresh token с более длительным сроком действия
+        refresh_token_expires = timedelta(days=30)  # 30 дней
+        refresh_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=refresh_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "role": user.role
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ошибка при аутентификации: {str(e)}"
+        )
 
 
 @router.post("/register", response_model=UserResponse)
 def register(
+    *,
+    db: Session = Depends(get_db),
     user_in: UserCreate,
-    db: Session = Depends(get_db)
-):
-    """Регистрация нового пользователя"""
-    # Проверяем, что пользователь с таким email не существует
-    existing_user = get_user_by_email(db, user_in.email)
-    
-    if existing_user:
+) -> Any:
+    """
+    Регистрация нового пользователя
+    """
+    try:
+        # Проверяем, не существует ли уже пользователь с таким email
+        user = db.query(User).filter(User.email == user_in.email).first()
+        if user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Пользователь с таким email уже существует"
+            )
+        
+        # Создаем нового пользователя
+        user = User(
+            email=user_in.email,
+            hashed_password=get_password_hash(user_in.password),
+            full_name=user_in.full_name,
+            role=user_in.role,
+            is_active=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        return user
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пользователь с таким email уже существует",
+            detail=f"Ошибка при регистрации: {str(e)}"
         )
-    
-    # Создаем нового пользователя
-    user = create_user(db, user_in)
-    
-    return user 
+
+
+@router.get("/me", response_model=UserResponse)
+def read_users_me(
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    Получение информации о текущем пользователе
+    """
+    return current_user 

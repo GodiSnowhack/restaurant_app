@@ -64,6 +64,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   name: string;
+  dish_name?: string;
   special_instructions?: string;
 }
 

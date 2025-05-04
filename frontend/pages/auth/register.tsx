@@ -51,11 +51,24 @@ export default function RegisterPage() {
 
     try {
       // Отправляем запрос на API для регистрации
-      const response = await axios.post('/api/auth/register', {
-        name: data.name,
-        email: data.email,
-        password: data.password,
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: data.name,
+          email: data.email,
+          password: data.password,
+          role: 'waiter' // Устанавливаем роль "waiter" для нового пользователя
+        }),
       });
+
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.detail || 'Ошибка при регистрации');
+      }
 
       // Показываем сообщение об успешной регистрации
       toast.success('Регистрация успешна! Выполните вход в систему');

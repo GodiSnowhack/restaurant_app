@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Table, Text
 from sqlalchemy.orm import relationship
 
 from app.database.session import Base
@@ -63,12 +63,12 @@ class Dish(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
-    description = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
     cost_price = Column(Float, nullable=True)
     image_url = Column(String, nullable=True)
     calories = Column(Integer, nullable=True)
-    cooking_time = Column(Integer, nullable=True)  # в минутах
+    cooking_time = Column(Integer, default=15)  # время приготовления в минутах
     is_vegetarian = Column(Boolean, default=False)
     is_vegan = Column(Boolean, default=False)
     is_available = Column(Boolean, default=True)

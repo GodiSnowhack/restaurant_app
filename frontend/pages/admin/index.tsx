@@ -4,7 +4,7 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import {ordersApi, menuApi, adminApi, DashboardStats} from '../../lib/api';
+import {adminApi, ordersApi, menuApi, DashboardStats} from '../../lib/api';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
 import { useTheme } from '@/lib/theme-context';
@@ -25,7 +25,7 @@ const AdminPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAdminAndLoadStats = async () => {
       if (!isAuthenticated) {
         router.push('/auth/login');
         return;
@@ -38,48 +38,47 @@ const AdminPage: NextPage = () => {
 
       try {
         setIsLoading(true);
-        const data = await adminApi.getDashboardStats();
-        setStats(data);
-      } catch (err) {
-        setError('Ошибка при загрузке статистики');
-        console.error('Error fetching stats:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAdmin();
-  }, [isAuthenticated, user, router]);
-
-  // Эффект для загрузки данных статистики
-  useEffect(() => {
-    const fetchStatistics = async () => {
-      try {
-        setIsLoading(true);
+        
+        // Проверяем доступ к adminApi и получаем статистику
+        if (adminApi && typeof adminApi.getDashboardStats === 'function') {
+          try {
+            const data = await adminApi.getDashboardStats();
+            setStats(data);
+            console.log('AdminDashboard - Получена статистика:', data);
+          } catch (adminError) {
+            console.error('AdminDashboard - Ошибка при запросе статистики:', adminError);
+            setError('Ошибка при загрузке статистики');
+          }
+        } else {
+          console.error('AdminDashboard - adminApi недоступен или метод getDashboardStats отсутствует');
+          setError('API статистики недоступно');
+        }
         
         // Проверка наличия заказов напрямую - для отладки
         console.log('Проверка наличия заказов в базе данных...');
         try {
-          const orders = await ordersApi.getOrders();
-          console.log('AdminDashboard - Заказы без фильтров:', orders);
-          console.log('AdminDashboard - Количество заказов:', orders.length);
-          console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
+          if (ordersApi && typeof ordersApi.getOrders === 'function') {
+            const orders = await ordersApi.getOrders();
+            console.log('AdminDashboard - Заказы без фильтров:', orders);
+            console.log('AdminDashboard - Количество заказов:', orders.length);
+            console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
+          } else {
+            console.error('AdminDashboard - ordersApi или метод getOrders недоступен');
+          }
         } catch (ordersError) {
           console.error('AdminDashboard - Ошибка при запросе заказов:', ordersError);
         }
         
-        // Здесь можно добавить дополнительные запросы для статистики
-        // ...
-        
       } catch (error) {
         console.error('Ошибка при загрузке статистики:', error);
+        setError('Ошибка при загрузке данных');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchStatistics();
-  }, []);
+    checkAdminAndLoadStats();
+  }, [isAuthenticated, user, router]);
 
   const menuItems = [
     {
@@ -175,7 +174,7 @@ const AdminPage: NextPage = () => {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка</h2>
-                <p className="text-2xl font-bold dark:text-white">{stats.revenue.toLocaleString()} ₸</p>
+                <p className="text-2xl font-bold dark:text-white">{(stats.revenue || 0).toLocaleString()} ₸</p>
               </div>
             </div>
           </div>

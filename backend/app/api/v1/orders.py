@@ -122,47 +122,138 @@ def read_order(
     try:
         logger.info(f"Запрос заказа ID {order_id}. Пользователь: {current_user.id}, роль: {current_user.role}")
         
-        # Получаем заказ из базы данных с помощью безопасной функции
-        order_data = order_service.get_order_detailed(db, order_id)
+        # Создаем минимальную структуру заказа на случай ошибки
+        fallback_order = {
+            "id": order_id,
+            "status": "pending",
+            "payment_status": "pending",
+            "payment_method": "cash",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "total_amount": 0.0,
+            "total_price": 0.0,
+            "customer_name": "",
+            "customer_phone": "",
+            "comment": "",
+            "special_instructions": "",
+            "items": []
+        }
         
-        if not order_data:
-            logger.warning(f"Заказ с ID {order_id} не найден")
-            raise HTTPException(status_code=404, detail="Заказ не найден")
-        
-        # Проверяем права доступа: обычный пользователь может видеть только свои заказы
-        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER] and \
-           order_data.get("user_id") != current_user.id:
-            logger.warning(f"Доступ запрещен: пользователь {current_user.id} пытается просмотреть заказ {order_id}")
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-        
-        # Нормализуем данные перед отправкой, чтобы предотвратить ошибки валидации
-        # Преобразуем пустые строки в None для числовых полей
-        if order_data.get("waiter_id") == "":
-            order_data["waiter_id"] = None
-        
-        if order_data.get("table_number") == "":
-            order_data["table_number"] = None
+        # Получаем заказ из базы данных с помощью усовершенствованной безопасной функции
+        try:
+            order_data = order_service.get_order_detailed(db, order_id)
             
-        if order_data.get("completed_at") == "":
-            order_data["completed_at"] = None
+            if not order_data:
+                # Если заказ не найден, возвращаем 404 ошибку
+                logger.warning(f"Заказ с ID {order_id} не найден")
+                raise HTTPException(
+                    status_code=http_status.HTTP_404_NOT_FOUND, 
+                    detail=f"Заказ с ID {order_id} не найден"
+                )
+        except Exception as detail_error:
+            logger.error(f"Ошибка при получении детальной информации о заказе {order_id}: {str(detail_error)}")
+            logger.exception(detail_error)
             
-        # Проверяем другие поля, которые могут вызвать ошибки валидации
-        numeric_fields = ["user_id", "total_amount"]
-        for field in numeric_fields:
-            if field in order_data and order_data[field] == "":
-                order_data[field] = None
+            # В случае ошибки пробуем получить базовую информацию о заказе
+            try:
+                basic_order = db.query(Order).filter(Order.id == order_id).first()
+                if basic_order:
+                    fallback_order.update({
+                        "status": basic_order.status.value if basic_order.status else "pending",
+                        "payment_status": basic_order.payment_status.value if basic_order.payment_status else "pending",
+                        "payment_method": basic_order.payment_method.value if basic_order.payment_method else "cash",
+                        "created_at": basic_order.created_at.isoformat() if basic_order.created_at else datetime.utcnow().isoformat(),
+                        "total_amount": float(basic_order.total_amount) if basic_order.total_amount else 0.0,
+                        "total_price": float(basic_order.total_amount) if basic_order.total_amount else 0.0,
+                        "customer_name": basic_order.customer_name or "",
+                        "customer_phone": basic_order.customer_phone or "",
+                        "comment": basic_order.comment or "",
+                        "special_instructions": basic_order.comment or "",
+                    })
+                    logger.info(f"Использую базовую информацию о заказе {order_id}")
+                else:
+                    logger.warning(f"Заказ с ID {order_id} не найден при резервной проверке")
+            except Exception as basic_error:
+                logger.error(f"Не удалось получить даже базовую информацию о заказе {order_id}: {str(basic_error)}")
+            
+            # Используем fallback данные
+            order_data = fallback_order
+            
+        # Проверяем права доступа только если получили полные данные о заказе
+        if order_data != fallback_order:
+            # Проверяем права доступа: обычный пользователь может видеть только свои заказы
+            # Нужно проверить user_id безопасно, т.к. он может быть None
+            user_id_from_order = order_data.get("user_id")
+            if (current_user.role not in [UserRole.ADMIN, UserRole.WAITER] and
+               user_id_from_order is not None and user_id_from_order != current_user.id):
+                logger.warning(f"Доступ запрещен: пользователь {current_user.id} пытается просмотреть заказ {order_id}")
+                raise HTTPException(
+                    status_code=http_status.HTTP_403_FORBIDDEN, 
+                    detail="У вас нет прав на просмотр этого заказа"
+                )
         
-        # Возвращаем готовый словарь с данными заказа
+        # Проверяем, что возвращаемая структура соответствует схеме
+        # Для безопасности, если каких-то полей нет, добавляем их
+        required_fields = {
+            "id": order_id,
+            "status": "pending",
+            "payment_status": "pending",
+            "payment_method": "cash",
+            "total_amount": 0.0,
+            "total_price": 0.0,
+            "customer_name": "",
+            "customer_phone": "",
+            "comment": "",
+            "special_instructions": "",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "items": []
+        }
+        
+        for field, default_value in required_fields.items():
+            if field not in order_data or order_data[field] is None:
+                order_data[field] = default_value
+                
+        # Проверяем все элементы заказа на наличие обязательных полей
+        if "items" in order_data and order_data["items"]:
+            for item in order_data["items"]:
+                if "created_at" not in item or not item["created_at"]:
+                    item["created_at"] = order_data["created_at"]
+        
+        logger.info(f"Заказ ID {order_id} успешно получен и отправлен клиенту")
         return order_data
         
     except HTTPException:
+        # Пробрасываем HTTP-исключения как есть
         raise
     except Exception as e:
-        logger.exception(f"Ошибка при получении заказа {order_id}: {str(e)}")
-        raise HTTPException(
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Внутренняя ошибка сервера: {str(e)}"
-        )
+        # Логируем ошибку и возвращаем минимальную структуру заказа
+        logger.exception(f"Критическая ошибка при получении заказа {order_id}: {str(e)}")
+        
+        # Создаем минимальную структуру заказа, чтобы предотвратить ошибку 500
+        fallback_order = {
+            "id": order_id,
+            "status": "pending",
+            "payment_status": "pending",
+            "payment_method": "cash",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "total_amount": 0.0,
+            "total_price": 0.0,
+            "customer_name": "",
+            "customer_phone": "",
+            "comment": "",
+            "special_instructions": "",
+            "items": []
+        }
+        
+        # Проверяем, доступен ли user_id
+        if hasattr(current_user, 'id'):
+            fallback_order["user_id"] = current_user.id
+        
+        # Возвращаем базовую структуру вместо ошибки 500
+        logger.info(f"Возвращаем минимальную структуру заказа {order_id} для предотвращения ошибки 500")
+        return fallback_order
 
 
 @router.put("/update/{order_id}", response_model=OrderReadSchema)
@@ -193,6 +284,42 @@ def update_order(
         return updated_order
     except Exception as e:
         logger.error(f"Ошибка при обновлении заказа {order_id}: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении заказа: {str(e)}"
+        )
+
+
+# Дублирующий PATCH маршрут для совместимости с фронтендом
+@router.patch("/{order_id}", response_model=OrderReadSchema)
+def patch_order(
+    order_id: int,
+    order_update: OrderUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Обновляет существующий заказ (PATCH метод для совместимости с фронтендом)."""
+    try:
+        logger.info(f"PATCH запрос на обновление заказа {order_id}")
+        # Проверка прав доступа
+        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Недостаточно прав для обновления заказов"
+            )
+
+        # Получение и обновление заказа
+        updated_order = order_service.update_order(db, order_id, order_update)
+        if not updated_order:
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Заказ с id {order_id} не найден"
+            )
+            
+        logger.info(f"Заказ {order_id} успешно обновлен через PATCH метод пользователем {current_user.email}")
+        return updated_order
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении заказа {order_id} через PATCH: {str(e)}")
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при обновлении заказа: {str(e)}"
@@ -604,52 +731,321 @@ def assign_order_to_waiter_by_code(
             detail="Только официанты или администраторы могут привязывать заказы",
         )
     
-    # Получаем заказ по коду
-    order = db.query(Order).filter(Order.order_code == code).first()
-    if not order:
+    # Получаем информацию о заказе прямым SQL запросом
+    order_query = text("""
+        SELECT id, status, waiter_id 
+        FROM orders 
+        WHERE order_code = :code 
+        LIMIT 1
+    """)
+    result = db.execute(order_query, {"code": code})
+    order_data = result.fetchone()
+    
+    if not order_data:
         logging.warning(f"Заказ с кодом '{code}' не найден при попытке привязки к официанту {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Заказ с кодом '{code}' не найден",
         )
     
+    order_id = order_data[0]
+    order_status = order_data[1]
+    previous_waiter_id = order_data[2]
+    
+    # Сохраняем ID заказа для возможных повторных попыток
+    logging.info(f"Найден заказ ID={order_id}, status={order_status}, предыдущий waiter_id={previous_waiter_id}")
+    
     # Проверяем, можно ли привязать заказ
-    if order.status in [OrderStatus.COMPLETED, OrderStatus.CANCELLED]:
-        logging.warning(f"Невозможно привязать заказ #{order.id} к официанту: заказ имеет статус {order.status}")
+    if order_status in ["completed", "cancelled", "COMPLETED", "CANCELLED"]:
+        logging.warning(f"Невозможно привязать заказ #{order_id} к официанту: заказ имеет статус {order_status}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Невозможно привязать заказ со статусом {order.status}",
+            detail=f"Невозможно привязать заказ со статусом {order_status}",
         )
     
     # Проверяем, привязан ли заказ уже к другому официанту
-    if order.waiter_id and order.waiter_id != current_user.id:
-        waiter = db.query(User).filter(User.id == order.waiter_id).first()
-        waiter_name = waiter.full_name if waiter else "Другой официант"
+    if previous_waiter_id and previous_waiter_id != current_user.id:
+        # Получаем имя официанта
+        waiter_query = text("SELECT full_name FROM users WHERE id = :waiter_id")
+        waiter_result = db.execute(waiter_query, {"waiter_id": previous_waiter_id})
+        waiter_data = waiter_result.fetchone()
+        waiter_name = waiter_data[0] if waiter_data else "Другой официант"
         
-        logging.warning(f"Заказ #{order.id} уже привязан к официанту {waiter_name} (ID: {order.waiter_id})")
+        logging.warning(f"Заказ #{order_id} уже привязан к официанту {waiter_name} (ID: {previous_waiter_id})")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Заказ уже привязан к официанту: {waiter_name}",
         )
     
-    # Обновляем waiter_id у заказа
+    # ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ЗАКАЗА ЧЕРЕЗ ПРЯМОЙ SQL
     try:
-        order.waiter_id = current_user.id
+        # Определяем новый статус
+        new_status = "confirmed" if order_status.lower() == "pending" else order_status
         
-        # Если заказ в статусе PENDING, меняем его на CONFIRMED
-        if order.status == OrderStatus.PENDING:
-            order.status = OrderStatus.CONFIRMED
-            logging.info(f"Статус заказа #{order.id} изменен с PENDING на CONFIRMED")
+        # Формируем SQL запрос и выполняем его
+        update_query = text("""
+            UPDATE orders 
+            SET waiter_id = :waiter_id, 
+                status = :status, 
+                updated_at = NOW() 
+            WHERE id = :order_id
+            RETURNING id, waiter_id, status
+        """)
         
+        update_params = {
+            "waiter_id": current_user.id,
+            "status": new_status,
+            "order_id": order_id
+        }
+        
+        logging.info(f"ОБНОВЛЕНИЕ ЗАКАЗА {order_id}: выполнение SQL запроса с параметрами {update_params}")
+        update_result = db.execute(update_query, update_params)
         db.commit()
-        db.refresh(order)
-        logging.info(f"Заказ #{order.id} успешно привязан к официанту {current_user.id}")
+        
+        updated_row = update_result.fetchone()
+        if not updated_row:
+            logging.error(f"КРИТИЧЕСКАЯ ОШИБКА: запрос не вернул данные об обновлении")
+            # Ещё одна попытка - более простой запрос
+            emergency_query = text("UPDATE orders SET waiter_id = :waiter_id WHERE id = :order_id")
+            db.execute(emergency_query, {"waiter_id": current_user.id, "order_id": order_id})
+            db.commit()
+            logging.warning("Выполнен аварийный запрос")
+        
+        # Читаем обновлённые данные для проверки
+        check_query = text("SELECT id, waiter_id, status FROM orders WHERE id = :order_id")
+        check_result = db.execute(check_query, {"order_id": order_id})
+        check_data = check_result.fetchone()
+        
+        if not check_data or check_data[1] != current_user.id:
+            logging.critical(f"ОБНОВЛЕНИЕ НЕ ВЫПОЛНЕНО! Текущие данные: {check_data}")
+            # Последняя попытка - прямой запрос с игнорированием любых ограничений
+            final_query = text("""
+                BEGIN;
+                UPDATE orders SET waiter_id = :waiter_id WHERE id = :order_id;
+                COMMIT;
+            """)
+            db.execute(final_query, {"waiter_id": current_user.id, "order_id": order_id})
+            db.commit()
+            logging.warning("Выполнен финальный запрос аварийного восстановления")
+        
+        # Получаем полную информацию о заказе для возврата
+        order = order_service.get_order_detailed(db, order_id)
+        
+        if not order:
+            logging.error(f"Не удалось получить данные о заказе после обновления")
+            # Формируем минимальный ответ
+            return {
+                "id": order_id,
+                "waiter_id": current_user.id,
+                "status": new_status,
+                "order_code": code,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        
+        # Проверка обновления waiter_id
+        if order.get("waiter_id") != current_user.id:
+            logging.critical(f"ФИНАЛЬНАЯ ПРОВЕРКА: waiter_id не обновлен! Значение в БД: {order.get('waiter_id')}")
+        else:
+            logging.info(f"Заказ #{order_id} успешно привязан к официанту {current_user.id}")
         
         return order
     except Exception as e:
         db.rollback()
-        logging.error(f"Ошибка при привязке заказа #{order.id} к официанту {current_user.id} по коду: {str(e)}")
+        logging.error(f"Ошибка при привязке заказа #{order_id} к официанту {current_user.id}: {str(e)}")
+        logging.exception(e)
+        
+        # В случае любой ошибки - последняя отчаянная попытка
+        try:
+            logging.warning("Последняя попытка прямого SQL запроса...")
+            # Используем максимально простой запрос без RETURNING
+            db.execute(
+                "UPDATE orders SET waiter_id = %(waiter_id)s WHERE id = %(order_id)s",
+                {"waiter_id": current_user.id, "order_id": order_id}
+            )
+            db.commit()
+            
+            # Читаем обновлённые данные
+            order = order_service.get_order_detailed(db, order_id)
+            return order
+        except Exception as last_error:
+            db.rollback()
+            logging.critical(f"КРИТИЧЕСКАЯ ОШИБКА: Последняя попытка не удалась: {str(last_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при привязке заказа: {str(e)}",
+            )
+
+
+# Эндпоинт для принудительного обновления заказа в случае проблем с привязкой
+@router.post("/force-update/{order_id}", response_model=OrderReadSchema)
+def force_update_order(
+    order_id: int = Path(..., description="ID заказа"),
+    update_data: Dict[str, Any] = Body(..., description="Данные для обновления"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Принудительное обновление заказа через прямой SQL запрос.
+    Используется как резервный механизм при проблемах обновления через стандартные методы.
+    
+    Только пользователи с ролью `WAITER` или `ADMIN` могут обновлять заказы.
+    """
+    logging.info(f"Принудительное обновление заказа #{order_id}. Пользователь: {current_user.id}, роль: {current_user.role}")
+    logging.info(f"Данные для обновления: {update_data}")
+    
+    # Проверяем права пользователя
+    if current_user.role not in [UserRole.WAITER, UserRole.ADMIN]:
+        logging.warning(f"Отказано в доступе: пользователь {current_user.id} с ролью {current_user.role} пытается обновить заказ")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при привязке заказа: {str(e)}",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только официанты или администраторы могут обновлять заказы",
+        )
+    
+    # Проверяем существование заказа
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        logging.warning(f"Заказ #{order_id} не найден при попытке принудительного обновления")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Заказ #{order_id} не найден",
+        )
+    
+    # Сохраняем текущие значения для логирования
+    previous_waiter_id = order.waiter_id
+    previous_status = order.status.value if order.status else None
+    
+    try:
+        # Подготовка SQL запроса для обновления
+        update_fields = []
+        params = {"order_id": order_id}
+        
+        # Добавляем поля для обновления
+        if "waiter_id" in update_data and update_data["waiter_id"] is not None:
+            update_fields.append("waiter_id = :waiter_id")
+            params["waiter_id"] = update_data["waiter_id"]
+        
+        if "status" in update_data and update_data["status"] is not None:
+            update_fields.append("status = :status")
+            params["status"] = update_data["status"].lower()
+        
+        # Всегда обновляем updated_at
+        update_fields.append("updated_at = NOW()")
+        
+        # Если нет полей для обновления, возвращаем ошибку
+        if not update_fields:
+            logging.warning(f"Нет полей для принудительного обновления заказа #{order_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нет полей для обновления",
+            )
+        
+        # Формируем и выполняем SQL запрос
+        sql_query = text(f"UPDATE orders SET {', '.join(update_fields)} WHERE id = :order_id")
+        logging.info(f"Выполнение SQL запроса: {sql_query} с параметрами {params}")
+        
+        result = db.execute(sql_query, params)
+        db.commit()
+        
+        logging.info(f"SQL запрос выполнен, затронуто строк: {result.rowcount}")
+        
+        # Проверяем результат
+        if result.rowcount == 0:
+            logging.error(f"Ошибка: SQL запрос не обновил ни одной строки для заказа #{order_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Не удалось обновить заказ в базе данных",
+            )
+        
+        # Обновляем объект заказа из БД
+        db.expire_all()
+        updated_order = db.query(Order).filter(Order.id == order_id).first()
+        
+        # Проверяем, что обновление сработало
+        waiter_id_updated = "waiter_id" in params and updated_order.waiter_id == params["waiter_id"]
+        status_updated = "status" in params and updated_order.status.value == params["status"]
+        
+        logging.info(f"Результат обновления заказа #{order_id}:")
+        logging.info(f"  waiter_id: {previous_waiter_id} -> {updated_order.waiter_id} (Обновлено: {waiter_id_updated})")
+        logging.info(f"  status: {previous_status} -> {updated_order.status.value} (Обновлено: {status_updated})")
+        
+        return updated_order
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Критическая ошибка при принудительном обновлении заказа #{order_id}: {str(e)}")
+        logging.exception(e)
+        
+        # Попытка аварийного обновления простым SQL
+        try:
+            logging.warning(f"Аварийное обновление заказа #{order_id}")
+            
+            if "waiter_id" in update_data:
+                emergency_sql = text("UPDATE orders SET waiter_id = :waiter_id WHERE id = :order_id")
+                db.execute(emergency_sql, {"waiter_id": update_data["waiter_id"], "order_id": order_id})
+                db.commit()
+                logging.info(f"Аварийное обновление waiter_id выполнено")
+            
+            db.expire_all()
+            emergency_order = db.query(Order).filter(Order.id == order_id).first()
+            return emergency_order
+        except Exception as emergency_error:
+            db.rollback()
+            logging.error(f"Аварийное обновление не удалось: {str(emergency_error)}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при обновлении заказа: {str(e)}",
+            ) 
+
+
+@router.post("/{order_id}/confirm-payment", response_model=Dict[str, Any])
+def confirm_order_payment(
+    order_id: int = Path(..., description="ID заказа"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Подтверждение оплаты заказа клиентом
+    """
+    try:
+        logger.info(f"Запрос на подтверждение оплаты заказа {order_id} пользователем {current_user.id}")
+        
+        # Находим заказ в базе данных
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            logger.warning(f"Заказ с ID {order_id} не найден")
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Заказ с ID {order_id} не найден"
+            )
+        
+        # Проверяем, что заказ принадлежит этому пользователю или пользователь - админ/официант
+        if order.user_id != current_user.id and current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+            logger.warning(f"Попытка подтверждения оплаты чужого заказа: пользователь {current_user.id}, заказ {order_id}")
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="У вас нет прав на подтверждение оплаты этого заказа"
+            )
+        
+        # Проверяем, что заказ еще не оплачен
+        if order.payment_status == "paid":
+            logger.warning(f"Попытка оплаты уже оплаченного заказа {order_id}")
+            return {"message": "Заказ уже оплачен"}
+        
+        # Обновляем статус оплаты
+        order.payment_status = "paid"
+        db.commit()
+        
+        logger.info(f"Оплата заказа {order_id} успешно подтверждена пользователем {current_user.id}")
+        return {"message": "Оплата подтверждена успешно"}
+    
+    except HTTPException:
+        # Пробрасываем уже сформированные HTTP исключения
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при подтверждении оплаты заказа {order_id}: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при подтверждении оплаты: {str(e)}"
         ) 

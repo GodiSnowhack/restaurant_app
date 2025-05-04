@@ -9,7 +9,7 @@ engine = create_engine(
     settings.SQLITE_DATABASE_URI, 
     connect_args={
         "check_same_thread": False,  # Разрешаем доступ из разных потоков
-        "timeout": 30,               # Увеличиваем таймаут для ожидания блокировки
+        "timeout": 60,               # Увеличиваем таймаут для ожидания блокировки (было 30, стало 60)
     },
     # Настройки пула соединений
     pool_size=20,                    # Увеличиваем размер пула соединений
@@ -36,7 +36,7 @@ def optimize_sqlite_connection(dbapi_connection, connection_record):
     dbapi_connection.execute("PRAGMA foreign_keys=ON")
     
     # Устанавливаем таймаут для транзакций
-    dbapi_connection.execute("PRAGMA busy_timeout=5000")  # 5 секунд
+    dbapi_connection.execute("PRAGMA busy_timeout=10000")  # 10 секунд (было 5 секунд)
     
     # Используем временные таблицы в памяти
     dbapi_connection.execute("PRAGMA temp_store=MEMORY")

@@ -42,15 +42,20 @@ export default async function orderByIdProxy(req: NextApiRequest, res: NextApiRe
     
     // Формируем URL для запроса к основному API
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const endpoint = `${apiUrl}/orders/${id}`;
+    // Добавляем параметр для принудительного обновления данных (flush=1) и timestamp для предотвращения кэширования
+    const timestamp = Date.now();
+    const endpoint = `${apiUrl}/orders/${id}?flush=1&_t=${timestamp}`;
     
-    console.log(`Order API - Отправка ${req.method} запроса на ${endpoint}`);
+    console.log(`Order API - Отправка ${req.method} запроса на ${endpoint} (с принудительным обновлением данных)`);
     
     // Передаем токен авторизации, если он есть в заголовках запроса
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'User-Agent': userAgent
+      'User-Agent': userAgent,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     };
     
     const authHeader = req.headers.authorization;
@@ -75,7 +80,12 @@ export default async function orderByIdProxy(req: NextApiRequest, res: NextApiRe
               response = await axios.get(endpoint, {
                 headers,
                 timeout,
-                validateStatus: (status) => status < 500 // Принимаем все ответы кроме 5xx
+                validateStatus: (status) => status < 500, // Принимаем все ответы кроме 5xx
+                // Отключаем кэширование через параметры запроса
+                params: {
+                  flush: 1,
+                  _t: timestamp
+                }
               });
               break;
             case 'PUT':

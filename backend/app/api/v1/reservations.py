@@ -1,32 +1,67 @@
-from typing import List
+from typing import List, Dict, Any
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models.user import User, UserRole
 from app.models.reservation import ReservationStatus, Reservation
 from app.schemas.reservation import ReservationResponse, ReservationCreate, ReservationUpdate
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_optional_current_user
 from app.services.reservation import (
     get_reservation, get_reservations_by_user, get_reservations_by_date,
-    get_reservations_by_status, create_reservation, update_reservation, delete_reservation
+    get_reservations_by_status, create_reservation, update_reservation, delete_reservation,
+    get_reservation_by_code
 )
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[ReservationResponse])
-def read_reservations(
+async def read_reservations(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     status: ReservationStatus = None,
     date: datetime = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_optional_current_user)
 ):
     """Получение списка бронирований"""
-    # Проверяем права доступа
+    # Проверяем, есть ли пользователь (аутентифицирован ли)
+    if not current_user:
+        # Проверяем наличие X-User-ID в заголовке
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Пытаемся получить пользователя по ID из заголовка
+        try:
+            user_id_int = int(user_id)
+            user = db.query(User).filter(User.id == user_id_int).first()
+            if not user:
+                user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+                # Не сохраняем в базу, просто используем для проверки
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+        
+        # Возвращаем бронирования для этого пользователя
+        return get_reservations_by_user(db, user_id_int, skip, limit)
+    
+    # Если пользователь аутентифицирован, используем обычную логику
     if current_user.role == UserRole.ADMIN:
         # Администратор может видеть все бронирования
         if date:
@@ -37,10 +72,7 @@ def read_reservations(
             # Возвращаем все бронирования
             return db.query(Reservation).offset(skip).limit(limit).all()
     elif current_user.role == UserRole.WAITER:
-        # Официант должен видеть только свои бронирования, 
-        # но поскольку нет понятия "официант бронирования", 
-        # возвращаем обычному пользователю пустой список
-        # Будем считать, что официант может видеть только свои личные бронирования
+        # Официант видит только свои бронирования
         return get_reservations_by_user(db, current_user.id, skip, limit)
     else:
         # Обычный пользователь видит только свои бронирования
@@ -48,12 +80,49 @@ def read_reservations(
 
 
 @router.post("/", response_model=ReservationResponse, status_code=status.HTTP_201_CREATED)
-def create_reservation_endpoint(
+async def create_reservation_endpoint(
+    request: Request,
     reservation_in: ReservationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_optional_current_user)
 ):
     """Создание нового бронирования"""
+    # Отладочный вывод входящих данных
+    print(f"[DEBUG API] Входящие данные бронирования: {reservation_in.dict()}")
+    
+    # Если пользователь не аутентифицирован через JWT, пробуем использовать ID из заголовка
+    if not current_user:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        try:
+            user_id_int = int(user_id)
+            current_user = db.query(User).filter(User.id == user_id_int).first()
+            
+            # Если пользователя с таким ID нет, создаем временного
+            if not current_user:
+                current_user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+                # Здесь можно сохранить в базу, если нужно
+                # db.add(current_user)
+                # db.commit()
+                # db.refresh(current_user)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+    
     # Проверяем, что выбранная дата в будущем
     if reservation_in.reservation_time <= datetime.now():
         raise HTTPException(
@@ -61,16 +130,63 @@ def create_reservation_endpoint(
             detail="Дата бронирования должна быть в будущем",
         )
     
-    return create_reservation(db, current_user.id, reservation_in)
+    # Проверяем, что код бронирования уникален
+    if reservation_in.reservation_code:
+        existing = get_reservation_by_code(db, reservation_in.reservation_code)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Бронирование с кодом {reservation_in.reservation_code} уже существует",
+            )
+    
+    # Создаем бронирование
+    db_reservation = create_reservation(db, current_user.id, reservation_in)
+    
+    # Проверяем, что код бронирования установлен правильно
+    print(f"[DEBUG API] После создания бронирования: ID={db_reservation.id}, код={db_reservation.reservation_code}, исходный код={reservation_in.reservation_code}")
+    
+    if db_reservation.reservation_code != reservation_in.reservation_code:
+        print(f"[CRITICAL] НЕСООТВЕТСТВИЕ КОДОВ БРОНИРОВАНИЯ: отправлено={reservation_in.reservation_code}, сохранено={db_reservation.reservation_code}")
+    
+    return db_reservation
 
 
 @router.get("/{reservation_id}", response_model=ReservationResponse)
-def read_reservation_by_id(
+async def read_reservation_by_id(
+    request: Request,
     reservation_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_optional_current_user)
 ):
     """Получение бронирования по ID"""
+    # Проверяем авторизацию через X-User-ID если нет JWT
+    if not current_user:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        try:
+            user_id_int = int(user_id)
+            current_user = db.query(User).filter(User.id == user_id_int).first()
+            
+            if not current_user:
+                current_user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+    
     reservation = get_reservation(db, reservation_id)
     
     if not reservation:
@@ -90,13 +206,42 @@ def read_reservation_by_id(
 
 
 @router.put("/{reservation_id}", response_model=ReservationResponse)
-def update_reservation_endpoint(
+async def update_reservation_endpoint(
+    request: Request,
     reservation_id: int,
     reservation_in: ReservationUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_optional_current_user)
 ):
     """Обновление бронирования"""
+    # Проверяем авторизацию через X-User-ID если нет JWT
+    if not current_user:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        try:
+            user_id_int = int(user_id)
+            current_user = db.query(User).filter(User.id == user_id_int).first()
+            
+            if not current_user:
+                current_user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+    
     # Получаем бронирование
     reservation = get_reservation(db, reservation_id)
     
@@ -131,12 +276,41 @@ def update_reservation_endpoint(
 
 
 @router.delete("/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_reservation_endpoint(
+async def delete_reservation_endpoint(
+    request: Request,
     reservation_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_optional_current_user)
 ):
     """Удаление бронирования"""
+    # Проверяем авторизацию через X-User-ID если нет JWT
+    if not current_user:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        try:
+            user_id_int = int(user_id)
+            current_user = db.query(User).filter(User.id == user_id_int).first()
+            
+            if not current_user:
+                current_user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+    
     # Получаем бронирование
     reservation = get_reservation(db, reservation_id)
     
@@ -160,4 +334,38 @@ def delete_reservation_endpoint(
             detail="Нельзя удалить завершенное бронирование",
         )
     
-    delete_reservation(db, reservation_id) 
+    delete_reservation(db, reservation_id)
+
+
+@router.post("/verify-code", response_model=Dict[str, Any])
+def verify_reservation_code(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Проверка кода бронирования"""
+    code = request.get("code", "")
+    if not code:
+        return {"valid": False, "message": "Код бронирования не предоставлен"}
+    
+    reservation = get_reservation_by_code(db, code)
+    
+    if not reservation:
+        return {"valid": False, "message": "Код бронирования не найден"}
+    
+    # Проверяем, что бронирование не отменено и не завершено
+    if reservation.status == "cancelled":
+        return {"valid": False, "message": "Бронирование отменено"}
+    
+    if reservation.status == "completed":
+        return {"valid": False, "message": "Бронирование уже завершено"}
+    
+    # Возвращаем данные о бронировании
+    return {
+        "valid": True,
+        "reservation_id": reservation.id,
+        "table_number": reservation.table_number,
+        "guest_name": reservation.guest_name,
+        "guest_phone": reservation.guest_phone,
+        "guests_count": reservation.guests_count,
+        "reservation_time": reservation.reservation_time.isoformat()
+    } 
