@@ -191,8 +191,19 @@ def read_users_direct(
     # Логгируем запрос для отладки
     print(f"[DIRECT ACCESS] Запрос списка пользователей с ролью: {user_role}, заголовки: {req.headers}")
     
+    # Проверка роли пользователя
+    if user_role != 'admin':
+        print(f"[DIRECT ACCESS] Отказано в доступе: роль {user_role} не является admin")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Доступ запрещен: требуется роль администратора"
+        )
+    
     # Получаем пользователей из базы данных
     users = get_users(db, skip=skip, limit=limit, role=role)
+    
+    # Логгируем количество найденных пользователей
+    print(f"[DIRECT ACCESS] Найдено {len(users)} пользователей")
     
     # Возвращаем пользователей напрямую, без дополнительных проверок схемы
     return users 

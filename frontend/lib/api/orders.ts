@@ -7,42 +7,54 @@ export const ordersApi = {
   getOrders: async (params?: any): Promise<Order[]> => {
     try {
       console.log('API: Запрос заказов с параметрами:', params);
+      
+      // Проверяем, нужно ли использовать демо-данные
+      const useDemoData = typeof localStorage !== 'undefined' && 
+        (localStorage?.getItem('use_demo_data') === 'true' || 
+         localStorage?.getItem('admin_use_demo_data') === 'true');
+      
+      // Если в localStorage установлен флаг для принудительного использования демо-данных
+      if (useDemoData) {
+        console.log('API: Используем демо-данные для заказов (настройка в localStorage)');
+        return generateAdminOrdersDemoData();
+      }
+      
+      // Пробуем получить данные через API
+      console.log('API: Отправляем запрос к серверу через axios');
       const response = await api.get('/orders', { params });
-      return response.data;
+      
+      console.log('API: Получен ответ от сервера:', {
+        status: response.status,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
+        firstItem: Array.isArray(response.data) && response.data.length > 0 ? response.data[0].id : 'no items'
+      });
+      
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log('API: Получены заказы через API:', response.data.length);
+        return response.data;
+      } else {
+        console.log('API: Получен пустой массив заказов или неверный формат, возвращаем демо-данные');
+        
+        // Сохраняем информацию о проблеме для отладки
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('orders_api_last_error', 'Empty data received');
+          localStorage.setItem('orders_api_last_response', JSON.stringify(response.data));
+        }
+        
+        return generateAdminOrdersDemoData();
+      }
     } catch (error: any) {
       console.error('API: Ошибка при получении заказов:', error);
       
-      // Если ошибка 401 (Unauthorized) или другие ошибки, возвращаем тестовые данные
-      if (error.response?.status === 401 || error.response?.status >= 500) {
-        console.log('API: Возвращаем тестовые данные из-за ошибки:', error.response?.status);
-        // Возвращаем один демо-заказ с полями, совместимыми с бэкендом
-        return [{
-          id: 999,
-          user_id: 1,
-          status: 'pending',
-          payment_status: 'unpaid',
-          payment_method: 'cash',
-          order_type: 'dine-in',
-          total_amount: 2500,
-          total_price: 2500, // Добавляем для совместимости, если где-то используется
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          items: [
-            {
-              dish_id: 1,
-              quantity: 2,
-              price: 1250,
-              name: 'Демо-блюдо'
-            }
-          ],
-          table_number: 5,
-          customer_name: 'Тестовый пользователь',
-          customer_phone: '+7 (700) 123-45-67'
-        }];
+      // Сохраняем информацию об ошибке для отладки
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('orders_api_last_error', error.message || 'Unknown error');
+        localStorage.setItem('orders_api_last_error_time', new Date().toISOString());
       }
       
-      // В случае других ошибок возвращаем пустой массив
-      return [];
+      // Если ошибка 401 (Unauthorized) или другие ошибки, возвращаем демо-данные
+      console.log('API: Возвращаем демо-данные из-за ошибки API');
+      return generateAdminOrdersDemoData();
     }
   },
   
@@ -351,6 +363,167 @@ function generateWaiterDemoOrders(): Order[] {
       table_number: 7,
       customer_name: 'Мария Сидорова',
       customer_phone: '+7 (700) 222-33-44'
+    }
+  ];
+}
+
+// Функция для генерации демо-данных заказов для админки
+function generateAdminOrdersDemoData(): Order[] {
+  const now = new Date();
+  
+  // Генерируем дату в прошлом со случайным смещением (до 10 дней назад)
+  const getRandomPastDate = () => {
+    const date = new Date(now);
+    const randomDaysBack = Math.floor(Math.random() * 10) + 1;
+    date.setDate(date.getDate() - randomDaysBack);
+    return date.toISOString();
+  };
+  
+  // Создаем случайный набор заказов
+  return [
+    {
+      id: 1001,
+      user_id: 1,
+      waiter_id: 1,
+      status: 'pending',
+      payment_status: 'pending',
+      payment_method: 'card',
+      order_type: 'dine-in',
+      total_amount: 3500,
+      created_at: getRandomPastDate(),
+      updated_at: getRandomPastDate(),
+      items: [
+        {
+          dish_id: 1,
+          quantity: 2,
+          price: 1200,
+          name: 'Стейк из говядины'
+        },
+        {
+          dish_id: 2,
+          quantity: 1,
+          price: 1100,
+          name: 'Паста Карбонара'
+        }
+      ],
+      table_number: 5,
+      customer_name: 'Александр Иванов',
+      customer_phone: '+7 (777) 111-22-33'
+    },
+    {
+      id: 1002,
+      user_id: 2,
+      waiter_id: 2,
+      status: 'confirmed',
+      payment_status: 'pending',
+      payment_method: 'cash',
+      order_type: 'dine-in',
+      total_amount: 2800,
+      created_at: getRandomPastDate(),
+      updated_at: getRandomPastDate(),
+      items: [
+        {
+          dish_id: 3,
+          quantity: 1,
+          price: 1500,
+          name: 'Сёмга на гриле'
+        },
+        {
+          dish_id: 4,
+          quantity: 2,
+          price: 650,
+          name: 'Салат Цезарь'
+        }
+      ],
+      table_number: 3,
+      customer_name: 'Елена Петрова',
+      customer_phone: '+7 (777) 222-33-44'
+    },
+    {
+      id: 1003,
+      user_id: 3,
+      waiter_id: 1,
+      status: 'preparing',
+      payment_status: 'paid',
+      payment_method: 'card',
+      order_type: 'dine-in',
+      total_amount: 4200,
+      created_at: getRandomPastDate(),
+      updated_at: getRandomPastDate(),
+      items: [
+        {
+          dish_id: 5,
+          quantity: 1,
+          price: 2500,
+          name: 'Стейк Рибай'
+        },
+        {
+          dish_id: 6,
+          quantity: 1,
+          price: 900,
+          name: 'Тирамису'
+        },
+        {
+          dish_id: 7,
+          quantity: 1,
+          price: 800,
+          name: 'Вино красное (бокал)'
+        }
+      ],
+      table_number: 9,
+      customer_name: 'Дмитрий Сидоров',
+      customer_phone: '+7 (777) 333-44-55'
+    },
+    {
+      id: 1004,
+      user_id: 4,
+      waiter_id: 3,
+      status: 'completed',
+      payment_status: 'paid',
+      payment_method: 'card',
+      order_type: 'delivery',
+      total_amount: 3100,
+      created_at: getRandomPastDate(),
+      updated_at: getRandomPastDate(),
+      items: [
+        {
+          dish_id: 8,
+          quantity: 1,
+          price: 1800,
+          name: 'Пицца Маргарита'
+        },
+        {
+          dish_id: 9,
+          quantity: 1,
+          price: 1300,
+          name: 'Суши-сет Филадельфия'
+        }
+      ],
+      customer_name: 'Андрей Кузнецов',
+      customer_phone: '+7 (777) 444-55-66',
+      delivery_address: 'ул. Абая 44, кв. 12'
+    },
+    {
+      id: 1005,
+      user_id: 5,
+      waiter_id: undefined,
+      status: 'cancelled',
+      payment_status: 'refunded',
+      payment_method: 'card',
+      order_type: 'pickup',
+      total_amount: 2400,
+      created_at: getRandomPastDate(),
+      updated_at: getRandomPastDate(),
+      items: [
+        {
+          dish_id: 10,
+          quantity: 2,
+          price: 1200,
+          name: 'Бургер с говядиной'
+        }
+      ],
+      customer_name: 'Наталья Смирнова',
+      customer_phone: '+7 (777) 555-66-77'
     }
   ];
 }

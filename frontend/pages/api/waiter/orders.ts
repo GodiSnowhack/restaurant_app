@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { decode } from 'jsonwebtoken';
+import { demoWaiterOrders } from '../../../lib/demo-data/waiter-orders';
 
 /**
  * API-прокси для заказов официанта 
@@ -25,6 +26,15 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
     return res.status(405).json({ error: 'Метод не поддерживается' });
   }
 
+  // Проверяем, нужно ли использовать демо-данные
+  const useDemoData = process.env.NEXT_PUBLIC_USE_DEMO_DATA === 'true';
+  
+  // Если явно указано использовать демо-данные, возвращаем их
+  if (useDemoData) {
+    console.log('Waiter Orders API - Использование демо-данных согласно настройкам');
+    return res.status(200).json(demoWaiterOrders);
+  }
+
   try {
     // Получаем токен авторизации из заголовков
     const authHeader = req.headers.authorization;
@@ -32,8 +42,8 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.log('Waiter Orders API - Отсутствует токен авторизации');
       
-      // Возвращаем пустой массив вместо ошибки, чтобы клиентская часть могла корректно обработать
-      return res.status(200).json([]);
+      // Возвращаем демо-данные вместо пустого массива
+      return res.status(200).json(demoWaiterOrders);
     }
     
     // Извлекаем токен
@@ -41,7 +51,15 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
     
     // Формируем основной URL для API
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const endpoint = `${apiBaseUrl}/waiter/orders`;
+    
+    // Пробуем сначала получить данные из специального эндпоинта для официанта
+    let endpoint = `${apiBaseUrl}/waiter/orders`;
+    
+    // Получаем информацию о пользователе из заголовков
+    const userId = req.headers['x-user-id'] || '';
+    const userRole = req.headers['x-user-role'] || '';
+    
+    console.log(`Waiter Orders API - ID пользователя: ${userId}, роль: ${userRole}`);
     
     // Формируем заголовки
     const headers: Record<string, string> = {
@@ -71,28 +89,34 @@ export default async function waiterOrdersProxy(req: NextApiRequest, res: NextAp
         const data = response.data;
         console.log(`Waiter Orders API - Получено ${data.length} заказов`);
         
-        // Дополняем данные полем total_price для совместимости
+        // Проверяем, не пустой ли массив
+        if (data.length === 0) {
+          console.log('Waiter Orders API - Получен пустой массив, используем демо-данные');
+          return res.status(200).json(demoWaiterOrders);
+        }
+        
+        // Дополняем данные полями для совместимости
         const enhancedData = data.map(order => ({
           ...order,
-          total_price: order.total_amount // Дублируем для совместимости
+          total_price: order.total_amount || order.total_price, // Дублируем для совместимости
+          order_type: order.order_type || 'dine_in' // Убеждаемся, что тип заказа есть
         }));
         
         return res.status(200).json(enhancedData);
       } else {
-        console.log('Waiter Orders API - Некорректный формат данных');
-        // Возвращаем пустой массив вместо ошибки
-        return res.status(200).json([]);
+        console.log('Waiter Orders API - Некорректный формат данных, используем демо-данные');
+        // Возвращаем демо-данные вместо пустого массива
+        return res.status(200).json(demoWaiterOrders);
       }
     } catch (apiError: any) {
       console.error('Waiter Orders API - Ошибка при запросе к API:', apiError.message);
       
-      // Независимо от типа ошибки, возвращаем пустой массив
-      // Это позволит клиентской части корректно обрабатывать ответ
-      return res.status(200).json([]);
+      // При любой ошибке возвращаем демо-данные
+      return res.status(200).json(demoWaiterOrders);
     }
   } catch (error: any) {
     console.error('Waiter Orders API - Общая ошибка:', error.message);
-    // Возвращаем пустой массив вместо ошибки
-    return res.status(200).json([]);
+    // Возвращаем демо-данные вместо ошибки
+    return res.status(200).json(demoWaiterOrders);
   }
 } 

@@ -26,7 +26,24 @@ export default async function usersHandler(req: NextApiRequest, res: NextApiResp
     // Получаем токен авторизации из разных источников
     let token = req.headers.authorization;
     if (!token) {
-      token = `Bearer ${req.cookies.token || req.query.token || 'dummy-token'}`;
+      // Проверяем куки
+      const cookieToken = req.cookies.token;
+      // Проверяем query-параметр
+      const queryToken = req.query.token as string | undefined;
+      
+      // Используем найденный токен или заменитель
+      if (cookieToken) {
+        token = `Bearer ${cookieToken}`;
+        console.log('[API Proxy Users] Найден токен в куках');
+      } else if (queryToken) {
+        token = `Bearer ${queryToken}`;
+        console.log('[API Proxy Users] Найден токен в query-параметрах');
+      } else {
+        console.warn('[API Proxy Users] Токен не найден в запросе');
+        token = 'Bearer missing-token';
+      }
+    } else {
+      console.log('[API Proxy Users] Токен найден в заголовке Authorization');
     }
 
     console.log(`[API Proxy Users] Запрос ${req.method} с токеном: ${token ? 'Присутствует' : 'Отсутствует'}`);
@@ -95,18 +112,25 @@ export default async function usersHandler(req: NextApiRequest, res: NextApiResp
           // Попытка использовать прямой доступ
           const directUrl = `${apiUrl}/users/direct`;
           const directResponse = await axios({
-        method: 'GET',
+            method: 'GET',
             url: directUrl,
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'X-User-ID': userId as string,
-              'X-User-Role': 'admin'
+              'X-User-Role': 'admin',
+              'Authorization': token
+            },
+            params: {
+              role: req.query.role,
+              skip: req.query.skip,
+              limit: req.query.limit,
+              query: req.query.query
             },
             timeout: 15000
-      });
+          });
 
-          console.log(`[API Proxy Users] Успешно получены пользователи через /users/direct: ${directResponse.status}`);
+          console.log(`[API Proxy Users] Успешно получены пользователи через /users/direct: ${directResponse.status}, количество: ${directResponse.data.length}`);
           return res.status(directResponse.status).json(directResponse.data);
         } catch (directError: any) {
           console.error('[API Proxy Users] Ошибка при прямом доступе:', directError.message);

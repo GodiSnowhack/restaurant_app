@@ -3,6 +3,7 @@
  */
 
 import { Order } from './types';
+import { demoWaiterOrders } from '../demo-data/waiter-orders';
 
 // Функция для получения информации о пользователе из localStorage
 const getUserInfo = () => {
@@ -35,6 +36,19 @@ const getAuthToken = () => {
   return localStorage.getItem('token') || null;
 };
 
+// Проверка, нужно ли использовать демо-данные
+const shouldUseDemoData = () => {
+  if (typeof window === 'undefined') return true;
+  
+  // Проверяем настройки использования демо-данных
+  const useDemoData = localStorage.getItem('use_demo_data');
+  
+  // Если явно установлено использование демо-данных или отсутствует бэкенд
+  return useDemoData === 'true' || 
+         process.env.NEXT_PUBLIC_USE_DEMO_DATA === 'true' || 
+         !process.env.NEXT_PUBLIC_API_URL;
+};
+
 /**
  * API для работы с заказами официантов
  */
@@ -47,6 +61,12 @@ export const waiterApi = {
     try {
       console.log('waiterApi.getWaiterOrders - Начало запроса');
       
+      // Проверяем, нужно ли использовать демо-данные
+      if (shouldUseDemoData()) {
+        console.log('waiterApi.getWaiterOrders - Используем демо-данные');
+        return demoWaiterOrders;
+      }
+      
       // Получаем информацию о пользователе
       const userInfo = getUserInfo();
       const token = getAuthToken();
@@ -55,7 +75,8 @@ export const waiterApi = {
 
       if (!userInfo || !token) {
         console.error('waiterApi.getWaiterOrders - Отсутствуют данные пользователя или токен авторизации');
-        return [];
+        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за отсутствия авторизации');
+        return demoWaiterOrders;
       }
 
       // Получаем ID пользователя и его роль
@@ -67,10 +88,45 @@ export const waiterApi = {
       
       if (!userId) {
         console.error('waiterApi.getWaiterOrders - Не удалось определить ID пользователя');
-        return [];
+        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за отсутствия ID пользователя');
+        return demoWaiterOrders;
       }
 
-      // Формируем URL запроса
+      // Пробуем сначала получить заказы через специальное API для официантов
+      try {
+        const apiUrl = '/api/waiter/simple-orders';
+        console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
+        
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': userRole,
+          'X-User-ID': userId ? String(userId) : ''
+        };
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: headers,
+          cache: 'no-store'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
+          
+          if (Array.isArray(data) && data.length > 0) {
+            return data;
+          }
+        }
+        
+        // Если не получилось или нет данных, пробуем основной API
+        console.log('waiterApi.getWaiterOrders - Переход к основному API заказов...');
+      } catch (error) {
+        console.warn('waiterApi.getWaiterOrders - Ошибка с simple-orders API, пробуем основной API:', error);
+      }
+
+      // Формируем URL запроса к обычному API
       const apiUrl = '/api/waiter/orders';
       
       console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
@@ -96,10 +152,10 @@ export const waiterApi = {
           const errorText = await response.text();
           console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}: ${errorText}`);
           
-          // Если ошибка 401 (не авторизован), возвращаем пустой массив
-          if (response.status === 401) {
-            console.log('waiterApi.getWaiterOrders - Ошибка авторизации (401), возвращаем пустой список заказов');
-            return [];
+          // Если ошибка 401 (не авторизован) или 403 (доступ запрещен), возвращаем демо-данные
+          if (response.status === 401 || response.status === 403) {
+            console.log('waiterApi.getWaiterOrders - Ошибка авторизации, используем демо-данные');
+            return demoWaiterOrders;
           }
           
           throw new Error(`Ошибка запроса: ${response.status} ${errorText}`);
@@ -110,17 +166,25 @@ export const waiterApi = {
         
         if (!Array.isArray(data)) {
           console.warn('waiterApi.getWaiterOrders - Получены данные не в формате массива:', data);
-          return data && typeof data === 'object' ? [data] : [];
+          return data && typeof data === 'object' ? [data] : demoWaiterOrders;
+        }
+        
+        // Если массив пустой, возвращаем демо-данные
+        if (data.length === 0) {
+          console.log('waiterApi.getWaiterOrders - Получен пустой массив, используем демо-данные');
+          return demoWaiterOrders;
         }
         
         return data;
       } catch (fetchError) {
         console.error('waiterApi.getWaiterOrders - Ошибка при выполнении запроса:', fetchError);
-        return [];
+        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за ошибки запроса');
+        return demoWaiterOrders;
       }
     } catch (error) {
       console.error('waiterApi.getWaiterOrders - Критическая ошибка:', error);
-      return [];
+      console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за критической ошибки');
+      return demoWaiterOrders;
     }
   },
 

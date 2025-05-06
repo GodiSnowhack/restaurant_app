@@ -217,10 +217,28 @@ export const usersApi = {
         });
         
         if (!proxyResponse.ok) {
+          console.error(`Ошибка API прокси: ${proxyResponse.status} ${proxyResponse.statusText}`);
+          
+          // Попытка прочитать данные ошибки
+          try {
+            const errorData = await proxyResponse.json();
+            console.error('Детали ошибки API:', errorData);
+          } catch (e) {
+            console.error('Не удалось прочитать данные ошибки');
+          }
+          
           throw new Error(`Ошибка API прокси: ${proxyResponse.status} ${proxyResponse.statusText}`);
         }
         
         const users = await proxyResponse.json();
+        
+        // Проверка на наличие данных
+        if (!Array.isArray(users)) {
+          console.error('API вернул не массив:', users);
+          throw new Error('Некорректный формат данных от API');
+        }
+        
+        console.log(`Получено ${users.length} пользователей через API прокси`);
         
         // Кэшируем результаты при успешном запросе
         if (!params.role && !params.query) {
@@ -228,7 +246,6 @@ export const usersApi = {
           lastFetchTime = now;
         }
         
-        console.log(`Получено ${users.length} пользователей через API прокси`);
         return users;
       } catch (proxyError) {
         console.warn('Ошибка при запросе через Next.js API прокси:', proxyError);

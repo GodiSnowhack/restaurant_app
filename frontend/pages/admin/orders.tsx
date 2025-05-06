@@ -47,6 +47,14 @@ const AdminOrdersPage: NextPage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  // State для отслеживания режима демо-данных
+  const [useDemoData, setUseDemoData] = useState<boolean>(false);
+  
+  // Эффект для загрузки настройки demo-режима из localStorage
+  useEffect(() => {
+    const demoSetting = localStorage?.getItem('admin_use_demo_data') === 'true';
+    setUseDemoData(demoSetting);
+  }, []);
 
   useEffect(() => {
       fetchOrders();
@@ -117,7 +125,19 @@ const AdminOrdersPage: NextPage = () => {
       console.log('Полученные заказы:', data);
       
       if (Array.isArray(data)) {
-        setOrders(data);
+        // Нормализуем данные заказов (приводим статусы к нижнему регистру для совместимости)
+        const normalizedOrders = data.map(order => ({
+          ...order,
+          // Нормализуем статус заказа
+          status: order.status?.toLowerCase() || 'pending',
+          // Нормализуем статус оплаты
+          payment_status: order.payment_status?.toLowerCase() || 'pending',
+          // Убеждаемся, что items - это массив
+          items: Array.isArray(order.items) ? order.items : []
+        }));
+        
+        console.log('Нормализованные заказы:', normalizedOrders);
+        setOrders(normalizedOrders);
       } else {
         console.error('API вернул неверный формат данных:', data);
         setError('Полученные данные имеют неверный формат. Ожидался массив заказов.');
@@ -369,13 +389,29 @@ const AdminOrdersPage: NextPage = () => {
       <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold dark:text-white">Управление заказами</h1>
-          <Link
-            href="/admin"
-            className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
-          >
-            <ArrowLeftIcon className="w-5 h-5 mr-1" />
-            Назад к панели управления
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const newValue = !useDemoData;
+                localStorage.setItem('admin_use_demo_data', newValue ? 'true' : 'false');
+                setUseDemoData(newValue);
+                alert(`Режим демо-данных ${newValue ? 'включен' : 'выключен'}`);
+                fetchOrders();
+              }}
+              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md flex items-center"
+            >
+              {useDemoData ? 
+                'Использовать реальные данные' : 
+                'Использовать демо-данные'}
+            </button>
+            <Link
+              href="/admin"
+              className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
+            >
+              <ArrowLeftIcon className="w-5 h-5 mr-1" />
+              Назад к панели управления
+            </Link>
+          </div>
         </div>
         
         {/* Фильтры */}

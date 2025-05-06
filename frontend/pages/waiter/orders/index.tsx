@@ -3,7 +3,6 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
-import Layout from '../../../components/Layout';
 import WaiterLayout from '../../../components/WaiterLayout';
 import useAuthStore from '../../../lib/auth-store';
 import { waiterApi } from '../../../lib/api/waiter-api';
@@ -80,6 +79,7 @@ interface WaiterOrder {
   customer_name?: string;
   items: OrderItem[];
   statusUpdating?: boolean;
+  waiter_id: number;
 }
 
 interface OrderItem {
@@ -147,6 +147,7 @@ const WaiterOrdersPage: NextPage = () => {
         if (!data || data.length === 0) {
           console.log('WaiterOrders - Список заказов пуст');
           setOrders([]);
+          // Не устанавливаем ошибку, просто показываем пустой список
         } else {
           // Проверяем корректность полученных данных и конвертируем их в нужный формат
           const validOrders: WaiterOrder[] = data
@@ -159,10 +160,17 @@ const WaiterOrdersPage: NextPage = () => {
               total_amount: order.total_amount || order.total_price || 0, // Используем total_price в качестве запасного варианта
               total_price: order.total_price || order.total_amount || 0, // Для обратной совместимости
               created_at: order.created_at || new Date().toISOString(),
-              table_number: order.table_number,
-              customer_name: order.customer_name,
-              items: Array.isArray(order.items) ? order.items : [],
-              statusUpdating: false
+              table_number: order.table_number || 0,
+              customer_name: order.customer_name || 'Гость',
+              items: Array.isArray(order.items) ? order.items.map(item => ({
+                dish_id: item.dish_id || 0,
+                quantity: item.quantity || 1,
+                price: item.price || 0,
+                name: item.name || 'Неизвестное блюдо',
+                special_instructions: item.special_instructions
+              })) : [],
+              statusUpdating: false,
+              waiter_id: order.waiter_id || 1
             }));
           
           if (validOrders.length < data.length) {
@@ -174,9 +182,13 @@ const WaiterOrdersPage: NextPage = () => {
         }
       } catch (err: any) {
         console.error('WaiterOrders - Ошибка при загрузке заказов:', err);
-        // Устанавливаем более дружественное сообщение для пользователя
-        setError('У вас нет активных заказов. Возможно, требуется авторизация с ролью официанта.');
-        setOrders([]);
+        setError('Не удалось загрузить заказы. Пожалуйста, попробуйте снова позже.');
+        
+        // Сохраняем текущие ордера при ошибке, чтобы не терять данные
+        // Если заказов еще не было, оставляем список пустым
+        if (orders.length === 0) {
+          setOrders([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -250,7 +262,7 @@ const WaiterOrdersPage: NextPage = () => {
 
   if (!isAuthenticated || !user) {
     return (
-      <WaiterLayout title="Загрузка..." activeTab="orders">
+      <WaiterLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
         </div>
@@ -259,153 +271,149 @@ const WaiterOrdersPage: NextPage = () => {
   }
 
   return (
-    <WaiterLayout title="Заказы" activeTab="orders">
+    <WaiterLayout>
       <Head>
-        <title>Заказы официанта</title>
+        <title>Заказы официанта | Панель управления</title>
       </Head>
       <MainContainer>
-        <PageTitle>
-          {user?.role === 'admin' ? 'Все заказы ресторана (режим администратора)' : 'Список ваших заказов'}
-        </PageTitle>
-        
-        {loading ? (
+        <div className="flex justify-between items-center mb-6">
+          <PageTitle>Мои заказы</PageTitle>
+          <Button 
+            variant="contained" 
+            startIcon={<RefreshIcon className="h-5 w-5" />}
+            onClick={refreshOrders}
+          >
+            Обновить
+          </Button>
+        </div>
+
+        {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress />
           </Box>
-        ) : error ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
             {error}
-            <Button 
-              variant="outlined" 
-              size="small" 
-              sx={{ ml: 2 }} 
-              onClick={refreshOrders}
-            >
-              Попробовать снова
-            </Button>
           </Alert>
-        ) : orders.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            У вас пока нет активных заказов. 
-            <Button 
-              variant="outlined" 
-              size="small" 
-              sx={{ ml: 2 }} 
-              onClick={refreshOrders}
-            >
-              Обновить
-            </Button>
-          </Alert>
-        ) : (
-          <>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              <Button 
-                variant="contained" 
-                startIcon={<RefreshIcon className="h-5 w-5" />} 
-                onClick={refreshOrders}
-              >
-                Обновить
-              </Button>
-            </Box>
-            
-            <Grid container spacing={2}>
-              {orders.map((order) => (
-                <div className="w-full mb-4" key={order.id}>
-                  <div className="bg-white rounded-lg shadow-md p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="text-lg font-medium">
-                          Заказ #{order.id}
-                          {order.table_number && <span className="ml-2">• Стол {order.table_number}</span>}
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          {new Date(order.created_at).toLocaleString('ru-RU')}
-                          {order.customer_name && <span className="ml-2">• {order.customer_name}</span>}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <span className={`px-2 py-1 rounded-full text-xs flex items-center ${statusColors[order.status as keyof typeof statusColors] || 'bg-gray-100'}`}>
-                          <span className="mr-1">{statusIcons[order.status as keyof typeof statusIcons]}</span>
-                          {statusLabels[order.status as keyof typeof statusLabels] || order.status}
-                        </span>
-                      </div>
-                    </div>
+        )}
 
-                    <div className="mt-3 border-t border-gray-100 pt-3">
-                      <div className="text-sm font-medium mb-2">Блюда:</div>
-                      <ul className="space-y-1">
-                        {order.items && order.items.map((item, index) => (
-                          <li key={index} className="text-sm flex justify-between">
-                            <span>{item.quantity} × {item.name}</span>
-                            <span className="text-gray-600">{item.price.toFixed(2)} ₸</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+        {!loading && orders.length === 0 && !error && (
+          <div className="bg-gray-50 p-8 text-center rounded-lg border border-gray-200">
+            <div className="flex justify-center mb-4">
+              <ListBulletIcon className="h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Нет активных заказов</h3>
+            <p className="text-gray-500 mb-4">
+              У вас пока нет назначенных заказов от клиентов.
+            </p>
+            <div className="flex justify-center">
+              <Link href="/waiter/create-order">
+                <Button variant="contained">Создать заказ</Button>
+              </Link>
+            </div>
+          </div>
+        )}
 
-                    <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4">
-                      <div className="font-medium">Итого: {(order.total_amount || order.total_price || 0).toFixed(2)} ₸</div>
+        {!loading && orders.length > 0 && (
+          <Grid container spacing={2}>
+            {orders.map((order) => (
+              <div className="w-full mb-4" key={order.id}>
+                <div className="bg-white rounded-lg shadow-md p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-medium">
+                        Заказ #{order.id}
+                        {order.table_number && <span className="ml-2">• Стол {order.table_number}</span>}
+                      </h3>
+                      <p className="text-gray-500 text-sm">
+                        {new Date(order.created_at).toLocaleString('ru-RU')}
+                        {order.customer_name && <span className="ml-2">• {order.customer_name}</span>}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <span className={`px-2 py-1 rounded-full text-xs flex items-center ${statusColors[order.status as keyof typeof statusColors] || 'bg-gray-100'}`}>
+                        <span className="mr-1">{statusIcons[order.status as keyof typeof statusIcons]}</span>
+                        {statusLabels[order.status as keyof typeof statusLabels] || order.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-gray-100 pt-3">
+                    <div className="text-sm font-medium mb-2">Блюда:</div>
+                    <ul className="space-y-1">
+                      {order.items && order.items.map((item, index) => (
+                        <li key={index} className="text-sm flex justify-between">
+                          <span>{item.quantity} × {item.name}</span>
+                          <span className="text-gray-600">{item.price.toFixed(2)} ₸</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4">
+                    <div className="font-medium">Итого: {(order.total_amount || order.total_price || 0).toFixed(2)} ₸</div>
+                    
+                    <div className="flex space-x-2">
+                      <Link href={`/waiter/orders/${order.id}`} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm">
+                        Подробнее
+                      </Link>
                       
-                      <div className="flex space-x-2">
-                        <Link href={`/waiter/orders/${order.id}`} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm">
-                          Подробнее
-                        </Link>
-                        
-                        {order.statusUpdating ? (
-                          <div className="px-3 py-1 bg-gray-100 rounded-md flex items-center">
-                            <svg className="animate-spin h-4 w-4 text-primary mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span className="text-sm">Обновление...</span>
-                          </div>
-                        ) : (
-                          <>
-                            {order.status === 'new' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'preparing')}
-                                className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors text-sm"
-                              >
-                                Принять
-                              </button>
-                            )}
-                            
-                            {order.status === 'preparing' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'ready')}
-                                className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm"
-                              >
-                                Готов
-                              </button>
-                            )}
-                            
-                            {order.status === 'ready' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'delivered')}
-                                className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm"
-                              >
-                                Доставлен
-                              </button>
-                            )}
-                            
-                            {order.status === 'delivered' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'completed')}
-                                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
-                              >
-                                Завершить
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
+                      {order.statusUpdating ? (
+                        <div className="px-3 py-1 bg-gray-100 rounded-md flex items-center">
+                          <svg className="animate-spin h-4 w-4 text-primary mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span className="text-sm">Обновление...</span>
+                        </div>
+                      ) : (
+                        <>
+                          {order.status === 'new' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'preparing')}
+                              className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition-colors text-sm"
+                            >
+                              Принять
+                            </button>
+                          )}
+                          
+                          {order.status === 'preparing' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'ready')}
+                              className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm"
+                            >
+                              Готов
+                            </button>
+                          )}
+                          
+                          {order.status === 'ready' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'delivered')}
+                              className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm"
+                            >
+                              Доставлен
+                            </button>
+                          )}
+                          
+                          {order.status === 'delivered' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'completed')}
+                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
+                            >
+                              Завершить
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </Grid>
-          </>
+              </div>
+            ))}
+          </Grid>
         )}
       </MainContainer>
     </WaiterLayout>
