@@ -13,4 +13,5 @@ class Token(BaseModel):
 class TokenPayload(BaseModel):
     """Схема полезной нагрузки токена"""
     sub: Optional[int] = None
+    exp: Optional[int] = None
     role: Optional[str] = None 

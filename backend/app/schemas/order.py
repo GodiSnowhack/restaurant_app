@@ -51,7 +51,6 @@ class OrderBase(BaseModel):
     reservation_code: Optional[str] = None
     order_code: Optional[str] = None
     customer_age_group: Optional[str] = None
-    customer_gender: Optional[str] = None
 
 
 class OrderCreate(OrderBase):
@@ -160,12 +159,17 @@ class OrderItem(OrderItemBase):
     id: int
     order_id: Optional[int] = None
     dish_id: int
+    name: Optional[str] = None
     dish_name: Optional[str] = None
     dish_image: Optional[str] = None
     price: float
     quantity: int = 1
     special_instructions: Optional[str] = None
-    created_at: Optional[datetime] = None
+    description: Optional[str] = None
+    category_id: Optional[int] = None
+    total_price: Optional[float] = None
+    price_formatted: Optional[str] = None
+    total_price_formatted: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -221,16 +225,25 @@ class OrderResponse(BaseModel):
             "user": obj.user,
             "items": [
                 {
-                    "dish_id": item.id,
-                    "name": item.name,
-                    "price": item.price,
-                    "quantity": next((od.quantity for od in obj.order_dishes if od.dish_id == item.id), 1),
-                    "special_instructions": next((od.special_instructions for od in obj.order_dishes if od.dish_id == item.id), None)
+                    "id": od.id,
+                    "dish_id": od.dish_id,
+                    "name": od.dish.name if od.dish else f"Блюдо #{od.dish_id}",
+                    "dish_name": od.dish.name if od.dish else f"Блюдо #{od.dish_id}",
+                    "price": float(od.price),
+                    "quantity": od.quantity,
+                    "special_instructions": od.special_instructions,
+                    "dish_image": od.dish.image_url if od.dish else None,
+                    "description": od.dish.description if od.dish else None,
+                    "category_id": od.dish.category_id if od.dish else None,
+                    "total_price": float(od.price) * od.quantity,
+                    "price_formatted": f"{float(od.price)} ₸",
+                    "total_price_formatted": f"{float(od.price) * od.quantity} ₸",
+                    "order_id": obj.id
                 }
-                for item in obj.items
+                for od in obj.order_dishes
             ]
         }
-        return cls(**data) 
+        return cls(**data)
 
 
 # Схемы для заказов обновления статуса

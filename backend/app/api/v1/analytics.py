@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 
 from app.database.session import get_db
 from app.models.user import User, UserRole
@@ -193,8 +193,22 @@ def get_financial_metrics(
         print(f"Запрос финансовых метрик с параметрами: startDate={start_date}, endDate={end_date}")
         
         # Конвертируем строковые даты в datetime
-        start_datetime = parse_date(start_date)
-        end_datetime = parse_date(end_date)
+        start_datetime = None
+        end_datetime = None
+        
+        if start_date:
+            try:
+                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            except Exception as e:
+                print(f"Ошибка при преобразовании start_date: {e}")
+                start_datetime = datetime.now() - timedelta(days=30)
+        
+        if end_date:
+            try:
+                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            except Exception as e:
+                print(f"Ошибка при преобразовании end_date: {e}")
+                end_datetime = datetime.now()
         
         # Логируем преобразованные даты
         print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
@@ -211,9 +225,11 @@ def get_financial_metrics(
         result = analytics.get_financial_metrics(db, start_datetime, end_datetime)
         return result
     except Exception as e:
-        # Логируем ошибку
         print(f"Ошибка при получении финансовых метрик: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при получении финансовых метрик: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при получении финансовых метрик: {str(e)}"
+        )
 
 
 @router.get("/menu", response_model=Dict[str, Any])

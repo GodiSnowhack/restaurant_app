@@ -9,14 +9,11 @@ export const getApiBaseUrl = () => {
   
   // Если мы на клиенте, используем относительный URL для проксирования через Next.js
   if (typeof window !== 'undefined') {
-    // Используем относительный URL, который будет обрабатываться rewrites в next.config.js
-    return '/api';
+    return 'http://localhost:8000';
   }
   
-  // Получаем хост из запроса (для SSR)
-  // В режиме SSR мы не имеем доступа к window, но можем использовать
-  // текущий хост из headers запроса (это не работает непосредственно здесь, но указываем направление)
-  return 'http://localhost:8000/api/v1';
+  // Для SSR используем прямой URL к бэкенду
+  return 'http://localhost:8000';
 };
 
 const baseURL = getApiBaseUrl();
@@ -121,21 +118,27 @@ api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
     
-    if (token && !isTokenExpired(token)) {
+    if (token) {
+      // Добавляем токен в заголовки
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Проверяем, является ли запрос регистрацией
-    if (config.url === '/auth/register' && config.method === 'post') {
-      // Если это запрос на регистрацию, проверяем, что роль установлена как 'guest'
-      if (config.data && typeof config.data === 'object') {
-        // Если роль не указана или указана как 'user', устанавливаем её как 'guest'
-        if (!config.data.role || config.data.role === 'user') {
-          config.data.role = 'guest';
-          console.log('API Interceptor: Установлена роль "guest" для запроса регистрации');
+      
+      try {
+        // Добавляем информацию о пользователе из localStorage
+        const userInfo = localStorage.getItem('user');
+        if (userInfo) {
+          const user = JSON.parse(userInfo);
+          config.headers['X-User-ID'] = user.id;
+          config.headers['X-User-Role'] = user.role;
+          config.headers['X-Is-Admin'] = user.role === 'admin' ? 'true' : 'false';
         }
+      } catch (e) {
+        console.error('Ошибка при добавлении информации пользователя в заголовки:', e);
       }
     }
+    
+    // Добавляем CORS заголовки
+    config.headers['Access-Control-Allow-Credentials'] = 'true';
+    config.headers['Access-Control-Allow-Origin'] = window.location.origin;
     
     return config;
   },

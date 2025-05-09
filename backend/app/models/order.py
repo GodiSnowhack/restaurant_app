@@ -9,8 +9,11 @@ from app.database.session import Base
 
 
 class OrderStatus(str, PyEnum):
+    PENDING = "pending"
     NEW = "new"
     CONFIRMED = "confirmed"
+    COOKING = "cooking"
+    PREPARING = "preparing"
     IN_PROGRESS = "in_progress"
     READY = "ready"
     DELIVERED = "delivered"
@@ -67,7 +70,7 @@ class Order(Base):
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
     
-    status = Column(Enum(OrderStatus), default=OrderStatus.NEW)
+    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     total_amount = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
@@ -76,7 +79,6 @@ class Order(Base):
     
     # Информация о клиенте
     customer_age_group = Column(String, nullable=True)  # teen, young, adult, elderly
-    customer_gender = Column(String, nullable=True)  # male, female, other
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models.user import User, UserRole
+from app.core.config import settings
 
 # Настройки JWT
-SECRET_KEY = "your-secret-key-keep-it-secret"  # В продакшене использовать безопасный ключ
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 дней
+SECRET_KEY = settings.JWT_SECRET  # Используем ключ из настроек
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

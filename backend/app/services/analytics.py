@@ -19,45 +19,22 @@ def get_sales_by_period(
     Получение статистики продаж за период
     """
     try:
-        # Дополнительная проверка и преобразование даты
-        if start_date and not isinstance(start_date, datetime):
-            try:
-                if isinstance(start_date, str):
-                    start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                else:
-                    print(f"Неподдерживаемый тип даты начала: {type(start_date)}")
-                    start_date = datetime.now() - timedelta(days=30)
-            except Exception as e:
-                print(f"Ошибка при преобразовании даты начала: {e}")
-                start_date = datetime.now() - timedelta(days=30)
-        
-        if end_date and not isinstance(end_date, datetime):
-            try:
-                if isinstance(end_date, str):
-                    end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                else:
-                    print(f"Неподдерживаемый тип даты окончания: {type(end_date)}")
-                    end_date = datetime.now()
-            except Exception as e:
-                print(f"Ошибка при преобразовании даты окончания: {e}")
-                end_date = datetime.now()
-                
         # Если даты не указаны, устанавливаем значения по умолчанию
         if not start_date:
             start_date = datetime.now() - timedelta(days=30)
         if not end_date:
             end_date = datetime.now()
             
+        # Логируем даты для отладки
+        print(f"Используем даты в get_sales_by_period: start_date={start_date}, end_date={end_date}")
+        
         query = db.query(
             cast(Order.created_at, Date).label('date'),
             func.count(Order.id).label('orders_count'),
             func.sum(Order.total_amount).label('total_revenue')
         )
         
-        # Не фильтруем по статусу, учитываем все заказы в расчетах
-        # query = query.filter(Order.status.in_([OrderStatus.COMPLETED, OrderStatus.DELIVERED]))
-        
-        # Применяем фильтры по датам, если указаны
+        # Применяем фильтры по датам
         query = query.filter(Order.created_at >= start_date)
         query = query.filter(Order.created_at <= end_date)
         
@@ -77,12 +54,12 @@ def get_sales_by_period(
             try:
                 # Безопасное преобразование даты
                 date_value = item.date
-                if hasattr(date_value, 'isoformat'):
+                if isinstance(date_value, datetime):
+                    date_str = date_value.date().isoformat()
+                elif isinstance(date_value, date):
                     date_str = date_value.isoformat()
-                elif isinstance(date_value, str):
-                    date_str = date_value
                 else:
-                    date_str = str(date_value) if date_value else ""
+                    date_str = str(date_value)
                 
                 # Безопасное преобразование числовых значений
                 orders_count = item.orders_count or 0
@@ -120,6 +97,8 @@ def get_sales_by_period(
         
     except Exception as e:
         print(f"Критическая ошибка в get_sales_by_period: {e}")
+        print(f"Тип start_date: {type(start_date)}, значение: {start_date}")
+        print(f"Тип end_date: {type(end_date)}, значение: {end_date}")
         # Возвращаем минимальный набор данных в случае ошибки
         return [{
             "date": datetime.now().date().isoformat(),

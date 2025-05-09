@@ -144,68 +144,62 @@ const WaiterOrdersPage: NextPage = () => {
         const data = await waiterApi.getWaiterOrders();
         console.log('WaiterOrders - Получены данные заказов:', data);
         
-        if (!data || data.length === 0) {
+        if (!data || !Array.isArray(data)) {
+          console.error('WaiterOrders - Получены некорректные данные:', data);
+          setError('Получены некорректные данные с сервера');
+          setOrders([]);
+          return;
+        }
+
+        if (data.length === 0) {
           console.log('WaiterOrders - Список заказов пуст');
           setOrders([]);
-          // Не устанавливаем ошибку, просто показываем пустой список
-        } else {
-          // Проверяем корректность полученных данных и конвертируем их в нужный формат
-          const validOrders: WaiterOrder[] = data
-            .filter(order => order && typeof order === 'object' && order.id)
-            .map(order => ({
-              id: order.id || 0, // Убеждаемся, что id всегда существует
-              status: order.status || 'new',
-              payment_status: order.payment_status || 'not_paid',
-              payment_method: order.payment_method || 'cash',
-              total_amount: order.total_amount || order.total_price || 0, // Используем total_price в качестве запасного варианта
-              total_price: order.total_price || order.total_amount || 0, // Для обратной совместимости
-              created_at: order.created_at || new Date().toISOString(),
-              table_number: order.table_number || 0,
-              customer_name: order.customer_name || 'Гость',
-              items: Array.isArray(order.items) ? order.items.map(item => ({
-                dish_id: item.dish_id || 0,
-                quantity: item.quantity || 1,
-                price: item.price || 0,
-                name: item.name || 'Неизвестное блюдо',
-                special_instructions: item.special_instructions
-              })) : [],
-              statusUpdating: false,
-              waiter_id: order.waiter_id || 1
-            }));
-          
-          if (validOrders.length < data.length) {
-            console.warn(`WaiterOrders - Отфильтровано ${data.length - validOrders.length} некорректных заказов`);
-          }
-          
-          setOrders(validOrders);
-          console.log(`WaiterOrders - Установлено ${validOrders.length} заказов`);
+          return;
         }
+
+        const validOrders: WaiterOrder[] = data
+          .filter(order => order && typeof order === 'object' && typeof order.id === 'number')
+          .map(order => ({
+            id: order.id as number,
+            status: order.status || 'new',
+            payment_status: order.payment_status || 'not_paid',
+            payment_method: order.payment_method || 'cash',
+            total_amount: Number(order.total_amount) || 0,
+            created_at: order.created_at || new Date().toISOString(),
+            table_number: Number(order.table_number) || 0,
+            customer_name: order.customer_name || 'Гость',
+            items: Array.isArray(order.items) ? order.items.map(item => ({
+              dish_id: Number(item.dish_id),
+              quantity: Number(item.quantity),
+              price: Number(item.price),
+              name: item.name || 'Неизвестное блюдо',
+              special_instructions: item.special_instructions
+            })) : [],
+            statusUpdating: false,
+            waiter_id: Number(order.waiter_id)
+          }));
+
+        console.log(`WaiterOrders - Обработано ${validOrders.length} заказов`);
+        setOrders(validOrders);
       } catch (err: any) {
         console.error('WaiterOrders - Ошибка при загрузке заказов:', err);
-        setError('Не удалось загрузить заказы. Пожалуйста, попробуйте снова позже.');
-        
-        // Сохраняем текущие ордера при ошибке, чтобы не терять данные
-        // Если заказов еще не было, оставляем список пустым
-        if (orders.length === 0) {
-          setOrders([]);
-        }
+        const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить заказы';
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOrders();
-    
-    // Устанавливаем интервал для периодического обновления
-    const intervalId = setInterval(() => {
-      console.log('WaiterOrders - Автоматическое обновление списка заказов');
+    if (isAuthenticated) {
       fetchOrders();
-    }, 30000); // Обновляем каждые 30 секунд
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [refreshTrigger]);
+      
+      // Устанавливаем интервал для периодического обновления
+      const intervalId = setInterval(fetchOrders, 30000); // Обновляем каждые 30 секунд
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [isAuthenticated, refreshTrigger]);
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     // Проверяем, не обновляется ли уже заказ

@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Запрос к API для проверки сессии
     const response = await axios({
       method: 'GET',
-      url: `${API_BASE_URL}/auth/profile`,
+      url: `${API_BASE_URL}/auth/me`,
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -62,15 +62,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
-    } else {
-      // Если токен недействителен или пользователь не найден
-      console.log(`[Auth Session API] Ошибка проверки профиля: ${response.status}`);
+    }
+
+    // Если первый запрос не удался, пробуем альтернативный эндпоинт
+    const altResponse = await axios({
+      method: 'GET',
+      url: `${API_BASE_URL}/users/me`,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      validateStatus: () => true,
+    });
+
+    if (altResponse.status === 200) {
+      const user = altResponse.data;
       
       return res.status(200).json({
-        user: null,
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          role: user.role,
+          image: user.avatar || null,
+        },
         expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
     }
+
+    // Если оба запроса не удались
+    console.log(`[Auth Session API] Ошибка проверки профиля: ${response.status}`);
+    
+    return res.status(200).json({
+      user: null,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
   } catch (error) {
     console.error('[Auth Session API] Ошибка при получении профиля:', error);
     

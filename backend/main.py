@@ -31,141 +31,61 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Получаем список разрешенных источников для CORS
-# Когда используется withCredentials, нельзя использовать звездочку "*"
-# Нужно явно перечислить все разрешенные источники
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:8080", 
-    "http://127.0.0.1",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:8080",
-    "http://0.0.0.0",
-    "http://0.0.0.0:3000",
-    "http://0.0.0.0:8000",
-    "http://0.0.0.0:8080",
-    # IP-адреса в локальной сети
-    "http://192.168.0.10",
-    "http://192.168.0.10:3000",
-    "http://192.168.0.10:8000",
-    "http://192.168.0.11",
-    "http://192.168.0.11:3000",
-    "http://192.168.0.11:8000",
-    "http://192.168.0.12",
-    "http://192.168.0.12:3000",
-    "http://192.168.0.12:8000",
-    "http://192.168.0.13",
-    "http://192.168.0.13:3000",
-    "http://192.168.0.13:8000",
-    "http://192.168.0.14",
-    "http://192.168.0.14:3000",
-    "http://192.168.0.14:8000",
-    "http://192.168.0.15",
-    "http://192.168.0.15:3000",
-    "http://192.168.0.15:8000",
-    "http://192.168.0.16",
-    "http://192.168.0.16:3000",
-    "http://192.168.0.16:8000",
-    "http://192.168.1.1",
-    "http://192.168.1.1:3000",
-    "http://192.168.1.1:8000",
-    "http://192.168.1.2",
-    "http://192.168.1.2:3000",
-    "http://192.168.1.2:8000",
-    "http://192.168.1.3",
-    "http://192.168.1.3:3000",
-    "http://192.168.1.3:8000",
-    "http://192.168.1.4",
-    "http://192.168.1.4:3000",
-    "http://192.168.1.4:8000",
-    "http://192.168.1.5",
-    "http://192.168.1.5:3000",
-    "http://192.168.1.5:8000",
-    # IP-адреса с другими масками подсети
-    "http://10.0.0.1",
-    "http://10.0.0.1:3000",
-    "http://10.0.0.1:8000",
-    "http://10.0.0.2",
-    "http://10.0.0.2:3000",
-    "http://10.0.0.2:8000",
-    "http://10.0.0.3",
-    "http://10.0.0.3:3000",
-    "http://10.0.0.3:8000",
-    "http://10.0.0.4",
-    "http://10.0.0.4:3000",
-    "http://10.0.0.4:8000",
-    "http://10.0.0.5",
-    "http://10.0.0.5:3000",
-    "http://10.0.0.5:8000",
-    # HTTPS варианты
-    "https://localhost",
-    "https://localhost:3000",
-    "https://localhost:8000",
-    "https://localhost:8080",
-    "https://127.0.0.1",
-    "https://127.0.0.1:3000",
-    "https://127.0.0.1:8000",
-    "https://127.0.0.1:8080",
-    "https://0.0.0.0",
-    "https://0.0.0.0:3000",
-    "https://0.0.0.0:8000",
-    "https://0.0.0.0:8080",
-    "https://192.168.0.10",
-    "https://192.168.0.10:3000",
-    "https://192.168.0.10:8000",
-    "https://192.168.0.11",
-    "https://192.168.0.11:3000",
-    "https://192.168.0.11:8000",
-    "https://192.168.0.12",
-    "https://192.168.0.12:3000",
-    "https://192.168.0.12:8000",
-    "https://192.168.0.13",
-    "https://192.168.0.13:3000",
-    "https://192.168.0.13:8000",
-    "https://192.168.0.14",
-    "https://192.168.0.14:3000",
-    "https://192.168.0.14:8000",
-    "https://192.168.0.15",
-    "https://192.168.0.15:3000",
-    "https://192.168.0.15:8000",
-    "https://192.168.0.16",
-    "https://192.168.0.16:3000",
-    "https://192.168.0.16:8000"
-]
-
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    # Расширенный список origins для поддержки мобильных устройств
-    allow_origins=origins,  # Возвращаем список origins
-    allow_credentials=True,  # Включаем credentials для поддержки куки авторизации
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allow_headers=["*"],  # Разрешаем все заголовки для упрощения отладки
-    expose_headers=["Content-Disposition", "Location"],
-    max_age=1800,  # Кешировать предполетные запросы на 30 минут
-    allow_origin_regex="https?://localhost(:[0-9]+)?|https?://127\.0\.0\.1(:[0-9]+)?"  # Поддержка всех локальных портов
+    allow_origins=["*"],  # Разрешаем все источники
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешаем все методы
+    allow_headers=[
+        "Content-Type",
+        "Authorization", 
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-CSRF-Token",
+        "X-User-ID",
+        "X-User-Role",
+        "X-Is-Admin",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
+    ],
+    expose_headers=["*"],
+    max_age=1800,
 )
 
-# Middleware для логирования запросов, особенно важно для отладки мобильных клиентов
+# Middleware для логирования запросов и CORS
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     # Получаем информацию о запросе
     client_host = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    is_mobile = "mobile" in user_agent.lower() or "android" in user_agent.lower() or "iphone" in user_agent.lower()
+    auth_header = request.headers.get("authorization", "no-auth")
     
-    # Логируем запрос
-    logger.info(f"Request: {request.method} {request.url.path} - Client: {client_host} - UA: {user_agent[:30]}...")
+    # Логируем запрос с деталями
+    logger.info(f"Request: {request.method} {request.url.path} - Client: {client_host} - UA: {user_agent[:30]}... - Auth: {auth_header[:20]}...")
+    
+    # Для OPTIONS запросов сразу возвращаем ответ с CORS заголовками
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
     
     # Продолжаем обработку запроса
     response = await call_next(request)
     
-    # Для ошибок логируем статус ответа
+    # Для ошибок логируем статус ответа и детали
     if response.status_code >= 400:
-        logger.warning(f"Response: {response.status_code} - {request.method} {request.url.path} - Client: {client_host}")
+        logger.warning(f"Response: {response.status_code} - {request.method} {request.url.path} - Client: {client_host} - Auth: {auth_header[:20]}...")
+    
+    # Добавляем CORS заголовки к ответу
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
     
     return response
 

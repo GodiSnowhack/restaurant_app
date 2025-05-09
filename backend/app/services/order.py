@@ -63,7 +63,6 @@ def get_order(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
             "customer_name": db_order.customer_name or "",
             "customer_phone": db_order.customer_phone or "",
             "customer_age_group": db_order.customer_age_group or "",
-            "customer_gender": db_order.customer_gender or "",
             "order_code": db_order.order_code or "",
             "items": []
         }
@@ -151,7 +150,7 @@ def get_orders(
                 o.status, o.payment_status, o.payment_method,
                 o.created_at, o.updated_at, o.total_amount,
                 o.comment, o.customer_name, o.customer_phone,
-                o.customer_age_group, o.customer_gender,
+                o.customer_age_group,
                 o.order_code, o.reservation_code,
                 o.is_urgent, o.is_group_order, o.completed_at
             FROM orders o
@@ -481,21 +480,21 @@ def format_order_for_response(db: Session, db_order: Order) -> Dict[str, Any]:
         "user_id": db_order.user_id,
         "waiter_id": db_order.waiter_id,
         "table_number": db_order.table_number,
-        "status": db_order.status.value if db_order.status else "",
-        "payment_status": db_order.payment_status.value if db_order.payment_status else "",
-        "payment_method": db_order.payment_method.value if db_order.payment_method else "",
+        "status": db_order.status.value if db_order.status else "pending",
+        "payment_status": db_order.payment_status.value if db_order.payment_status else "pending",
+        "payment_method": db_order.payment_method.value if db_order.payment_method else None,
         "total_amount": float(db_order.total_amount) if db_order.total_amount is not None else 0.0,
-        "comment": db_order.comment or "",
+        "comment": db_order.comment,
         "is_urgent": db_order.is_urgent,
         "is_group_order": db_order.is_group_order,
-        "customer_name": db_order.customer_name or "",
-        "customer_phone": db_order.customer_phone or "",
-        "customer_age_group": db_order.customer_age_group or "",
-        "customer_gender": db_order.customer_gender or "",
-        "order_code": db_order.order_code or "",
-        "created_at": db_order.created_at.isoformat() if db_order.created_at else "",
-        "updated_at": db_order.updated_at.isoformat() if db_order.updated_at else "",
-        "completed_at": db_order.completed_at.isoformat() if db_order.completed_at else "",
+        "customer_name": db_order.customer_name,
+        "customer_phone": db_order.customer_phone,
+        "customer_age_group": db_order.customer_age_group,
+        "reservation_code": db_order.reservation_code,
+        "order_code": db_order.order_code,
+        "created_at": db_order.created_at,
+        "updated_at": db_order.updated_at,
+        "completed_at": db_order.completed_at,
         "items": []
     }
     

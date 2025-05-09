@@ -8,7 +8,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    # Используем значение из .env или фиксированное значение по умолчанию
+    JWT_SECRET: str = "your-super-secret-key-keep-it-safe-and-secure-123"
+    JWT_ALGORITHM: str = "HS256"
     # 60 минут * 24 часа * 8 дней = 8 дней
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     SERVER_NAME: str = "restaurant_app"
@@ -31,10 +33,16 @@ class Settings(BaseSettings):
         "http://0.0.0.0:3001",
         "http://localhost",
         "http://127.0.0.1",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
         # HTTPS варианты
         "https://localhost:3000",
         "https://127.0.0.1:3000",
         "https://192.168.0.16:3000",
+        "https://localhost:8000",
+        "https://127.0.0.1:8000",
+        # Разрешаем все локальные источники для разработки
+        "*"
     ]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
@@ -61,10 +69,6 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 8000
     DEBUG: bool = True
     WORKERS_COUNT: int = 1
-    
-    # Настройки JWT
-    JWT_SECRET: str = SECRET_KEY
-    JWT_ALGORITHM: str = "HS256"
     
     # Настройки пользователей
     FIRST_SUPERUSER: str = "admin1@example.com"

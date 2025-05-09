@@ -147,4 +147,14 @@ def read_users_me(
     """
     Получение информации о текущем пользователе
     """
+    return current_user
+
+
+@router.get("/profile", response_model=UserResponse)
+def read_user_profile(
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    Получение профиля текущего пользователя
+    """
     return current_user 
