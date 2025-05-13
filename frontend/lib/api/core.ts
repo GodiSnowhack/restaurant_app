@@ -7,29 +7,22 @@ export const getApiBaseUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Если мы на клиенте, используем относительный URL для проксирования через Next.js
-  if (typeof window !== 'undefined') {
-    return 'http://localhost:8000';
-  }
-  
-  // Для SSR используем прямой URL к бэкенду
-  return 'http://localhost:8000';
+  // Всегда используем прямой URL к бэкенду
+  return 'http://localhost:8000/api/v1';
 };
 
-const baseURL = getApiBaseUrl();
 // Используем baseURL как API_URL для унификации
-export const API_URL = baseURL;
+export const API_URL = getApiBaseUrl();
 
+// Создаем экземпляр axios с базовыми настройками
 export const api = axios.create({
-  baseURL,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'
   },
-  withCredentials: true, // Включаем отправку куки для поддержки авторизации
-  timeout: 60000, // Увеличиваем таймаут для мобильных устройств до 60 секунд
-  maxRedirects: 5, // Максимальное количество редиректов
+  withCredentials: true,
+  timeout: 30000,
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -113,193 +106,41 @@ export const clearAuthTokens = () => {
   }
 };
 
-// Interceptor для добавления токена в заголовки
+// Интерцептор запросов
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
     
     if (token) {
-      // Добавляем токен в заголовки
-      config.headers.Authorization = `Bearer ${token}`;
-      
-      try {
-        // Добавляем информацию о пользователе из localStorage
-        const userInfo = localStorage.getItem('user');
-        if (userInfo) {
-          const user = JSON.parse(userInfo);
-          config.headers['X-User-ID'] = user.id;
-          config.headers['X-User-Role'] = user.role;
-          config.headers['X-Is-Admin'] = user.role === 'admin' ? 'true' : 'false';
-        }
-      } catch (e) {
-        console.error('Ошибка при добавлении информации пользователя в заголовки:', e);
-      }
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
     
     // Добавляем CORS заголовки
+    config.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000';
     config.headers['Access-Control-Allow-Credentials'] = 'true';
-    config.headers['Access-Control-Allow-Origin'] = window.location.origin;
     
     return config;
   },
   (error) => {
-    console.error('Ошибка запроса API:', error);
     return Promise.reject(error);
   }
 );
 
-// Добавляем обработчик ответов для централизованной обработки ошибок
+// Интерцептор ответов
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    const isMobile = typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
-    
-    // Сохраняем информацию о последней ошибке для диагностики
-    if (typeof window !== 'undefined') {
-      try {
-        const lastErrors = JSON.parse(localStorage.getItem('api_last_errors') || '[]');
-        const newError = {
-          timestamp: new Date().toISOString(),
-          url: error.config?.url,
-          method: error.config?.method?.toUpperCase(),
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-          isMobile
-        };
-        
-        // Сохраняем последние 5 ошибок
-        lastErrors.unshift(newError);
-        if (lastErrors.length > 5) lastErrors.pop();
-        
-        localStorage.setItem('api_last_errors', JSON.stringify(lastErrors));
-      } catch (e) {
-        console.error('Не удалось сохранить информацию об ошибке:', e);
-      }
+  (response) => response,
+  async (error) => {
+    // Если ошибка сети или таймаут, пробуем использовать кеш
+    if (!error.response || error.code === 'ECONNABORTED') {
+      return Promise.reject(error);
     }
     
-    if (error.response) {
-      // Сервер вернул статус отличный от 2xx
-      console.error('API Response Error:', {
-        message: error.message,
-        status: error.response.status,
-        data: error.response.data
-      });
-      
-      // Преобразуем ошибку в строку, если это объект
-      if (error.response.data && typeof error.response.data === 'object') {
-        if (error.response.data.detail) {
-          if (typeof error.response.data.detail === 'string') {
-            error.response.data.detail = error.response.data.detail;
-          } else if (Array.isArray(error.response.data.detail)) {
-            error.response.data.detail = error.response.data.detail.map((err: any) => {
-              if (err.loc && err.msg) {
-                const field = err.loc.slice(1).join('.') || 'значение';
-                return `Поле "${field}": ${err.msg}`;
-              }
-              return typeof err === 'string' ? err : JSON.stringify(err);
-            }).join('\n');
-          } else {
-            error.response.data.detail = JSON.stringify(error.response.data.detail);
-          }
-        } else {
-          error.response.data.detail = JSON.stringify(error.response.data);
-        }
+    // Если 401, очищаем токены и перенаправляем на логин
+    if (error.response?.status === 401) {
+      clearAuthTokens();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+        window.location.href = '/auth/login';
       }
-      
-      // Обрабатываем ошибку авторизации
-      if (error.response.status === 401) {
-        console.warn('Получена ошибка 401, возможно токен истек');
-        
-        // На мобильных устройствах не удаляем токен и не перенаправляем сразу,
-        // чтобы дать возможность обработать ошибку и повторить запрос
-        if (!isMobile) {
-          // Удаляем токен только если мы не на мобильном устройстве
-          localStorage.removeItem('token');
-          
-          // Проверяем, является ли текущий маршрут публичным
-          const isPublicRoute = checkIfPublicRoute();
-          
-          // Если не находимся на странице авторизации И маршрут не публичный, перенаправляем
-          if (typeof window !== 'undefined' && 
-              window.location.pathname !== '/auth/login' && 
-              !isPublicRoute) {
-            console.log('Перенаправление на страницу авторизации с защищенного маршрута:', window.location.pathname);
-            window.location.href = '/auth/login';
-          } else {
-            console.log('Получена ошибка 401 на публичном маршруте, перенаправление не требуется');
-          }
-        } else {
-          console.log('Мобильное устройство: ошибка 401 будет обработана локально');
-        }
-      }
-    } else if (error.request) {
-      // Запрос был создан, но ответ не получен (ошибка сети)
-      console.error('API Response Error:', {
-        message: error.message,
-        response: 'No response',
-        request: 'Request was sent',
-      });
-      
-      // Для мобильных устройств отображаем более подробную ошибку
-      if (isMobile) {
-        const networkDiagnostics = {
-          timestamp: new Date().toISOString(),
-          online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
-          userAgent: navigator.userAgent,
-          url: error.config?.url,
-          method: error.config?.method
-        };
-        
-        console.log('Мобильное устройство: диагностика сети', networkDiagnostics);
-        
-        try {
-          localStorage.setItem('network_diagnostics', JSON.stringify(networkDiagnostics));
-        } catch (e) {
-          console.error('Не удалось сохранить диагностику сети:', e);
-        }
-        
-        error.response = { 
-          data: { 
-            detail: `Ошибка сети: ${error.message}. Проверьте подключение к интернету и повторите попытку.` 
-          } 
-        };
-      } else {
-      error.response = { data: { detail: 'Ошибка сети. Пожалуйста, проверьте подключение к интернету.' } };
-      }
-    } else {
-      // Произошла ошибка во время создания запроса
-      console.error('API Error:', error.message);
-      error.response = { data: { detail: error.message } };
-    }
-    
-    // Дополнительное логирование для сетевых ошибок
-    if (error.code === 'ECONNABORTED' || error.message.includes('Network Error')) {
-      console.error('Ошибка сети или таймаут запроса', error);
-      
-      // Для мобильных устройств пытаемся сохранить информацию о сети
-      if (isMobile && typeof navigator !== 'undefined') {
-        const connectionInfo = {
-          online: navigator.onLine,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          url: error.config?.url,
-          method: error.config?.method
-        };
-        
-        console.log('Информация о подключении:', connectionInfo);
-        
-        try {
-          localStorage.setItem('last_connection_error', JSON.stringify(connectionInfo));
-        } catch (e) {
-          console.error('Не удалось сохранить информацию о подключении:', e);
-        }
-      }
-      
-      error.response = { data: { detail: 'Ошибка сети или таймаут запроса. Пожалуйста, попробуйте позже.' } };
     }
     
     return Promise.reject(error);
@@ -430,17 +271,45 @@ export const isMobileDevice = (): boolean => {
 export const checkConnection = async (
   options?: { silent?: boolean; url?: string }
 ): Promise<{ isOnline: boolean; pingTime?: number; error?: string }> => {
-  const url = options?.url || '/api/ping';
+  const url = options?.url || '/api/ping';  // Используем /api/ping вместо /api/v1
   const startTime = Date.now();
   
   try {
+    // Сначала проверяем базовое соединение
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       cache: 'no-store'
     });
     
     if (!response.ok) {
+      // Если основной пинг не прошел, пробуем альтернативные эндпоинты
+      const alternativeUrls = ['/api/categories', '/api/dishes'];
+      
+      for (const altUrl of alternativeUrls) {
+        try {
+          const altResponse = await fetch(altUrl, {
+            method: 'GET',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            cache: 'no-store'
+          });
+          
+          if (altResponse.ok) {
+            const pingTime = Date.now() - startTime;
+            return { isOnline: true, pingTime };
+          }
+        } catch (e) {
+          // Игнорируем ошибки альтернативных проверок
+          console.log(`Альтернативная проверка ${altUrl} не удалась`);
+        }
+      }
+      
       return { 
         isOnline: false,
         error: `Ошибка соединения: ${response.status} ${response.statusText}`,
@@ -450,7 +319,7 @@ export const checkConnection = async (
     const data = await response.json();
     const pingTime = Date.now() - startTime;
     
-    if (data?.status === 'ok') {
+    if (data?.status === 'ok' || data?.length >= 0) {
       return { isOnline: true, pingTime };
     } else {
       return {
@@ -461,6 +330,25 @@ export const checkConnection = async (
   } catch (error: any) {
     if (!options?.silent) {
       console.error('Ошибка при проверке соединения:', error);
+    }
+    
+    // Пробуем альтернативные эндпоинты при ошибке
+    try {
+      const altResponse = await fetch('/api/categories', {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        cache: 'no-store'
+      });
+      
+      if (altResponse.ok) {
+        const pingTime = Date.now() - startTime;
+        return { isOnline: true, pingTime };
+      }
+    } catch (e) {
+      // Игнорируем ошибку альтернативной проверки
     }
     
     return { 

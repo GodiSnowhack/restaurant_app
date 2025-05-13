@@ -161,14 +161,14 @@ const nextConfig = {
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
     return [
+      // Маршрут для проверки соединения
+      {
+        source: '/api/ping',
+        destination: 'http://localhost:8000/api/v1/ping',
+      },
       // Основной API прокси маршрут
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/v1/:path*',
-      },
-      // Альтернативный маршрут для api/v1
-      {
-        source: '/api/v1/:path*',
         destination: 'http://localhost:8000/api/v1/:path*',
       },
       // Поддержка прямых маршрутов для совместимости
@@ -200,20 +200,14 @@ const nextConfig = {
         source: '/api/settings/:path*',
         destination: 'http://localhost:8000/api/v1/settings/:path*',
       },
-      // Специальная обработка для проверки связи и пинга
       {
-        source: '/api/ping',
-        destination: 'http://localhost:8000/api/v1/ping',
+        source: '/api/categories/:path*',
+        destination: 'http://localhost:8000/api/v1/categories/:path*',
       },
       {
-        source: '/api/auth/ping',
-        destination: 'http://localhost:8000/api/v1/auth/ping',
-      },
-      // Обработка корневого маршрута
-      {
-        source: '/api',
-        destination: 'http://localhost:8000/api/v1/ping',
-      },
+        source: '/api/dishes/:path*',
+        destination: 'http://localhost:8000/api/v1/dishes/:path*',
+      }
     ];
   },
   // Переменные окружения, доступные на клиенте
@@ -247,4 +241,5 @@ const nextConfig = {
   },
 }
 
+module.exports = nextConfig 
 module.exports = nextConfig 

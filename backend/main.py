@@ -32,62 +32,35 @@ app = FastAPI(
 )
 
 # Настройки CORS
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Разрешаем все источники
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Разрешаем все методы
+    allow_methods=["*"],
     allow_headers=[
         "Content-Type",
-        "Authorization", 
+        "Authorization",
         "Accept",
         "Origin",
-        "X-Requested-With",
-        "X-CSRF-Token",
         "X-User-ID",
-        "X-User-Role",
-        "X-Is-Admin",
+        "X-Requested-With",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
         "Access-Control-Allow-Origin",
         "Access-Control-Allow-Credentials",
         "Access-Control-Allow-Methods",
         "Access-Control-Allow-Headers"
     ],
     expose_headers=["*"],
-    max_age=1800,
+    max_age=3600,
 )
-
-# Middleware для логирования запросов и CORS
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    # Получаем информацию о запросе
-    client_host = request.client.host if request.client else "unknown"
-    user_agent = request.headers.get("user-agent", "unknown")
-    auth_header = request.headers.get("authorization", "no-auth")
-    
-    # Логируем запрос с деталями
-    logger.info(f"Request: {request.method} {request.url.path} - Client: {client_host} - UA: {user_agent[:30]}... - Auth: {auth_header[:20]}...")
-    
-    # Для OPTIONS запросов сразу возвращаем ответ с CORS заголовками
-    if request.method == "OPTIONS":
-        response = Response()
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
-    
-    # Продолжаем обработку запроса
-    response = await call_next(request)
-    
-    # Для ошибок логируем статус ответа и детали
-    if response.status_code >= 400:
-        logger.warning(f"Response: {response.status_code} - {request.method} {request.url.path} - Client: {client_host} - Auth: {auth_header[:20]}...")
-    
-    # Добавляем CORS заголовки к ответу
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    
-    return response
 
 # Монтируем статические файлы
 static_path = Path(__file__).parent / "static"

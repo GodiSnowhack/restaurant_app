@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc, extract, cast, Date, distinct
 
@@ -685,6 +685,7 @@ def get_menu_metrics(
         Dish.price,
         Dish.cost_price,
         Dish.cooking_time,
+        Dish.category_id,
         func.sum(OrderDish.quantity).label("sales_count"),
         func.sum(OrderDish.quantity * OrderDish.price).label("revenue")
     ).join(
@@ -703,15 +704,19 @@ def get_menu_metrics(
     
     # Общее количество проданных блюд за период
     total_dishes_sold = sum(item.sales_count for item in dish_sales) if dish_sales else 0
+    # Общая выручка за период
+    total_revenue = sum(item.revenue for item in dish_sales) if dish_sales else 0
     
     # Формируем топы блюд
     top_selling_dishes = []
     most_profitable_dishes = []
     least_selling_dishes = []
+    menu_item_performance = []  # Для ABC-анализа
     
     # Перебираем все блюда и формируем выборки
     for dish in dish_sales:
         sales_percentage = (dish.sales_count / total_dishes_sold * 100) if total_dishes_sold else 0
+        revenue_percentage = (dish.revenue / total_revenue * 100) if total_revenue else 0
         
         # Расчет прибыли
         if dish.cost_price:
@@ -735,6 +740,16 @@ def get_menu_metrics(
             "profitMargin": round(profit_margin, 2)
         }
         
+        # Добавляем данные для ABC-анализа
+        menu_item_performance.append({
+            "dishId": dish.id,
+            "dishName": dish.name,
+            "salesCount": dish.sales_count,
+            "revenue": float(dish.revenue) if dish.revenue else 0,
+            "profitMargin": round(profit_margin, 2),
+            "popularity": round(revenue_percentage, 2)  # Используем процент от общей выручки как показатель популярности
+        })
+        
         top_selling_dishes.append(dish_data)
         most_profitable_dishes.append(dish_data)
     
@@ -752,7 +767,9 @@ def get_menu_metrics(
     category_data = db.query(
         Category.id,
         Category.name,
-        func.sum(OrderDish.quantity).label("sales_count")
+        func.sum(OrderDish.quantity).label("sales_count"),
+        func.sum(OrderDish.quantity * OrderDish.price).label("revenue"),
+        func.avg((OrderDish.price - Dish.cost_price) / OrderDish.price * 100).label("avg_profit_margin")
     ).join(
         Dish, Dish.category_id == Category.id
     ).join(
@@ -768,8 +785,18 @@ def get_menu_metrics(
     ).all()
     
     category_popularity = {}
+    category_performance = {}
+    
     for cat in category_data:
-        category_popularity[cat.id] = (cat.sales_count / total_dishes_sold * 100) if total_dishes_sold else 0
+        sales_percentage = (cat.sales_count / total_dishes_sold * 100) if total_dishes_sold else 0
+        category_popularity[cat.id] = sales_percentage
+        
+        # Добавляем данные о производительности категории для ABC-анализа
+        category_performance[str(cat.id)] = {
+            "salesPercentage": round(sales_percentage, 2),
+            "averageOrderValue": round(float(cat.revenue / cat.sales_count) if cat.sales_count else 0, 2),
+            "averageProfitMargin": round(float(cat.avg_profit_margin) if cat.avg_profit_margin else 70, 2)
+        }
     
     # Тренд продаж блюд по дням
     top_dish_ids = [dish["dishId"] for dish in top_selling_dishes[:3]]
@@ -793,7 +820,6 @@ def get_menu_metrics(
         dish_trend = []
         for day in daily_sales:
             try:
-                # Безопасное преобразование даты
                 date_value = day.date
                 if hasattr(date_value, 'isoformat'):
                     date_str = date_value.isoformat()
@@ -817,7 +843,9 @@ def get_menu_metrics(
         "leastSellingDishes": least_selling_dishes,
         "averageCookingTime": float(avg_cooking_time),
         "categoryPopularity": category_popularity,
-        "menuItemSalesTrend": menu_item_sales_trend
+        "menuItemSalesTrend": menu_item_sales_trend,
+        "menuItemPerformance": menu_item_performance,  # Добавляем данные для ABC-анализа блюд
+        "categoryPerformance": category_performance    # Добавляем данные для ABC-анализа категорий
     }
 
 

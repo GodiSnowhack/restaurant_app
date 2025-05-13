@@ -95,12 +95,18 @@ export interface OrderItem {
   dish_id: number;
   quantity: number;
   price: number;
-  name: string;
+  name?: string;
+  dish_name?: string;
   special_instructions?: string;
+  id?: number;
+  order_id?: number;
+  dish_image?: string;
+  created_at?: string;
+  updated_at?: string | null;
 }
 
 export interface Order {
-  id?: number;
+  id: number;
   user_id?: number;
   waiter_id?: number;
   table_number?: number;
@@ -112,10 +118,24 @@ export interface Order {
   total_amount: number;
   total_price?: number;
   special_instructions?: string;
-  created_at?: string;
+  created_at: string;
   updated_at?: string;
+  completed_at?: string;
   customer_name?: string;
   customer_phone?: string;
   customer_email?: string;
   delivery_address?: string;
+  order_code?: string;
+  reservation_code?: string;
+  is_urgent?: boolean;
+  is_group_order?: boolean;
+  comment?: string;
+  customer_age_group?: string | null;
+  payments?: any[];
+  user?: {
+    id: number;
+    full_name: string;
+    email: string;
+    phone?: string;
+  };
 } 

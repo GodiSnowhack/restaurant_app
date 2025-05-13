@@ -13,13 +13,19 @@ export interface UserProfile {
 export interface Category {
   id: number;
   name: string;
-  description: string;
+  description?: string;
+  image_url?: string;
+  is_active?: boolean;
+  order?: number;
+  created_at?: string;
+  updated_at?: string;
+  dish_count?: number;
 }
 
 export interface Allergen {
   id: number;
   name: string;
-  description: string;
+  description?: string;
 }
 
 export interface Tag {
@@ -27,29 +33,57 @@ export interface Tag {
   name: string;
 }
 
-export interface Dish {
+// Интерфейс для данных блюда с бэкенда
+export interface ApiDish {
   id: number;
   name: string;
   description: string;
   price: number;
   cost_price?: number;
   image_url?: string;
+  calories?: number;
+  cooking_time?: number;
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_available?: boolean;
+  category_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Интерфейс для блюда в приложении
+export interface Dish {
+  id: number;
+  name: string;
+  description?: string;
+  price: number;
+  formatted_price?: string;
+  image_url: string | null;
+  is_available: boolean;
   category_id: number;
   is_vegetarian: boolean;
   is_vegan: boolean;
-  cooking_time: number;
-  calories: number;
-  allergens: Allergen[];
-  tags: Tag[];
-  category?: Category;
+  calories: number | null;
+  cooking_time: number | null;
+  is_featured?: boolean;
+  ingredients?: string;
+  allergens?: string;
+  nutritional_info?: string;
+  is_gluten_free?: boolean;
+  spiciness_level?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Типы для корзины
 export interface CartItem {
   id: string;
   dish_id: number;
-  dish: Dish;
+  name: string;
+  price: number;
   quantity: number;
+  image_url?: string;
   comment?: string;
 }
 
@@ -72,7 +106,7 @@ export interface Order {
   id: number;
   created_at: string;
   updated_at?: string;
-  status: string; // 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled'
+  status: string;
   total_amount: number;
   items?: OrderItem[];
   user_id?: number;
@@ -83,8 +117,8 @@ export interface Order {
     phone?: string;
   };
   table_number?: number;
-  payment_status?: string; // 'pending' | 'paid' | 'failed' | 'refunded'
-  payment_method?: string; // 'cash' | 'card' | 'online'
+  payment_status?: string;
+  payment_method?: string;
   comment?: string;
   customer_name?: string;
   customer_phone?: string;
@@ -161,6 +195,6 @@ export interface RestaurantSettings {
   table_reservation_enabled: boolean;
   privacy_policy: string;
   terms_of_service: string;
-  tables: Array<any>; // Можно определить более конкретный тип для столов
-  payment_methods?: string[]; // 'cash' | 'card' | 'online'
+  tables: Array<any>;
+  payment_methods?: string[];
 } 

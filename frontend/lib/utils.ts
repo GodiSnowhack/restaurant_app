@@ -87,4 +87,15 @@ export function getInitials(name: string): string {
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
   
   return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
-} 
+}
+
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) ||
+    (window.innerWidth <= 768 && 'ontouchstart' in window)
+  );
+}; 

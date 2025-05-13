@@ -35,7 +35,7 @@ const ReservationsPage: NextPage = () => {
   const { isDark } = useTheme();
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
-  const { createReservation, getReservations, reservations, isLoading } = useReservationsStore();
+  const { createReservation, getReservations, reservations, isLoading, clearStore } = useReservationsStore();
   const { settings, loadSettings, isLoading: isSettingsLoading } = useSettingsStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -149,7 +149,12 @@ const ReservationsPage: NextPage = () => {
 
       fetchReservations();
     }
-  }, [isAuthenticated, getReservations, user, loadSettings, showForm]);
+
+    // Очищаем хранилище при размонтировании компонента
+    return () => {
+      clearStore();
+    };
+  }, [isAuthenticated, getReservations, user, loadSettings, showForm, clearStore]);
 
   // Функция для проверки, может ли пользователь сделать новую бронь
   const canCreateNewReservation = () => {

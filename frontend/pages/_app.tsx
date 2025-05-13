@@ -80,6 +80,14 @@ export const PUBLIC_ROUTES = [
   '/checkout'
 ];
 
+// Список маршрутов, где нужно инициализировать бронирования
+const RESERVATION_ROUTES = [
+  '/reservations',
+  '/reservations/[id]',
+  '/admin/reservations',
+  '/profile/reservations'
+];
+
 // Указываем Next.js использовать динамический рендеринг для всего приложения
 export const renderMode = 'force-dynamic';
 
@@ -130,17 +138,29 @@ export default function App({ Component, pageProps }: AppProps) {
       // Загружаем настройки без ожидания
       loadSettings();
       
-      // Инициализируем хранилище бронирований с помощью getState().init()
+      // Инициализируем хранилище бронирований только на соответствующих страницах
       if (typeof window !== 'undefined') {
-        try {
-          const reservationsStore = useReservationsStore.getState();
-          if (typeof reservationsStore.init === 'function') {
-            reservationsStore.init();
-          } else {
-            console.log('Метод init не найден в хранилище бронирований');
+        const currentPath = router.pathname;
+        const shouldInitReservations = RESERVATION_ROUTES.some(route => {
+          // Используем точное совпадение или проверку на динамический маршрут
+          if (route.includes('[') && route.includes(']')) {
+            const routePattern = new RegExp('^' + route.replace(/\[.*?\]/g, '[^/]+') + '$');
+            return routePattern.test(currentPath);
           }
-        } catch (error) {
-          console.error('Ошибка при инициализации хранилища бронирований:', error);
+          return currentPath === route;
+        });
+
+        if (shouldInitReservations) {
+          try {
+            const reservationsStore = useReservationsStore.getState();
+            if (typeof reservationsStore.init === 'function') {
+              reservationsStore.init();
+            } else {
+              console.log('Метод init не найден в хранилище бронирований');
+            }
+          } catch (error) {
+            console.error('Ошибка при инициализации хранилища бронирований:', error);
+          }
         }
       }
     };
@@ -157,7 +177,7 @@ export default function App({ Component, pageProps }: AppProps) {
     }, 300000); // 5 минут вместо 30 секунд
     
     return () => clearInterval(intervalCheck);
-  }, [isClient, isAuthenticated, fetchUserProfile, loadSettings]);
+  }, [isClient, isAuthenticated, fetchUserProfile, loadSettings, router.pathname]);
   
   // Проверяем, имеет ли пользователь роль админа для отображения отладчика
   useEffect(() => {

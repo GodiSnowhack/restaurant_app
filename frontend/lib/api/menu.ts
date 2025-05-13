@@ -1,41 +1,5 @@
 import { api } from './core';
-
-// Тип для категории блюд
-export interface Category {
-  id: number;
-  name: string;
-  description?: string;
-  image_url?: string;
-  is_active: boolean;
-  order: number;
-  created_at: string;
-  updated_at: string;
-  dish_count?: number;
-}
-
-// Тип для блюда
-export interface Dish {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  formatted_price?: string;
-  image_url?: string;
-  category_id: number;
-  is_available: boolean;
-  is_featured: boolean;
-  ingredients?: string;
-  allergens?: string;
-  nutritional_info?: string;
-  preparation_time?: number;
-  is_vegetarian?: boolean;
-  is_vegan?: boolean;
-  is_gluten_free?: boolean;
-  spiciness_level?: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { Dish, Category } from '@/types';
 
 // API функции для работы с меню и блюдами
 export const menuApi = {
@@ -43,127 +7,35 @@ export const menuApi = {
   getCategories: async (): Promise<Category[]> => {
     try {
       console.log('API: Получение категорий...');
+      const response = await api.get('/menu/categories');
       
-      // Добавляем дополнительную проверку подключения
-      try {
-        console.log('API: Проверка подключения к бэкенду...');
-        const response = await fetch('/api/ping', { 
-          method: 'HEAD',
-          cache: 'no-store'
-        }).catch(() => ({ ok: false }));
-        
-        if (!response.ok) {
-          console.log('API: Проблема с соединением к бэкенду, попытка использовать кэш');
-          // Проверяем, есть ли категории в кэше
-          const cachedCategories = localStorage.getItem('cached_categories');
-          if (cachedCategories) {
-            console.log('API: Используем кэшированные категории');
-            return JSON.parse(cachedCategories);
-          }
-        }
-      } catch (connectionError) {
-        console.error('API: Ошибка при проверке подключения:', connectionError);
+      if (!response.data) {
+        throw new Error('Данные не получены');
       }
       
-      // Сначала пробуем получить категории через API с retry механизмом
+      // Сохраняем в кеш
       try {
-        const response = await api.get('/categories');
-        console.log('API: Успешно получены категории через API, количество:', response.data.length);
-        
-        // Кэшируем результат
-        try {
-          localStorage.setItem('cached_categories', JSON.stringify(response.data));
-        } catch (cacheError) {
-          console.error('API: Ошибка при кэшировании категорий:', cacheError);
-        }
-        
-        return response.data;
-      } catch (apiError) {
-        console.error('API: Ошибка при получении категорий через API:', apiError);
-        
-        // Пробуем получить категории через fetch с относительным URL
-        try {
-          console.log('API: Попытка получения категорий через fetch с относительным URL');
-          const response = await fetch('/api/categories');
-          
-          if (!response.ok) {
-            console.error('API getCategories - Проблема с соединением: Ошибка соединения:', response.status, response.statusText);
-            throw new Error(`Ошибка HTTP: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          console.log('API: Успешно получены категории через fetch, количество:', data.length);
-          
-          // Кэшируем результат
-          try {
-            localStorage.setItem('cached_categories', JSON.stringify(data));
-          } catch (cacheError) {
-            console.error('API: Ошибка при кэшировании категорий:', cacheError);
-          }
-          
-          return data;
-        } catch (fetchError) {
-          console.error('API: Ошибка при получении категорий через fetch:', fetchError);
-          
-          // Пробуем прямое обращение к API в обход прокси
-          try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-            console.log(`API: Попытка прямого обращения к API: ${backendUrl}/api/v1/categories`);
-            
-            const directResponse = await fetch(`${backendUrl}/api/v1/categories`, {
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (!directResponse.ok) {
-              console.error('API: Ошибка при прямом обращении к API:', directResponse.status);
-              throw new Error(`Ошибка HTTP при прямом обращении: ${directResponse.status}`);
-            }
-            
-            const directData = await directResponse.json();
-            console.log('API: Успешно получены категории через прямое обращение, количество:', directData.length);
-            
-            // Кэшируем результат
-            try {
-              localStorage.setItem('cached_categories', JSON.stringify(directData));
-            } catch (cacheError) {
-              console.error('API: Ошибка при кэшировании категорий:', cacheError);
-            }
-            
-            return directData;
-          } catch (directError) {
-            console.error('API: Ошибка при прямом обращении к API:', directError);
-          }
-          
-          // Если обе попытки завершились неудачно, проверяем кеш
-          const cachedCategories = localStorage.getItem('cached_categories');
-          if (cachedCategories) {
-            console.log('API: Используем кешированные категории');
-            return JSON.parse(cachedCategories);
-          }
-          
-          // Если нет кеша, возвращаем пустой массив
-          console.log('API: Нет кэша, возвращаем пустой массив категорий');
-          return [];
-        }
+        localStorage.setItem('cached_categories', JSON.stringify(response.data));
+        localStorage.setItem('categories_cache_timestamp', Date.now().toString());
+      } catch (cacheError) {
+        console.error('API: Ошибка при кешировании категорий:', cacheError);
       }
+      
+      return response.data;
     } catch (error) {
       console.error('API: Ошибка при получении категорий:', error);
       
-      // Проверяем, есть ли категории в кэше
+      // Пробуем получить из кеша
       try {
         const cachedCategories = localStorage.getItem('cached_categories');
         if (cachedCategories) {
-          console.log('API: Используем кэшированные категории после ошибки');
+          console.log('API: Используем кешированные категории');
           return JSON.parse(cachedCategories);
         }
       } catch (cacheError) {
-        console.error('API: Ошибка при чтении кэша категорий:', cacheError);
+        console.error('API: Ошибка при чтении кеша категорий:', cacheError);
       }
       
-      // Возвращаем пустой массив для избежания падения UI
       return [];
     }
   },
@@ -200,130 +72,16 @@ export const menuApi = {
   getDishes: async (): Promise<Dish[]> => {
     try {
       console.log('API: Получение блюд...');
+      const response = await fetch('/api/menu/dishes');
       
-      // Проверка подключения перед запросом
-      try {
-        console.log('API: Проверка подключения к бэкенду...');
-        const response = await fetch('/api/ping', { 
-          method: 'HEAD',
-          cache: 'no-store'
-        }).catch(() => ({ ok: false }));
-        
-        if (!response.ok) {
-          console.log('API: Проблема с соединением к бэкенду, попытка использовать кэш');
-          // Проверяем, есть ли блюда в кэше
-          const cachedDishes = localStorage.getItem('cached_dishes');
-          if (cachedDishes) {
-            console.log('API: Используем кэшированные блюда');
-            return JSON.parse(cachedDishes);
-          }
-        }
-      } catch (connectionError) {
-        console.error('API: Ошибка при проверке подключения:', connectionError);
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
       
-      // Сначала пробуем получить блюда через API
-      try {
-        const response = await api.get('/menu/dishes');
-        console.log('API: Успешно получены блюда через API, количество:', response.data.length);
-        
-        // Кешируем блюда для оффлайн доступа
-        try {
-          localStorage.setItem('cached_dishes', JSON.stringify(response.data));
-          localStorage.setItem('dishes_cache_timestamp', Date.now().toString());
-        } catch (cacheError) {
-          console.error('API: Ошибка при кешировании блюд:', cacheError);
-        }
-        
-        return response.data;
-      } catch (apiError) {
-        console.error('API: Ошибка при получении блюд через API:', apiError);
-        
-        // Пробуем получить блюда через fetch как резервный вариант
-        try {
-          console.log('API: Попытка получения блюд через fetch с относительным URL');
-          const response = await fetch('/api/menu?method=dishes');
-          
-          if (!response.ok) {
-            console.error('API getDishes - Проблема с соединением: Ошибка соединения:', response.status, response.statusText);
-            throw new Error(`Ошибка HTTP: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          console.log('API: Успешно получены блюда через fetch, количество:', data.length);
-          
-          // Кешируем блюда
-          try {
-            localStorage.setItem('cached_dishes', JSON.stringify(data));
-            localStorage.setItem('dishes_cache_timestamp', Date.now().toString());
-          } catch (cacheError) {
-            console.error('API: Ошибка при кешировании блюд:', cacheError);
-          }
-          
-          return data;
-        } catch (fetchError) {
-          console.error('API: Ошибка при получении блюд через fetch:', fetchError);
-          
-          // Пробуем прямое обращение к API в обход прокси
-          try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-            console.log(`API: Попытка прямого обращения к API для блюд: ${backendUrl}/api/v1/menu/dishes`);
-            
-            const directResponse = await fetch(`${backendUrl}/api/v1/menu/dishes`, {
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (!directResponse.ok) {
-              console.error('API: Ошибка при прямом обращении к API для блюд:', directResponse.status);
-              throw new Error(`Ошибка HTTP при прямом обращении: ${directResponse.status}`);
-            }
-            
-            const directData = await directResponse.json();
-            console.log('API: Успешно получены блюда через прямое обращение, количество:', directData.length);
-            
-            // Кешируем результат
-            try {
-              localStorage.setItem('cached_dishes', JSON.stringify(directData));
-              localStorage.setItem('dishes_cache_timestamp', Date.now().toString());
-            } catch (cacheError) {
-              console.error('API: Ошибка при кешировании блюд:', cacheError);
-            }
-            
-            return directData;
-          } catch (directError) {
-            console.error('API: Ошибка при прямом обращении к API для блюд:', directError);
-          }
-          
-          // Если обе попытки завершились неудачно, проверяем кеш
-          const cachedDishes = localStorage.getItem('cached_dishes');
-          if (cachedDishes) {
-            console.log('API: Используем кешированные блюда');
-            return JSON.parse(cachedDishes);
-          }
-          
-          // Если нет кеша, возвращаем пустой массив
-          console.log('API: Нет кэша, возвращаем пустой массив блюд');
-          return [];
-        }
-      }
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('API: Ошибка при получении блюд:', error);
-      
-      // Проверяем, есть ли блюда в кэше
-      try {
-        const cachedDishes = localStorage.getItem('cached_dishes');
-        if (cachedDishes) {
-          console.log('API: Используем кэшированные блюда после ошибки');
-          return JSON.parse(cachedDishes);
-        }
-      } catch (cacheError) {
-        console.error('API: Ошибка при чтении кэша блюд:', cacheError);
-      }
-      
-      // Возвращаем пустой массив для избежания падения UI
       return [];
     }
   },
@@ -422,11 +180,91 @@ export const menuApi = {
   // Получение блюда по ID
   getDishById: async (id: number): Promise<Dish | null> => {
     try {
-      const response = await api.get(`/dishes/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`API: Ошибка при получении блюда ${id}:`, error);
-      return null;
+      console.log('API getDishById - Получение блюда с ID', id);
+      
+      // Сначала проверяем кеш
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          const cachedDish = dishes.find((d: Dish) => d.id === id);
+          if (cachedDish) {
+            console.log(`API getDishById - Блюдо с ID ${id} найдено в кеше`);
+            return cachedDish;
+          }
+        }
+      } catch (cacheError) {
+        console.error('API getDishById - Ошибка при чтении кеша:', cacheError);
+      }
+      
+      // Если в кеше нет, делаем запрос к API
+      const response = await api.get(`/menu/dishes/${id}`);
+      
+      if (!response.data) {
+        throw new Error('Данные не получены');
+      }
+      
+      // Преобразуем данные в формат Dish
+      const dish: Dish = {
+        id: response.data.id,
+        name: response.data.name,
+        description: response.data.description || '',
+        price: response.data.price,
+        image_url: response.data.image_url || null,
+        is_available: response.data.is_available ?? true,
+        category_id: response.data.category_id || 0,
+        is_vegetarian: response.data.is_vegetarian ?? false,
+        is_vegan: response.data.is_vegan ?? false,
+        calories: response.data.calories !== undefined ? parseInt(response.data.calories.toString()) : null,
+        cooking_time: response.data.cooking_time !== undefined ? parseInt(response.data.cooking_time.toString()) : null
+      };
+      
+      // Сохраняем в кеш
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        const dishes = cachedDishes ? JSON.parse(cachedDishes) : [];
+        const dishIndex = dishes.findIndex((d: Dish) => d.id === id);
+        
+        if (dishIndex !== -1) {
+          dishes[dishIndex] = dish;
+        } else {
+          dishes.push(dish);
+        }
+        
+        localStorage.setItem('cached_dishes', JSON.stringify(dishes));
+        console.log(`API getDishById - Блюдо с ID ${id} сохранено в кеш`);
+      } catch (cacheError) {
+        console.error('API getDishById - Ошибка при сохранении в кеш:', cacheError);
+      }
+      
+      return dish;
+    } catch (error: any) {
+      console.error(`API getDishById - Ошибка при получении блюда с ID ${id}:`, error);
+      
+      // Пробуем получить из кеша еще раз в случае ошибки
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          const dish = dishes.find((d: Dish) => d.id === id);
+          if (dish) {
+            console.log(`API getDishById - Блюдо с ID ${id} найдено в кеше после ошибки API`);
+            return dish;
+          }
+        }
+      } catch (cacheError) {
+        console.error('API getDishById - Ошибка при чтении кеша после ошибки API:', cacheError);
+      }
+      
+      if (error.response?.status === 401) {
+        throw new Error('Необходима авторизация');
+      } else if (error.response?.status === 403) {
+        throw new Error('Недостаточно прав для просмотра блюда');
+      } else if (error.response?.status === 404) {
+        throw new Error('Блюдо не найдено');
+      }
+      
+      throw new Error('Не удалось загрузить данные блюда. Проверьте подключение к интернету.');
     }
   },
   

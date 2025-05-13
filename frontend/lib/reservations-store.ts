@@ -19,6 +19,7 @@ interface ReservationsState {
   reservations: Reservation[];
   isLoading: boolean;
   error: string | null;
+  selectedDate: string | null;
   init: () => void;
   getReservations: () => Promise<void>;
   createReservation: (data: ReservationCreateData) => Promise<Reservation>;
@@ -26,6 +27,7 @@ interface ReservationsState {
   generateReservationCode: (reservationId: number) => string;
   verifyReservationCode: (code: string) => Promise<any>;
   syncLocalReservations: () => Promise<void>;
+  clearStore: () => void;
 }
 
 // Генерирует произвольную строку заданной длины
@@ -63,6 +65,19 @@ const useReservationsStore = create<ReservationsState>((set, get) => ({
     
     // Загружаем бронирования при инициализации
     get().getReservations();
+  },
+  
+  /**
+   * Очистка хранилища
+   */
+  clearStore: () => {
+    console.log('[ReservationsStore] Очистка хранилища бронирований');
+    set({
+      reservations: [],
+      isLoading: false,
+      error: null,
+      selectedDate: null
+    });
   },
   
   getReservations: async () => {
@@ -143,44 +158,39 @@ const useReservationsStore = create<ReservationsState>((set, get) => ({
             
             console.log(`[ФРОНТ] Отправка запроса бронирований с ID пользователя: ${userIdHeader}`);
             
-            // Отправляем запрос через нашу прокси-функцию, которая будет использовать ID пользователя
-            return await fetch('/api/v1/reservations', {
-              method: 'GET',
+            // Используем axios instance с правильной конфигурацией
+            const response = await api.get('/reservations', {
               headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-User-ID': userIdHeader,
-                'Authorization': `Bearer ${token || 'dummy-token'}`
+                'X-User-ID': userIdHeader
               }
-            }).then(response => {
-              if (!response.ok) {
-                console.error(`[ФРОНТ] Ошибка HTTP при получении бронирований: ${response.status}`);
-                // Не выбрасываем ошибку для 401, просто возвращаем пустой массив или демо-данные
-                if (response.status === 401 || response.status === 404 || response.status >= 500) {
-                  console.log('[ФРОНТ] Ошибка HTTP, возвращаем демо-данные вместо пустого массива');
-                  return { data: getDemoReservations() };
-                }
-                throw new Error(`Ошибка HTTP: ${response.status}`);
-              }
-              return response.json();
-            }).then(data => {
-              return { data: Array.isArray(data) ? data : [] };
             });
-          } catch (fetchError: any) {
-            console.warn('[ФРОНТ] Ошибка при получении бронирований:', fetchError);
             
-            // Проверяем, есть ли сохраненные данные в localStorage
-            try {
-              const cachedData = localStorage.getItem('cached_reservations');
-              if (cachedData) {
-                console.log('[ФРОНТ] Используем кэшированные данные бронирований');
-                return { data: JSON.parse(cachedData) };
+            return { data: response.data };
+          } catch (error: any) {
+            console.error('[ФРОНТ] Ошибка при получении бронирований:', error);
+            
+            // Проверяем статус ошибки
+            if (error.response) {
+              if (error.response.status === 403) {
+                // Если ошибка авторизации, очищаем токен и перенаправляем на страницу входа
+                localStorage.removeItem('token');
+                if (typeof window !== 'undefined') {
+                  window.location.href = '/auth/login';
+                }
+                throw new Error('Ошибка авторизации');
               }
-            } catch (cacheError) {
-              console.error('[ФРОНТ] Ошибка при чтении кэша:', cacheError);
+              
+              if (error.response.status === 404) {
+                console.log('[ФРОНТ] API недоступен, используем кэшированные данные');
+                // Проверяем наличие кэшированных данных
+                const cachedData = localStorage.getItem('cached_reservations');
+                if (cachedData) {
+                  return { data: JSON.parse(cachedData) };
+                }
+              }
             }
             
-            // Создаем демо-данные, чтобы не блокировать интерфейс
+            // В случае сетевой ошибки или если кэш недоступен, возвращаем демо-данные
             console.log('[ФРОНТ] Возвращаем демо-данные для отображения в интерфейсе');
             return { data: getDemoReservations() };
           }

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { menuApi, isMobileDevice } from '@/lib/api';
-import { Dish, Category, CartItem } from '@/types';
+import { menuApi } from '@/lib/api/menu';
+import { isMobileDevice } from '@/lib/utils';
+import { Dish, ApiDish, Category, CartItem } from '@/types';
 import { useRouter } from 'next/router';
 import useCartStore from '@/lib/cart-store';
 import { useSettings } from '@/settings-context';
@@ -11,6 +12,17 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Spinner } from '@/components/ui/spinner';
 import DishCard from '@/components/ui/dish-card';
+
+// Добавляем функцию для безопасного парсинга JSON
+const safeJsonParse = (jsonString: string | null | undefined, defaultValue: any) => {
+  if (!jsonString) return defaultValue;
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.warn('Ошибка парсинга JSON:', error);
+    return defaultValue;
+  }
+};
 
 export default function MenuPage() {
   const router = useRouter();
@@ -52,34 +64,75 @@ export default function MenuPage() {
   // Загрузка категорий
   useEffect(() => {
     const loadCategories = async () => {
-    try {
-      setCategoriesLoading(true);
-      const data = await menuApi.getCategories();
-      setCategories(data);
+      try {
+        setCategoriesLoading(true);
+        const data = await menuApi.getCategories();
+        // Преобразуем данные категорий
+        const mappedCategories = data.map((category): Category => ({
+          id: category.id,
+          name: category.name,
+          description: category.description || '',
+          image_url: category.image_url,
+          is_active: category.is_active,
+          order: category.order,
+          created_at: category.created_at,
+          updated_at: category.updated_at,
+          dish_count: category.dish_count
+        }));
+        setCategories(mappedCategories);
       } catch (error) {
         console.error('Ошибка при загрузке категорий:', error);
         setError('Не удалось загрузить категории');
       } finally {
-      setCategoriesLoading(false);
+        setCategoriesLoading(false);
       }
     };
 
-          loadCategories();
+    loadCategories();
   }, []);
 
   // Загрузка блюд
   useEffect(() => {
     const loadDishes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const params = selectedCategory ? { category_id: selectedCategory } : undefined;
-      const data = await menuApi.getDishes(params);
-      setDishes(data);
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('Загрузка блюд...');
+        const data = await menuApi.getDishes();
+        console.log('Получены данные от API:', data);
+        
+        // Преобразуем данные для соответствия интерфейсу
+        const mappedDishes = (data as ApiDish[]).map((dish): Dish => {
+          console.log('Обработка блюда:', dish);
+          return {
+            id: dish.id,
+            name: dish.name,
+            description: dish.description || '',
+            price: typeof dish.price === 'string' ? parseFloat(dish.price) : dish.price,
+            image_url: dish.image_url || null,
+            is_available: dish.is_available ?? true,
+            category_id: dish.category_id || 0,
+            is_vegetarian: dish.is_vegetarian ?? false,
+            is_vegan: dish.is_vegan ?? false,
+            calories: dish.calories !== undefined ? parseInt(dish.calories.toString()) : null,
+            cooking_time: dish.cooking_time !== undefined ? parseInt(dish.cooking_time.toString()) : null
+          };
+        });
+        
+        console.log('Преобразованные данные:', mappedDishes);
+        
+        // Фильтруем блюда по категории, если она выбрана
+        const filteredDishes = selectedCategory 
+          ? mappedDishes.filter(dish => dish.category_id === selectedCategory)
+          : mappedDishes;
+        
+        console.log('Отфильтрованные блюда:', filteredDishes);
+        setDishes(filteredDishes);
         setRetryCount(0);
       } catch (error) {
         console.error('Ошибка при загрузке блюд:', error);
-      if (retryCount < maxRetries) {
+        if (retryCount < maxRetries) {
           setRetryCount(prev => prev + 1);
           setTimeout(loadDishes, 2000 * Math.pow(2, retryCount));
         } else {
@@ -97,12 +150,12 @@ export default function MenuPage() {
 
   const handleAddToCart = useCallback((dish: Dish) => {
     addItem({
-      id: `${dish.id}`,
-      dishId: dish.id,
+      dish_id: dish.id,
       name: dish.name,
       price: dish.price,
       quantity: 1,
-      imageUrl: dish.image_url
+      image_url: dish.image_url || undefined,
+      comment: undefined
     });
   }, [addItem]);
 
@@ -189,26 +242,21 @@ export default function MenuPage() {
         {/* Сетка блюд */}
         {dishes.length > 0 && (
           <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {dishes.map((dish) => {
-              const cartItem = items.find(item => item.dishId === dish.id);
-              return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {dishes.map((dish) => {
+                const cartItem = items.find(item => item.dish_id === dish.id);
+                return (
                   <DishCard
-                  key={dish.id}
-                    id={dish.id}
-                    name={dish.name}
-                    description={dish.description}
-                    price={dish.price}
-                    image_url={dish.image_url}
-                    is_vegetarian={dish.is_vegetarian}
-                    cartItem={cartItem as CartItem | undefined}
+                    key={dish.id}
+                    {...dish}
+                    cartItem={cartItem}
                     onAddToCart={() => handleAddToCart(dish)}
                     onRemoveFromCart={() => cartItem && handleRemoveFromCart(cartItem.id)}
                   />
                 );
               })}
-                  </div>
-                        </div>
+            </div>
+          </div>
         )}
 
         {/* Сообщение об ошибке */}

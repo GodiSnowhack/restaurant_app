@@ -29,235 +29,120 @@ const filterObject = (obj: any, allowedFields: string[]) => {
  * Поддерживает операции GET, PUT (обновление) и DELETE
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Настройка CORS заголовков
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PUT,DELETE');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  // Обработка предварительных запросов CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const { method, query, body, headers } = req;
   const { id } = query;
-  
+
   if (!id || Array.isArray(id)) {
-    return res.status(400).json({ message: 'Неверный ID блюда' });
+    return res.status(400).json({ message: 'Invalid dish ID' });
   }
-  
-  console.log(`[Dish API Proxy] Получен запрос ${method} для блюда с ID: ${id}`);
-  
-  // Проверяем и получаем authorization header
-  const authHeader = headers.authorization;
-  
-  // Строим URL для запроса к бэкенду
-  let url = `${API_BASE_URL}/menu/dishes/${id}`;
-  
-  // Добавляем timestamp для предотвращения кэширования
-  const timestamp = Date.now();
-  url += `?_=${timestamp}`;
-  
+
   try {
-    // Настройка заголовков для запроса к бэкенду
-    const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-    };
-    
-    // Добавляем заголовок авторизации, если он есть
-    if (authHeader) {
-      requestHeaders['Authorization'] = authHeader;
-    } else if (method === 'PUT' || method === 'DELETE') {
-      // Для методов, требующих авторизации, возвращаем ошибку, если нет токена
-      console.warn('[Dish API Proxy] Отсутствует токен авторизации для запроса', method);
-      return res.status(401).json({
-        error: 'auth_required',
-        message: 'Требуется авторизация для выполнения этой операции',
-        success: false
-      });
-    }
-    
-    // Для операций изменения (PUT, DELETE) добавляем дополнительную проверку
-    let requestData = body;
-    
-    if (method === 'PUT') {
-      // Фильтруем данные для обновления, оставляя только разрешенные поля
-      requestData = filterObject(body, allowedDishFields);
-      console.log(`[Dish API Proxy] Отфильтрованные данные для обновления:`, requestData);
-      
-      // Проверяем обязательные поля
-      if (!requestData.name || !requestData.price || !requestData.category_id) {
-        return res.status(400).json({ 
-          message: 'Отсутствуют обязательные поля: название, цена или категория',
-          success: false
+    switch (method) {
+      case 'GET':
+        const getResponse = await axios.get(`${API_BASE_URL}/menu/dishes/${id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(headers.authorization ? { 'Authorization': headers.authorization } : {})
+          },
         });
-      }
-    }
-    
-    // Проверяем доступность API сервера перед отправкой запроса
-    try {
-      console.log(`[Dish API Proxy] Проверка доступности API сервера: ${API_BASE_URL}`);
-      
-      // Используем более надежный метод проверки - простой запрос с быстрым таймаутом
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-      
-      try {
-        // Пробуем простой запрос к корню API
-        const pingResponse = await fetch(`${API_BASE_URL}/`, { 
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Если сервер недоступен, сразу переходим к демо-режиму
-        if (!pingResponse.ok) {
-          console.warn(`[Dish API Proxy] Сервер API недоступен (${pingResponse.status}), переключаемся на демо-режим`);
-          throw new Error(`API сервер недоступен: ${pingResponse.status}`);
+
+        return res.status(200).json(getResponse.data);
+
+      case 'PUT':
+        // Проверяем данные блюда
+        if (!body) {
+          return res.status(400).json({ 
+            success: false,
+            message: 'Данные блюда обязательны' 
+          });
         }
-        
-        console.log('[Dish API Proxy] API сервер доступен, продолжаем запрос');
-      } catch (pingFetchError) {
-        clearTimeout(timeoutId);
-        throw pingFetchError; // Прокидываем ошибку дальше для обработки
-      }
-    } catch (pingError) {
-      console.warn('[Dish API Proxy] Ошибка при проверке доступности API:', pingError);
-      
-      // Переходим в демо-режим при любой ошибке проверки соединения
-      if (method === 'PUT') {
-        console.log('[Dish API Proxy] Возвращаем демо-ответ из-за недоступности API');
-        return res.status(200).json({
-          id: parseInt(id),
-          ...requestData,
-          updated: true,
-          message: 'Блюдо обновлено локально (API недоступен)',
-          demo: true
-        });
-      } else if (method === 'GET') {
-        return res.status(200).json({
-          id: parseInt(id),
-          name: 'Демо-блюдо',
-          price: 100,
-          category_id: 1,
-          description: 'Это демо-блюдо, созданное при недоступности сервера',
-          is_available: true,
-          demo: true
-        });
-      }
-    }
-    
-    // Устанавливаем таймаут для запроса
-    const timeout = 15000; // 15 секунд
-    
-    console.log(`[Dish API Proxy] Отправка запроса ${method} на: ${url}`);
-    
-    // Выполняем запрос к бэкенду с соответствующим методом
-    const response = await axios({
-      method: method as string,
-      url,
-      headers: requestHeaders,
-      data: ['PUT', 'POST', 'PATCH'].includes(method || '') ? requestData : undefined,
-      timeout,
-      validateStatus: () => true, // Возвращает все статусы ответов
-    });
-    
-    // Логируем ответ
-    console.log(`[Dish API Proxy] Получен ответ со статусом: ${response.status}`);
-    
-    // Если получили ошибку авторизации, пробуем локальную демо-реализацию
-    if (response.status === 401) {
-      console.warn('[Dish API Proxy] Ошибка авторизации при запросе к бэкенду');
-      
-      // Логируем диагностическую информацию
-      try {
-        const errorData = {
-          timestamp: new Date().toISOString(),
-          url: url,
-          method: method,
-          statusCode: response.status,
-          headers: JSON.stringify(requestHeaders),
-          responseData: JSON.stringify(response.data)
-        };
-        console.log('[Dish API Proxy] Диагностика ошибки авторизации:', errorData);
-      } catch (e) {
-        console.error('[Dish API Proxy] Ошибка при логировании диагностики:', e);
-      }
-      
-      if (method === 'PUT') {
-        console.log('[Dish API Proxy] Возвращаем демо-ответ для работы интерфейса');
-        return res.status(200).json({
-          id: parseInt(id),
-          ...requestData,
-          updated: false,
+
+        // Фильтруем данные для безопасности
+        const dishData = filterObject(body, allowedDishFields);
+
+        // Проверяем обязательные поля
+        if (!dishData.name || !dishData.price || !dishData.category_id) {
+          return res.status(400).json({ 
+            success: false,
+            message: 'Отсутствуют обязательные поля: название, цена или категория'
+          });
+        }
+
+        try {
+          // Отправляем запрос на обновление
+          console.log('[API Proxy] Отправка запроса на обновление блюда:', {
+            url: `${API_BASE_URL}/menu/dishes/${id}`,
+            data: dishData
+          });
+
+          const putResponse = await axios.put(
+            `${API_BASE_URL}/menu/dishes/${id}`,
+            dishData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(headers.authorization ? { 'Authorization': headers.authorization } : {})
+              },
+            }
+          );
+
+          console.log('[API Proxy] Детальный лог ответа:', {
+            status: putResponse.status,
+            statusText: putResponse.statusText,
+            data: putResponse.data
+          });
+
+          // Если получили ответ от бэкенда, просто передаем его клиенту
+          return res.status(putResponse.status).json(putResponse.data);
+
+        } catch (error: any) {
+          console.error('[API Proxy] Ошибка при обновлении блюда:', {
+            response: error.response?.data,
+            status: error.response?.status,
+            message: error.message
+          });
+
+          // Если есть ответ от сервера, передаем его
+          if (error.response) {
+            return res.status(error.response.status).json(error.response.data);
+          }
+
+          // Если нет ответа, возвращаем общую ошибку
+          return res.status(500).json({
+            message: error.message || 'Внутренняя ошибка сервера'
+          });
+        }
+
+      default:
+        res.setHeader('Allow', ['GET', 'PUT']);
+        return res.status(405).json({ 
           success: false,
-          error: 'auth_error',
-          message: 'Ошибка авторизации. Пожалуйста, перезайдите в систему.',
-          demo: true
+          message: `Method ${method} Not Allowed` 
         });
-      } else if (method === 'GET') {
-        // Для GET запросов можно вернуть демо-данные
-        return res.status(200).json({
-          id: parseInt(id),
-          name: 'Демо-блюдо (требуется авторизация)',
-          price: 0,
-          category_id: 1,
-          description: 'Для просмотра данных блюда требуется авторизация',
-          is_available: false,
-          error: 'auth_error',
-          demo: true
-        });
-      } else {
-        // Для других методов возвращаем ошибку авторизации напрямую
-        return res.status(401).json({
-          error: 'auth_error',
-          message: 'Ошибка авторизации. Пожалуйста, перезайдите в систему.',
-          success: false
-        });
-      }
     }
+  } catch (error: any) {
+    console.error(`Error handling ${method} request for dish ${id}:`, error);
     
-    // Отправляем ответ с тем же статусом и данными с сервера
-    res.status(response.status).json(response.data);
-  } catch (error) {
-    console.error('[Dish API Proxy] Ошибка при выполнении запроса:', error);
-    
-    // Обработка ошибок
-    if (axios.isAxiosError(error)) {
-      // Если сервер недоступен или истек таймаут, возвращаем демо-ответ
-      if (!error.response || error.code === 'ECONNABORTED') {
-        console.warn('[Dish API Proxy] Сервер недоступен, возвращаем демо-ответ');
-        
-        if (method === 'PUT') {
-          return res.status(200).json({
-            id: parseInt(id),
-            ...body,
-            updated: true,
-            message: 'Блюдо обновлено локально (демо-режим при недоступности сервера)',
-            demo: true
-          });
-        } else if (method === 'GET') {
-          return res.status(200).json({
-            id: parseInt(id),
-            name: 'Демо-блюдо',
-            price: 100,
-            category_id: 1,
-            description: 'Это демо-блюдо, созданное при недоступности сервера',
-            is_available: true,
-            demo: true
-          });
-        }
-      }
-      
-      const statusCode = error.response?.status || 500;
-      const errorData = error.response?.data || { 
-        message: 'Ошибка при выполнении запроса к API блюд',
-        error: error.message
-      };
-      
-      res.status(statusCode).json(errorData);
-    } else {
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: 'Произошла непредвиденная ошибка при обработке запроса',
-        path: url,
-        method
-      });
-    }
+    return res.status(error.response?.status || 500).json({ 
+      success: false,
+      message: error.response?.data?.detail || error.message || `Error ${method} dish ${id}`,
+      error: error.response?.data || error.message
+    });
   }
 } 

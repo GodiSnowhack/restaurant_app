@@ -23,7 +23,7 @@ export interface User {
 }
 
 // Функция для определения правильного baseURL для API
-const getApiBaseUrl = () => {
+export const getApiBaseUrl = () => {
   // Используем URL из переменной окружения, если он задан
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
@@ -50,8 +50,7 @@ export const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest'
+    'Accept': 'application/json'
   },
   withCredentials: true, // Включаем отправку куки для поддержки авторизации
   timeout: 60000, // Увеличиваем таймаут для мобильных устройств до 60 секунд
@@ -1250,259 +1249,34 @@ export const menuApi = {
   },
 
   getCategories: async () => {
-    const startTime = Date.now();
     const requestInfo = {
-      method: 'getCategories',
-      isMobile: false,
-      fromCache: false,
-      successPath: 'unknown',
-      duration: 0,
-      error: null as string | null
+      isMobile: isMobileDevice(),
+      error: null as string | null,
+      successPath: 'default'
     };
-    
+
     try {
-      // Проверяем кэш
-      const now = Date.now();
-      if (menuApi._cachedCategories && (now - menuApi._lastCategoriesUpdate) < menuApi._cacheTimeout) {
-        console.log('API getCategories - Используем кэшированные категории');
-        requestInfo.fromCache = true;
-        requestInfo.successPath = 'memory-cache';
-        return menuApi._cachedCategories;
-      }
-
-      // Определяем, является ли устройство мобильным
-      const isMobile = isMobileDevice();
-      requestInfo.isMobile = isMobile;
+      console.log('API getCategories - Мобильное устройство:', requestInfo.isMobile);
       
-      console.log('API getCategories - Мобильное устройство:', isMobile);
-      
-      // Проверяем сетевое подключение
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        console.warn('API getCategories - Нет подключения к сети');
-        requestInfo.error = 'no-network-connection';
-        
-        if (menuApi._cachedCategories) {
-          requestInfo.successPath = 'memory-cache-offline';
-          return menuApi._cachedCategories;
-        }
-        
-        // Проверяем локальный кэш
-        try {
-          const cachedData = localStorage.getItem('cached_categories');
-          if (cachedData) {
-            const parsed = JSON.parse(cachedData);
-            menuApi._cachedCategories = parsed;
-            requestInfo.successPath = 'localStorage-offline';
-            return parsed;
-          }
-        } catch (e) {
-          console.error('API getCategories - Ошибка чтения локального кэша:', e);
-          requestInfo.error = 'localStorage-error';
-        }
-        
-        throw new Error('Нет подключения к интернету');
-      }
-      
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      
-      // Проверяем соединение с сервером
-      const connectionStatus = await checkConnection({ url: apiUrl });
-      if (!connectionStatus.isOnline) {
-        console.warn(`API getCategories - Проблема с соединением: ${connectionStatus.error}`);
-        requestInfo.error = `connection-check-failed: ${connectionStatus.error}`;
-        
-        // Пробуем использовать кэш
-        if (menuApi._cachedCategories) {
-          requestInfo.successPath = 'memory-cache-connection-failed';
-          return menuApi._cachedCategories;
-        }
-        
-        // Проверяем локальный кэш
-        try {
-          const cachedData = localStorage.getItem('cached_categories');
-          if (cachedData) {
-            const parsed = JSON.parse(cachedData);
-            menuApi._cachedCategories = parsed;
-            requestInfo.successPath = 'localStorage-connection-failed';
-            return parsed;
-          }
-        } catch (e) {
-          console.error('API getCategories - Ошибка чтения локального кэша:', e);
-        }
-      }
-      
-      // Для мобильных устройств используем прямой запрос
-      if (isMobile) {
-        try {
-          console.log('API getCategories - Используем прямой запрос для мобильного устройства');
-          const token = localStorage.getItem('token');
-          
-          // Проверяем валидность URL
-          if (!apiUrl || !apiUrl.startsWith('http')) {
-            throw new Error(`Неверный URL API: ${apiUrl}`);
-          }
-          
-          // Используем fetch с таймаутом
-          const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 60000) => {
-            const controller = new AbortController();
-            const { signal } = controller;
-            
-            const timeoutId = setTimeout(() => controller.abort(), timeout);
-            
-            try {
-              const response = await fetch(url, { ...options, signal });
-              clearTimeout(timeoutId);
-              return response;
-    } catch (error) {
-              clearTimeout(timeoutId);
-              throw error;
-            }
-          };
-          
-          // Пробуем через fetch с таймаутом
-          console.log(`API getCategories - Отправка запроса на ${apiUrl}/menu/categories`);
-          const fetchResponse = await fetchWithTimeout(`${apiUrl}/menu/categories`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-              'X-Mobile-Request': 'true',
-              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
-            cache: 'no-store',
-            mode: 'cors',
-            credentials: 'include'
-          }, 60000);
-          
-          if (!fetchResponse.ok) {
-            throw new Error(`Ошибка при получении категорий: ${fetchResponse.status} ${fetchResponse.statusText}`);
-          }
-          
-          const data = await fetchResponse.json();
-          console.log('API getCategories - Успешно получены категории напрямую');
-          
-          // Кэшируем результаты
-          menuApi._cachedCategories = data;
-          menuApi._lastCategoriesUpdate = now;
-          
-          // Сохраняем в localStorage для офлайн-доступа
-          try {
-            localStorage.setItem('cached_categories', JSON.stringify(data));
-            localStorage.setItem('categories_update_time', String(now));
-          } catch (e) {
-            console.error('API getCategories - Ошибка при сохранении кэша:', e);
-          }
-          
-          requestInfo.successPath = 'direct-fetch';
-          return data;
-        } catch (mobileError: any) {
-          console.error('API getCategories - Ошибка прямого запроса:', mobileError);
-          requestInfo.error = `direct-fetch-error: ${mobileError.message}`;
-          
-          // Проверяем локальный кэш в localStorage
-          try {
-            const cachedData = localStorage.getItem('cached_categories');
-            if (cachedData) {
-              console.log('API getCategories - Используем локальный кэш из localStorage');
-              const parsed = JSON.parse(cachedData);
-              menuApi._cachedCategories = parsed;
-              requestInfo.successPath = 'localStorage-after-direct-fetch-error';
-              return parsed;
-            }
-          } catch (cacheError) {
-            console.error('API getCategories - Ошибка чтения локального кэша:', cacheError);
-          }
-          
-          // Пробуем через прокси
-          console.log('API getCategories - Пробуем через прокси');
-        }
-      }
-
-      // Стандартный запрос через прокси (для десктопа или если прямой запрос не удался)
-      console.log('API getCategories - Запрос через API прокси');
-      
-      // Формируем URL для запроса
-      const proxyUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/api/menu?method=categories&_=${Date.now()}` 
-        : '/api/menu?method=categories';
-      
-      console.log(`API getCategories - Отправка запроса на прокси: ${proxyUrl}`);
-      
-      // Формируем заголовки с токеном
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      };
-      
-      const token = localStorage.getItem('token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      // Выполняем запрос через прокси с fetch вместо axios
-      const proxyResponse = await fetch(proxyUrl, {
+      // Используем API-прокси вместо прямого URL
+      const response = await fetch('/api/menu/categories', {
         method: 'GET',
-        headers,
-        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
         credentials: 'include'
       });
       
-      if (!proxyResponse.ok) {
-        throw new Error(`Ошибка при получении категорий через прокси: ${proxyResponse.status}`);
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
       
-      const responseData = await proxyResponse.json();
-      
-      menuApi._cachedCategories = responseData;
-      menuApi._lastCategoriesUpdate = now;
-      
-      // Сохраняем в localStorage для офлайн-доступа
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem('cached_categories', JSON.stringify(responseData));
-          localStorage.setItem('categories_update_time', String(now));
-        } catch (e) {
-          console.error('API getCategories - Ошибка при сохранении кэша:', e);
-        }
-      }
-      
-      requestInfo.successPath = 'proxy-fetch';
-      return responseData;
-    } catch (error: any) {
-      console.error('API getCategories - Ошибка при получении категорий:', error);
-      requestInfo.error = `final-error: ${error.message}`;
-      
-      // Пробуем восстановить из localStorage в случае ошибки
-      if (typeof localStorage !== 'undefined') {
-        try {
-          const cachedData = localStorage.getItem('cached_categories');
-          if (cachedData) {
-            console.log('API getCategories - Восстановление из localStorage после ошибки');
-            const parsed = JSON.parse(cachedData);
-            requestInfo.successPath = 'localStorage-after-all-errors';
-            return parsed;
-          }
-        } catch (e) {
-          console.error('API getCategories - Ошибка чтения из localStorage:', e);
-        }
-      }
-      
-      // Возвращаем кэшированные данные в случае ошибки
-      if (menuApi._cachedCategories) {
-        requestInfo.successPath = 'memory-cache-after-all-errors';
-        return menuApi._cachedCategories;
-      }
-      
-      // Если все методы не удались, возвращаем пустой массив вместо ошибки
-      console.log('API getCategories - Все методы не удались, возвращаем пустой массив');
-      requestInfo.successPath = 'empty-array-fallback';
-      return [];
-    } finally {
-      // Завершаем замер времени и логируем диагностику
-      requestInfo.duration = Date.now() - startTime;
-      menuApi._logDiagnostic(requestInfo);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('API getCategories - Проблема с соединением:', error);
+      throw error;
     }
   },
   
@@ -1815,83 +1589,35 @@ export const menuApi = {
     try {
       console.log(`API getDishById - Получение блюда с ID ${id}`);
       
-      // Проверяем, есть ли блюдо в кэше
-      if (menuApi._cachedDishes) {
-        console.log(`API getDishById - Поиск блюда в кэше из ${menuApi._cachedDishes.length} элементов`);
-        const cachedDish = menuApi._cachedDishes.find(dish => dish.id === id);
-        if (cachedDish) {
-          console.log(`API getDishById - Найдено блюдо в кэше: ${cachedDish.name}`);
-          return cachedDish;
-        }
+      // Получаем токен авторизации
+      const token = localStorage.getItem('token');
+      
+      // Формируем заголовки
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
-      // Пробуем найти в локальном хранилище
-      if (typeof localStorage !== 'undefined') {
-        try {
-          const cachedDishesStr = localStorage.getItem('cached_dishes');
-          if (cachedDishesStr) {
-            const cachedDishes = JSON.parse(cachedDishesStr);
-            const cachedDish = cachedDishes.find((dish: any) => dish.id === id);
-            if (cachedDish) {
-              console.log(`API getDishById - Найдено блюдо в localStorage: ${cachedDish.name}`);
-              return cachedDish;
-            }
-          }
-        } catch (e) {
-          console.error('API getDishById - Ошибка при чтении из localStorage:', e);
-        }
-      }
-      
-      // Добавляем timestamp для предотвращения кэширования на уровне браузера
-      const timestamp = new Date().getTime();
-      const url = `/menu/dishes/${id}?_=${timestamp}`;
-      
-      // Запрашиваем с сервера с увеличенным таймаутом
-      const response = await api.get(url, {
-        timeout: 30000, // Увеличенный таймаут для мобильных устройств
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+      // Делаем запрос к API через прокси
+      const response = await fetch(`/api/menu/dishes/${id}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
       });
       
-      console.log(`API getDishById - Успешно получены данные блюда: ${response.data.name}`);
-      return response.data;
-    } catch (error: any) {
-      console.error(`API getDishById - Ошибка при получении блюда с ID ${id}:`, error);
-      
-      // Улучшенная диагностика ошибок
-      let errorMessage = `Не удалось загрузить данные блюда #${id}`;
-      
-      if (error.response) {
-        // Ошибка от сервера
-        console.error('Детали ошибки сервера:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        
-        if (error.response.status === 404) {
-          errorMessage = `Блюдо с ID ${id} не найдено`;
-        } else if (error.response.data) {
-          if (typeof error.response.data === 'object' && error.response.data.detail) {
-            errorMessage = `Ошибка: ${error.response.data.detail}`;
-          } else if (typeof error.response.data === 'string') {
-            errorMessage = `Ошибка: ${error.response.data}`;
-          } else {
-            errorMessage = `Ошибка сервера: ${error.response.status}`;
-          }
-        }
-      } else if (error.request) {
-        // Запрос был сделан, но ответ не получен
-        console.error('Запрос отправлен, но ответ не получен:', error.request);
-        errorMessage = 'Сервер не отвечает. Проверьте соединение с интернетом.';
-      } else {
-        // Ошибка при настройке запроса
-        console.error('Ошибка запроса:', error.message);
-        errorMessage = error.message || 'Неизвестная ошибка';
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
       
-      throw new Error(errorMessage);
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error(`API getDishById - Ошибка при получении блюда с ID ${id}:`, error);
+      throw error;
     }
   },
   

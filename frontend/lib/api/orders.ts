@@ -1,60 +1,57 @@
 import { api } from './core';
 import { Order } from './types';
+import axios from 'axios';
 
 // API функции для работы с заказами
 export const ordersApi = {
   // Получение всех заказов с возможностью фильтрации
-  getOrders: async (params?: any): Promise<Order[]> => {
+  getOrders: async (startDate: string, endDate: string): Promise<Order[]> => {
     try {
-      console.log('API: Запрос заказов с параметрами:', params);
-      
-      // Проверяем, нужно ли использовать демо-данные
-      const useDemoData = typeof localStorage !== 'undefined' && 
-        (localStorage?.getItem('use_demo_data') === 'true' || 
-         localStorage?.getItem('admin_use_demo_data') === 'true');
-      
-      // Если в localStorage установлен флаг для принудительного использования демо-данных
-      if (useDemoData) {
-        console.log('API: Используем демо-данные для заказов (настройка в localStorage)');
-        return generateAdminOrdersDemoData();
+      console.log('API: Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
+
+      // Получаем токен для запроса
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
       }
-      
-      // Пробуем получить данные через API
-      console.log('API: Отправляем запрос к серверу через axios');
-      const response = await api.get('/orders', { params });
-      
-      console.log('API: Получен ответ от сервера:', {
-        status: response.status,
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
-        firstItem: Array.isArray(response.data) && response.data.length > 0 ? response.data[0].id : 'no items'
-      });
-      
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log('API: Получены заказы через API:', response.data.length);
-        return response.data;
-      } else {
-        console.log('API: Получен пустой массив заказов или неверный формат, возвращаем демо-данные');
-        
-        // Сохраняем информацию о проблеме для отладки
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('orders_api_last_error', 'Empty data received');
-          localStorage.setItem('orders_api_last_response', JSON.stringify(response.data));
+
+      // Используем локальный API-прокси вместо прямого обращения к бэкенду
+      const response = await fetch(`/api/orders?start_date=${startDate}&end_date=${endDate}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
-        
-        return generateAdminOrdersDemoData();
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Ошибка при получении заказов');
       }
+
+      const data = await response.json();
+      return data;
     } catch (error: any) {
       console.error('API: Ошибка при получении заказов:', error);
-      
-      // Сохраняем информацию об ошибке для отладки
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('orders_api_last_error', error.message || 'Unknown error');
-        localStorage.setItem('orders_api_last_error_time', new Date().toISOString());
-      }
-      
-      // Если ошибка 401 (Unauthorized) или другие ошибки, возвращаем демо-данные
+
+      // В случае ошибки возвращаем демо-данные
       console.log('API: Возвращаем демо-данные из-за ошибки API');
-      return generateAdminOrdersDemoData();
+      return [
+        {
+          id: 1,
+          status: 'pending',
+          payment_status: 'pending',
+          payment_method: 'cash',
+          order_type: 'dine-in',
+          total_amount: 200,
+          created_at: '2024-01-01T12:00:00Z',
+          items: [
+            { dish_id: 1, quantity: 2, price: 100, name: 'Демо блюдо' }
+          ]
+        },
+        // ... другие демо-заказы
+      ];
     }
   },
   
@@ -203,9 +200,35 @@ export const ordersApi = {
   // Получение заказа по ID
   getOrderById: async (id: number): Promise<Order | null> => {
     try {
-      const response = await api.get(`/orders/${id}`);
-      return response.data;
-    } catch (error) {
+      console.log(`API: Запрос заказа #${id}`);
+      
+      // Получаем токен для запроса
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      // Используем локальный API-прокси вместо прямого обращения к бэкенду
+      const response = await fetch(`/api/orders/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Ошибка при получении заказа ${id}`);
+      }
+
+      const data = await response.json();
+      console.log(`API: Получены данные заказа #${id}:`, data);
+      return data;
+    } catch (error: any) {
       console.error(`API: Ошибка при получении заказа ${id}:`, error);
       return null;
     }

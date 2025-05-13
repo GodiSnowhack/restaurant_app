@@ -121,31 +121,34 @@ const AdminOrdersPage: NextPage = () => {
       console.log('Запрос заказов с параметрами:', params);
       
       // Получаем заказы через API
-      const data = await ordersApi.getOrders(params);
-      console.log('Полученные заказы:', data);
+      const ordersData = await ordersApi.getOrders(
+        params.start_date,
+        params.end_date
+      );
+      console.log('Полученные заказы:', ordersData);
       
-      if (Array.isArray(data)) {
-        // Нормализуем данные заказов (приводим статусы к нижнему регистру для совместимости)
-        const normalizedOrders = data.map(order => ({
+      if (Array.isArray(ordersData)) {
+        // Нормализуем данные заказов
+        const normalizedOrders = ordersData.map(order => ({
           ...order,
-          // Нормализуем статус заказа
-          status: order.status?.toLowerCase() || 'pending',
-          // Нормализуем статус оплаты
-          payment_status: order.payment_status?.toLowerCase() || 'pending',
-          // Убеждаемся, что items - это массив
-          items: Array.isArray(order.items) ? order.items : []
+          // Преобразуем строку в объект Date только если она существует
+          created_at: order.created_at || new Date().toISOString(),
+          items: order.items.map(item => ({
+            ...item,
+            total: item.quantity * item.price
+          }))
         }));
         
         console.log('Нормализованные заказы:', normalizedOrders);
         setOrders(normalizedOrders);
       } else {
-        console.error('API вернул неверный формат данных:', data);
+        console.error('API вернул неверный формат данных:', ordersData);
         setError('Полученные данные имеют неверный формат. Ожидался массив заказов.');
         setOrders([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при загрузке заказов:', error);
-      setError('Не удалось загрузить заказы. Пожалуйста, попробуйте позже.');
+      setError(error.message || 'Не удалось загрузить заказы');
       // Если нет данных, устанавливаем пустой массив
       setOrders([]);
     } finally {

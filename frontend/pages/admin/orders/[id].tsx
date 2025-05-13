@@ -4,10 +4,10 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import useAuthStore from '../../../lib/auth-store';
-import {Order, OrderItem} from '../../../types';
+import {Order, OrderItem} from '../../../lib/api/types';
 import {ordersApi} from '../../../lib/api';
 import {formatPrice} from '../../../utils/priceFormatter';
-import {ClockIcon, CheckCircleIcon, XCircleIcon, BanknotesIcon as CashIcon, CreditCardIcon, ArrowLeftIcon, PhoneIcon, EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon, DocumentTextIcon, BanIcon, CurrencyDollarIcon} from '@heroicons/react/24/outline';
+import {ClockIcon, CheckCircleIcon, XCircleIcon, BanknotesIcon as CashIcon, CreditCardIcon, ArrowLeftIcon, PhoneIcon, EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon, DocumentTextIcon, CurrencyDollarIcon} from '@heroicons/react/24/outline';
 import {ExclamationTriangleIcon as ExclamationIcon, CheckIcon} from '@heroicons/react/24/solid';
 
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -64,7 +64,7 @@ const AdminOrderDetailPage: NextPage = () => {
   const { user, isAuthenticated } = useAuthStore();
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
 
@@ -73,18 +73,22 @@ const AdminOrderDetailPage: NextPage = () => {
   const paymentStatusOrder = ['pending', 'paid', 'refunded', 'failed'];
 
   useEffect(() => {
-      if (!id) return;
-      fetchOrder();
+    if (!id || typeof id !== 'string') return;
+    fetchOrder();
   }, [id]);
 
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
+      setError('');
       const fetchedOrder = await ordersApi.getOrderById(Number(id));
+      if (!fetchedOrder) {
+        throw new Error('Заказ не найден');
+      }
       setOrder(fetchedOrder);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Ошибка при загрузке данных заказа:', err);
-      setError('Не удалось загрузить данные заказа. Пожалуйста, попробуйте позже.');
+      setError(err.message || 'Не удалось загрузить данные заказа. Пожалуйста, попробуйте позже.');
     } finally {
       setIsLoading(false);
     }
@@ -94,18 +98,15 @@ const AdminOrderDetailPage: NextPage = () => {
     if (!order || updatingStatus) return;
     
     setUpdatingStatus(true);
-    setError(null);
+    setError('');
 
     try {
       await ordersApi.updateOrderStatus(order.id, newStatus);
-      
-      // Перезагружаем данные заказа
       await fetchOrder();
-      
       alert(`Статус заказа #${order.id} успешно изменен на "${newStatus}"`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при обновлении статуса заказа:', error);
-      alert('Произошла ошибка при обновлении статуса заказа');
+      setError(error.message || 'Произошла ошибка при обновлении статуса заказа');
     } finally {
       setUpdatingStatus(false);
     }
@@ -115,18 +116,15 @@ const AdminOrderDetailPage: NextPage = () => {
     if (!order || updatingPayment) return;
     
     setUpdatingPayment(true);
-    setError(null);
+    setError('');
 
     try {
-      await ordersApi.updateOrderPaymentStatus(order.id, newStatus);
-      
-      // Перезагружаем данные заказа
+      await ordersApi.updateOrderStatus(order.id, newStatus);
       await fetchOrder();
-      
       alert(`Статус оплаты заказа #${order.id} успешно изменен на "${newStatus}"`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при обновлении статуса оплаты:', error);
-      alert('Произошла ошибка при обновлении статуса оплаты');
+      setError(error.message || 'Произошла ошибка при обновлении статуса оплаты');
     } finally {
       setUpdatingPayment(false);
     }
@@ -387,7 +385,9 @@ const AdminOrderDetailPage: NextPage = () => {
                     {order.items && order.items.map((item: OrderItem, index) => (
                       <tr key={item.dish_id || index} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.name || `Блюдо #${item.dish_id}`}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {item.dish_name || item.name || `Блюдо #${item.dish_id}`}
+                          </div>
                           {item.special_instructions && (
                             <div className="text-xs text-gray-500 mt-1 italic">{item.special_instructions}</div>
                           )}

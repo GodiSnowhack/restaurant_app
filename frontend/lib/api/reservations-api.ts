@@ -66,10 +66,11 @@ export const reservationsApi = {
       
       try {
         // Отправляем запрос через наш прокси API
-        const response = await fetch(`/api/v1/reservations${queryParams}`, {
+        const response = await fetch(`/api/reservations${queryParams}`, {
           method: 'GET',
           headers,
-          signal: controller.signal
+          signal: controller.signal,
+          credentials: 'include'
         });
         
         clearTimeout(timeoutId);
@@ -132,13 +133,14 @@ export const reservationsApi = {
       }
       
       // Отправляем запрос на получение бронирования
-      const response = await fetch(`/api/v1/reservations?id=${id}`, {
+      const response = await fetch(`/api/reservations/${id}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -167,14 +169,15 @@ export const reservationsApi = {
       console.log(`[Reservations API] Обновление статуса бронирования #${id} на "${status}"`);
       
       // Отправляем запрос на обновление статуса
-      const response = await fetch(`/api/v1/reservations/${id}/status`, {
+      const response = await fetch(`/api/reservations/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status }),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -208,13 +211,14 @@ export const reservationsApi = {
       console.log(`[Reservations API] Удаление бронирования #${id}`);
       
       // Отправляем запрос на удаление бронирования
-      const response = await fetch(`/api/v1/reservations?id=${id}`, {
+      const response = await fetch(`/api/reservations?id=${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        credentials: 'include'
       });
       
       if (!response.ok) {

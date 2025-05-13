@@ -32,9 +32,11 @@ const API_BASE_URL = getApiBaseUrl();
 const analyticsAxios = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
-  timeout: 20000 // Увеличиваем таймаут до 20 сек
+  timeout: 20000, // Увеличиваем таймаут до 20 сек
+  withCredentials: true
 });
 
 // Добавляем токен авторизации к каждому запросу
@@ -135,9 +137,9 @@ const validateDateRange = (filters?: AnalyticsFilters): AnalyticsFilters => {
 
 // Универсальная функция запроса для всех типов аналитики
 async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): Promise<T> {
-    // Проверяем и корректируем период дат
-    const validatedFilters = validateDateRange(filters);
-    
+  // Проверяем и корректируем период дат
+  const validatedFilters = validateDateRange(filters);
+  
   // Конвертируем даты в формат, который принимает сервер (YYYY-MM-DD)
   const startDate = validatedFilters.startDate ? 
     new Date(validatedFilters.startDate).toISOString().split('T')[0] : 
@@ -155,97 +157,30 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
   };
   
   const queryParams = buildQueryParams(formattedFilters);
-    // Формируем полный URL запроса (убедимся, что путь правильно сформирован)
-    let url = endpoint;
-    
-    // Если endpoint не начинается со слеша, добавляем его
-    if (!endpoint.startsWith('/')) {
-      url = `/${endpoint}`;
-    }
-    
-    // Добавляем параметры запроса
-    url = `${url}${queryParams}`;
-    
-    console.log(`Запрос аналитики: ${url}`);
-    
+  
+  // Формируем полный URL запроса
+  let url = endpoint;
+  if (!endpoint.startsWith('/')) {
+    url = `/${endpoint}`;
+  }
+  url = `${url}${queryParams}`;
+  
   try {
-    // Проверяем, что даты не в будущем, иначе используем текущую дату
-    const now = new Date();
-    
-    // Формируем заголовки запроса
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest'
-    };
-    
-    // Устанавливаем дополнительные параметры запроса
     const config = {
-      headers,
       params: {
-        // Используем реальные данные 
         useMockData: false,
         currentTimestamp: Date.now()
       }
     };
     
-    // Выполняем запрос с конфигурацией
     const response = await analyticsAxios.get<T>(url, config);
-    console.log(`Успешно получены данные: ${endpoint}`, response.status);
     return response.data;
   } catch (error: any) {
-    // Логируем ошибку
     console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
     
-    // Подготовим запрос с правильными датами, не в будущем
-    try {
-      console.log("Повторяем запрос с текущими датами...");
-      
-      // Получаем текущую дату 
-      const today = new Date();
-      const lastMonth = new Date();
-      lastMonth.setMonth(today.getMonth() - 1);
-      
-      // Форматируем даты для API
-      const todayStr = today.toISOString().split('T')[0];
-      const lastMonthStr = lastMonth.toISOString().split('T')[0];
-      
-      // Создаем параметры запроса с текущими датами
-      const currentDatesFilter = {
-        ...validatedFilters,
-        startDate: lastMonthStr,
-        endDate: todayStr
-      };
-      
-      // Создаем URL с текущими датами
-      const currentQueryParams = buildQueryParams(currentDatesFilter);
-      const currentUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-      const newUrl = `${currentUrl}${currentQueryParams}`;
-      
-      console.log(`Повторный запрос с текущими датами: ${newUrl}`);
-      
-      const retryConfig = {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        params: {
-          useMockData: false,
-          currentTimestamp: Date.now()
-      }
-      };
-      
-      const retryResponse = await analyticsAxios.get<T>(newUrl, retryConfig);
-      console.log(`Успешно получены данные при повторном запросе: ${endpoint}`);
-      return retryResponse.data;
-    } catch (retryError: any) {
-      console.error("Ошибка при повторном запросе:", retryError.message);
-    
-      // Вместо выбрасывания ошибки, возвращаем мок-данные
-      console.log(`Возвращаем мок-данные для ${endpoint}`);
-      return getMockData(endpoint);
-    }
+    // В случае ошибки возвращаем мок-данные
+    console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
+    return getMockData(endpoint.split('/').pop() || '') as T;
   }
 }
 
