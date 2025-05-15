@@ -15,6 +15,18 @@ if not exist data\restaurant.db (
   echo Файл базы данных создан
 )
 
+REM Проверка установленных модулей frontend
+echo Проверка модулей frontend...
+if not exist frontend\node_modules (
+  echo Модули frontend не найдены. Устанавливаем...
+  cd frontend
+  call npm install
+  cd ..
+  echo Модули frontend установлены
+) else (
+  echo Модули frontend уже установлены
+)
+
 echo Запуск бэкенда...
 start cmd /k "cd backend && python run.py"
 
