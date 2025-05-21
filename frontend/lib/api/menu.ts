@@ -380,18 +380,12 @@ export const menuApi = {
   },
 
   // Удаление изображения блюда
-  deleteDishImage: async (imageUrl: string): Promise<void> => {
+  deleteDishImage: async (filename: string): Promise<void> => {
     try {
-      // Извлекаем имя файла из URL
-      const filename = imageUrl.split('/').pop();
-      if (!filename) {
-        throw new Error('Некорректный URL изображения');
-      }
-
-      await api.delete(`/dishes/delete-image/${filename}`);
+      await api.delete(`/api/images/${encodeURIComponent(filename)}`);
     } catch (error) {
       console.error('API: Ошибка при удалении изображения:', error);
-      throw new Error('Не удалось удалить изображение');
+      throw error;
     }
   }
 }; 
