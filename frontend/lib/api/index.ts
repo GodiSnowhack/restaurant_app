@@ -1,7 +1,8 @@
 // Импорты необходимых API модулей
 import { api, API_URL, getAuthToken, clearAuthTokens, isTokenExpired, retryRequest, checkConnection, isMobileDevice, fetchWithTimeout, getAuthHeaders } from './core';
 import { authApi } from './auth';
-import { menuApi, Category, Dish } from './menu';
+import { menuApi } from './menu';
+import type { Category, Dish } from '@/types';
 import { ordersApi } from './orders';
 import { waiterApi } from './waiter';
 import { settingsApi } from './settings';
