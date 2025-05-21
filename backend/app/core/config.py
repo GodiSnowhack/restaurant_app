@@ -17,7 +17,13 @@ class Settings(BaseSettings):
     SERVER_HOST: str = "0.0.0.0"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["*"]
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "https://frontend-production-8eb6.up.railway.app",
+        "http://frontend-production-8eb6.up.railway.app",
+        "http://localhost:3000",
+        "https://localhost:3000",
+        "*"
+    ]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
@@ -30,7 +36,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Restaurant SPPR"
     
     # Окружение (development, staging, production)
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     
     # SQLite
     SQLITE_DATABASE_URI: str = "sqlite:///./data/restaurant.db"
@@ -40,9 +46,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     
     # Настройки сервера
-    SERVER_PORT: int = 8000
-    DEBUG: bool = True
-    WORKERS_COUNT: int = 1
+    SERVER_PORT: int = int(os.getenv("PORT", 8000))
+    DEBUG: bool = False
+    WORKERS_COUNT: int = 4
     
     # Настройки пользователей
     FIRST_SUPERUSER: str = "admin1@example.com"
