@@ -36,20 +36,20 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     console.log(`Auth API - IP клиента: ${clientIp}`);
     
     // Получаем учетные данные из тела запроса
-    const { email, password } = req.body;
+    const { username, password } = req.body;
     
     console.log('Auth API - Данные запроса:', { 
-      hasEmail: !!email, 
+      hasUsername: !!username, 
       hasPassword: !!password,
       bodyKeys: Object.keys(req.body)
     });
     
     // Проверяем логин и пароль
-    if (!email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ 
         detail: 'Необходимо указать email и пароль',
         field_errors: {
-          ...(email ? {} : { email: 'Обязательное поле' }),
+          ...(username ? {} : { username: 'Обязательное поле' }),
           ...(password ? {} : { password: 'Обязательное поле' })
         }
       });
@@ -72,14 +72,16 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
 
     // Отправляем запрос на авторизацию
     try {
-      console.log('Auth API - Отправка запроса на авторизацию в формате JSON');
+      console.log('Auth API - Отправка запроса на авторизацию в формате form-data');
       
-      const response = await axios.post(`${apiUrl}/auth/login`, {
-        email,
-        password
-      }, {
+      // Формируем данные для отправки
+      const formData = new URLSearchParams();
+      formData.append('username', username);
+      formData.append('password', password);
+
+      const response = await axios.post(`${apiUrl}/auth/login`, formData, {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
           'User-Agent': userAgent
         },

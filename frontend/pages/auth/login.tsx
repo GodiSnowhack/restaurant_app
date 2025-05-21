@@ -105,89 +105,23 @@ export default function LoginPage() {
     });
     
     try {
-      if (typeof window !== 'undefined') {
-        // Сохраняем информацию о попытке входа для отладки
-        localStorage.setItem('login_attempt_start', Date.now().toString());
-        localStorage.setItem('login_email', data.email); // Сохраняем только для отладки!
-      }
+      // Отправляем запрос на авторизацию
+      await login(data.email, data.password);
       
-      // Проверяем доступность сервера перед отправкой запроса на мобильных устройствах
-      if (isMobileDevice) {
-        setLoginStatus('Проверка соединения с сервером...');
-        
-        const isServerAvailable = await checkServerAvailability();
-        
-        // Для мобильных устройств используем расширенные методы авторизации
-        setLoginStatus('Выполняется вход (мобильная версия)...');
-        
-        try {
-          const directLoginResult = await directLogin(data.email, data.password);
-          if (directLoginResult.success) {
-            setLoginStatus('Авторизация успешна, загружаем профиль...');
-            
-            // Сохраняем успешную авторизацию для отладки
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('login_success', Date.now().toString());
-              localStorage.setItem('login_method', 'mobile_direct');
-            }
-            
-            // Явно запрашиваем профиль пользователя
-            try {
-              if (directLoginResult.token) {
-                const userProfile = await mobileAuth.fetchUserProfileDirect(directLoginResult.token);
-                console.log('Профиль пользователя загружен:', userProfile);
-              } else {
-                await fetchUserProfile();
-              }
-            } catch (profileError) {
-              console.error('Ошибка при загрузке профиля:', profileError);
-            }
-            
-            // Перенаправляем пользователя после успешного входа
-            setLoginStatus('Авторизация успешна, перенаправление...');
-            router.push((returnUrl as string) || '/');
-            return;
-          } else {
-            console.error('Ошибка мобильной авторизации:', directLoginResult.error);
-            setLoginStatus('Ошибка авторизации. Попытка через основной метод...');
-          }
-        } catch (mobileError) {
-          console.error('Ошибка в процессе мобильной авторизации:', mobileError);
-          setLoginStatus('Ошибка авторизации. Попытка через основной метод...');
-        }
-      }
+      setLoginStatus('Авторизация успешна, перенаправление...');
       
-      // Если мобильная авторизация не удалась или это десктоп, используем стандартный метод
-      setLoginStatus('Выполняется стандартная авторизация...');
-      
-      try {
-        await login(data.email, data.password);
-        
-        setLoginStatus('Авторизация успешна, перенаправление...');
-        
-        // Сохраняем успешную авторизацию для отладки
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('login_success', Date.now().toString());
-          localStorage.setItem('login_method', 'standard');
-        }
-        
-        // Перенаправляем пользователя после успешного входа
-        router.push((returnUrl as string) || '/');
-      } catch (error: any) {
-        console.error('Ошибка при стандартной авторизации:', error);
-        setLoginStatus(null);
-        
-        // Если ошибка связана с сетью, проверяем подключение
-        if (error.message && (error.message.includes('network') || error.message.includes('соединение') || error.message.includes('подключен'))) {
-          setGeneralError('Проблема с подключением к интернету. Пожалуйста, проверьте ваше соединение и попробуйте снова.');
-        } else {
-          setGeneralError(error.message || 'Произошла ошибка при входе. Пожалуйста, проверьте введенные данные.');
-        }
-      }
-    } catch (generalError: any) {
-      console.error('Общая ошибка входа:', generalError);
+      // Перенаправляем пользователя после успешного входа
+      router.push((returnUrl as string) || '/');
+    } catch (error: any) {
+      console.error('Ошибка при авторизации:', error);
       setLoginStatus(null);
-      setGeneralError('Произошла непредвиденная ошибка. Пожалуйста, попробуйте снова позже.');
+      
+      // Если ошибка связана с сетью, проверяем подключение
+      if (error.message && (error.message.includes('network') || error.message.includes('соединение') || error.message.includes('подключен'))) {
+        setGeneralError('Проблема с подключением к интернету. Пожалуйста, проверьте ваше соединение и попробуйте снова.');
+      } else {
+        setGeneralError(error.message || 'Произошла ошибка при входе. Пожалуйста, проверьте введенные данные.');
+      }
     } finally {
       setIsSubmitting(false);
     }

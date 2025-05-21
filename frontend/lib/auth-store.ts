@@ -312,18 +312,19 @@ const useAuthStore = create<AuthState>()(
                 step: `начало попытки ${attemptNumber}` 
               });
               
+              // Формируем данные для отправки
+              const formData = new URLSearchParams();
+              formData.append('username', username);
+              formData.append('password', password);
+              
               // Используем обычный fetch вместо axios для улучшения совместимости с мобильными устройствами
-              // Для мобильных устройств используем только относительные URL, что помогает избежать проблем с CORS
               const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
+                  'Content-Type': 'application/x-www-form-urlencoded',
                   'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                  email: username,
-                  password
-                })
+                body: formData.toString()
               });
               
               if (!response.ok) {
@@ -404,17 +405,19 @@ const useAuthStore = create<AuthState>()(
             
             diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'отправка запроса к прокси', url });
             
+            // Формируем данные для отправки
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+            
             // Отправляем запрос
             const response = await fetch(url, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
               },
-              body: JSON.stringify({ 
-                email: username, 
-                password 
-              }),
+              body: formData.toString(),
               cache: 'no-store'
             });
             
