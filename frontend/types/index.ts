@@ -197,6 +197,7 @@ export interface RestaurantSettings {
   phone: string;
   address: string;
   website: string;
+  logo_url?: string;
   working_hours: {
     monday: WorkingHours;
     tuesday: WorkingHours;
