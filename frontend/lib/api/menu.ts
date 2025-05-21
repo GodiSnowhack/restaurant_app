@@ -355,5 +355,43 @@ export const menuApi = {
       console.error('API: Ошибка при очистке кеша меню:', error);
       return false;
     }
+  },
+
+  // Загрузка изображения блюда
+  uploadDishImage: async (file: File): Promise<{ success: boolean; fileUrl: string }> => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await api.post('/dishes/upload-image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return {
+        success: true,
+        fileUrl: response.data.url,
+      };
+    } catch (error) {
+      console.error('API: Ошибка при загрузке изображения:', error);
+      throw new Error('Не удалось загрузить изображение');
+    }
+  },
+
+  // Удаление изображения блюда
+  deleteDishImage: async (imageUrl: string): Promise<void> => {
+    try {
+      // Извлекаем имя файла из URL
+      const filename = imageUrl.split('/').pop();
+      if (!filename) {
+        throw new Error('Некорректный URL изображения');
+      }
+
+      await api.delete(`/dishes/delete-image/${filename}`);
+    } catch (error) {
+      console.error('API: Ошибка при удалении изображения:', error);
+      throw new Error('Не удалось удалить изображение');
+    }
   }
 }; 
