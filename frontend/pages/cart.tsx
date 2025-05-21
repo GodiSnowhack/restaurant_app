@@ -128,9 +128,9 @@ const CartPage: NextPage = () => {
                   <li key={item.id} className="px-6 py-4">
                     <div className="flex flex-col sm:flex-row">
                       <div className="sm:w-16 sm:h-16 mb-4 sm:mb-0 bg-gray-200 rounded flex-shrink-0">
-                        {item.imageUrl ? (
+                        {item.image_url ? (
                           <img
-                            src={item.imageUrl}
+                            src={item.image_url}
                             alt={item.name}
                             className="w-full h-full object-cover rounded"
                           />
