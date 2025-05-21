@@ -105,7 +105,7 @@ const useReservationsStore = create<ReservationsState>((set, get) => ({
       }
       
       // Получаем ID пользователя из кэшированного профиля
-      let userId = null;
+      let userId: number | null = null;
       
       // Проверяем наличие кэшированного профиля
       if (typeof window !== 'undefined') {
