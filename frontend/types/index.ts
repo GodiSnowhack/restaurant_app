@@ -45,8 +45,10 @@ export interface ApiDish {
   cooking_time?: number;
   is_vegetarian?: boolean;
   is_vegan?: boolean;
+  is_spicy?: boolean;
   is_available?: boolean;
   category_id?: number;
+  weight?: number;
   created_at?: string;
   updated_at?: string;
 }

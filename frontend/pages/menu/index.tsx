@@ -72,12 +72,12 @@ export default function MenuPage() {
           id: category.id,
           name: category.name,
           description: category.description || '',
-          image_url: category.image_url,
-          is_active: category.is_active,
-          order: category.order,
-          created_at: category.created_at,
-          updated_at: category.updated_at,
-          dish_count: category.dish_count
+          image_url: category.image_url || undefined,
+          is_active: category.is_active || false,
+          position: category.position || 0,
+          created_at: category.created_at || undefined,
+          updated_at: category.updated_at || undefined,
+          dish_count: category.dish_count || 0
         }));
         setCategories(mappedCategories);
       } catch (error) {
@@ -110,13 +110,15 @@ export default function MenuPage() {
             name: dish.name,
             description: dish.description || '',
             price: typeof dish.price === 'string' ? parseFloat(dish.price) : dish.price,
-            image_url: dish.image_url || null,
+            image_url: dish.image_url || '',
             is_available: dish.is_available ?? true,
             category_id: dish.category_id || 0,
             is_vegetarian: dish.is_vegetarian ?? false,
             is_vegan: dish.is_vegan ?? false,
-            calories: dish.calories !== undefined ? parseInt(dish.calories.toString()) : null,
-            cooking_time: dish.cooking_time !== undefined ? parseInt(dish.cooking_time.toString()) : null
+            is_spicy: dish.is_spicy ?? false,
+            calories: dish.calories !== undefined ? Number(dish.calories) : 0,
+            cooking_time: dish.cooking_time !== undefined ? Number(dish.cooking_time) : 0,
+            weight: dish.weight !== undefined ? Number(dish.weight) : 0
           };
         });
         
