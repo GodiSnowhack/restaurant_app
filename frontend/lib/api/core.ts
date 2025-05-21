@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 // Функция для определения правильного baseURL для API
 export const getApiBaseUrl = () => {
@@ -11,7 +11,6 @@ export const getApiBaseUrl = () => {
   return 'http://localhost:8000/api/v1';
 };
 
-// Используем baseURL как API_URL для унификации
 export const API_URL = getApiBaseUrl();
 
 // Создаем экземпляр axios с базовыми настройками

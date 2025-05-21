@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 // Импортируем модуль API бронирований
 import { reservationsApi } from './api/reservations-api';
 // Импортируем API для заказов и админ-панели
@@ -61,6 +61,11 @@ export const api = axios.create({
   timeout: 60000, // Увеличиваем таймаут для мобильных устройств до 60 секунд
   maxRedirects: 5, // Максимальное количество редиректов
 });
+
+// Добавляем интерфейс для расширенной конфигурации
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _isRetry?: boolean;
+}
 
 // Функция повторных попыток для критически важных API-вызовов
 export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> => {
@@ -131,11 +136,16 @@ const getAuthToken = (): string | null => {
 
 // Interceptor для добавления токена в заголовки
 api.interceptors.request.use(
-  async (config) => {
+  async (config: ExtendedAxiosRequestConfig) => {
     const token = getAuthToken();
     
     // Проверяем, есть ли токен
     if (token) {
+      // Инициализируем заголовки, если их нет
+      if (!config.headers) {
+        config.headers = new AxiosHeaders();
+      }
+      
       // Добавляем токен в заголовок авторизации без проверки истечения срока
       config.headers.Authorization = `Bearer ${token}`;
       
@@ -170,7 +180,7 @@ api.interceptors.request.use(
     
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     console.error('Ошибка запроса API:', error);
     return Promise.reject(error);
   }
@@ -178,12 +188,13 @@ api.interceptors.request.use(
 
 // Добавляем обработчик ответов для централизованной обработки ошибок
 api.interceptors.response.use(
-  (response) => {
+  (response: AxiosResponse) => {
     return response;
   },
-  async (error) => {
+  async (error: AxiosError) => {
     // Проверяем, является ли этот запрос повторным
-    const isRetry = error.config && error.config._isRetry;
+    const config = error.config as ExtendedAxiosRequestConfig | undefined;
+    const isRetry = config?._isRetry;
     
     // Если это повторный запрос, не пытаемся снова обновить токен
     if (isRetry) {
@@ -215,7 +226,7 @@ api.interceptors.response.use(
     }
     
     // Если у нас ошибка авторизации (401), попробуем обновить токен
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 401 && config) {
       console.log('API: Получена ошибка 401, пробуем обновить токен');
       
       // Предотвращаем частое обновление токена
@@ -261,13 +272,15 @@ api.interceptors.response.use(
               }
               
               // Обновляем заголовок Authorization
-              error.config.headers.Authorization = `Bearer ${tokenData.access_token}`;
+              if (config.headers instanceof AxiosHeaders) {
+                config.headers.Authorization = `Bearer ${tokenData.access_token}`;
+              }
               
               // Помечаем запрос как повторный
-              error.config._isRetry = true;
+              config._isRetry = true;
               
               // Повторяем исходный запрос с новым токеном
-              return api(error.config);
+              return api(config);
             }
           } else {
             console.log('API: Ошибка при обновлении токена:', refreshResponse.status);

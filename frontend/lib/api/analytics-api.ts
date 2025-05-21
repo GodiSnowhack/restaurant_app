@@ -1,12 +1,77 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 import { 
   FinancialMetrics, 
-  MenuMetrics, 
-  CustomerMetrics, 
-  OperationalMetrics, 
-  PredictiveMetrics,
+  CustomerMetrics,
+  OperationalMetrics,
   AnalyticsFilters
 } from '../../types/analytics';
+
+// Добавляем недостающие интерфейсы
+interface MenuMetrics {
+  topSellingDishes: Array<{
+    dishId: number;
+    dishName: string;
+    salesCount: number;
+    revenue: number;
+    profitMargin: number;
+  }>;
+  mostProfitableDishes: Array<{
+    dishId: number;
+    dishName: string;
+    salesCount: number;
+    revenue: number;
+    percentage: number;
+    costPrice: number;
+    profit: number;
+    profitMargin: number;
+  }>;
+  leastSellingDishes: Array<{
+    dishId: number;
+    dishName: string;
+    salesCount: number;
+    revenue: number;
+    percentage: number;
+  }>;
+  averageCookingTime: number;
+  categoryPopularity: Record<string, number>;
+  menuItemSalesTrend: Record<string, Array<{ date: string; value: number }>>;
+  menuItemPerformance: Array<{
+    dishId: number;
+    dishName: string;
+    salesCount: number;
+    revenue: number;
+    profitMargin: number;
+  }>;
+  categoryPerformance: Record<string, {
+    salesPercentage: number;
+    averageOrderValue: number;
+    averageProfitMargin: number;
+  }>;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}
+
+interface PredictiveMetrics {
+  salesForecast: Array<{
+    date: string;
+    value: number;
+  }>;
+  inventoryForecast: Record<string, any>;
+  staffingNeeds: Record<string, Record<string, number>>;
+  peakTimePrediction: Record<string, any>;
+  suggestedPromotions: Array<{
+    dishId: number;
+    dishName: string;
+    suggestedDiscount: number;
+    potentialRevenue: number;
+  }>;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}
 
 // Функция для получения базового URL для API
 const getApiBaseUrl = () => {
@@ -40,7 +105,7 @@ const analyticsAxios = axios.create({
 });
 
 // Добавляем токен авторизации к каждому запросу
-analyticsAxios.interceptors.request.use(config => {
+analyticsAxios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

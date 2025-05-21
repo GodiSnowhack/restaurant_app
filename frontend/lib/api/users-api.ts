@@ -1,5 +1,5 @@
 import { api, API_URL, getAuthHeaders, getAuthTokenFromAllSources } from './core';
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 interface UserParams {
   role?: string;
@@ -133,7 +133,7 @@ usersAxios.interceptors.request.use((config) => {
 
 // Добавляем перехватчик ответов
 usersAxios.interceptors.response.use(
-  (response) => {
+  (response: AxiosResponse) => {
     // Для успешных ответов
     console.log(`Успешный ответ от ${response.config.url}:`, {
       status: response.status,
@@ -141,7 +141,7 @@ usersAxios.interceptors.response.use(
     });
     return response;
   },
-  (error) => {
+  (error: AxiosError) => {
     // Для ошибок
     if (error.response) {
       console.error(`Ошибка ${error.response.status} при запросе ${error.config?.url}:`, 
