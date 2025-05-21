@@ -36,20 +36,20 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     console.log(`Auth API - IP клиента: ${clientIp}`);
     
     // Получаем учетные данные из тела запроса
-    const { username, password } = req.body;
+    const { email, password } = req.body;
     
     console.log('Auth API - Данные запроса:', { 
-      hasUsername: !!username, 
+      hasEmail: !!email, 
       hasPassword: !!password,
       bodyKeys: Object.keys(req.body)
     });
     
-    // Проверяем логин и пароль
-    if (!username || !password) {
+    // Проверяем email и пароль
+    if (!email || !password) {
       return res.status(400).json({ 
         detail: 'Необходимо указать email и пароль',
         field_errors: {
-          ...(username ? {} : { username: 'Обязательное поле' }),
+          ...(email ? {} : { email: 'Обязательное поле' }),
           ...(password ? {} : { password: 'Обязательное поле' })
         }
       });
@@ -76,7 +76,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       
       // Формируем данные для отправки
       const formData = new URLSearchParams();
-      formData.append('username', username);
+      formData.append('username', email);
       formData.append('password', password);
 
       const response = await axios.post(`${apiUrl}/auth/login`, formData, {

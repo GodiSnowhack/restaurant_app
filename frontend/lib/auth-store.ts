@@ -238,6 +238,11 @@ const useAuthStore = create<AuthState>()(
         const startTime = Date.now();
         set({ isLoading: true, error: null });
         
+        console.log('AuthStore: Начало процесса авторизации', { 
+          hasUsername: !!username,
+          timestamp: new Date().toISOString()
+        });
+        
         // Проверяем подключение к сети
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           console.warn('AuthStore: Нет подключения к сети, проверяем кэшированные данные');
@@ -405,80 +410,120 @@ const useAuthStore = create<AuthState>()(
             
             diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'отправка запроса к прокси', url });
             
-            // Формируем данные для отправки
-            const formData = new URLSearchParams();
-            formData.append('username', username);
-            formData.append('password', password);
-            
-            // Отправляем запрос
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
-              },
-              body: formData.toString(),
-              cache: 'no-store'
-            });
-            
-            diagnosticInfo.steps.push({ 
-              timestamp: Date.now(), 
-              step: 'получен ответ от прокси', 
-              status: response.status 
-            });
-            
-            // Проверяем статус ответа
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(JSON.stringify(errorData));
-            }
-            
-            const data = await response.json();
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'разбор ответа' });
-            
-            // Сохраняем токен и данные авторизации
-            if (data) {
-              try {
-                const { access_token, refresh_token } = data;
-                
-                if (access_token) {
-                  saveAuthToken(access_token);
+            // Отправляем запрос на авторизацию
+            try {
+              console.log('AuthStore: Отправка запроса на авторизацию в формате form-data');
+              
+              // Формируем данные для отправки
+              const formData = new URLSearchParams();
+              formData.append('email', username); // Используем username как email
+              formData.append('password', password);
+
+              const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'Accept': 'application/json'
+                },
+                body: formData.toString()
+              });
+              
+              console.log('AuthStore: Получен ответ от сервера:', {
+                status: response.status,
+                ok: response.ok
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                console.error('AuthStore: Ошибка авторизации:', errorData);
+                throw new Error(JSON.stringify(errorData));
+              }
+
+              const data = await response.json();
+              diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'разбор ответа' });
+              
+              // Сохраняем токен и данные авторизации
+              if (data) {
+                try {
+                  const { access_token, refresh_token } = data;
                   
-                  // Сохраняем refresh_token, если он есть
-                  if (refresh_token) {
-                    localStorage.setItem('refresh_token', refresh_token);
-                    console.log('AuthStore: Сохранен refresh_token');
+                  if (access_token) {
+                    saveAuthToken(access_token);
+                    
+                    // Сохраняем refresh_token, если он есть
+                    if (refresh_token) {
+                      localStorage.setItem('refresh_token', refresh_token);
+                      console.log('AuthStore: Сохранен refresh_token');
+                    }
+                    
+                    set({ 
+                      isAuthenticated: true, 
+                      token: access_token,
+                      error: null,
+                      isLoading: false
+                    });
+                    
+                    // Загружаем профиль пользователя
+                    get().fetchUserProfile();
+                    return;
                   }
-                  
-                  set({ 
-                    isAuthenticated: true, 
-                    token: access_token,
-                    error: null,
-                    isLoading: false
-                  });
-                  
-                  // Загружаем профиль пользователя
-                  get().fetchUserProfile();
-                  return;
+                } catch (tokenError) {
+                  console.error('AuthStore: Ошибка при обработке токена:', tokenError);
                 }
-              } catch (tokenError) {
-                console.error('AuthStore: Ошибка при обработке токена:', tokenError);
+              }
+            } catch (error: unknown) {
+              console.error('AuthStore: Общая ошибка авторизации:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+              
+              diagnosticInfo.steps.push({ 
+                timestamp: Date.now(), 
+                step: 'общая ошибка авторизации', 
+                error: errorMessage
+              });
+              
+              set({ 
+                isLoading: false, 
+                error: errorMessage
+              });
+              diagnosticInfo.error = errorMessage;
+            } finally {
+              diagnosticInfo.endTime = Date.now();
+              diagnosticInfo.duration = diagnosticInfo.endTime - startTime;
+              
+              // Сохраняем информацию о запросе для анализа
+              const networkDiagnostics = [...get().networkDiagnostics];
+              networkDiagnostics.unshift(diagnosticInfo);
+              
+              // Ограничиваем размер истории диагностики
+              if (networkDiagnostics.length > 10) {
+                networkDiagnostics.pop();
+              }
+              
+              set({ networkDiagnostics });
+              
+              // Сохраняем диагностику в localStorage
+              try {
+                localStorage.setItem('auth_diagnostics', JSON.stringify(networkDiagnostics));
+              } catch (e) {
+                console.error('Ошибка при сохранении диагностики:', e);
               }
             }
           }
-        } catch (error: any) {
-          console.error('Общая ошибка авторизации:', error);
+        } catch (error: unknown) {
+          console.error('AuthStore: Общая ошибка авторизации:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+          
           diagnosticInfo.steps.push({ 
             timestamp: Date.now(), 
             step: 'общая ошибка авторизации', 
-            error: error.message 
+            error: errorMessage
           });
           
           set({ 
             isLoading: false, 
-            error: `${error.message}` 
+            error: errorMessage
           });
-          diagnosticInfo.error = error.message;
+          diagnosticInfo.error = errorMessage;
         } finally {
           diagnosticInfo.endTime = Date.now();
           diagnosticInfo.duration = diagnosticInfo.endTime - startTime;
