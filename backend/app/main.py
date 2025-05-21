@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import logging
 
-from api.v1 import api_router
+from app.api.v1 import api_router
 from core.config import settings
 from database.session import SessionLocal
 from core.init_db import init_db
