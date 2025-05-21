@@ -143,9 +143,8 @@ export interface CustomerMetrics {
   
   // Демографические данные клиентов
   customerDemographics?: {
-    age?: Record<string, number>; // Возрастные группы и их процент
-    gender?: Record<string, number>; // Гендерное распределение
-    location?: Record<string, number>; // Распределение по локациям
+    age_groups: Record<string, number>; // Распределение по возрастным группам
+    total_customers: number;
   };
   
   // Распределение по времени посещений

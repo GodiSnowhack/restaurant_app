@@ -125,33 +125,24 @@ export interface Payment {
 
 export interface Order {
   id: number;
-  created_at: string;
-  updated_at?: string;
-  status: string;
-  total_amount: number;
-  items?: OrderItem[];
   user_id?: number;
-  user?: {
-    id: number;
-    full_name: string;
-    email: string;
-    phone?: string;
-  };
+  waiter_id?: number;
   table_number?: number;
-  payment_status?: string;
   payment_method?: string;
-  payment?: Payment;
-  payment_details?: Payment;
-  comment?: string;
   customer_name?: string;
   customer_phone?: string;
-  is_urgent?: boolean;
   reservation_code?: string;
   order_code?: string;
-  delivery_address?: string;
-  special_requests?: string;
+  status: string;
+  payment_status?: string;
+  total_amount: number;
+  comment?: string;
+  is_urgent?: boolean;
+  is_group_order?: boolean;
   customer_age_group?: string;
-  customer_gender?: string;
+  created_at: string;
+  updated_at?: string;
+  completed_at?: string;
 }
 
 // Типы для бронирования
@@ -241,4 +232,20 @@ export interface CreateDishDTO {
   cooking_time: number;
   weight: number;
   position?: number;
+}
+
+// Типы для столов ресторана
+export interface RestaurantTable {
+  id: number;
+  number: number;
+  name: string;
+  capacity: number;
+  status: 'available' | 'occupied' | 'reserved';
+  is_active: boolean;
+  position_x: number;
+  position_y: number;
+  position?: {
+    x: number;
+    y: number;
+  };
 } 

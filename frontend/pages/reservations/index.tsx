@@ -22,7 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import FloorPlan from '../../components/FloorPlan';
-import { RestaurantTable } from '../../lib/api/types';
+import { RestaurantTable } from '../../types';
 import { useTheme } from '@/lib/theme-context';
 
 // Генерируем время для выбора в выпадающем списке: от 11:00 до 22:00 с шагом 30 минут
@@ -227,7 +227,11 @@ const ReservationsPage: NextPage = () => {
       is_active: true,
       position_x: 100 + (table.number * 50),
       position_y: 100 + (table.id || 0) * 30,
-      status: (table.status || 'available') as 'available' | 'reserved' | 'occupied'
+      status: table.status || 'available',
+      position: {
+        x: 100 + (table.number * 50),
+        y: 100 + (table.id || 0) * 30
+      }
     })) as RestaurantTable[];
   };
 

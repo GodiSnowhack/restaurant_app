@@ -73,6 +73,16 @@ interface PredictiveMetrics {
   };
 }
 
+export interface CustomerDemographics {
+  age_groups: Record<string, number>;
+  total_customers: number;
+}
+
+export interface AnalyticsData {
+  // ... other fields ...
+  customerDemographics: CustomerDemographics;
+}
+
 // Функция для получения базового URL для API
 const getApiBaseUrl = () => {
   // Используем URL из переменной окружения, если он задан
@@ -438,17 +448,14 @@ function getMockData(endpoint: string): any {
       returnRateChange: 3.2,
       averageOrderValueChange: 5.8,
       customerDemographics: {
-        age: {
+        age_groups: {
           '18-24': 15,
           '25-34': 35,
           '35-44': 25,
           '45-54': 15,
           '55+': 10
         },
-        gender: {
-          'Мужчины': 45,
-          'Женщины': 55
-        }
+        total_customers: 1200
       },
       visitTimes: {
         'Утро (8-12)': 20,
@@ -615,8 +622,8 @@ const analyticsApi = {
         ...baseCustomerData,
         customerDemographics: {
           ...baseCustomerData.customerDemographics,
-          age: dashboardData.customerDemographics?.age || baseCustomerData.customerDemographics?.age,
-          gender: dashboardData.customerDemographics?.gender || baseCustomerData.customerDemographics?.gender
+          age_groups: dashboardData.customerDemographics?.age_groups || baseCustomerData.customerDemographics?.age_groups,
+          total_customers: dashboardData.customerDemographics?.total_customers || baseCustomerData.customerDemographics?.total_customers
         },
         visitFrequency: dashboardData.visitFrequency || baseCustomerData.visitFrequency
       };

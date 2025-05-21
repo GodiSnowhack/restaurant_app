@@ -38,9 +38,9 @@ type Payment = {
 type Order = OrderType & {
   payment?: Payment;
   special_requests?: string;
-  customer_age_group?: string;  // Добавляем поле возрастной группы клиента
-  customer_gender?: string;     // Добавляем поле пола клиента
-}
+  customer_age_group?: string;
+  items?: OrderItem[]; // Связь с order_dish
+};
 
 type StatusButtonProps = {
   status: string;
@@ -68,9 +68,8 @@ const StatusButton = ({ status, currentStatus, onClick, disabled = false }: Stat
   );
 };
 
-// Добавляем типы для возрастных групп и пола
+// Добавляем типы для возрастных групп
 type AgeGroup = 'teen' | 'young' | 'adult' | 'elderly';
-type Gender = 'male' | 'female' | 'other';
 
 const WaiterOrderDetailPage: NextPage = () => {
   const router = useRouter();
@@ -467,15 +466,6 @@ const WaiterOrderDetailPage: NextPage = () => {
     return labels[group] || group;
   };
 
-  const getGenderLabel = (gender: Gender): string => {
-    const labels: Record<Gender, string> = {
-      'male': 'Мужской',
-      'female': 'Женский',
-      'other': 'Другой'
-    };
-    return labels[gender] || gender;
-  };
-
   if (isLoading) {
     return (
       <WaiterLayout title="Детали заказа" activeTab="orders">
@@ -612,13 +602,13 @@ const WaiterOrderDetailPage: NextPage = () => {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Имя клиента</p>
                       <p className="font-medium">
-                        {order.customer_name || order.user?.full_name || 'Не указано'}
+                        {order.customer_name || 'Не указано'}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Телефон</p>
                       <p className="font-medium">
-                        {order.customer_phone || order.user?.phone || 'Не указано'}
+                        {order.customer_phone || 'Не указано'}
                       </p>
                     </div>
                     {order.customer_age_group && (
@@ -629,20 +619,6 @@ const WaiterOrderDetailPage: NextPage = () => {
                         </p>
                       </div>
                     )}
-                    {order.customer_gender && (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Пол</p>
-                        <p className="font-medium">
-                          {getGenderLabel(order.customer_gender as Gender)}
-                        </p>
-                      </div>
-                    )}
-                    {order.user && (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Email</p>
-                        <p className="font-medium">{order.user.email || 'Не указано'}</p>
-                      </div>
-                )}
                   </div>
                 </div>
               </div>
