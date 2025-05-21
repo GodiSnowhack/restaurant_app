@@ -22,7 +22,6 @@ process.on('uncaughtException', (err) => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   skipMiddlewareUrlNormalize: true,
   images: {
     domains: [
@@ -241,5 +240,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
 module.exports = nextConfig 
