@@ -4,7 +4,7 @@ import { authApi } from './auth';
 import { menuApi } from './menu';
 import type { Category, Dish } from '@/types';
 import { ordersApi } from './orders';
-import { waiterApi } from './waiter';
+import waiterApi from './waiter';
 import { settingsApi } from './settings';
 import { reservationsApi, Reservation } from './reservations';
 import adminApi from './admin-api';

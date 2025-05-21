@@ -40,7 +40,7 @@ const fetchWithRetry = async (url: string, options: any = {}, maxRetries = 2): P
 };
 
 // API функции для официантов
-export const waiterApi = {
+const waiterApi = {
   // Получение всех заказов, назначенных на официанта
   getWaiterOrders: async (): Promise<Order[]> => {
     try {
@@ -302,4 +302,6 @@ export const waiterApi = {
       throw error;
     }
   }
-}; 
+};
+
+export default waiterApi; 
