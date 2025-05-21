@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { waiterApi } from '../lib/api/';
+import { waiterApi } from '../lib/api/waiter-api';
 import { toast } from 'react-hot-toast';
 import { ArrowPathIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
@@ -41,9 +41,8 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
       
       // Считаем операцию успешной при любом успешном ответе от сервера
       // или если получены какие-либо данные о заказе (даже с ошибкой API)
-      if (result && (result.success || result.orderId || result.order_id)) {
-        const orderId = result.order_id || result.orderId || `с кодом ${orderCode}`;
-        const successMessage = `Заказ ${orderId} успешно привязан к вам`;
+      if (result && (result.success || result.order_id)) {
+        const successMessage = `Заказ ${result.order_id || `с кодом ${orderCode}`} успешно привязан к вам`;
         
         setSuccess(successMessage);
         toast.success(successMessage);
