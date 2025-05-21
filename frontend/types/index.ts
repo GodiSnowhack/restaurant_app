@@ -143,6 +143,7 @@ export interface Order {
   created_at: string;
   updated_at?: string;
   completed_at?: string;
+  items?: OrderItem[];
 }
 
 // Типы для бронирования
