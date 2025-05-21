@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import { Order, OrderItem } from '@/lib/api/types';
-import { ordersApi } from '../../lib/api';
+import { ordersApi } from '../../lib/api/orders';
 import { waiterApi } from '../../lib/api/waiter-api';
 import { formatPrice } from '../../utils/priceFormatter';
 import OrderCode from '../../components/OrderCode';

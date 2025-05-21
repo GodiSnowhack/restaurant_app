@@ -5,7 +5,7 @@ import Link from 'next/link';
 import WaiterLayout from '../../../components/WaiterLayout';
 import useAuthStore from '../../../lib/auth-store';
 import { Order as OrderType, OrderItem } from '../../../types';
-import { ordersApi } from '../../../lib/api';
+import { ordersApi } from '../../../lib/api/orders';
 import { formatPrice } from '../../../utils/priceFormatter';
 import {
   ClockIcon,
@@ -145,7 +145,9 @@ const WaiterOrderDetailPage: NextPage = () => {
         total_amount: fetchedOrder.total_amount || 0,
         customer_name: fetchedOrder.customer_name || "",
         customer_phone: fetchedOrder.customer_phone || "",
-        items: Array.isArray(fetchedOrder.items) ? fetchedOrder.items : []
+        items: Array.isArray(fetchedOrder.items) ? fetchedOrder.items : [],
+        // Обрабатываем customer_age_group
+        customer_age_group: fetchedOrder.customer_age_group || undefined
       };
       
       console.log('Нормализованный заказ:', normalizedOrder);
@@ -413,7 +415,7 @@ const WaiterOrderDetailPage: NextPage = () => {
     return method; // Возвращаем исходное значение, если не распознано
   };
 
-  const handleUpdatePaymentStatus = async (newStatus: string) => {
+  const handleUpdatePaymentStatus = async (newStatus: PaymentStatus) => {
     // Если заказ не загружен или идет обновление, ничего не делаем
     if (!order || updatingStatus) return;
     
@@ -430,71 +432,16 @@ const WaiterOrderDetailPage: NextPage = () => {
       // Исходный статус для отображения пользователю
       const displayStatus = getPaymentStatusLabel(newStatus);
       
-      // Преобразуем статус в нижний регистр для бэкенда
-      const normalizedStatus = newStatus.toLowerCase();
+      // Обновляем статус через API
+      const result = await ordersApi.updateOrderPaymentStatus(order.id, newStatus);
       
-      // РЕШЕНИЕ 1: Для paid используем специальный эндпоинт подтверждения оплаты
-      if (normalizedStatus === 'paid') {
-        try {
-          console.log(`DEBUG: Пробуем специальный эндпоинт для подтверждения оплаты`);
-          const result = await ordersApi.updateOrderPaymentStatus(order.id, normalizedStatus);
-          
-          if (result && result.success !== false) {
-            console.log('DEBUG: Обновление через специальный эндпоинт успешно');
-            await fetchOrder();
-            alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}"`);
-            setUpdatingStatus(false);
-            return;
-          }
-        } catch (error) {
-          console.error('DEBUG: Ошибка специального эндпоинта:', error);
-        }
+      if (result.success) {
+        // Обновляем данные заказа
+        setOrder(result.order);
+        alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}"`);
+      } else {
+        throw new Error('Не удалось обновить статус оплаты');
       }
-      
-      // РЕШЕНИЕ 2: Используем прокси API для обхода проблем с CORS
-      try {
-        console.log(`DEBUG: Пробуем прокси API для обновления статуса оплаты на ${normalizedStatus}`);
-        const response = await fetch('/api/orders/payment_update', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            payment_status: normalizedStatus
-          })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('DEBUG: Обновление через прокси API успешно', data);
-          await fetchOrder();
-          alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}"`);
-          setUpdatingStatus(false);
-          return;
-        } else {
-          const errorText = await response.text();
-          console.error('DEBUG: Ошибка прокси API:', response.status, errorText);
-        }
-      } catch (error) {
-        console.error('DEBUG: Ошибка при использовании прокси API:', error);
-      }
-      
-      // РЕШЕНИЕ 3: Оптимистичное обновление (без серверного подтверждения)
-      console.log('DEBUG: Используем оптимистичное обновление статуса оплаты');
-      
-      // Обновляем данные заказа локально
-      setOrder(prevOrder => {
-        if (!prevOrder) return null;
-        return {
-          ...prevOrder,
-          payment_status: normalizedStatus
-        };
-      });
-      
-      alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}" (локально)`);
-      
     } catch (error: any) {
       // В случае критической ошибки, показываем сообщение
       console.error('Ошибка при обновлении статуса оплаты:', error);

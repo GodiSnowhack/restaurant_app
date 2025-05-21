@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Header from './Header';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ordersApi } from '../lib/api';
+import { ordersApi } from '../lib/api/orders';
 import waiterApi from '../lib/api/waiter';
 import type { Order } from '../lib/api/types';
 import { 

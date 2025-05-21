@@ -3,7 +3,6 @@ import { api, API_URL, getAuthToken, clearAuthTokens, isTokenExpired, retryReque
 import { authApi } from './auth';
 import { menuApi } from './menu';
 import type { Category, Dish } from '@/types';
-import { ordersApi } from './orders';
 import waiterApi from './waiter';
 import { settingsApi } from './settings';
 import { reservationsApi, Reservation } from './reservations';
@@ -146,7 +145,6 @@ export {
   API_URL, 
   authApi,
   menuApi,
-  ordersApi,
   waiterApi,
   settingsApi,
   reservationsApi,
@@ -189,7 +187,6 @@ export type {
 export default {
   auth: authApi,
   menu: menuApi,
-  orders: ordersApi,
   waiter: waiterApi, 
   settings: settingsApi,
   reservations: reservationsApi,

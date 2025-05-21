@@ -7,7 +7,9 @@ import useCartStore from '../lib/cart-store';
 import useAuthStore from '../lib/auth-store';
 import {CheckCircleIcon, CreditCardIcon, BanknotesIcon as CashIcon, UserIcon, PhoneIcon, ClockIcon, KeyIcon, ExclamationTriangleIcon as ExclamationCircleIcon, InformationCircleIcon, MapPinIcon as LocationMarkerIcon} from '@heroicons/react/24/outline';
 import {formatPrice} from '../utils/priceFormatter';
-import { ordersApi, settingsApi, assignWaiterToOrder } from '../lib/api/';
+import { ordersApi } from '../lib/api/orders';
+import { settingsApi } from '../lib/api/settings';
+import waiterApi from '../lib/api/waiter';
 import {toast} from 'react-hot-toast';
 import useReservationsStore from '../lib/reservations-store';
 
@@ -207,9 +209,9 @@ const CheckoutPage: NextPage = () => {
       // Собираем данные заказа
       const orderData: any = {
         items: items.map(item => ({
-          dish_id: item.dishId,
+          dish_id: item.dish_id,
           quantity: item.quantity,
-          special_instructions: item.comment || ''
+          comment: item.comment || ''
         })),
         comments: comments || '',
         payment_method: formData.payment_method,

@@ -105,6 +105,16 @@ export interface OrderItem {
   updated_at?: string | null;
 }
 
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+export interface PaymentDetails {
+  method?: string;
+  status?: PaymentStatus;
+  amount?: number;
+  transaction_id?: string;
+  payment_date?: string;
+}
+
 export interface Order {
   id: number;
   user_id?: number;
@@ -130,12 +140,21 @@ export interface Order {
   is_urgent?: boolean;
   is_group_order?: boolean;
   comment?: string;
-  customer_age_group?: string | null;
+  customer_age_group?: string;
   payments?: any[];
+  payment_details?: PaymentDetails;
+  payment?: PaymentDetails;
   user?: {
     id: number;
     full_name: string;
     email: string;
     phone?: string;
   };
+}
+
+export interface AssignOrderResponse {
+  success: boolean;
+  orderId?: number;
+  orderNumber?: number;
+  message?: string;
 } 

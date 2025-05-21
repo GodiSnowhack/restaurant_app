@@ -4,7 +4,10 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import {adminApi, ordersApi, menuApi, DashboardStats} from '../../lib/api';
+import adminApi from '../../lib/api/admin-api';
+import { ordersApi } from '../../lib/api/orders';
+import { menuApi } from '../../lib/api/menu';
+import type { DashboardStats } from '../../lib/api/types';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
 import { useTheme } from '@/lib/theme-context';
@@ -58,10 +61,13 @@ const AdminPage: NextPage = () => {
         console.log('Проверка наличия заказов в базе данных...');
         try {
           if (ordersApi && typeof ordersApi.getOrders === 'function') {
-          const orders = await ordersApi.getOrders();
-          console.log('AdminDashboard - Заказы без фильтров:', orders);
-          console.log('AdminDashboard - Количество заказов:', orders.length);
-          console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
+            // Получаем заказы за последние 30 дней
+            const endDate = new Date().toISOString().split('T')[0];
+            const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const orders = await ordersApi.getOrders(startDate, endDate);
+            console.log('AdminDashboard - Заказы за последние 30 дней:', orders);
+            console.log('AdminDashboard - Количество заказов:', orders.length);
+            console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
           } else {
             console.error('AdminDashboard - ordersApi или метод getOrders недоступен');
           }

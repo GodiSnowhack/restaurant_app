@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
-import { ordersApi } from '../../lib/api';
+import { ordersApi } from '../../lib/api/orders';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import OrderCodeInput from '../../components/OrderCodeInput';
 

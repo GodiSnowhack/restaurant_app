@@ -1,6 +1,9 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
-import api from './api/index';
-import { authApi, menuApi, ordersApi, reservationsApi } from './api';
+import { api } from './api/core';
+import { authApi } from './api/auth';
+import { menuApi } from './api/menu';
+import { ordersApi } from './api/orders';
+import { reservationsApi } from './api/reservations-api';
 import waiterApi from './api/waiter';
 import { settingsApi } from './api/settings';
 import { RestaurantSettings, UserProfile } from './api/types';

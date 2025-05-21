@@ -97,9 +97,24 @@ export interface OrderItem {
   dish_id: number;
   quantity: number;
   price: number;
-  name: string;
+  name?: string;
   dish_name?: string;
   special_instructions?: string;
+  id?: number;
+  order_id?: number;
+  dish_image?: string;
+  created_at?: string;
+  updated_at?: string | null;
+}
+
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+export interface Payment {
+  method?: string;
+  status?: PaymentStatus;
+  amount?: number;
+  transaction_id?: string;
+  payment_date?: string;
 }
 
 export interface Order {
@@ -119,6 +134,8 @@ export interface Order {
   table_number?: number;
   payment_status?: string;
   payment_method?: string;
+  payment?: Payment;
+  payment_details?: Payment;
   comment?: string;
   customer_name?: string;
   customer_phone?: string;
@@ -126,6 +143,9 @@ export interface Order {
   reservation_code?: string;
   order_code?: string;
   delivery_address?: string;
+  special_requests?: string;
+  customer_age_group?: string;
+  customer_gender?: string;
 }
 
 // Типы для бронирования

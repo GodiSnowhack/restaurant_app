@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import { Order } from '../../types';
-import { ordersApi } from '../../lib/api';
+import { ordersApi } from '../../lib/api/orders';
 import { 
   ClockIcon, 
   CheckCircleIcon, 
@@ -42,7 +42,10 @@ const OrdersPage: NextPage = () => {
       setError('');
       
       // Используем API клиент с обработкой ошибок
-      const data = await ordersApi.getOrders();
+      const data = await ordersApi.getOrders(
+        dateRange.startDate.toISOString(),
+        dateRange.endDate.toISOString()
+      );
       console.log('Полученные заказы:', data);
       
       // Проверяем полученные данные
@@ -56,7 +59,15 @@ const OrdersPage: NextPage = () => {
           customer_name: order.customer_name || '',
           customer_phone: order.customer_phone || '',
           payment_status: order.payment_status || 'pending',
-          items: Array.isArray(order.items) ? order.items : []
+          // Преобразуем items, чтобы они соответствовали типу OrderItem из types/index.ts
+          items: Array.isArray(order.items) ? order.items.map(item => ({
+            dish_id: item.dish_id,
+            quantity: item.quantity,
+            price: item.price,
+            name: item.name || item.dish_name || 'Неизвестное блюдо',
+            dish_name: item.dish_name,
+            special_instructions: item.special_instructions
+          })) : []
         }));
         setOrders(validOrders);
       } else {

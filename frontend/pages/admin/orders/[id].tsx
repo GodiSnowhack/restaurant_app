@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import useAuthStore from '../../../lib/auth-store';
 import {Order, OrderItem} from '../../../lib/api/types';
-import {ordersApi} from '../../../lib/api';
+import {ordersApi} from '../../../lib/api/orders';
 import {formatPrice} from '../../../utils/priceFormatter';
 import {ClockIcon, CheckCircleIcon, XCircleIcon, BanknotesIcon as CashIcon, CreditCardIcon, ArrowLeftIcon, PhoneIcon, EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon, DocumentTextIcon, CurrencyDollarIcon} from '@heroicons/react/24/outline';
 import {ExclamationTriangleIcon as ExclamationIcon, CheckIcon} from '@heroicons/react/24/solid';

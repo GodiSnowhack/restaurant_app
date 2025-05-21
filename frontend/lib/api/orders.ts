@@ -1,5 +1,5 @@
 import { api } from './core';
-import { Order } from './types';
+import { Order, AssignOrderResponse, PaymentStatus } from './types';
 import axios from 'axios';
 
 // API функции для работы с заказами
@@ -331,6 +331,88 @@ export const ordersApi = {
       return response.data;
     } catch (error) {
       console.error(`API: Ошибка при обновлении статуса заказа ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Привязка заказа к официанту по коду
+  assignOrderByCode: async (code: string): Promise<AssignOrderResponse> => {
+    try {
+      console.log('API: Привязка заказа по коду:', code);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch('/api/waiter/orders/bind', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'waiter'
+        },
+        body: JSON.stringify({ code })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return {
+          success: false,
+          message: error.message || 'Не удалось привязать заказ'
+        };
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        message: 'Заказ успешно привязан'
+      };
+    } catch (error: any) {
+      console.error('API: Ошибка при привязке заказа:', error);
+      return {
+        success: false,
+        message: error.message || 'Произошла ошибка при привязке заказа'
+      };
+    }
+  },
+
+  // Обновление статуса оплаты заказа
+  updateOrderPaymentStatus: async (id: number, status: PaymentStatus): Promise<{ success: boolean; order: Order }> => {
+    try {
+      console.log(`API: Обновление статуса оплаты заказа ${id} на ${status}`);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch(`/api/orders/${id}/payment-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'waiter'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Ошибка при обновлении статуса оплаты заказа ${id}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        order: data
+      };
+    } catch (error: any) {
+      console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
       throw error;
     }
   }
