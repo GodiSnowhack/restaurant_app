@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { assignWaiterToOrder } from '../lib/api/';
+import { waiterApi } from '../lib/api/waiter-api';
 import { toast } from 'react-hot-toast';
 
 interface WaiterCodeInputProps {
@@ -35,19 +35,22 @@ const WaiterCodeInput: React.FC<WaiterCodeInputProps> = ({
     setSuccess(null);
     
     try {
-      const result = await assignWaiterToOrder(orderId, waiterCode);
+      const result = await waiterApi.assignWaiterToOrder(orderId, waiterCode);
       
       if (result.success) {
         setSuccess(result.message);
-        setWaiterCode('');
+        toast.success(result.message);
         if (onSuccess && result.waiterId) {
           onSuccess(result.waiterId);
         }
       } else {
         setError(result.message);
+        toast.error(result.message);
       }
-    } catch (err: any) {
-      setError(err.message || 'Произошла ошибка при привязке к официанту');
+    } catch (error: any) {
+      const errorMessage = error.message || 'Произошла ошибка при привязке официанта';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

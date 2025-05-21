@@ -417,6 +417,60 @@ export const waiterApi = {
         message: error.message || 'Произошла ошибка при генерации кода'
       };
     }
+  },
+
+  /**
+   * Привязка официанта к заказу по коду
+   * @param orderId ID заказа
+   * @param waiterCode Код официанта
+   * @returns Результат привязки
+   */
+  assignWaiterToOrder: async (orderId: number, waiterCode: string): Promise<{
+    success: boolean;
+    message: string;
+    waiterId?: string;
+  }> => {
+    try {
+      // Проверяем, нужно ли использовать демо-данные
+      if (shouldUseDemoData()) {
+        return {
+          success: true,
+          waiterId: '12345',
+          message: 'Официант успешно привязан к заказу (демо-режим)'
+        };
+      }
+
+      const token = getEnhancedToken();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch(`/api/waiter/orders/${orderId}/assign-waiter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: waiterCode })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Ошибка при привязке официанта');
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        ...result
+      };
+    } catch (error: any) {
+      console.error('Ошибка при привязке официанта:', error);
+      return {
+        success: false,
+        message: error.message || 'Произошла ошибка при привязке официанта'
+      };
+    }
   }
 };
 
