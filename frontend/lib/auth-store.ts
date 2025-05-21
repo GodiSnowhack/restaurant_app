@@ -238,10 +238,18 @@ const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         
         try {
+          console.log('AuthStore - Данные для авторизации:', {
+            username,
+            password,
+            timestamp: new Date().toISOString()
+          });
+
           // Формируем данные для отправки
           const formData = new URLSearchParams();
           formData.append('email', username);
           formData.append('password', password);
+
+          console.log('AuthStore - Отправляемые данные:', formData.toString());
 
           const response = await fetch('/api/auth/login', {
             method: 'POST',

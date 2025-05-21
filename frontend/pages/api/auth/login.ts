@@ -38,7 +38,11 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     // Получаем учетные данные из тела запроса
     const { email, password } = req.body;
     
-    console.log('Auth API - Начало обработки запроса авторизации');
+    console.log('Auth API - Данные запроса:', { 
+      email,
+      password,
+      rawBody: req.body
+    });
     
     // Базовая валидация
     if (!email || !password) {
@@ -55,6 +59,8 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       const formData = new URLSearchParams();
       formData.append('username', email);
       formData.append('password', password);
+
+      console.log('Auth API - Отправляемые данные:', formData.toString());
 
       const response = await axios.post(`${apiUrl}/auth/login`, formData, {
         headers: {
