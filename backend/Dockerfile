@@ -14,9 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование кода приложения
 COPY . .
 
-# Устанавливаем права на базу данных
-RUN chmod 666 backend/data/restaurant.db
-
 # Добавляем текущую директорию в PYTHONPATH
 ENV PYTHONPATH=/app
 
