@@ -12,17 +12,7 @@ import { settingsApi } from '../lib/api/settings';
 import waiterApi from '../lib/api/waiter';
 import {toast} from 'react-hot-toast';
 import useReservationsStore from '../lib/reservations-store';
-
-// Тип для столов ресторана
-interface RestaurantTable {
-  id: number;
-  name: string;
-  capacity: number;
-  is_active: boolean;
-  position_x: number;
-  position_y: number;
-  status: 'available' | 'reserved' | 'occupied';
-}
+import { RestaurantTable } from '../lib/api/types';
 
 const CheckoutPage: NextPage = () => {
   const router = useRouter();

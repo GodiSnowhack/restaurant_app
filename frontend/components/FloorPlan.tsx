@@ -1,22 +1,11 @@
 import React from 'react';
 import {InformationCircleIcon} from '@heroicons/react/24/solid';
-
-// Интерфейс для столов
-export interface RestaurantTable {
-  id: number;
-  number: number;
-  name: string;
-  capacity: number;
-  is_active: boolean;
-  position_x: number;
-  position_y: number;
-  status: 'available' | 'reserved' | 'occupied';
-}
+import { RestaurantTable } from '../lib/api/types';
 
 interface FloorPlanProps {
   tables: RestaurantTable[];
   selectedTableId?: number | null;
-  onTableSelect?: (tableId: number) => void;
+  onTableSelect?: (table: RestaurantTable) => void;
   minGuestCount?: number;
   containerClassName?: string;
   height?: string;
@@ -104,7 +93,7 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   // Обработчик выбора стола
   const handleTableClick = (table: RestaurantTable) => {
     if (onTableSelect && table.is_active && table.status === 'available' && (minGuestCount === 0 || table.capacity >= minGuestCount)) {
-      onTableSelect(table.id);
+      onTableSelect(table);
     }
   };
 

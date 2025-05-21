@@ -239,7 +239,7 @@ const waiterApi = {
   },
   
   // Изменение статуса столика (занят/свободен)
-  updateTableStatus: async (tableId: number, status: string): Promise<any> => {
+  updateTableStatus: async (tableId: number, status: 'available' | 'reserved' | 'occupied'): Promise<any> => {
     try {
       console.log(`API updateTableStatus - Обновление статуса столика ${tableId} до "${status}"`);
       

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import WaiterLayout from '../../components/WaiterLayout';
 import useAuthStore from '../../lib/auth-store';
 import { 
@@ -12,16 +13,10 @@ import {
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
+import { api } from '../../lib/api';
+import { RestaurantTable } from '../../lib/api/types';
 
 // Интерфейсы для работы с данными
-interface RestaurantTable {
-  id: number;
-  number: number;
-  capacity: number;
-  status?: string;
-  name?: string;
-}
-
 interface MenuItem {
   id: string;
   name: string;

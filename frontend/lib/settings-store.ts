@@ -12,7 +12,7 @@ interface SettingsState {
   updateTables: (tables: RestaurantTable[]) => Promise<void>;
   addTable: (table: Omit<RestaurantTable, 'id'>) => Promise<void>;
   removeTable: (tableId: number) => Promise<void>;
-  updateTableStatus: (tableId: number, status: string) => Promise<void>;
+  updateTableStatus: (tableId: number, status: 'available' | 'reserved' | 'occupied') => Promise<void>;
   checkForUpdates: () => Promise<void>;
 }
 
@@ -191,7 +191,7 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   // Обновление статуса стола
-  updateTableStatus: async (tableId: number, status: string) => {
+  updateTableStatus: async (tableId: number, status: 'available' | 'reserved' | 'occupied') => {
     const { settings } = get();
     const tables = settings.tables || [];
     const updatedTables = tables.map(table => 
