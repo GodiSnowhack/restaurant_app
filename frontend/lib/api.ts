@@ -1896,7 +1896,13 @@ export interface User {
 }
 
 // Реэкспортируем API
-export { ordersApi, adminApi, reservationsApi };
+export { 
+  ordersApi, 
+  adminApi, 
+  reservationsApi,
+  getWaiterRating,
+  getWaiterReviews 
+};
 
 // Определения для admin-api.ts
 export class ApiError extends Error {
@@ -1950,12 +1956,7 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   return options;
 };
 
-export {
-  usersApi,
-  getWaiterRating,
-  getWaiterReviews,
-  settingsApi
-};
+export {  usersApi,  settingsApi};
 
 export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
   try {
