@@ -23,8 +23,10 @@ export const DishCard: React.FC<DishCardProps> = ({
   image_url,
   is_vegetarian,
   is_vegan,
+  is_spicy,
   calories,
   cooking_time,
+  weight,
   category_id,
   is_available,
   cartItem,
@@ -60,13 +62,15 @@ export const DishCard: React.FC<DishCardProps> = ({
         name: response.name,
         description: response.description || '',
         price: response.price,
-        image_url: response.image_url || null,
+        image_url: response.image_url || '',
         is_available: response.is_available ?? true,
         category_id: response.category_id || 0,
         is_vegetarian: response.is_vegetarian ?? false,
         is_vegan: response.is_vegan ?? false,
-        calories: response.calories ?? null,
-        cooking_time: response.cooking_time ?? null
+        is_spicy: response.is_spicy ?? false,
+        calories: response.calories ?? 0,
+        cooking_time: response.cooking_time ?? 0,
+        weight: response.weight ?? 0
       };
       
       setDetailedDish(formattedDish);
@@ -237,13 +241,15 @@ export const DishCard: React.FC<DishCardProps> = ({
           name,
           description: description || '',
           price,
-          image_url: image_url || null,
+          image_url: image_url || '',
           is_available,
           category_id,
           is_vegetarian,
           is_vegan,
-          calories: calories ?? null,
-          cooking_time: cooking_time ?? null
+          is_spicy,
+          calories,
+          cooking_time,
+          weight
         }}
         isOpen={isModalOpen}
         onClose={() => {
