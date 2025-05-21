@@ -6,6 +6,9 @@ import { ordersApi } from './api/orders';
 import adminApi from './api/admin-api';
 // Импортируем список публичных маршрутов
 import { PUBLIC_ROUTES } from '../pages/_app';
+import { usersApi } from './api/users-api';
+import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
+import { settingsApi } from './api/settings-api';
 
 // Интерфейс для типа пользователя
 export interface User {
@@ -1945,4 +1948,11 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   }
 
   return options;
+};
+
+export {
+  usersApi,
+  getWaiterRating,
+  getWaiterReviews,
+  settingsApi
 };

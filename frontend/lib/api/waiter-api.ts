@@ -4,6 +4,7 @@
 
 import { Order } from './types';
 import { demoWaiterOrders } from '../demo-data/waiter-orders';
+import { api } from '../api';
 
 // Функция для получения информации о пользователе из localStorage
 const getUserInfo = () => {
@@ -424,3 +425,36 @@ function getEnhancedToken(): string {
   // Возвращаем пустую строку, если токен не найден
   return '';
 }
+
+interface WaiterRating {
+  rating: number;
+  count: number;
+}
+
+interface WaiterReview {
+  id: number;
+  user_name: string;
+  service_rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+export const getWaiterRating = async (waiterId: number): Promise<WaiterRating> => {
+  try {
+    const response = await api.get(`/waiter/${waiterId}/rating`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching waiter rating:', error);
+    return { rating: 0, count: 0 };
+  }
+};
+
+export const getWaiterReviews = async (waiterId: number): Promise<WaiterReview[]> => {
+  try {
+    const response = await api.get(`/waiter/${waiterId}/reviews`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching waiter reviews:', error);
+    return [];
+  }
+};
