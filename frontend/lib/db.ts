@@ -305,27 +305,83 @@ try {
 
 /**
  * Выполняет SQL запрос к базе данных
- * @param sql SQL запрос
- * @param params Параметры запроса
- * @returns Результат запроса
+ * @param sql SQL-запрос с плейсхолдерами (?)
+ * @param params Параметры для подстановки в SQL-запрос
+ * @returns Promise с результатом запроса
+ * @throws Error при критических ошибках выполнения запроса
  */
-export async function query<T = any>(sql: string, params: any[] = []): Promise<T> {
+export async function query(sql: string, params: any[] = []) {
   try {
-    // Проверяем соединение с базой данных
+    // Инициализация соединения, если оно еще не создано
     if (!db) {
-      await initDB();
+      try {
+        await initDB();
+      } catch (error) {
+        console.error('Не удалось инициализировать соединение с БД:', error);
+        return [];
+      }
     }
     
     if (!db) {
-      throw new Error('Не удалось установить соединение с базой данных');
+      console.error('Соединение с базой данных не инициализировано');
+      throw new Error('Соединение с базой данных не установлено');
     }
     
-    // Выполняем запрос
-    const result = await db.all(sql, params);
-    return result as T;
+    // Проверяем SQL-запрос
+    if (!sql || typeof sql !== 'string') {
+      throw new Error('Некорректный SQL запрос');
+    }
+    
+    // Подготовка параметров запроса
+    const safeParams = params.map(param => {
+      if (param instanceof Date) {
+        return param.toISOString();
+      }
+      return param === undefined || param === null ? null : param;
+    });
+    
+    console.log(`Выполнение SQL: ${sql.slice(0, 200)}${sql.length > 200 ? '...' : ''}`);
+    console.log('Параметры:', JSON.stringify(safeParams));
+    
+    // Определяем тип запроса
+    const isSelect = sql.trim().toLowerCase().startsWith('select');
+    
+    // Выполнение запроса с таймаутом
+    try {
+      let results;
+      if (isSelect) {
+        // Для SELECT запросов используем all()
+        results = await Promise.race([
+          db.all(sql, safeParams),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Таймаут запроса к базе данных')), 15000)
+          )
+        ]);
+      } else {
+        // Для других запросов (INSERT, UPDATE, DELETE) используем run()
+        results = await Promise.race([
+          db.run(sql, safeParams),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Таймаут запроса к базе данных')), 15000)
+          )
+        ]);
+      }
+      
+      console.log(`Запрос выполнен, получено ${Array.isArray(results) ? results.length : 1} результатов`);
+      return results || [];
+    } catch (error) {
+      console.error('Ошибка выполнения запроса:', error);
+      throw error;
+    }
   } catch (error) {
-    console.error('Ошибка при выполнении запроса:', error);
-    throw error;
+    console.error('Ошибка запроса к базе данных:', error);
+    if (error instanceof Error && 
+        (error.message.includes('database is locked') || 
+         error.message.includes('Таймаут запроса'))) {
+      console.error('Критическая ошибка соединения с базой данных');
+      throw error;
+    }
+    return [];
   }
 }
 

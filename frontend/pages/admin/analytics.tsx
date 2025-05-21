@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { 
   FinancialMetrics, 
   CustomerMetrics, 
-  OperationalMetrics, 
+  OperationalMetrics,
   MenuMetrics,
   PredictiveMetrics,
   AnalyticsFilters 
@@ -72,7 +72,7 @@ const AnalyticsPage: NextPage<AnalyticsPageProps> = () => {
             ) {
               throw new Error('Некорректный формат данных блюда');
             }
-            return {
+    return {
               dishId: dish.dishId,
               dishName: dish.dishName,
               salesCount: dish.salesCount,
@@ -180,13 +180,13 @@ const AnalyticsPage: NextPage<AnalyticsPageProps> = () => {
 
     loadData();
   }, [timeRange]);
-
-  return (
-    <div>
+                          
+                          return (
+                  <div>
       {isLoading && <LoadingSpinner />}
       {error && <div className="error">{error}</div>}
       {/* Остальной JSX код */}
-    </div>
+                        </div>
   );
 };
 
