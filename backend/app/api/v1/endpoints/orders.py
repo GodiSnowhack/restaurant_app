@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from restaurant_app.schemas import OrderCreate, OrderOut
@@ -8,6 +8,10 @@ from restaurant_app.database import get_db
 from restaurant_app.utils import get_current_user
 
 router = APIRouter()
+
+@router.get("/", response_model=List[OrderOut])
+def get_orders(db: Session = Depends(get_db)):
+    return {"message": "Orders endpoint"}
 
 @router.post("/", response_model=OrderOut)
 def create_order(

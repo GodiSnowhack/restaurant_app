@@ -1,4 +1,20 @@
 """
+Pydantic schemas for the application
+"""
+
+from app.schemas.orders import OrderCreate, OrderOut
+from app.schemas.dishes import DishCreate, DishOut
+from app.schemas.users import UserCreate, UserOut
+from app.schemas.categories import CategoryCreate, CategoryOut
+
+__all__ = [
+    "OrderCreate", "OrderOut",
+    "DishCreate", "DishOut",
+    "UserCreate", "UserOut",
+    "CategoryCreate", "CategoryOut"
+]
+
+"""
 Пакет схем для pydantic-моделей API
 """
 from app.schemas.user import (
