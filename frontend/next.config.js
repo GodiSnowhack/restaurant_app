@@ -159,60 +159,58 @@ const nextConfig = {
   },
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'https://backend-production-1a78.up.railway.app';
     return [
-      // Маршрут для проверки соединения
       {
         source: '/api/ping',
-        destination: 'http://localhost:8000/api/v1/ping',
+        destination: `${backendUrl}/api/v1/ping`,
       },
-      // Основной API прокси маршрут
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/v1/:path*',
+        destination: `${backendUrl}/api/v1/:path*`,
       },
-      // Поддержка прямых маршрутов для совместимости
       {
         source: '/api/auth/:path*',
-        destination: 'http://localhost:8000/api/v1/auth/:path*',
+        destination: `${backendUrl}/api/v1/auth/:path*`,
       },
       {
         source: '/api/menu/:path*',
-        destination: 'http://localhost:8000/api/v1/menu/:path*',
+        destination: `${backendUrl}/api/v1/menu/:path*`,
       },
       {
         source: '/api/orders/:path*',
-        destination: 'http://localhost:8000/api/v1/orders/:path*',
+        destination: `${backendUrl}/api/v1/orders/:path*`,
       },
       {
         source: '/api/reservations/:path*',
-        destination: 'http://localhost:8000/api/v1/reservations/:path*',
+        destination: `${backendUrl}/api/v1/reservations/:path*`,
       },
       {
         source: '/api/users/:path*',
-        destination: 'http://localhost:8000/api/v1/users/:path*',
+        destination: `${backendUrl}/api/v1/users/:path*`,
       },
       {
         source: '/api/waiter/:path*',
-        destination: 'http://localhost:8000/api/v1/waiter/:path*',
+        destination: `${backendUrl}/api/v1/waiter/:path*`,
       },
       {
         source: '/api/settings/:path*',
-        destination: 'http://localhost:8000/api/v1/settings/:path*',
+        destination: `${backendUrl}/api/v1/settings/:path*`,
       },
       {
         source: '/api/categories/:path*',
-        destination: 'http://localhost:8000/api/v1/categories/:path*',
+        destination: `${backendUrl}/api/v1/categories/:path*`,
       },
       {
         source: '/api/dishes/:path*',
-        destination: 'http://localhost:8000/api/v1/dishes/:path*',
-      }
+        destination: `${backendUrl}/api/v1/dishes/:path*`,
+      },
     ];
   },
   // Переменные окружения, доступные на клиенте
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
+    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-production-1a78.up.railway.app',
   },
   // Добавляем поддержку SVG
   webpack(config) {
