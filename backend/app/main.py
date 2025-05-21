@@ -6,9 +6,9 @@ from pathlib import Path
 import logging
 
 from app.api.v1 import api_router
-from core.config import settings
-from database.session import SessionLocal
-from core.init_db import init_db
+from app.core.config import settings
+from app.database.session import SessionLocal
+from app.core.init_db import init_db
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
