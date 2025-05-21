@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {PhotoIcon as PhotographIcon, XCircleIcon, ArrowUpTrayIcon as UploadIcon} from '@heroicons/react/24/outline';
-import {menuApi} from '../lib/api/';
+import {menuApi} from '../lib/api/menu';
 
 interface ImageUploaderProps {
   initialImage?: string;

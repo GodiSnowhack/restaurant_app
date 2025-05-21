@@ -3,9 +3,9 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { Dish, Allergen, Tag } from '../../types';
+import { Dish } from '../../types';
 import useCartStore from '../../lib/cart-store';
-import { menuApi } from '../../lib/api';
+import { menuApi } from '../../lib/api/menu';
 import { 
   PlusIcon, 
   MinusIcon, 
@@ -17,8 +17,30 @@ import {
 import { formatPrice } from '../../utils/priceFormatter';
 import { getDishImageUrl, handleImageError } from '../../utils/imageHelper';
 
+// Определяем базовые типы
+interface AllergenType {
+  id: number;
+  name: string;
+}
+
+interface TagType {
+  id: number;
+  name: string;
+}
+
+// Определяем тип для блюда с расширенными свойствами
+interface DishWithDetails extends Omit<Dish, 'allergens'> {
+  allergens?: AllergenType[];
+  tags?: TagType[];
+}
+
+// Определяем тип для ответа API
+interface DishResponse extends Dish {
+  tags?: any[];
+}
+
 const DishDetailPage: NextPage = () => {
-  const [dish, setDish] = useState<Dish | null>(null);
+  const [dish, setDish] = useState<DishWithDetails | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [comment, setComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -33,8 +55,35 @@ const DishDetailPage: NextPage = () => {
       
       try {
         setIsLoading(true);
-        const dishData = await menuApi.getDishById(Number(id));
-        setDish(dishData);
+        const dishData = await menuApi.getDishById(Number(id)) as DishResponse;
+        
+        if (!dishData) {
+          throw new Error('Блюдо не найдено');
+        }
+
+        // Преобразуем данные в нужный формат
+        const formattedDish: DishWithDetails = {
+          id: dishData.id,
+          name: dishData.name,
+          description: dishData.description,
+          price: dishData.price,
+          image_url: dishData.image_url,
+          category_id: dishData.category_id,
+          is_available: dishData.is_available,
+          is_vegetarian: dishData.is_vegetarian,
+          is_vegan: dishData.is_vegan,
+          is_spicy: dishData.is_spicy,
+          calories: dishData.calories,
+          weight: dishData.weight,
+          cooking_time: dishData.cooking_time,
+          cost_price: dishData.cost_price,
+          allergens: Array.isArray(dishData.allergens) 
+            ? dishData.allergens.map((a: any) => typeof a === 'string' ? { id: 0, name: a } : a)
+            : undefined,
+          tags: dishData.tags?.map((t: any) => typeof t === 'string' ? { id: 0, name: t } : t)
+        };
+        
+        setDish(formattedDish);
       } catch (error) {
         console.error('Ошибка при загрузке блюда:', error);
         setError('Не удалось загрузить информацию о блюде. Пожалуйста, попробуйте позже.');
@@ -55,11 +104,11 @@ const DishDetailPage: NextPage = () => {
     if (!dish) return;
     
     addItem({
-      dishId: dish.id,
+      dish_id: dish.id,
       name: dish.name,
       price: dish.price,
       quantity: quantity,
-      imageUrl: dish.image_url,
+      image_url: dish.image_url,
       comment: comment.trim() || undefined
     });
     
@@ -152,7 +201,7 @@ const DishDetailPage: NextPage = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold text-sm mb-2">Аллергены:</h3>
                   <div className="flex flex-wrap">
-                    {dish.allergens.map((allergen) => (
+                    {dish.allergens.map((allergen: AllergenType) => (
                       <span 
                         key={allergen.id} 
                         className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded mr-2 mb-2"
@@ -169,7 +218,7 @@ const DishDetailPage: NextPage = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold text-sm mb-2">Теги:</h3>
                   <div className="flex flex-wrap">
-                    {dish.tags.map((tag) => (
+                    {dish.tags.map((tag: TagType) => (
                       <span 
                         key={tag.id} 
                         className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded mr-2 mb-2"

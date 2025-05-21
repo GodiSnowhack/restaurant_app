@@ -4,7 +4,7 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../../../components/Layout';
 import useAuthStore from '../../../../lib/auth-store';
-import {menuApi} from '../../../../lib/api';
+import { menuApi } from '../../../../lib/api/menu';
 import ImageUploader from '../../../../components/ImageUploader';
 import {ArrowLeftIcon, CheckIcon as SaveIcon} from '@heroicons/react/24/outline';
 
@@ -63,6 +63,10 @@ const EditDishPage: NextPage = () => {
         
         // Загружаем данные блюда
         const dishData = await menuApi.getDishById(parseInt(id));
+        
+        if (!dishData) {
+          throw new Error('Блюдо не найдено');
+        }
         
         // Преобразуем числовые значения в строки для полей формы
         setFormData({
