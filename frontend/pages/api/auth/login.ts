@@ -32,10 +32,10 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     
     // Определяем, является ли устройство мобильным
     const isMobile = /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(userAgent);
-    console.log(`Auth API - Запрос авторизации от устройства${isMobile ? ' (мобильное)' : ''}: ${userAgent}`);
+    console.log(`Auth API - Запрос авторизации от устройства: ${userAgent}`);
     console.log(`Auth API - IP клиента: ${clientIp}`);
     
-    // Получаем учетные данные из тела запроса и обеспечиваем их валидность
+    // Получаем учетные данные из тела запроса
     let { username, password, email } = req.body;
     
     console.log('Auth API - Данные запроса:', { 
@@ -61,97 +61,71 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
         }
       });
     }
+
+    // Проверяем доступность сервера перед отправкой запроса
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
     
-    // Формируем URL для запроса к основному API
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    
-    // Сначала проверяем доступность сервера перед запросом авторизации
     try {
       console.log('Auth API - Проверка доступности сервера перед авторизацией');
-      const healthCheck = await axios.get(`${apiUrl}/health`, { 
-        timeout: 5000,
-        validateStatus: () => true // Принимаем любой код ответа
-      });
-      
-      if (healthCheck.status >= 500) {
-        console.error(`Auth API - Сервер недоступен, код ответа: ${healthCheck.status}`);
-        return res.status(503).json({
-          detail: 'Сервер временно недоступен',
-          message: 'Пожалуйста, попробуйте позже',
-          server_status: healthCheck.status
-        });
-      }
-      
+      const healthCheck = await axios.get(`${apiUrl}/health`);
       console.log(`Auth API - Сервер доступен, код ответа: ${healthCheck.status}`);
-    } catch (healthError: any) {
-      console.warn('Auth API - Ошибка при проверке доступности сервера:', healthError.message);
-      // Продолжаем работу, но запоминаем ошибку для диагностики
+    } catch (error) {
+      console.error('Auth API - Ошибка при проверке доступности сервера:', error);
+      return res.status(503).json({
+        detail: 'Сервер авторизации недоступен',
+        message: 'Пожалуйста, попробуйте позже'
+      });
     }
 
-    // Используем формат form-username (URL-encoded), который работает надежнее
+    // Отправляем запрос на авторизацию
     try {
-      console.log('Auth API - Отправка запроса на авторизацию в формате form-username');
+      console.log('Auth API - Отправка запроса на авторизацию в формате form-data');
       
-      // Формируем URL-encoded данные
-      const requestBody = new URLSearchParams({ 
-        username, 
-        password 
-      }).toString();
+      const formData = new URLSearchParams();
+      formData.append('username', username);
+      formData.append('password', password);
       
-      const endpoint = `${apiUrl}/auth/login`;
-      const response = await axios({
-        method: 'POST',
-        url: endpoint,
-        data: requestBody,
+      const response = await axios.post(`${apiUrl}/auth/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
-          'User-Agent': userAgent,
-          'X-Client-Type': isMobile ? 'mobile' : 'desktop',
-          'X-Forwarded-For': String(clientIp)
+          'User-Agent': userAgent
         },
-        timeout: isMobile ? 60000 : 15000,
-        validateStatus: (status) => status < 500 // Отклоняем только серверные ошибки 5xx
+        timeout: isMobile ? 60000 : 15000
       });
       
       console.log(`Auth API - Получен ответ от сервера: ${response.status}`);
       
-      // Если получили успешный ответ
-      if (response.status === 200 && response.data && response.data.access_token) {
-        const authResult = response.data;
+      if (response.data && response.data.access_token) {
         const duration = Date.now() - startTime;
         console.log(`Auth API - Авторизация успешна, время: ${duration}ms`);
         
-        // Добавляем refresh_token, если его нет в ответе
-        if (!authResult.refresh_token && authResult.access_token) {
-          console.log(`Auth API - Добавляем refresh_token`);
-          authResult.refresh_token = generateRefreshToken();
-        }
-        
         return res.status(200).json({
-          ...authResult,
+          ...response.data,
           auth_method: 'proxy',
           duration
         });
+      } else {
+        console.error('Auth API - Отсутствует токен в ответе');
+        return res.status(401).json({
+          detail: 'Неверные учетные данные',
+          message: 'Проверьте правильность email и пароля'
+        });
       }
-      
-      // Если ответ не 200 или нет токена, обрабатываем ошибку
-      console.error(`Auth API - Ошибка авторизации, статус: ${response.status}`);
-      
-      return res.status(response.status || 400).json({
-        detail: response.data?.detail || 'Ошибка авторизации',
-        message: 'Не удалось авторизоваться. Проверьте правильность учетных данных.',
-        status: response.status,
-        data: response.data
-      });
     } catch (error: any) {
-      // Обрабатываем ошибки запроса
-      console.error('Auth API - Ошибка при отправке запроса на авторизацию:', error.message);
+      console.error('Auth API - Ошибка при отправке запроса:', error.message);
+      
+      // Если есть ответ от сервера с деталями ошибки
+      if (error.response) {
+        return res.status(error.response.status).json({
+          detail: error.response.data?.detail || 'Ошибка авторизации',
+          message: error.response.data?.message || 'Не удалось авторизоваться'
+        });
+      }
       
       return res.status(500).json({
         detail: error.message,
-        message: 'Внутренняя ошибка сервера при авторизации',
-        timestamp: Date.now()
+        message: 'Внутренняя ошибка сервера при авторизации'
       });
     }
   } catch (error: any) {
@@ -159,8 +133,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     
     return res.status(500).json({
       detail: error.message,
-      message: 'Внутренняя ошибка сервера',
-      timestamp: Date.now()
+      message: 'Внутренняя ошибка сервера'
     });
   }
 }

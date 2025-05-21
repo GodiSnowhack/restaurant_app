@@ -37,25 +37,35 @@ async def auth_info():
 async def login(
     db: Session = Depends(get_db),
     login_data: LoginRequest = None,
-    form_data: OAuth2PasswordRequestForm = Depends(None)
+    form_data: OAuth2PasswordRequestForm = Depends(None),
+    username: str = Form(None),
+    password: str = Form(None)
 ) -> Any:
     """
     Аутентификация пользователя и получение токена.
-    Поддерживает как JSON, так и form-data формат.
+    Поддерживает JSON, form-data и x-www-form-urlencoded форматы.
     """
     try:
         # Определяем, какой формат данных используется
-        username = login_data.email if login_data else form_data.username if form_data else None
-        password = login_data.password if login_data else form_data.password if form_data else None
+        final_username = (
+            login_data.email if login_data else 
+            form_data.username if form_data else 
+            username
+        )
+        final_password = (
+            login_data.password if login_data else 
+            form_data.password if form_data else 
+            password
+        )
         
-        if not username or not password:
+        if not final_username or not final_password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Необходимо предоставить email и пароль"
             )
         
         # Аутентифицируем пользователя
-        user = authenticate_user(db, username, password)
+        user = authenticate_user(db, final_username, final_password)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -77,27 +87,20 @@ async def login(
             expires_delta=access_token_expires
         )
         
-        # Создаем refresh token с более длительным сроком действия
-        refresh_token_expires = timedelta(days=30)  # 30 дней
-        refresh_token = create_access_token(
-            data={"sub": str(user.id)},
-            expires_delta=refresh_token_expires
-        )
-        
         return {
             "access_token": access_token,
-            "refresh_token": refresh_token,
             "token_type": "bearer",
             "user": {
                 "id": user.id,
                 "email": user.email,
-                "role": user.role
+                "role": user.role,
+                "is_active": user.is_active
             }
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка при аутентификации: {str(e)}"
+            detail=str(e)
         )
 
 
