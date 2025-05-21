@@ -7,7 +7,12 @@ export const getApiBaseUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Всегда используем прямой URL к бэкенду
+  // Для разработки в Docker
+  if (process.env.NODE_ENV === 'production') {
+    return 'http://backend:8000/api/v1';
+  }
+  
+  // Для локальной разработки
   return 'http://localhost:8000/api/v1';
 };
 
@@ -114,9 +119,14 @@ api.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Добавляем CORS заголовки
-    config.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000';
-    config.headers['Access-Control-Allow-Credentials'] = 'true';
+    // Добавляем CORS заголовки для всех окружений
+    const allowedOrigins = ['http://localhost:3000', 'http://frontend:3000'];
+    const origin = typeof window !== 'undefined' ? window.location.origin : allowedOrigins[0];
+    
+    if (allowedOrigins.includes(origin)) {
+      config.headers['Access-Control-Allow-Origin'] = origin;
+      config.headers['Access-Control-Allow-Credentials'] = 'true';
+    }
     
     return config;
   },

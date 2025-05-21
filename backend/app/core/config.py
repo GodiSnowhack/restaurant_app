@@ -19,13 +19,14 @@ class Settings(BaseSettings):
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        "https://frontend-production-8eb6.up.railway.app",
-        "http://frontend-production-8eb6.up.railway.app",
         "http://localhost:3000",
         "https://localhost:3000",
         "http://localhost:8000",
         "https://localhost:8000",
-        "*"
+        "http://frontend:3000",
+        "https://frontend:3000",
+        "http://backend:8000",
+        "https://backend:8000"
     ]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
