@@ -4,38 +4,13 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import {menuApi} from '../../lib/api';
+import { menuApi } from '../../lib/api/menu';
+import type { Dish, Category, CreateDishDTO } from '@/types';
 import ImageUploader from '../../components/ImageUploader';
 import {ArrowLeftIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon} from '@heroicons/react/24/outline';
 import {PencilIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/solid';
 import {formatPrice} from '../../utils/priceFormatter';
 import { useTheme } from '@/lib/theme-context';
-
-type Dish = {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  category_id: number;
-  image_url: string;
-  is_available: boolean;
-  calories: number;
-  weight: number;
-  is_vegetarian: boolean;
-  is_spicy: boolean;
-  position: number;
-  category?: {
-    id: number;
-    name: string;
-  };
-};
-
-type Category = {
-  id: number;
-  name: string;
-  description: string;
-  position: number;
-};
 
 const AdminMenuPage: NextPage = () => {
   const router = useRouter();
@@ -48,16 +23,16 @@ const AdminMenuPage: NextPage = () => {
   const [showDishForm, setShowDishForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [currentFilter, setCurrentFilter] = useState<number | 'all'>('all');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Partial<CreateDishDTO>>({
     name: '',
     description: '',
-    price: '',
-    cost_price: '',
-    category_id: '',
+    price: 0,
+    cost_price: 0,
+    category_id: undefined,
     image_url: '',
-    calories: '',
-    cooking_time: '',
-    weight: '',
+    calories: 0,
+    cooking_time: 0,
+    weight: 0,
     is_vegetarian: false,
     is_vegan: false,
     is_spicy: false,
@@ -81,31 +56,20 @@ const AdminMenuPage: NextPage = () => {
       try {
         setIsLoading(true);
         
-        // Принудительно очищаем кэш перед загрузкой для получения актуальных данных
-        try {
-          // Сбрасываем кэш в API объекте
-          if (menuApi._cachedDishes) {
-            menuApi._cachedDishes = null;
-            menuApi._lastDishesUpdate = 0;
+        // Сбрасываем localStorage кэш
+        localStorage.removeItem('cached_dishes');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('cached_dishes_')) {
+            localStorage.removeItem(key);
           }
-          
-          // Сбрасываем localStorage кэш
-          localStorage.removeItem('cached_dishes');
-          Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('cached_dishes_')) {
-              localStorage.removeItem(key);
-            }
-          });
-        } catch (e) {
-          console.error('Ошибка при очистке кэша:', e);
-        }
+        });
         
         // Загружаем данные с сервера через API
         const categoriesData = await menuApi.getCategories();
         setCategories(categoriesData);
         
-        // Добавляем параметр для принудительной загрузки с сервера
-        const dishesData = await menuApi.getDishes({ _bypass_cache: true });
+        // Загружаем блюда
+        const dishesData = await menuApi.getDishes();
         setDishes(dishesData);
         
         setIsLoading(false);
@@ -208,62 +172,72 @@ const AdminMenuPage: NextPage = () => {
     e.preventDefault();
     
     try {
-      // Преобразуем строковые значения в числа
-      const dishData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        cost_price: formData.cost_price ? parseFloat(formData.cost_price) : undefined,
-        category_id: parseInt(formData.category_id),
-        calories: formData.calories ? parseInt(formData.calories) : undefined,
-        cooking_time: formData.cooking_time ? parseInt(formData.cooking_time) : undefined,
-        weight: formData.weight ? parseInt(formData.weight) : undefined,
+      const dishData: CreateDishDTO = {
+        name: formData.name || '',
+        description: formData.description || '',
+        price: parseFloat(formData.price?.toString() || '0'),
+        cost_price: formData.cost_price ? parseFloat(formData.cost_price.toString()) : undefined,
+        category_id: formData.category_id ? parseInt(formData.category_id.toString()) : 0,
+        image_url: formData.image_url || '',
+        calories: parseInt(formData.calories?.toString() || '0'),
+        cooking_time: parseInt(formData.cooking_time?.toString() || '0'),
+        weight: parseInt(formData.weight?.toString() || '0'),
+        is_vegetarian: formData.is_vegetarian ?? false,
+        is_vegan: formData.is_vegan ?? false,
+        is_spicy: formData.is_spicy ?? false,
+        is_available: formData.is_available ?? true
       };
       
       // Добавляем позицию по умолчанию
       const position = dishes.filter(d => d.category_id === dishData.category_id).length + 1;
+      dishData.position = position;
       
-      // В реальном приложении отправляем запрос на сервер
       try {
-        // Пытаемся отправить через API
         const newDish = await menuApi.createDish(dishData);
         setDishes(prev => [...prev, newDish]);
+        setShowDishForm(false);
+        setFormData({
+          name: '',
+          description: '',
+          price: 0,
+          cost_price: 0,
+          category_id: undefined,
+          image_url: '',
+          calories: 0,
+          cooking_time: 0,
+          weight: 0,
+          is_vegetarian: false,
+          is_vegan: false,
+          is_spicy: false,
+          is_available: true
+        });
       } catch (error) {
         console.error('Ошибка при создании блюда через API:', error);
         
         // Если API не работает, добавляем локально для демонстрации
-        const newDish = {
-          ...dishData,
+        const newDish: Dish = {
           id: Math.max(0, ...dishes.map(d => d.id)) + 1,
+          name: dishData.name,
+          description: dishData.description,
+          price: dishData.price,
+          image_url: dishData.image_url,
+          category_id: dishData.category_id,
+          is_available: dishData.is_available,
+          is_vegetarian: dishData.is_vegetarian,
+          is_vegan: dishData.is_vegan,
+          is_spicy: dishData.is_spicy,
+          calories: dishData.calories,
+          cooking_time: dishData.cooking_time,
+          weight: dishData.weight,
           position: position,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        } as Dish;
+          formatted_price: formatPrice(dishData.price)
+        };
         
         setDishes(prev => [...prev, newDish]);
+        setShowDishForm(false);
       }
-      
-      // Очищаем форму и закрываем её
-      setFormData({
-        name: '',
-        description: '',
-        price: '',
-        cost_price: '',
-        category_id: '',
-        image_url: '',
-        calories: '',
-        cooking_time: '',
-        weight: '',
-        is_vegetarian: false,
-        is_vegan: false,
-        is_spicy: false,
-        is_available: true
-      });
-      
-      setShowDishForm(false);
-      alert('Блюдо успешно добавлено!');
     } catch (error) {
-      console.error('Ошибка при добавлении блюда:', error);
-      alert('Не удалось добавить блюдо. Пожалуйста, проверьте введенные данные.');
+      console.error('Ошибка при создании блюда:', error);
     }
   };
 

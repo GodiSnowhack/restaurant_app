@@ -210,13 +210,15 @@ export const menuApi = {
         name: response.data.name,
         description: response.data.description || '',
         price: response.data.price,
-        image_url: response.data.image_url || null,
+        image_url: response.data.image_url || '',
         is_available: response.data.is_available ?? true,
         category_id: response.data.category_id || 0,
         is_vegetarian: response.data.is_vegetarian ?? false,
         is_vegan: response.data.is_vegan ?? false,
-        calories: response.data.calories !== undefined ? parseInt(response.data.calories.toString()) : null,
-        cooking_time: response.data.cooking_time !== undefined ? parseInt(response.data.cooking_time.toString()) : null
+        is_spicy: response.data.is_spicy ?? false,
+        calories: response.data.calories !== undefined ? parseInt(response.data.calories.toString()) : 0,
+        cooking_time: response.data.cooking_time !== undefined ? parseInt(response.data.cooking_time.toString()) : 0,
+        weight: response.data.weight !== undefined ? parseInt(response.data.weight.toString()) : 0
       };
       
       // Сохраняем в кеш

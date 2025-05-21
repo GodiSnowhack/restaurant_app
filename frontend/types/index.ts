@@ -16,7 +16,7 @@ export interface Category {
   description?: string;
   image_url?: string;
   is_active?: boolean;
-  order?: number;
+  position: number;
   created_at?: string;
   updated_at?: string;
   dish_count?: number;
@@ -55,19 +55,23 @@ export interface ApiDish {
 export interface Dish {
   id: number;
   name: string;
-  description?: string;
+  description: string;
   price: number;
+  cost_price?: number;
   formatted_price?: string;
-  image_url: string | null;
+  image_url: string;
   is_available: boolean;
   category_id: number;
   is_vegetarian: boolean;
   is_vegan: boolean;
-  calories: number | null;
-  cooking_time: number | null;
+  is_spicy: boolean;
+  calories: number;
+  cooking_time: number;
+  weight: number;
+  position?: number;
   is_featured?: boolean;
   ingredients?: string;
-  allergens?: string;
+  allergens?: string[];
   nutritional_info?: string;
   is_gluten_free?: boolean;
   spiciness_level?: number;
@@ -217,4 +221,22 @@ export interface RestaurantSettings {
   terms_of_service: string;
   tables: Array<any>;
   payment_methods?: string[];
+}
+
+// Добавляем тип для создания нового блюда
+export interface CreateDishDTO {
+  name: string;
+  description: string;
+  price: number;
+  cost_price?: number;
+  image_url: string;
+  category_id: number;
+  is_available: boolean;
+  is_vegetarian: boolean;
+  is_vegan: boolean;
+  is_spicy: boolean;
+  calories: number;
+  cooking_time: number;
+  weight: number;
+  position?: number;
 } 
