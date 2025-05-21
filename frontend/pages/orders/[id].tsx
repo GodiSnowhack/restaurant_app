@@ -4,9 +4,9 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import { Order, OrderItem } from '../../types';
+import { Order, OrderItem } from '@/lib/api/types';
 import { ordersApi } from '../../lib/api';
-import waiterApi from '../../lib/api/waiter-api';
+import { waiterApi } from '../../lib/api/waiter-api';
 import { formatPrice } from '../../utils/priceFormatter';
 import OrderCode from '../../components/OrderCode';
 import { 
@@ -30,7 +30,7 @@ import ReviewForm from '../../components/orders/ReviewForm';
 import { updateOrderPaymentStatus } from "../../lib/api/order-payment";
 
 // Расширяем тип Order с полем comment и special_instructions
-interface ExtendedOrder extends Order {
+interface ExtendedOrder extends Omit<Order, 'waiter_id'> {
   comment?: string;
   special_instructions?: string;
   waiter_id?: number | null;

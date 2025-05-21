@@ -365,7 +365,7 @@ export const authApi = {
     const isClient = typeof window !== 'undefined';
     
     // Получаем сохраненный профиль для использования в случае ошибок
-    let cachedProfile = null;
+    let cachedProfile: UserProfile | null = null;
     
     if (isClient) {
       try {
