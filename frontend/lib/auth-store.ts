@@ -235,316 +235,57 @@ const useAuthStore = create<AuthState>()(
       
       // Авторизация пользователя
       login: async (username: string, password: string) => {
-        const startTime = Date.now();
         set({ isLoading: true, error: null });
         
-        console.log('AuthStore: Начало процесса авторизации', { 
-          hasUsername: !!username,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Проверяем подключение к сети
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          console.warn('AuthStore: Нет подключения к сети, проверяем кэшированные данные');
-          
-          try {
-            // Проверяем кэшированный токен и профиль
-            const cachedToken = getAuthToken();
-            const cachedProfile = localStorage.getItem('user_profile');
-            
-            if (cachedToken && cachedProfile) {
-              console.log('AuthStore: Используем кэшированные данные в офлайн-режиме');
-              const profile = JSON.parse(cachedProfile);
-              
-              set({
-                isAuthenticated: true,
-                token: cachedToken,
-                user: profile,
-                error: 'Работа в офлайн-режиме. Некоторые функции могут быть недоступны.',
-                isLoading: false
-              });
-              
-              return;
-            }
-          } catch (e) {
-            console.error('AuthStore: Ошибка при проверке кэшированных данных:', e);
-          }
-          
-          set({
-            isLoading: false,
-            error: 'Отсутствует подключение к интернету. Пожалуйста, проверьте соединение и попробуйте снова.'
-          });
-          
-          return;
-        }
-        
-        // Создаем объект для сбора диагностической информации
-        const diagnosticInfo: any = {
-          startTime,
-          steps: [],
-          retries: 0,
-          maxRetries: 3,
-          success: false,
-          isMobile: isMobileDeviceFn(),
-          error: null
-        };
-
         try {
-          // Проверяем тип устройства для выбора метода авторизации
-          if (isMobileDeviceFn()) {
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'мобильная авторизация' });
-            
-            // Проверяем качество сети для мобильных устройств
-            const lowQuality = hasLowQualityConnection();
-            if (lowQuality) {
-              diagnosticInfo.steps.push({ 
-                timestamp: Date.now(), 
-                step: 'обнаружено низкое качество сети',
-                connectionInfo: (navigator as any).connection ? {
-                  effectiveType: (navigator as any).connection.effectiveType,
-                  downlink: (navigator as any).connection.downlink,
-                  saveData: (navigator as any).connection.saveData
-                } : null
-              });
-              console.log('AuthStore: Обнаружено низкое качество сети, оптимизируем запросы');
-            }
-            
-            // Авторизация на мобильном устройстве
-            const attemptMobileLogin = async (attemptNumber: number): Promise<any> => {
-              const startAttemptTime = Date.now();
-              diagnosticInfo.steps.push({ 
-                timestamp: startAttemptTime, 
-                step: `начало попытки ${attemptNumber}` 
-              });
-              
-              // Формируем данные для отправки
-              const formData = new URLSearchParams();
-              formData.append('username', username);
-              formData.append('password', password);
-              
-              // Используем обычный fetch вместо axios для улучшения совместимости с мобильными устройствами
-              const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                  'Accept': 'application/json'
-                },
-                body: formData.toString()
-              });
-              
-              if (!response.ok) {
-                const error = await response.json().catch(() => ({ detail: 'Ошибка авторизации' }));
-                throw new Error(error.detail || 'Не удалось авторизоваться');
-              }
-              
-              const result = await response.json();
-              
-              // Если успешно получили токен
-              if (result && result.access_token) {
-                return result;
-              }
-              
-              throw new Error('Не удалось получить токен доступа');
-            };
-            
-            // Пробуем авторизоваться несколько раз с экспоненциальной задержкой
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                diagnosticInfo.retries = attempt - 1;
-                const result = await attemptMobileLogin(attempt);
-                
-                // Сохраняем токен и данные авторизации
-                if (result) {
-                  try {
-                    const { access_token, refresh_token } = result;
-                    
-                    if (access_token) {
-                      saveAuthToken(access_token);
-                      
-                      // Сохраняем refresh_token, если он есть
-                      if (refresh_token) {
-                        localStorage.setItem('refresh_token', refresh_token);
-                        console.log('AuthStore: Сохранен refresh_token');
-                      }
-                      
-                      set({ 
-                        isAuthenticated: true, 
-                        token: access_token,
-                        error: null,
-                        isLoading: false
-                      });
-                      
-                      // Загружаем профиль пользователя
-                      get().fetchUserProfile();
-                      return;
-                    }
-                  } catch (tokenError) {
-                    console.error('AuthStore: Ошибка при обработке токена:', tokenError);
-                  }
-                }
-              } catch (error: any) {
-                // Если это последняя попытка или получили 401 (неверные учетные данные),
-                // прекращаем повторные попытки
-                if (attempt === 3 || error?.response?.status === 401) {
-                  diagnosticInfo.error = error.message;
-                  
-                  set({ 
-                    isLoading: false, 
-                    error: error.message || 'Ошибка авторизации. Проверьте логин и пароль.' 
-                  });
-                  
-                  return;
-                }
-                
-                // Ждем перед следующей попыткой
-                const delay = Math.pow(2, attempt) * 1000; // 2, 4, 8 секунд
-                await new Promise(resolve => setTimeout(resolve, delay));
-              }
-            }
-          } else {
-            // Для десктопных устройств используем прокси
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'запрос через прокси для десктопа' });
-            
-            // URL для запроса
-            const url = '/api/auth/login';
-            
-            diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'отправка запроса к прокси', url });
-            
-            // Отправляем запрос на авторизацию
-            try {
-              console.log('AuthStore: Отправка запроса на авторизацию в формате form-data');
-              
-              // Формируем данные для отправки
-              const formData = new URLSearchParams();
-              formData.append('email', username); // Используем username как email
-              formData.append('password', password);
+          // Формируем данные для отправки
+          const formData = new URLSearchParams();
+          formData.append('email', username);
+          formData.append('password', password);
 
-              const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                  'Accept': 'application/json'
-                },
-                body: formData.toString()
-              });
-              
-              console.log('AuthStore: Получен ответ от сервера:', {
-                status: response.status,
-                ok: response.ok
-              });
-
-              if (!response.ok) {
-                const errorData = await response.json();
-                console.error('AuthStore: Ошибка авторизации:', errorData);
-                throw new Error(JSON.stringify(errorData));
-              }
-
-              const data = await response.json();
-              diagnosticInfo.steps.push({ timestamp: Date.now(), step: 'разбор ответа' });
-              
-              // Сохраняем токен и данные авторизации
-              if (data) {
-                try {
-                  const { access_token, refresh_token } = data;
-                  
-                  if (access_token) {
-                    saveAuthToken(access_token);
-                    
-                    // Сохраняем refresh_token, если он есть
-                    if (refresh_token) {
-                      localStorage.setItem('refresh_token', refresh_token);
-                      console.log('AuthStore: Сохранен refresh_token');
-                    }
-                    
-                    set({ 
-                      isAuthenticated: true, 
-                      token: access_token,
-                      error: null,
-                      isLoading: false
-                    });
-                    
-                    // Загружаем профиль пользователя
-                    get().fetchUserProfile();
-                    return;
-                  }
-                } catch (tokenError) {
-                  console.error('AuthStore: Ошибка при обработке токена:', tokenError);
-                }
-              }
-            } catch (error: unknown) {
-              console.error('AuthStore: Общая ошибка авторизации:', error);
-              const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-              
-              diagnosticInfo.steps.push({ 
-                timestamp: Date.now(), 
-                step: 'общая ошибка авторизации', 
-                error: errorMessage
-              });
-              
-              set({ 
-                isLoading: false, 
-                error: errorMessage
-              });
-              diagnosticInfo.error = errorMessage;
-            } finally {
-              diagnosticInfo.endTime = Date.now();
-              diagnosticInfo.duration = diagnosticInfo.endTime - startTime;
-              
-              // Сохраняем информацию о запросе для анализа
-              const networkDiagnostics = [...get().networkDiagnostics];
-              networkDiagnostics.unshift(diagnosticInfo);
-              
-              // Ограничиваем размер истории диагностики
-              if (networkDiagnostics.length > 10) {
-                networkDiagnostics.pop();
-              }
-              
-              set({ networkDiagnostics });
-              
-              // Сохраняем диагностику в localStorage
-              try {
-                localStorage.setItem('auth_diagnostics', JSON.stringify(networkDiagnostics));
-              } catch (e) {
-                console.error('Ошибка при сохранении диагностики:', e);
-              }
-            }
-          }
-        } catch (error: unknown) {
-          console.error('AuthStore: Общая ошибка авторизации:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-          
-          diagnosticInfo.steps.push({ 
-            timestamp: Date.now(), 
-            step: 'общая ошибка авторизации', 
-            error: errorMessage
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json'
+            },
+            body: formData.toString()
           });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || 'Ошибка авторизации');
+          }
+
+          if (data.access_token) {
+            saveAuthToken(data.access_token);
+            
+            if (data.refresh_token) {
+              localStorage.setItem('refresh_token', data.refresh_token);
+            }
+            
+            set({ 
+              isAuthenticated: true, 
+              token: data.access_token,
+              error: null,
+              isLoading: false
+            });
+            
+            // Загружаем профиль пользователя
+            await get().fetchUserProfile();
+            return;
+          }
+          
+          throw new Error('Не удалось получить токен доступа');
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Ошибка авторизации';
+          console.error('AuthStore: Ошибка авторизации:', errorMessage);
           
           set({ 
             isLoading: false, 
             error: errorMessage
           });
-          diagnosticInfo.error = errorMessage;
-        } finally {
-          diagnosticInfo.endTime = Date.now();
-          diagnosticInfo.duration = diagnosticInfo.endTime - startTime;
-          
-          // Сохраняем информацию о запросе для анализа
-          const networkDiagnostics = [...get().networkDiagnostics];
-          networkDiagnostics.unshift(diagnosticInfo);
-          
-          // Ограничиваем размер истории диагностики
-          if (networkDiagnostics.length > 10) {
-            networkDiagnostics.pop();
-          }
-          
-          set({ networkDiagnostics });
-          
-          // Сохраняем диагностику в localStorage
-          try {
-            localStorage.setItem('auth_diagnostics', JSON.stringify(networkDiagnostics));
-          } catch (e) {
-            console.error('Ошибка при сохранении диагностики:', e);
-          }
         }
       },
       

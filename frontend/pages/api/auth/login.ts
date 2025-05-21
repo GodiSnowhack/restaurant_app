@@ -38,20 +38,12 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     // Получаем учетные данные из тела запроса
     const { email, password } = req.body;
     
-    console.log('Auth API - Данные запроса:', { 
-      hasEmail: !!email, 
-      hasPassword: !!password,
-      bodyKeys: Object.keys(req.body)
-    });
+    console.log('Auth API - Начало обработки запроса авторизации');
     
-    // Проверяем email и пароль
+    // Базовая валидация
     if (!email || !password) {
       return res.status(400).json({ 
-        detail: 'Необходимо указать email и пароль',
-        field_errors: {
-          ...(email ? {} : { email: 'Обязательное поле' }),
-          ...(password ? {} : { password: 'Обязательное поле' })
-        }
+        detail: 'Email и пароль обязательны'
       });
     }
 
@@ -59,21 +51,6 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
     
     try {
-      console.log('Auth API - Проверка доступности сервера перед авторизацией');
-      const healthCheck = await axios.get(`${apiUrl}/health`);
-      console.log(`Auth API - Сервер доступен, код ответа: ${healthCheck.status}`);
-    } catch (error) {
-      console.error('Auth API - Ошибка при проверке доступности сервера:', error);
-      return res.status(503).json({
-        detail: 'Сервер авторизации недоступен',
-        message: 'Пожалуйста, попробуйте позже'
-      });
-    }
-
-    // Отправляем запрос на авторизацию
-    try {
-      console.log('Auth API - Отправка запроса на авторизацию в формате form-data');
-      
       // Формируем данные для отправки
       const formData = new URLSearchParams();
       formData.append('username', email);
@@ -82,32 +59,19 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       const response = await axios.post(`${apiUrl}/auth/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-          'User-Agent': userAgent
-        },
-        timeout: isMobile ? 60000 : 15000
+          'Accept': 'application/json'
+        }
       });
       
-      console.log(`Auth API - Получен ответ от сервера: ${response.status}`);
-      
       if (response.data && response.data.access_token) {
-        const duration = Date.now() - startTime;
-        console.log(`Auth API - Авторизация успешна, время: ${duration}ms`);
-        
-        return res.status(200).json({
-          ...response.data,
-          auth_method: 'proxy',
-          duration
-        });
+        return res.status(200).json(response.data);
       } else {
-        console.error('Auth API - Отсутствует токен в ответе');
         return res.status(401).json({
-          detail: 'Неверные учетные данные',
-          message: 'Проверьте правильность email и пароля'
+          detail: 'Неверные учетные данные'
         });
       }
     } catch (error: any) {
-      console.error('Auth API - Ошибка при отправке запроса:', error.message);
+      console.error('Auth API - Ошибка авторизации:', error.response?.data || error.message);
       
       // Если есть ответ от сервера с деталями ошибки
       if (error.response) {
@@ -115,8 +79,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       }
       
       return res.status(500).json({
-        detail: error.message,
-        message: 'Внутренняя ошибка сервера при авторизации'
+        detail: 'Ошибка сервера при авторизации'
       });
     }
   } catch (error: any) {
