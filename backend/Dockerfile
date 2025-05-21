@@ -9,8 +9,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование кода приложения
 COPY . .
 
-# Установка прав на базу данных
-RUN chmod 666 restaurant.db || true
-
 # Запуск приложения
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 

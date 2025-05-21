@@ -5,10 +5,10 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import logging
 
-from app.api.v1 import api_router
-from app.core.config import settings
-from app.database.session import SessionLocal
-from app.core.init_db import init_db
+from api.v1 import api_router
+from core.config import settings
+from database.session import SessionLocal
+from core.init_db import init_db
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -63,7 +63,7 @@ app.add_middleware(
 )
 
 # Монтируем статические файлы
-static_path = Path(__file__).parent / "static"
+static_path = Path(__file__).parent.parent / "static"
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
