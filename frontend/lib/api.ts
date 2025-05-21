@@ -8,7 +8,7 @@ import adminApi from './api/admin-api';
 import { PUBLIC_ROUTES } from '../pages/_app';
 import { usersApi } from './api/users-api';
 import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
-import { settingsApi } from './api/settings-api';
+import { settingsApi } from '@/lib/api/settings-api';
 
 // Интерфейс для типа пользователя
 export interface User {
@@ -1955,4 +1955,44 @@ export {
   getWaiterRating,
   getWaiterReviews,
   settingsApi
+};
+
+export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
+  try {
+    const response = await api.get(`/reviews/order/${orderId}/status`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error getting order review status:', error);
+    throw error;
+  }
+};
+
+export const createOrderReview = async (data: any): Promise<any> => {
+  try {
+    const response = await api.post('/reviews/order', data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error creating order review:', error);
+    throw error;
+  }
+};
+
+export const createServiceReview = async (data: any): Promise<any> => {
+  try {
+    const response = await api.post('/reviews/service', data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error creating service review:', error);
+    throw error;
+  }
+};
+
+export const createCombinedReview = async (data: any): Promise<any> => {
+  try {
+    const response = await api.post('/reviews/combined', data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error creating combined review:', error);
+    throw error;
+  }
 };
