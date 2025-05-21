@@ -3,8 +3,9 @@ import Head from 'next/head';
 import Header from './Header';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ordersApi } from '../lib/api/';
-import { waiterApi } from '../lib/api/waiter';
+import { ordersApi } from '../lib/api';
+import waiterApi from '../lib/api/waiter';
+import type { Order } from '../lib/api/types';
 import { 
   HomeIcon, 
   ListBulletIcon,
@@ -61,9 +62,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
         
         // Для администратора показываем количество всех активных заказов
         // Для официанта - только его заказы (фильтрация уже на сервере)
-        const activeOrders = orders.filter(
-          order => !['completed', 'cancelled'].includes(order.status)
-        );
+                const activeOrders = orders.filter(          (order: Order) => !['completed', 'cancelled'].includes(order.status)        );
         
         setAssignedOrdersCount(activeOrders.length);
       } catch (error) {
