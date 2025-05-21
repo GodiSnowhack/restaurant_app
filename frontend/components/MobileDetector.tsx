@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { isMobileDevice } from '@/lib/api';
+import { isMobileDevice } from '@/lib/api/core';
 import { Spinner } from '@/components/ui/spinner';
 
 interface MobileDetectorProps {
