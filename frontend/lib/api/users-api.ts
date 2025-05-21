@@ -529,5 +529,24 @@ export const usersApi = {
     usersCache = null;
     lastFetchTime = 0;
     console.log('Кэш пользователей очищен');
+  },
+  
+  // Обновление статуса пользователя
+  async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
+    try {
+      console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
+      
+      const response = await usersAxios.patch(`/users/${userId}/status`, {
+        is_active: isActive
+      });
+      
+      // Очищаем кэш после обновления
+      this.clearCache();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Ошибка при обновлении статуса пользователя:', error);
+      throw error;
+    }
   }
 }; 

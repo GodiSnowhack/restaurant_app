@@ -56,14 +56,15 @@ const UserEditPage: NextPage = () => {
         setIsLoading(true);
         const userData = await usersApi.getUserById(Number(id));
         
+        // Проверяем наличие данных и устанавливаем значения по умолчанию
         setFormData({
-          email: userData.email,
+          email: userData?.email || '',
           password: '',
           confirm_password: '',
-          full_name: userData.full_name,
-          phone: userData.phone || '',
-          role: userData.role as Role,
-          is_active: userData.is_active
+          full_name: userData?.full_name || '',
+          phone: userData?.phone || '',
+          role: (userData?.role as Role) || 'client',
+          is_active: userData?.is_active ?? true
         });
         
         setIsLoading(false);
