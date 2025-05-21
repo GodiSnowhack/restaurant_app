@@ -14,7 +14,7 @@ import {
   Skeleton
 } from '@mui/material';
 import { Star } from '@mui/icons-material';
-import { getWaiterReviews, getWaiterRating } from '@/lib/api';
+import { getWaiterReviews, getWaiterRating } from '@/lib/api/waiter-api';
 import { formatDate } from '@/utils/dateFormatter';
 
 interface WaiterReviewsProps {

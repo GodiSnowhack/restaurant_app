@@ -1899,9 +1899,7 @@ export interface User {
 export { 
   ordersApi, 
   adminApi, 
-  reservationsApi,
-  getWaiterRating,
-  getWaiterReviews 
+  reservationsApi
 };
 
 // Определения для admin-api.ts
