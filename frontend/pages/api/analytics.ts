@@ -2,6 +2,27 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { query as dbQuery, checkConnection } from '../../lib/db';
 import jwt from 'jsonwebtoken';
 
+// Интерфейсы для типизации данных
+interface FinancialData {
+  totalRevenue: number;
+  totalCost: number;
+  grossProfit: number;
+  profitMargin: number;
+  averageOrderValue: number;
+  orderCount: number;
+}
+
+interface CategoryData {
+  categoryId: number;
+  categoryName: string;
+  revenue: number;
+}
+
+interface TrendData {
+  date: string;
+  value: number;
+}
+
 // SQL запросы для аналитики
 const SQL_QUERIES = {
   financial: `
@@ -183,16 +204,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     switch (targetEndpoint) {
       case 'financial':
-        const financialData = await dbQuery(SQL_QUERIES.financial, [startDate, endDate]);
+        const financialData = await dbQuery<FinancialData[]>(SQL_QUERIES.financial, [startDate, endDate]);
         
         // Формируем объект для ответа
         result = {
-          totalRevenue: financialData[0]?.totalRevenue || 0,
-          totalCost: financialData[0]?.totalCost || 0,
-          grossProfit: financialData[0]?.grossProfit || 0,
-          profitMargin: financialData[0]?.profitMargin || 0,
-          averageOrderValue: financialData[0]?.averageOrderValue || 0,
-          orderCount: financialData[0]?.orderCount || 0,
+          totalRevenue: financialData?.[0]?.totalRevenue ?? 0,
+          totalCost: financialData?.[0]?.totalCost ?? 0,
+          grossProfit: financialData?.[0]?.grossProfit ?? 0,
+          profitMargin: financialData?.[0]?.profitMargin ?? 0,
+          averageOrderValue: financialData?.[0]?.averageOrderValue ?? 0,
+          orderCount: financialData?.[0]?.orderCount ?? 0,
           revenueByCategory: {} as Record<string, number>,
           revenueByTimeOfDay: {} as Record<string, number>,
           revenueByDayOfWeek: {} as Record<string, number>,
@@ -201,7 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
         
         // Получаем данные по категориям
-        const categoryData = await dbQuery(`
+        const categoryData = await dbQuery<CategoryData[]>(`
           SELECT 
             c.id as categoryId,
             c.name as categoryName,
@@ -217,12 +238,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `, [startDate, endDate]);
         
         // Добавляем данные по категориям в результат
-        categoryData.forEach((cat: any) => {
+        categoryData.forEach((cat) => {
           result.revenueByCategory[cat.categoryId] = cat.revenue;
         });
         
         // Получаем тренд выручки за период
-        const trendData = await dbQuery(`
+        const trendData = await dbQuery<TrendData[]>(`
           SELECT 
             date(o.created_at) as date,
             SUM(oi.price * oi.quantity) as value
