@@ -159,53 +159,7 @@ const nextConfig = {
   },
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'https://backend-production-1a78.up.railway.app';
-    return [
-      {
-        source: '/api/ping',
-        destination: `${backendUrl}/api/v1/ping`,
-      },
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/v1/:path*`,
-      },
-      {
-        source: '/api/auth/:path*',
-        destination: `${backendUrl}/api/v1/auth/:path*`,
-      },
-      {
-        source: '/api/menu/:path*',
-        destination: `${backendUrl}/api/v1/menu/:path*`,
-      },
-      {
-        source: '/api/orders/:path*',
-        destination: `${backendUrl}/api/v1/orders/:path*`,
-      },
-      {
-        source: '/api/reservations/:path*',
-        destination: `${backendUrl}/api/v1/reservations/:path*`,
-      },
-      {
-        source: '/api/users/:path*',
-        destination: `${backendUrl}/api/v1/users/:path*`,
-      },
-      {
-        source: '/api/waiter/:path*',
-        destination: `${backendUrl}/api/v1/waiter/:path*`,
-      },
-      {
-        source: '/api/settings/:path*',
-        destination: `${backendUrl}/api/v1/settings/:path*`,
-      },
-      {
-        source: '/api/categories/:path*',
-        destination: `${backendUrl}/api/v1/categories/:path*`,
-      },
-      {
-        source: '/api/dishes/:path*',
-        destination: `${backendUrl}/api/v1/dishes/:path*`,
-      },
-    ];
+    return [];  // Отключаем rewrites, чтобы запросы шли напрямую к бэкенду
   },
   // Переменные окружения, доступные на клиенте
   env: {

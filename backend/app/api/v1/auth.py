@@ -37,35 +37,34 @@ async def auth_info():
 async def login(
     db: Session = Depends(get_db),
     login_data: LoginRequest = None,
-    form_data: OAuth2PasswordRequestForm = Depends(None),
-    username: str = Form(None),
-    password: str = Form(None)
+    form_data: OAuth2PasswordRequestForm = Depends(None)
 ) -> Any:
     """
     Аутентификация пользователя и получение токена.
-    Поддерживает JSON, form-data и x-www-form-urlencoded форматы.
+    Поддерживает JSON и form-data форматы.
     """
     try:
         # Определяем, какой формат данных используется
-        final_username = (
-            login_data.email if login_data else 
-            form_data.username if form_data else 
-            username
-        )
-        final_password = (
-            login_data.password if login_data else 
-            form_data.password if form_data else 
-            password
-        )
+        if login_data:
+            username = login_data.email
+            password = login_data.password
+        elif form_data:
+            username = form_data.username
+            password = form_data.password
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Необходимо предоставить данные для авторизации"
+            )
         
-        if not final_username or not final_password:
+        if not username or not password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Необходимо предоставить email и пароль"
             )
         
         # Аутентифицируем пользователя
-        user = authenticate_user(db, final_username, final_password)
+        user = authenticate_user(db, username, password)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

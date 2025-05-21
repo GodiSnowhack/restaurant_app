@@ -36,27 +36,20 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     console.log(`Auth API - IP клиента: ${clientIp}`);
     
     // Получаем учетные данные из тела запроса
-    let { username, password, email } = req.body;
+    const { email, password } = req.body;
     
     console.log('Auth API - Данные запроса:', { 
-      hasUsername: !!username, 
+      hasEmail: !!email, 
       hasPassword: !!password,
-      hasEmail: !!email,
       bodyKeys: Object.keys(req.body)
     });
     
-    // Если передан email вместо username, используем его
-    if (!username && email) {
-      username = email;
-      console.log('Auth API - Используем email в качестве username');
-    }
-    
     // Проверяем логин и пароль
-    if (!username || !password) {
+    if (!email || !password) {
       return res.status(400).json({ 
-        detail: 'Необходимо указать имя пользователя/email и пароль',
+        detail: 'Необходимо указать email и пароль',
         field_errors: {
-          ...(username ? {} : { username: 'Обязательное поле' }),
+          ...(email ? {} : { email: 'Обязательное поле' }),
           ...(password ? {} : { password: 'Обязательное поле' })
         }
       });
@@ -79,15 +72,14 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
 
     // Отправляем запрос на авторизацию
     try {
-      console.log('Auth API - Отправка запроса на авторизацию в формате form-data');
+      console.log('Auth API - Отправка запроса на авторизацию в формате JSON');
       
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-      
-      const response = await axios.post(`${apiUrl}/auth/login`, formData, {
+      const response = await axios.post(`${apiUrl}/auth/login`, {
+        email,
+        password
+      }, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'User-Agent': userAgent
         },
@@ -117,10 +109,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       
       // Если есть ответ от сервера с деталями ошибки
       if (error.response) {
-        return res.status(error.response.status).json({
-          detail: error.response.data?.detail || 'Ошибка авторизации',
-          message: error.response.data?.message || 'Не удалось авторизоваться'
-        });
+        return res.status(error.response.status).json(error.response.data);
       }
       
       return res.status(500).json({
