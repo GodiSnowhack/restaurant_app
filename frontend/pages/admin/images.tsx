@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import {TrashIcon, ArrowLeftIcon, ArrowUpTrayIcon as UploadIcon} from '@heroicons/react/24/outline';
-import {menuApi} from '../../lib/api';
+import {menuApi} from '../../lib/api/menu';
 import ImageUploader from '../../components/ImageUploader';
 import {useRouter} from 'next/router';
 
