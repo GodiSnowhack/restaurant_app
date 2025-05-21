@@ -1,6 +1,7 @@
 import os
 import secrets
 from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
 
 from pydantic import validator
 from pydantic_settings import BaseSettings
@@ -39,7 +40,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     
     # SQLite
-    SQLITE_DATABASE_URI: str = "sqlite:///./backend/data/restaurant.db"
+    SQLITE_DATABASE_URI: str = os.getenv(
+        "DATABASE_URL",
+        f"sqlite:///{Path(__file__).parent.parent.parent}/data/restaurant.db"
+    )
     
     # Redis (для очередей и кэширования)
     REDIS_HOST: str = "localhost"
@@ -48,7 +52,7 @@ class Settings(BaseSettings):
     # Настройки сервера
     SERVER_PORT: int = int(os.getenv("PORT", 8000))
     DEBUG: bool = False
-    WORKERS_COUNT: int = 4
+    WORKERS_COUNT: int = 1  # Уменьшаем количество воркеров для Railway
     
     # Настройки пользователей
     FIRST_SUPERUSER: str = "admin1@example.com"

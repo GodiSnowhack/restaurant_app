@@ -14,6 +14,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование кода приложения
 COPY . .
 
+# Создаем директорию для данных и логов
+RUN mkdir -p /app/data /app/logs && \
+    chown -R nobody:nogroup /app/data /app/logs
+
+# Переключаемся на непривилегированного пользователя
+USER nobody
+
 # Добавляем текущую директорию в PYTHONPATH
 ENV PYTHONPATH=/app
 
@@ -21,4 +28,4 @@ ENV PYTHONPATH=/app
 ENV PORT=8000
 
 # Запуск приложения
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4 
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 

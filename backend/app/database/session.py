@@ -1,22 +1,27 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from pathlib import Path
 
 from app.core.config import settings
 
+# Создаем директорию для базы данных, если она не существует
+db_path = Path(settings.SQLITE_DATABASE_URI.replace("sqlite:///", "")).parent
+db_path.mkdir(parents=True, exist_ok=True)
+
 # Создаем движок SQLAlchemy для SQLite с оптимизированными настройками
 engine = create_engine(
-    settings.SQLITE_DATABASE_URI, 
+    settings.SQLITE_DATABASE_URI,
     connect_args={
         "check_same_thread": False,  # Разрешаем доступ из разных потоков
-        "timeout": 60,               # Увеличиваем таймаут для ожидания блокировки (было 30, стало 60)
+        "timeout": 30,               # Таймаут для ожидания блокировки
     },
     # Настройки пула соединений
-    pool_size=20,                    # Увеличиваем размер пула соединений
-    max_overflow=30,                 # Разрешаем дополнительные соединения при перегрузке
-    pool_timeout=30,                 # Таймаут ожидания соединения из пула
-    pool_recycle=1800,               # Пересоздаем соединения каждые 30 минут
-    pool_pre_ping=True,              # Проверяем соединение перед использованием
+    pool_size=5,                    # Уменьшаем размер пула для Railway
+    max_overflow=10,                # Разрешаем дополнительные соединения при перегрузке
+    pool_timeout=30,                # Таймаут ожидания соединения из пула
+    pool_recycle=1800,              # Пересоздаем соединения каждые 30 минут
+    pool_pre_ping=True,             # Проверяем соединение перед использованием
 )
 
 # Оптимизируем SQLite через события подключения
@@ -26,22 +31,15 @@ def optimize_sqlite_connection(dbapi_connection, connection_record):
     dbapi_connection.execute("PRAGMA journal_mode=WAL")
     
     # Отключаем синхронизацию с диском для повышения производительности
-    # (может привести к потере данных при сбое питания, но увеличит скорость)
     dbapi_connection.execute("PRAGMA synchronous=NORMAL")
-    
-    # Разрешаем кэширование для повышения производительности
-    dbapi_connection.execute("PRAGMA cache_size=-2000")  # ~2MB кэша
     
     # Включаем внешние ключи
     dbapi_connection.execute("PRAGMA foreign_keys=ON")
     
     # Устанавливаем таймаут для транзакций
-    dbapi_connection.execute("PRAGMA busy_timeout=10000")  # 10 секунд (было 5 секунд)
-    
-    # Используем временные таблицы в памяти
-    dbapi_connection.execute("PRAGMA temp_store=MEMORY")
+    dbapi_connection.execute("PRAGMA busy_timeout=5000")
 
-# Создаем фабрику сессий с дополнительными настройками
+# Создаем фабрику сессий
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
