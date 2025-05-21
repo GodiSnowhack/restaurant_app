@@ -2,6 +2,82 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { query as dbQuery, checkConnection } from '../../lib/db';
 import jwt from 'jsonwebtoken';
 
+interface FinancialData {
+  totalRevenue: number;
+  totalCost: number;
+  grossProfit: number;
+  profitMargin: number;
+  averageOrderValue: number;
+  orderCount: number;
+}
+
+interface CategoryData {
+  categoryId: number;
+  categoryName: string;
+  revenue: number;
+}
+
+interface DishData {
+  dishId: number;
+  dishName: string;
+  salesCount: number;
+  revenue: number;
+  percentage: number;
+  profit?: number;
+  profitMargin?: number;
+  costPrice?: number;
+}
+
+interface CustomerData {
+  totalCustomers: number;
+  newCustomers: number;
+  returningCustomers: number;
+  returnRate: number;
+  averageVisitsPerCustomer: number;
+  customerSatisfaction: number;
+}
+
+interface OperationalData {
+  averageOrderPreparationTime: number;
+  averageTableTurnoverTime: number;
+  tablesCount: number;
+  averageOrdersPerTable: number;
+  orderCompletionRates: string;
+}
+
+interface TableData {
+  table_id: number;
+  orderCount: number;
+}
+
+interface HourlyData {
+  hour: string;
+  orderCount: number;
+}
+
+interface PredictiveData {
+  salesForecast: string;
+}
+
+interface InventoryData {
+  id: number;
+  name: string;
+  currentStock: number;
+  weeklyUsage: number;
+}
+
+interface DashboardData {
+  totalRevenue: number;
+  ordersCount: number;
+  customersCount: number;
+  avgPreparationTime: number;
+}
+
+// Добавляем интерфейс для результата запроса
+interface QueryResult {
+  [key: string]: any;
+}
+
 // SQL запросы для аналитики
 const SQL_QUERIES = {
   financial: `
@@ -179,20 +255,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Выполняем запрос к базе данных в зависимости от типа эндпоинта
-    let result: any;
+    let result: QueryResult = {};
     
     switch (targetEndpoint) {
       case 'financial':
-        const financialData = await dbQuery(SQL_QUERIES.financial, [startDate, endDate]);
+        const financialData = await dbQuery(SQL_QUERIES.financial, [startDate, endDate]) as FinancialData[];
         
         // Формируем объект для ответа
         result = {
-          totalRevenue: financialData[0]?.totalRevenue || 0,
-          totalCost: financialData[0]?.totalCost || 0,
-          grossProfit: financialData[0]?.grossProfit || 0,
-          profitMargin: financialData[0]?.profitMargin || 0,
-          averageOrderValue: financialData[0]?.averageOrderValue || 0,
-          orderCount: financialData[0]?.orderCount || 0,
+          totalRevenue: financialData[0]?.totalRevenue ?? 0,
+          totalCost: financialData[0]?.totalCost ?? 0,
+          grossProfit: financialData[0]?.grossProfit ?? 0,
+          profitMargin: financialData[0]?.profitMargin ?? 0,
+          averageOrderValue: financialData[0]?.averageOrderValue ?? 0,
+          orderCount: financialData[0]?.orderCount ?? 0,
           revenueByCategory: {} as Record<string, number>,
           revenueByTimeOfDay: {} as Record<string, number>,
           revenueByDayOfWeek: {} as Record<string, number>,
@@ -214,10 +290,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             AND o.created_at BETWEEN ? AND ?
           GROUP BY c.id, c.name
           ORDER BY revenue DESC
-        `, [startDate, endDate]);
+        `, [startDate, endDate]) as CategoryData[];
         
         // Добавляем данные по категориям в результат
-        categoryData.forEach((cat: any) => {
+        categoryData.forEach((cat: CategoryData) => {
           result.revenueByCategory[cat.categoryId] = cat.revenue;
         });
         
@@ -239,7 +315,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
       case 'menu':
         // Получаем топ продаваемых блюд
-        const topSellingDishes = await dbQuery(SQL_QUERIES.menu, [startDate, endDate, startDate, endDate]);
+        const topSellingDishes = await dbQuery(SQL_QUERIES.menu, [startDate, endDate, startDate, endDate]) as DishData[];
         
         // Получаем наименее продаваемые блюда
         const leastSellingDishes = await dbQuery(`
@@ -257,7 +333,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           GROUP BY m.id, m.name
           ORDER BY salesCount ASC
           LIMIT 5
-        `, [startDate, endDate, startDate, endDate]);
+        `, [startDate, endDate, startDate, endDate]) as DishData[];
         
         // Получаем самые прибыльные блюда
         const mostProfitableDishes = await dbQuery(`
@@ -284,33 +360,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           topSellingDishes,
           leastSellingDishes,
           mostProfitableDishes,
-          averageCookingTime: 18.5, // Заглушка, так как нет реальных данных
-          categoryPopularity: {},
-          menuItemSalesTrend: {},
+          averageCookingTime: 18.5,
+          categoryPopularity: {} as Record<string, number>,
+          menuItemSalesTrend: {} as Record<string, any>,
           period: { startDate, endDate }
         };
         break;
         
       case 'customers':
         try {
-          const customerData = await dbQuery(SQL_QUERIES.customers, [startDate, endDate, startDate, endDate]);
+          const customerData = await dbQuery(SQL_QUERIES.customers, [startDate, endDate, startDate, endDate]) as CustomerData[];
           
           result = {
-            totalCustomers: customerData[0]?.totalCustomers || 0,
-            newCustomers: customerData[0]?.newCustomers || 0,
-            returningCustomers: customerData[0]?.returningCustomers || 0,
-            customerRetentionRate: customerData[0]?.returnRate || 0,
-            returnRate: customerData[0]?.returnRate || 0,
-            averageVisitsPerCustomer: customerData[0]?.averageVisitsPerCustomer || 0,
-            customerSatisfaction: customerData[0]?.customerSatisfaction || 0,
-            customerSegmentation: {},
-            topCustomers: [],
+            totalCustomers: customerData[0]?.totalCustomers ?? 0,
+            newCustomers: customerData[0]?.newCustomers ?? 0,
+            returningCustomers: customerData[0]?.returningCustomers ?? 0,
+            customerRetentionRate: customerData[0]?.returnRate ?? 0,
+            returnRate: customerData[0]?.returnRate ?? 0,
+            averageVisitsPerCustomer: customerData[0]?.averageVisitsPerCustomer ?? 0,
+            customerSatisfaction: customerData[0]?.customerSatisfaction ?? 0,
+            customerSegmentation: {} as Record<string, number>,
+            topCustomers: [] as any[],
             customerDemographics: {
-              age: {},
-              gender: {}
+              age: {} as Record<string, number>,
+              gender: {} as Record<string, number>
             },
             period: { startDate, endDate }
-          };
+          } as QueryResult;
           
           // Получаем топ клиентов
           const topCustomers = await dbQuery(`
@@ -343,20 +419,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break;
         
       case 'operational':
-        const operationalData = await dbQuery(SQL_QUERIES.operational, [startDate, endDate, startDate, endDate, startDate, endDate]);
+        const operationalData = await dbQuery(SQL_QUERIES.operational, [startDate, endDate, startDate, endDate, startDate, endDate]) as OperationalData[];
         
         result = {
-          averageOrderPreparationTime: operationalData[0]?.averageOrderPreparationTime || 0,
-          averageTableTurnoverTime: operationalData[0]?.averageTableTurnoverTime || 0,
-          tablesCount: operationalData[0]?.tablesCount || 0,
-          averageTableUtilization: 0, // Заглушка
-          averageOrdersPerTable: operationalData[0]?.averageOrdersPerTable || 0,
+          averageOrderPreparationTime: operationalData?.[0]?.averageOrderPreparationTime ?? 0,
+          averageTableTurnoverTime: operationalData?.[0]?.averageTableTurnoverTime ?? 0,
+          tablesCount: operationalData?.[0]?.tablesCount ?? 0,
+          averageTableUtilization: 0,
+          averageOrdersPerTable: operationalData?.[0]?.averageOrdersPerTable ?? 0,
           tableUtilization: {} as Record<string, number>,
           peakHours: {} as Record<string, number>,
           staffEfficiency: {} as Record<string, any>,
-          orderCompletionRates: operationalData[0]?.orderCompletionRates ? JSON.parse(operationalData[0].orderCompletionRates) : {},
+          orderCompletionRates: operationalData?.[0]?.orderCompletionRates ? JSON.parse(operationalData[0].orderCompletionRates) : {},
           period: { startDate, endDate }
-        };
+        } as QueryResult;
         
         // Получаем данные по загрузке столиков
         const tableData = await dbQuery(`
@@ -367,11 +443,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           WHERE created_at BETWEEN ? AND ?
             AND table_id IS NOT NULL
           GROUP BY table_id
-        `, [startDate, endDate]);
+        `, [startDate, endDate]) as TableData[];
         
-        // Рассчитываем утилизацию столиков (упрощенная логика)
-        const maxOrdersPerTable = Math.max(...tableData.map((t: any) => t.orderCount), 1);
-        tableData.forEach((t: any) => {
+        // Рассчитываем утилизацию столиков
+        const maxOrdersPerTable = Math.max(...tableData.map((t: TableData) => t.orderCount), 1);
+        tableData.forEach((t: TableData) => {
           result.tableUtilization[t.table_id] = Math.round((t.orderCount / maxOrdersPerTable) * 100);
         });
         
@@ -384,21 +460,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           WHERE created_at BETWEEN ? AND ?
           GROUP BY hour
           ORDER BY orderCount DESC
-        `, [startDate, endDate]);
+        `, [startDate, endDate]) as HourlyData[];
         
         // Преобразуем пиковые часы в проценты от максимума
-        const maxHourlyOrders = Math.max(...hourlyData.map((h: any) => h.orderCount), 1);
-        hourlyData.forEach((h: any) => {
+        const maxHourlyOrders = Math.max(...hourlyData.map((h: HourlyData) => h.orderCount), 1);
+        hourlyData.forEach((h: HourlyData) => {
           result.peakHours[h.hour] = Math.round((h.orderCount / maxHourlyOrders) * 100);
         });
         break;
         
       case 'predictive':
-        const predictiveData = await dbQuery(SQL_QUERIES.predictive, [endDate, endDate]);
+        const predictiveData = await dbQuery(SQL_QUERIES.predictive, [endDate, endDate]) as PredictiveData[];
         
         result = {
-          salesForecast: predictiveData[0]?.salesForecast ? JSON.parse(predictiveData[0].salesForecast) : [],
-          inventoryForecast: {},
+          salesForecast: predictiveData?.[0]?.salesForecast ? JSON.parse(predictiveData[0].salesForecast) : [],
+          inventoryForecast: {} as Record<number, number>,
           staffingNeeds: {
             'monday': { '10-14': 3, '14-18': 4, '18-22': 5 },
             'tuesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
@@ -408,10 +484,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'saturday': { '10-14': 6, '14-18': 7, '18-22': 8 },
             'sunday': { '10-14': 5, '14-18': 6, '18-22': 6 }
           },
-          peakTimePrediction: {},
+          peakTimePrediction: {} as Record<string, number>,
           suggestedPromotions: [],
           period: { startDate, endDate }
-        };
+        } as QueryResult;
         
         // Получаем прогнозы по запасам (упрощенная логика)
         const inventoryData = await dbQuery(`
@@ -431,10 +507,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           FROM ingredients i
           ORDER BY weeklyUsage DESC NULLS LAST
           LIMIT 10
-        `, [endDate, endDate]);
+        `, [endDate, endDate]) as InventoryData[];
         
         // Преобразуем данные по запасам
-        inventoryData.forEach((i: any) => {
+        inventoryData.forEach((i: InventoryData) => {
           if (i.id && i.weeklyUsage) {
             result.inventoryForecast[i.id] = Math.round(i.weeklyUsage * 1.1); // Прогноз с 10% запасом
           }
@@ -443,7 +519,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break;
         
       case 'dashboard':
-        // Получаем сводные данные для дашборда (упрощенная логика)
+        // Получаем сводные данные для дашборда
         const dashboardData = await dbQuery(`
           SELECT 
             (
@@ -471,15 +547,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 AND o.created_at BETWEEN ? AND ?
                 AND o.completed_at IS NOT NULL
             ) as avgPreparationTime
-        `, [startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate]);
+        `, [startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate]) as DashboardData[];
         
         result = {
-          revenue: dashboardData[0]?.totalRevenue || 0,
-          orders: dashboardData[0]?.ordersCount || 0,
-          customers: dashboardData[0]?.customersCount || 0,
-          avgPreparationTime: dashboardData[0]?.avgPreparationTime || 0,
+          revenue: dashboardData?.[0]?.totalRevenue ?? 0,
+          orders: dashboardData?.[0]?.ordersCount ?? 0,
+          customers: dashboardData?.[0]?.customersCount ?? 0,
+          avgPreparationTime: dashboardData?.[0]?.avgPreparationTime ?? 0,
           period: { startDate, endDate }
-        };
+        } as QueryResult;
         break;
         
       case 'top-dishes':
