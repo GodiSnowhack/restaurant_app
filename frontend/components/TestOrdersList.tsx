@@ -127,7 +127,7 @@ const TestOrdersList = ({ showDebug = false }: TestOrdersListProps) => {
               <div className="text-sm text-gray-500">
                 {order.items.length} {getItemsText(order.items.length)}:
                 {' '}
-                {order.items.map(item => `${item.dish?.name || `Блюдо #${item.dish_id}`} (${item.quantity})`).join(', ')}
+                {order.items.map(item => `${item.dish_name || item.name} (${item.quantity})`).join(', ')}
               </div>
             )}
             
