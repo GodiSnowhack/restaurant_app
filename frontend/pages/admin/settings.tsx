@@ -1,16 +1,18 @@
-import {useState, useEffect} from 'react';
-import {NextPage} from 'next';
-import {useRouter} from 'next/router';
+import { NextPage } from 'next';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import useSettingsStore from '../../lib/settings-store';
-import {settingsApi} from '../../lib/api';
+import { settingsApi } from '../../lib/api/settings';
 import {ArrowLeftIcon, ClockIcon, Cog6ToothIcon as CogIcon, PhoneIcon, MapPinIcon as LocationMarkerIcon, EnvelopeIcon as MailIcon, PlusIcon, TrashIcon, Squares2X2Icon as ViewGridIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, GlobeAltIcon, DocumentTextIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
-import {RestaurantTable} from '../../lib/settings-store';
+import { RestaurantTable } from '../../lib/api/types';
 import FloorPlan from '../../components/FloorPlan';
 import { useTheme } from '@/lib/theme-context';
+import { WorkingHours, WorkingHoursItem } from '../../lib/api/types';
+import { formatPrice } from '../../utils/priceFormatter';
 
 const AdminSettingsPage: NextPage = () => {
   const router = useRouter();
@@ -58,6 +60,14 @@ const AdminSettingsPage: NextPage = () => {
   }, [settings, isLoading]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -459,7 +469,7 @@ const AdminSettingsPage: NextPage = () => {
                         id="currency"
                         name="currency"
                         value={formData.currency}
-                        onChange={handleInputChange}
+                        onChange={handleSelectChange}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                       >
                         <option value="KZT">Казахстанский тенге (KZT)</option>
@@ -760,23 +770,24 @@ const AdminSettingsPage: NextPage = () => {
                       <button 
                         onClick={() => {
                           // Добавление нового стола
-                          const newTable = {
+                          const newTable: RestaurantTable = {
+                            id: formData.tables?.length > 0 
+                              ? Math.max(...formData.tables.map(t => t.id)) + 1 
+                              : 1,
+                            number: formData.tables?.length > 0 
+                              ? Math.max(...formData.tables.map(t => t.number)) + 1 
+                              : 1,
                             name: `Стол ${(formData.tables || []).length + 1}`,
                             capacity: 4,
                             is_active: true,
                             position_x: 100,
                             position_y: 100,
-                            status: 'available' as 'available' | 'reserved' | 'occupied'
+                            status: 'available'
                           };
                           
                           setFormData(prev => ({
                             ...prev,
-                            tables: [...(prev.tables || []), {
-                              ...newTable,
-                              id: prev.tables?.length > 0 
-                                ? Math.max(...prev.tables.map(t => t.id)) + 1 
-                                : 1
-                            }]
+                            tables: [...(prev.tables || []), newTable]
                           }));
                         }}
                         className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"

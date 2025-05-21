@@ -64,10 +64,14 @@ export interface WorkingHours {
 }
 
 export interface RestaurantTable {
-  id?: number;
+  id: number;
   number: number;
+  name: string;
   capacity: number;
-  status?: string;
+  is_active: boolean;
+  position_x: number;
+  position_y: number;
+  status: 'available' | 'reserved' | 'occupied';
 }
 
 export interface RestaurantSettings {
@@ -76,19 +80,24 @@ export interface RestaurantSettings {
   phone: string;
   address: string;
   website: string;
-  working_hours: WorkingHours;
   currency: string;
   currency_symbol: string;
   tax_percentage: number;
   min_order_amount: number;
-  delivery_fee: number;
-  free_delivery_threshold: number;
   table_reservation_enabled: boolean;
-  delivery_enabled: boolean;
-  pickup_enabled: boolean;
+  working_hours: WorkingHours;
+  tables: RestaurantTable[];
+  payment_methods: string[];
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from_email: string;
+  smtp_from_name: string;
+  sms_api_key: string;
+  sms_sender: string;
   privacy_policy: string;
   terms_of_service: string;
-  tables: RestaurantTable[];
 }
 
 export interface OrderItem {

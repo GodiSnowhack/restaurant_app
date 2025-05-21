@@ -6,14 +6,13 @@ import useSettingsStore from '../lib/settings-store';
  * @param options Опции форматирования
  * @returns Отформатированная строка цены с символом валюты
  */
-export const formatPrice = (price: number | null | undefined, options: { decimals?: number } = {}): string => {
-  const { decimals = 2 } = options;
+export const formatPrice = (price: number, currency: string = '₸'): string => {
+  if (typeof price !== 'number') return '';
   
-  if (price === null || price === undefined) {
-    return `0.${'0'.repeat(decimals)} ₸`;
-  }
-  
-  return `${Number(price).toFixed(decimals)} ₸`;
+  return price.toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }) + ' ' + currency;
 };
 
 /**

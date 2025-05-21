@@ -1,4 +1,9 @@
 import { RestaurantSettings } from './types';
+import { api } from '../api/api';
+
+interface ApiResponse<T> {
+  data: T;
+}
 
 // API функции для работы с настройками ресторана
 export const settingsApi = {
@@ -23,83 +28,71 @@ export const settingsApi = {
       currency_symbol: '₸',
       tax_percentage: 12,
       min_order_amount: 1000,
-      delivery_fee: 500,
-      free_delivery_threshold: 5000,
       table_reservation_enabled: true,
-      delivery_enabled: true,
-      pickup_enabled: true,
       privacy_policy: 'Политика конфиденциальности ресторана',
       terms_of_service: 'Условия использования сервиса',
       tables: [
-        { id: 1, number: 1, capacity: 2, status: 'available' },
-        { id: 2, number: 2, capacity: 4, status: 'available' },
-        { id: 3, number: 3, capacity: 6, status: 'available' }
-      ]
+        { 
+          id: 1, 
+          number: 1, 
+          name: 'Стол 1',
+          capacity: 2, 
+          status: 'available',
+          is_active: true,
+          position_x: 10,
+          position_y: 10
+        },
+        { 
+          id: 2, 
+          number: 2,
+          name: 'Стол 2', 
+          capacity: 4, 
+          status: 'available',
+          is_active: true,
+          position_x: 40,
+          position_y: 10
+        },
+        { 
+          id: 3, 
+          number: 3,
+          name: 'Стол 3', 
+          capacity: 6, 
+          status: 'available',
+          is_active: true,
+          position_x: 70,
+          position_y: 10
+        }
+      ],
+      payment_methods: ['cash', 'card'],
+      smtp_host: '',
+      smtp_port: 587,
+      smtp_user: '',
+      smtp_password: '',
+      smtp_from_email: '',
+      smtp_from_name: '',
+      sms_api_key: '',
+      sms_sender: ''
     };
     
     return defaultSettings;
   },
   
   // Получение настроек с сервера
-  getSettings: async () => {
-    try {
-      const response = await fetch('/api/settings');
-        
-      if (!response.ok) {
-        throw new Error(`Ошибка при получении настроек: ${response.status}`);
-      }
-        
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Ошибка при получении настроек:', error);
-      // Возвращаем настройки по умолчанию в случае ошибки
-      return settingsApi.getLocalSettings() || settingsApi.getDefaultSettings();
-    }
+  getSettings: async (): Promise<RestaurantSettings> => {
+    const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
+    return response.data.data;
   },
 
   // Обновление настроек на сервере
-  updateSettings: async (settings: RestaurantSettings) => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Ошибка при обновлении настроек: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      // Сохраняем обновленные настройки локально
-      settingsApi.saveSettingsLocally(data);
-      return data;
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      throw error;
-    }
+  updateSettings: async (settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> => {
+    const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settings);
+    return response.data.data;
   },
   
   // Принудительное обновление настроек с сервера (игнорируя кеш)
-  forceRefreshSettings: async () => {
-    try {
-      const response = await fetch('/api/settings?force=1');
-        
-      if (!response.ok) {
-        throw new Error(`Ошибка при обновлении настроек: ${response.status}`);
-      }
-        
-      const data = await response.json();
-      // Сохраняем обновленные настройки локально
-      settingsApi.saveSettingsLocally(data);
-      return data;
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      throw error;
-    }
+  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
+    const response = await api.get<ApiResponse<RestaurantSettings>>('/settings/refresh');
+    return response.data.data;
   },
   
   // Получение настроек из localStorage
