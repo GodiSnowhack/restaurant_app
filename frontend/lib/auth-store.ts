@@ -238,15 +238,9 @@ const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         
         try {
-          console.log('AuthStore - Данные для авторизации:', {
-            username,
-            password,
-            timestamp: new Date().toISOString()
-          });
-
           // Формируем данные для отправки
           const formData = new URLSearchParams();
-          formData.append('email', username);
+          formData.append('username', username);
           formData.append('password', password);
 
           console.log('AuthStore - Отправляемые данные:', formData.toString());
@@ -261,6 +255,11 @@ const useAuthStore = create<AuthState>()(
           });
 
           const data = await response.json();
+          console.log('AuthStore - Ответ от сервера:', {
+            status: response.status,
+            ok: response.ok,
+            data
+          });
 
           if (!response.ok) {
             throw new Error(data.detail || 'Ошибка авторизации');
@@ -292,7 +291,10 @@ const useAuthStore = create<AuthState>()(
           
           set({ 
             isLoading: false, 
-            error: errorMessage
+            error: errorMessage,
+            isAuthenticated: false,
+            token: null,
+            user: null
           });
         }
       },

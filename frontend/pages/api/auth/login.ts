@@ -65,24 +65,34 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       const response = await axios.post(`${apiUrl}/auth/login`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        validateStatus: function (status) {
+          return status < 500; // Разрешаем все статусы < 500
         }
       });
-      
-      if (response.data && response.data.access_token) {
-        return res.status(200).json(response.data);
-      } else {
+
+      console.log('Auth API - Ответ от сервера:', {
+        status: response.status,
+        data: response.data
+      });
+
+      if (response.status === 401) {
         return res.status(401).json({
           detail: 'Неверные учетные данные'
         });
       }
+
+      if (response.data && response.data.access_token) {
+        return res.status(200).json(response.data);
+      } else {
+        return res.status(401).json({
+          detail: 'Не удалось получить токен доступа'
+        });
+      }
     } catch (error: any) {
       console.error('Auth API - Ошибка авторизации:', error.response?.data || error.message);
-      
-      // Если есть ответ от сервера с деталями ошибки
-      if (error.response) {
-        return res.status(error.response.status).json(error.response.data);
-      }
       
       return res.status(500).json({
         detail: 'Ошибка сервера при авторизации'
