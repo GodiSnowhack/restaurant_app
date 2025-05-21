@@ -17,33 +17,7 @@ class Settings(BaseSettings):
     SERVER_HOST: str = "0.0.0.0"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.0.10:3000",
-        "http://192.168.0.11:3000",
-        "http://192.168.0.12:3000",
-        "http://192.168.0.13:3000",
-        "http://192.168.0.14:3000",
-        "http://192.168.0.15:3000",
-        "http://192.168.0.16:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://0.0.0.0:3000",
-        "http://0.0.0.0:3001",
-        "http://localhost",
-        "http://127.0.0.1",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        # HTTPS варианты
-        "https://localhost:3000",
-        "https://127.0.0.1:3000",
-        "https://192.168.0.16:3000",
-        "https://localhost:8000",
-        "https://127.0.0.1:8000",
-        # Разрешаем все локальные источники для разработки
-        "*"
-    ]
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
@@ -59,7 +33,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
     # SQLite
-    SQLITE_DATABASE_URI: str = "sqlite:///../../data/restaurant.db"
+    SQLITE_DATABASE_URI: str = "sqlite:///./data/restaurant.db"
     
     # Redis (для очередей и кэширования)
     REDIS_HOST: str = "localhost"

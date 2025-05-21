@@ -59,9 +59,9 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
     waiter_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    table_number = Column(Integer, nullable=True)
+    table_number = Column(Integer)
     
     # Дополнительные поля для интеграции с фронтендом
     payment_method = Column(Enum(PaymentMethod), nullable=True)
@@ -70,9 +70,9 @@ class Order(Base):
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
     
-    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
+    status = Column(String, default="pending")
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
-    total_amount = Column(Float, default=0.0)
+    total_price = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
     is_urgent = Column(Boolean, default=False)
     is_group_order = Column(Boolean, default=False)
@@ -80,7 +80,7 @@ class Order(Base):
     # Информация о клиенте
     customer_age_group = Column(String, nullable=True)  # teen, young, adult, elderly
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
@@ -104,7 +104,7 @@ class Order(Base):
             "waiter_id": self.waiter_id,
             "table_number": self.table_number,
             "status": self.status,
-            "total_amount": self.total_amount,
+            "total_price": self.total_price,
             "comment": self.comment,
             "created_at": self.created_at.isoformat() if self.created_at else datetime.utcnow().isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

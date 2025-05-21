@@ -9,6 +9,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование кода приложения
 COPY . .
 
+# Создаем директорию для базы данных
+RUN mkdir -p data
+
+# Копируем базу данных
+COPY restaurant.db data/restaurant.db
+
 # Добавляем текущую директорию в PYTHONPATH
 ENV PYTHONPATH=/app/backend
 

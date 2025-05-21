@@ -1,11 +1,12 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from restaurant_app.schemas import OrderCreate, OrderOut
-from restaurant_app.services import create_order
-from restaurant_app.models import User
-from restaurant_app.database import get_db
-from restaurant_app.utils import get_current_user
+
+from app.schemas.orders import OrderCreate, OrderOut
+from app.services.orders import create_order
+from app.models.user import User
+from app.database.session import get_db
+from app.core.auth import get_current_user
 
 router = APIRouter()
 
