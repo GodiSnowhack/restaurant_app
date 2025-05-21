@@ -1,4 +1,4 @@
-import { Dish } from './menu';
+import type { Dish } from '@/types';
 import { Order } from './types';
 
 // Функция форматирования цены
