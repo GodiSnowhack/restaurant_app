@@ -1,6 +1,8 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
 import api from './api/index';
-import { authApi, menuApi, ordersApi, reservationsApi, settingsApi, waiterApi } from './api';
+import { authApi, menuApi, ordersApi, reservationsApi } from './api';
+import waiterApi from './api/waiter';
+import { settingsApi } from './api/settings';
 import { RestaurantSettings, UserProfile } from './api/types';
 import * as apiUtils from './api/utils';
 
@@ -51,9 +53,13 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
       return settings;
     } catch (error) {
       console.error('ApiProvider: Ошибка при получении настроек ресторана:', error);
+      // Используем настройки по умолчанию в случае ошибки
       const defaultSettings = settingsApi.getDefaultSettings();
-      setSettings(defaultSettings);
-      return defaultSettings;
+      if (defaultSettings) {
+        setSettings(defaultSettings);
+        return defaultSettings;
+      }
+      throw error; // Если не удалось получить настройки по умолчанию, пробрасываем ошибку
     }
   };
 
