@@ -194,61 +194,45 @@ export const waiterApi = {
    * @param orderCode Код заказа
    * @returns Результат привязки
    */
-  assignOrder: async (orderCode: string): Promise<{
-    success: boolean; 
-    order_id?: number; 
+  assignOrderByCode: async (orderCode: string): Promise<{
+    success: boolean;
+    order_id?: number;
     message: string;
-    status?: string;
-    waiter_id?: number;
   }> => {
-    console.log('waiterApi.assignOrder - Начало привязки заказа с кодом:', orderCode);
-    
     try {
-      // Получаем информацию о пользователе
-      const userInfo = getUserInfo();
-      const token = getAuthToken();
-
-      if (!userInfo || !token) {
-        console.error('waiterApi.assignOrder - Отсутствуют данные пользователя или токен авторизации');
-        throw new Error('Необходима авторизация');
+      // Проверяем, нужно ли использовать демо-данные
+      if (shouldUseDemoData()) {
+        return {
+          success: true,
+          order_id: 12345,
+          message: 'Заказ успешно привязан (демо-режим)'
+        };
       }
 
-      // Формируем URL запроса
-      const apiUrl = `/api/waiter/assign-order`;
-      
-      // Формируем заголовки
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
+      const token = getEnhancedToken();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
 
-      // Выполняем запрос
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/waiter/assign-order-by-code', {
         method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ order_code: orderCode })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: orderCode })
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`waiterApi.assignOrder - Ошибка ${response.status}: ${errorText}`);
-        throw new Error(errorText || `Ошибка запроса: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Ошибка при привязке заказа');
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        ...data
-      };
+      const result = await response.json();
+      return result;
     } catch (error: any) {
-      console.error(`waiterApi.assignOrder - Критическая ошибка:`, error);
-      
-      // Возвращаем ошибку
-      return {
-        success: false,
-        message: error.message || 'Неизвестная ошибка при привязке заказа'
-      };
+      console.error('Ошибка при привязке заказа по коду:', error);
+      throw error;
     }
   },
 
@@ -380,14 +364,6 @@ export const waiterApi = {
     }
   }
 };
-
-// Экспортируем функцию привязки заказа для обратной совместимости
-export const assignOrderByCode = async (orderCode: string): Promise<any> => {
-  console.log('assignOrderByCode - Вызов waiterApi.assignOrder');
-  return waiterApi.assignOrder(orderCode);
-};
-
-export default waiterApi;
 
 // Добавим функцию для получения улучшенного токена
 function getEnhancedToken(): string {
