@@ -9,10 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копирование кода приложения
 COPY . .
 
-# Создаем директорию для базы данных и копируем её
-RUN mkdir -p backend/data
-COPY backend/data/restaurant.db backend/data/restaurant.db
-
 # Устанавливаем права на базу данных
 RUN chmod 666 backend/data/restaurant.db
 
