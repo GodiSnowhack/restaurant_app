@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ordersApi } from '../lib/api/';
+import { assignOrderByCode } from '../lib/api/waiter-api';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 
@@ -53,7 +53,7 @@ const OrderCodeInput: React.FC<OrderCodeInputProps> = ({
     setInternalError(null);
     
     try {
-      const result = await ordersApi.assignOrderByCode(codeToSubmit);
+      const result = await assignOrderByCode(codeToSubmit);
       
       if (result.success) {
         setSuccess(`Заказ #${result.orderNumber} успешно привязан к вам!`);
@@ -66,8 +66,9 @@ const OrderCodeInput: React.FC<OrderCodeInputProps> = ({
       } else {
         setInternalError(result.message || 'Не удалось привязать заказ');
       }
-    } catch (err: any) {
-      setInternalError(err.message || 'Произошла ошибка при привязке заказа');
+    } catch (err) {
+      setInternalError(err instanceof Error ? err.message : 'Произошла ошибка при привязке заказа');
+      console.error('Ошибка загрузки:', err);
     } finally {
       setLoading(false);
     }
