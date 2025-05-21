@@ -10,14 +10,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Создаем директорию для базы данных и копируем её
-RUN mkdir -p data
-COPY restaurant.db data/restaurant.db
+RUN mkdir -p backend/data
+COPY backend/data/restaurant.db backend/data/restaurant.db
 
 # Устанавливаем права на базу данных
-RUN chmod 666 data/restaurant.db
+RUN chmod 666 backend/data/restaurant.db
 
 # Добавляем текущую директорию в PYTHONPATH
-ENV PYTHONPATH=/app/backend
+ENV PYTHONPATH=/app
 
 # Определяем порт из переменной окружения или используем 8000 по умолчанию
 ENV PORT=8000

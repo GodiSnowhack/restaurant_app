@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     
     # SQLite
-    SQLITE_DATABASE_URI: str = "sqlite:///./data/restaurant.db"
+    SQLITE_DATABASE_URI: str = "sqlite:///./backend/data/restaurant.db"
     
     # Redis (для очередей и кэширования)
     REDIS_HOST: str = "localhost"
