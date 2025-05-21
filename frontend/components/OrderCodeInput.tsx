@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { assignOrderByCode } from '../lib/api/waiter-api';
+import { waiterApi } from '../lib/api/waiter-api';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 
@@ -53,15 +53,15 @@ const OrderCodeInput: React.FC<OrderCodeInputProps> = ({
     setInternalError(null);
     
     try {
-      const result = await assignOrderByCode(codeToSubmit);
+      const result = await waiterApi.assignOrderByCode(codeToSubmit);
       
       if (result.success) {
-        setSuccess(`Заказ #${result.orderNumber} успешно привязан к вам!`);
+        setSuccess(`Заказ #${result.order_id} успешно привязан к вам!`);
         if (value === undefined) setOrderCode(''); // Очищаем только внутреннее состояние
         
         // Перенаправляем на страницу заказа через 2 секунды
         setTimeout(() => {
-          router.push(`/waiter/orders/${result.orderId}`);
+          router.push(`/waiter/orders/${result.order_id}`);
         }, 2000);
       } else {
         setInternalError(result.message || 'Не удалось привязать заказ');
