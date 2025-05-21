@@ -362,6 +362,61 @@ export const waiterApi = {
       console.error(`waiterApi.completeOrder - Критическая ошибка:`, error);
       return false;
     }
+  },
+
+  /**
+   * Генерация кода официанта
+   * @returns Результат генерации кода
+   */
+  generateWaiterCode: async (): Promise<{
+    success: boolean;
+    code?: string;
+    expiresAt?: Date;
+    message?: string;
+  }> => {
+    try {
+      // Проверяем, нужно ли использовать демо-данные
+      if (shouldUseDemoData()) {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 часа
+        return {
+          success: true,
+          code,
+          expiresAt,
+          message: 'Код успешно сгенерирован (демо-режим)'
+        };
+      }
+
+      const token = getEnhancedToken();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch('/api/waiter/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Ошибка при генерации кода');
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        ...result
+      };
+    } catch (error: any) {
+      console.error('Ошибка при генерации кода:', error);
+      return {
+        success: false,
+        message: error.message || 'Произошла ошибка при генерации кода'
+      };
+    }
   }
 };
 
