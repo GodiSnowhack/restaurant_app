@@ -30,13 +30,7 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   loadSettings: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Сначала загружаем локальные настройки для быстрого отображения UI
-      const localSettings = settingsApi.getLocalSettings();
-      if (localSettings) {
-        set({ settings: localSettings });
-      }
-
-      // Затем загружаем актуальные настройки с сервера (ВСЕГДА)
+      // Загружаем актуальные настройки с сервера
       const serverSettings = await settingsApi.getSettings();
       
       if (serverSettings) {
@@ -48,7 +42,21 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
         });
         settingsApi.saveSettingsLocally(serverSettings);
       } else {
-        set({ isLoading: false });
+        // Если с сервера не получили данные, пробуем использовать локальный кеш
+        const localSettings = settingsApi.getLocalSettings();
+        if (localSettings) {
+          set({ 
+            settings: localSettings,
+            isLoading: false,
+            lastUpdated: Date.now()
+          });
+        } else {
+          // Если нет ни серверных, ни локальных данных, используем дефолтные
+          set({ 
+            settings: settingsApi.getDefaultSettings(),
+            isLoading: false
+          });
+        }
       }
       
       // Настраиваем периодическую проверку обновлений
@@ -59,10 +67,22 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       }
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
-      set({ 
-        error: 'Не удалось загрузить настройки с сервера.',
-        isLoading: false
-      });
+      
+      // При ошибке пробуем использовать локальный кеш
+      const localSettings = settingsApi.getLocalSettings();
+      if (localSettings) {
+        set({ 
+          settings: localSettings,
+          isLoading: false,
+          error: 'Не удалось загрузить настройки с сервера. Используются локальные настройки.'
+        });
+      } else {
+        set({ 
+          settings: settingsApi.getDefaultSettings(),
+          error: 'Не удалось загрузить настройки с сервера.',
+          isLoading: false
+        });
+      }
     }
   },
 

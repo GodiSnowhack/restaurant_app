@@ -1,5 +1,5 @@
 // API конфигурация
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app';
 
 // Базовые настройки для fetch запросов
 export const defaultFetchOptions = {

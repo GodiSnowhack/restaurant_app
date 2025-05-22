@@ -31,38 +31,7 @@ export const settingsApi = {
       table_reservation_enabled: true,
       privacy_policy: 'Политика конфиденциальности ресторана',
       terms_of_service: 'Условия использования сервиса',
-      tables: [
-        { 
-          id: 1, 
-          number: 1, 
-          name: 'Стол 1',
-          capacity: 2, 
-          status: 'available',
-          is_active: true,
-          position_x: 10,
-          position_y: 10
-        },
-        { 
-          id: 2, 
-          number: 2,
-          name: 'Стол 2', 
-          capacity: 4, 
-          status: 'available',
-          is_active: true,
-          position_x: 40,
-          position_y: 10
-        },
-        { 
-          id: 3, 
-          number: 3,
-          name: 'Стол 3', 
-          capacity: 6, 
-          status: 'available',
-          is_active: true,
-          position_x: 70,
-          position_y: 10
-        }
-      ],
+      tables: [], // Пустой массив столов по умолчанию
       payment_methods: ['cash', 'card'],
       smtp_host: '',
       smtp_port: 587,
@@ -101,7 +70,21 @@ export const settingsApi = {
       try {
         const localSettings = localStorage.getItem('restaurant_settings');
         if (localSettings) {
-          return JSON.parse(localSettings);
+          const settings = JSON.parse(localSettings);
+          const timestamp = localStorage.getItem('restaurant_settings_timestamp');
+          
+          // Проверяем срок действия кеша (30 минут)
+          if (timestamp) {
+            const now = Date.now();
+            const cacheAge = now - parseInt(timestamp);
+            if (cacheAge < 30 * 60 * 1000) { // 30 минут
+              return settings;
+            }
+          }
+          
+          // Если кеш устарел, удаляем его
+          localStorage.removeItem('restaurant_settings');
+          localStorage.removeItem('restaurant_settings_timestamp');
         }
       } catch (error) {
         console.error('Ошибка при чтении настроек из localStorage:', error);
@@ -115,6 +98,7 @@ export const settingsApi = {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('restaurant_settings', JSON.stringify(settings));
+        localStorage.setItem('restaurant_settings_timestamp', Date.now().toString());
       } catch (error) {
         console.error('Ошибка при сохранении настроек в localStorage:', error);
       }
