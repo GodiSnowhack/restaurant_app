@@ -36,16 +36,16 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     console.log(`Auth API - IP клиента: ${clientIp}`);
     
     // Получаем учетные данные из тела запроса
-    const { email, password } = req.body;
+    const { username, password } = req.body;
     
     console.log('Auth API - Данные запроса:', { 
-      email,
+      username,
       password,
       rawBody: req.body
     });
     
     // Базовая валидация
-    if (!email || !password) {
+    if (!username || !password) {
       return res.status(400).json({ 
         detail: 'Email и пароль обязательны'
       });
@@ -57,7 +57,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     try {
       // Формируем данные для отправки
       const formData = new URLSearchParams();
-      formData.append('username', email);
+      formData.append('username', username);
       formData.append('password', password);
 
       console.log('Auth API - Отправляемые данные:', formData.toString());
