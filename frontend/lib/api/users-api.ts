@@ -198,65 +198,34 @@ export const usersApi = {
       try {
         console.log('Пробуем использовать Next.js API прокси для получения пользователей');
         
-        // Формируем URL для Next.js API
-        let proxyUrl = '/api/v1/users';
-        if (queryParams.toString()) {
-          proxyUrl += `?${queryParams.toString()}`;
-        }
-        
-        // Выполняем запрос через Next.js API прокси
-        const proxyResponse = await fetch(proxyUrl, {
+        const response = await fetch('/api/v1/users?' + queryParams.toString(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': token ? `Bearer ${token}` : '',
-            'X-User-ID': userId || '1',
-            'X-User-Role': userRole || 'admin'
+            'X-User-Role': userRole || 'client',
+            'X-User-ID': userId || '1'
           }
         });
-        
-        if (!proxyResponse.ok) {
-          console.error(`Ошибка API прокси: ${proxyResponse.status} ${proxyResponse.statusText}`);
-          
-          // Попытка прочитать данные ошибки
-          try {
-            const errorData = await proxyResponse.json();
-            console.error('Детали ошибки API:', errorData);
-          } catch (e) {
-            console.error('Не удалось прочитать данные ошибки');
-          }
-          
-          throw new Error(`Ошибка API прокси: ${proxyResponse.status} ${proxyResponse.statusText}`);
+
+        if (!response.ok) {
+          throw new Error(`Ошибка API прокси: ${response.status}`);
         }
+
+        const data = await response.json();
         
-        const users = await proxyResponse.json();
-        
-        // Проверка на наличие данных
-        if (!Array.isArray(users)) {
-          console.error('API вернул не массив:', users);
-          throw new Error('Некорректный формат данных от API');
-        }
-        
-        console.log(`Получено ${users.length} пользователей через API прокси`);
-        
-        // Кэшируем результаты при успешном запросе
+        // Кэшируем результат, если нет фильтров
         if (!params.role && !params.query) {
-          usersCache = users;
+          usersCache = data;
           lastFetchTime = now;
+          console.log('Данные пользователей обновлены в кэше');
         }
         
-        return users;
+        return data;
       } catch (proxyError) {
-        console.warn('Ошибка при запросе через Next.js API прокси:', proxyError);
-        
-        if (Array.isArray(usersCache) && usersCache.length > 0) {
-          console.log('Возвращаем кэшированные данные из-за ошибки прокси');
-          return usersCache;
-        }
-        
-        console.log('Возвращаем мок-данные из-за ошибки API');
-        return this.getMockUsers();
+        console.error('Ошибка при использовании API прокси:', proxyError);
+        throw proxyError;
       }
     } catch (error: any) {
       console.error('Ошибка при получении пользователей:', error.message || error);
