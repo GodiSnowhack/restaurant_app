@@ -780,8 +780,8 @@ const AdminSettingsPage: NextPage = () => {
                             name: `Стол ${(formData.tables || []).length + 1}`,
                             capacity: 4,
                             is_active: true,
-                            position_x: 100,
-                            position_y: 100,
+                            position_x: 20,
+                            position_y: 20,
                             status: 'available'
                           };
                           
@@ -806,10 +806,10 @@ const AdminSettingsPage: NextPage = () => {
                           
                           // Определяем количество столов по осям
                           const gridSize = Math.ceil(Math.sqrt(tableCount));
-                          const stepX = 20; // шаг между столами по горизонтали (в процентах)
-                          const stepY = 20; // шаг между столами по вертикали (в процентах)
-                          const startX = 15; // отступ слева (в процентах)
-                          const startY = 15; // отступ сверху (в процентах)
+                          const stepX = 15; // шаг между столами по горизонтали (в процентах)
+                          const stepY = 15; // шаг между столами по вертикали (в процентах)
+                          const startX = 10; // отступ слева (в процентах)
+                          const startY = 10; // отступ сверху (в процентах)
                           
                           // Распределяем столы по сетке
                           newTables.forEach((table, index) => {

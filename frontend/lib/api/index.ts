@@ -21,6 +21,7 @@ import {
   WorkingHoursItem,
   RestaurantTable
 } from './types';
+import axios, { AxiosResponse, AxiosError } from 'axios';
 
 // Определения типов для аналитики
 export interface FinancialMetrics {
@@ -194,3 +195,27 @@ export default {
   analytics: analyticsApi,
   version: API_VERSION
 }; 
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
+
+// Добавляем перехватчик для обработки редиректов
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
+    if (error.response && error.response.status === 307) {
+      // Повторяем запрос с новым URL из заголовка Location
+      const newUrl = error.response.headers.location;
+      return api.request({
+        ...error.config,
+        url: newUrl
+      });
+    }
+    return Promise.reject(error);
+  }
+); 

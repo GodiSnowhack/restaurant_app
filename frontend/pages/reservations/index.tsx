@@ -701,11 +701,11 @@ const ReservationsPage: NextPage = () => {
                           showBarCounter={true}
                           showLegend={true}
                           showEntrance={true}
-                          isPixelPosition={true}
+                          isPixelPosition={false}
                           tableScaleFactor={0.9}
                           maxWidth={500}
                           maxHeight={350}
-                          percentMultiplier={2.5}
+                          percentMultiplier={1}
                           isDark={isDark}
                         />
                       </div>
