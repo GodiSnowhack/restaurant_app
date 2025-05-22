@@ -331,7 +331,7 @@ const clearAuth = () => {
 
 // Типы для API запросов
 export interface LoginCredentials {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -491,7 +491,7 @@ export const authApi = {
           
           // Формируем данные для запроса
           const formData = new URLSearchParams();
-          formData.append('username', credentials.username);
+          formData.append('username', credentials.email);
           formData.append('password', credentials.password);
           
           try {

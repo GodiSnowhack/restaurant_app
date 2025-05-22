@@ -200,7 +200,7 @@ export interface AuthState {
   networkDiagnostics: any[];
   refreshToken: string | null;
   
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string, phone?: string) => Promise<void>;
   logout: () => void;
   fetchUserProfile: () => Promise<void>;
@@ -234,68 +234,56 @@ const useAuthStore = create<AuthState>()(
       },
       
       // Авторизация пользователя
-      login: async (username: string, password: string) => {
-        set({ isLoading: true, error: null });
-        
+      login: async (email: string, password: string) => {
         try {
-          // Формируем данные для отправки
-          const formData = new URLSearchParams();
-          formData.append('username', username);
-          formData.append('password', password);
+          console.log('AuthStore - Отправляемые данные:', {
+            email,
+            password: password ? '[HIDDEN]' : null
+          });
 
-          console.log('AuthStore - Отправляемые данные:', formData.toString());
+          const formData = new URLSearchParams();
+          formData.append('email', email);
+          formData.append('password', password);
 
           const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Accept': 'application/json'
+              'Content-Type': 'application/json'
             },
-            body: formData.toString()
+            body: JSON.stringify({ email, password })
           });
 
           const data = await response.json();
-          console.log('AuthStore - Ответ от сервера:', {
-            status: response.status,
-            ok: response.ok,
-            data
-          });
 
           if (!response.ok) {
+            console.log('AuthStore - Ответ от сервера:', {
+              status: response.status,
+              ok: response.ok,
+              data
+            });
             throw new Error(data.detail || 'Ошибка авторизации');
           }
 
+          // Сохраняем токен
           if (data.access_token) {
             saveAuthToken(data.access_token);
             
-            if (data.refresh_token) {
-              localStorage.setItem('refresh_token', data.refresh_token);
+            // Сохраняем информацию о пользователе
+            if (data.user) {
+              localStorage.setItem('user', JSON.stringify(data.user));
             }
             
-            set({ 
-              isAuthenticated: true, 
+            set({
+              isAuthenticated: true,
               token: data.access_token,
-              error: null,
-              isLoading: false
+              user: data.user,
+              error: null
             });
-            
-            // Загружаем профиль пользователя
-            await get().fetchUserProfile();
-            return;
           }
-          
-          throw new Error('Не удалось получить токен доступа');
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Ошибка авторизации';
-          console.error('AuthStore: Ошибка авторизации:', errorMessage);
-          
-          set({ 
-            isLoading: false, 
-            error: errorMessage,
-            isAuthenticated: false,
-            token: null,
-            user: null
-          });
+        } catch (error: any) {
+          console.log('AuthStore: Ошибка авторизации:', error.message);
+          set({ error: error.message });
+          throw error;
         }
       },
       
