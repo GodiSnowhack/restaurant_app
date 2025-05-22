@@ -12,11 +12,11 @@ interface FloorPlanProps {
   showBarCounter?: boolean;
   showLegend?: boolean;
   showEntrance?: boolean;
-  isPixelPosition?: boolean; // true - позиция в px, false - в процентах
-  tableScaleFactor?: number; // Множитель для изменения размера столов
-  maxWidth?: number; // Максимальная ширина зала
-  maxHeight?: number; // Максимальная высота зала
-  percentMultiplier?: number; // Множитель для процентных координат
+  isPixelPosition?: boolean;
+  tableScaleFactor?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  percentMultiplier?: number;
   isDark?: boolean;
 }
 
@@ -30,39 +30,24 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   showLegend = true,
   showEntrance = true,
   isPixelPosition = true,
-  tableScaleFactor = 1.0, // По умолчанию нет изменения размера
-  maxWidth = 600, // Максимальная ширина зала по умолчанию
-  maxHeight = 400, // Максимальная высота зала по умолчанию
-  percentMultiplier = 2, // Уменьшенный множитель для процентных координат
+  tableScaleFactor = 1.0,
+  maxWidth = 600,
+  maxHeight = 400,
+  percentMultiplier = 1,
   isDark = false
 }) => {
   // Функция для получения стиля стола на основе его статуса и доступности
   const getTableStyle = (table: RestaurantTable) => {
     // Базовые стили
-    let baseStyle = 'absolute transform -translate-x-1/2 -translate-y-1/2 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-md';
+    const baseStyle = 'absolute transform -translate-x-1/2 -translate-y-1/2 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-md';
     
-    // Стили в зависимости от размера стола (с учетом множителя масштабирования)
-    let sizeClass = '';
-    if (table.capacity <= 2) {
-      sizeClass = `w-${Math.max(16, Math.round(20 * tableScaleFactor))} h-${Math.max(16, Math.round(20 * tableScaleFactor))}`;
-    } else if (table.capacity <= 4) {
-      sizeClass = `w-${Math.max(20, Math.round(24 * tableScaleFactor))} h-${Math.max(20, Math.round(24 * tableScaleFactor))}`;
-    } else if (table.capacity <= 6) {
-      sizeClass = `w-${Math.max(24, Math.round(28 * tableScaleFactor))} h-${Math.max(24, Math.round(28 * tableScaleFactor))}`;
-    } else {
-      sizeClass = `w-${Math.max(28, Math.round(32 * tableScaleFactor))} h-${Math.max(28, Math.round(32 * tableScaleFactor))}`;
-    }
-    
-    // Можно также использовать абсолютные размеры через стили:
+    // Размеры стола в зависимости от вместимости
     const widthPx = table.capacity <= 2 ? 80 * tableScaleFactor :
-                     table.capacity <= 4 ? 96 * tableScaleFactor :
-                     table.capacity <= 6 ? 112 * tableScaleFactor :
-                     128 * tableScaleFactor;
+                    table.capacity <= 4 ? 96 * tableScaleFactor :
+                    table.capacity <= 6 ? 112 * tableScaleFactor :
+                    128 * tableScaleFactor;
     
-    const heightPx = table.capacity <= 2 ? 80 * tableScaleFactor :
-                      table.capacity <= 4 ? 96 * tableScaleFactor :
-                      table.capacity <= 6 ? 112 * tableScaleFactor :
-                      128 * tableScaleFactor;
+    const heightPx = widthPx; // Делаем столы квадратными для лучшего вида
     
     // Стили в зависимости от статуса
     let statusStyle = '';
@@ -95,7 +80,9 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
       className: `${baseStyle} ${statusStyle}`,
       style: {
         width: `${widthPx}px`,
-        height: `${heightPx}px`
+        height: `${heightPx}px`,
+        left: isPixelPosition ? `${table.position_x}px` : `${table.position_x}%`,
+        top: isPixelPosition ? `${table.position_y}px` : `${table.position_y}%`
       }
     };
   };
@@ -107,107 +94,82 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
     }
   };
 
-  // Функция для вычисления подходящего размера плана зала
-  const floorPlanDimensions = () => {
-    if (tables.length === 0) return { width: 800, height: 600 };
-    
-    // Находим максимальные координаты, чтобы определить размеры плана
-    const maxX = Math.max(...tables.map(t => isPixelPosition ? t.position_x : t.position_x * percentMultiplier)) + 100; // Увеличиваем отступ справа
-    const maxY = Math.max(...tables.map(t => isPixelPosition ? t.position_y : t.position_y * percentMultiplier)) + 100; // Увеличиваем отступ снизу
-    
-    return {
-      width: Math.min(maxWidth, Math.max(800, maxX)), // Минимальная ширина 800px
-      height: Math.min(maxHeight, Math.max(600, maxY))  // Минимальная высота 600px
-    };
-  };
-
-  const dimensions = floorPlanDimensions();
-
   return (
-    <div className={`relative ${height} overflow-auto rounded-md border border-dashed ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-300 bg-gray-50'} ${containerClassName}`}>
-      {/* Визуальная сетка для ориентации (тонкие линии) */}
-      <div className="absolute inset-0" style={{ width: '100%', height: '100%', minWidth: `${dimensions.width}px`, minHeight: `${dimensions.height}px` }}>
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div key={`grid-hor-${i}`} className={`absolute border-t ${isDark ? 'border-gray-800' : 'border-gray-100'} w-full`} style={{ top: `${(i + 1) * 10}%` }}></div>
-        ))}
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div key={`grid-ver-${i}`} className={`absolute border-l ${isDark ? 'border-gray-800' : 'border-gray-100'} h-full`} style={{ left: `${(i + 1) * 10}%` }}></div>
-        ))}
-      </div>
+    <div className={`relative ${height} ${containerClassName}`}>
+      <div className="absolute inset-0 w-full h-full">
+        {/* Сетка для ориентации */}
+        <div className="absolute inset-0 grid grid-cols-10 grid-rows-10">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={`grid-row-${i}`} className="w-full h-full border-t border-gray-200/10" />
+          ))}
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={`grid-col-${i}`} className="w-full h-full border-l border-gray-200/10" />
+          ))}
+        </div>
 
-      {/* Декоративные элементы */}
-      <div className={`absolute top-1/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-b-2 ${isDark ? 'border-gray-700' : 'border-gray-300'} w-3/4`}
-           style={{ width: `${Math.max(dimensions.width * 0.75, 800)}px` }}></div>
-      <div className={`absolute top-1/3 left-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tr-xl rounded-br-xl opacity-80`}></div>
-      <div className={`absolute top-2/3 right-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tl-xl rounded-bl-xl opacity-80`}></div>
-      
-      {/* Вход */}
-      {showEntrance && (
-        <div className={`absolute bottom-12 right-12 ${isDark ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-blue-100 text-blue-700 border-blue-200'} rounded-md h-16 w-28 flex items-center justify-center text-sm font-medium border shadow-inner z-10`}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Вход
-        </div>
-      )}
-      
-      {/* Столы */}
-      {tables.map((table) => {
-        const tableStyles = getTableStyle(table);
-        
-        // Определим позицию с учетом типа координат (проценты или пиксели)
-        const posX = isPixelPosition ? `${table.position_x}px` : `${table.position_x * percentMultiplier}%`;
-        const posY = isPixelPosition ? `${table.position_y}px` : `${table.position_y * percentMultiplier}%`;
-        
-        return (
-          <div
-            key={table.id}
-            className={tableStyles.className}
-            style={{ 
-              ...tableStyles.style,
-              left: posX, 
-              top: posY 
-            }}
-            onClick={() => handleTableClick(table)}
-          >
-            <div className="text-center">
-              <div className="font-bold">{table.name}</div>
-              <div className="text-xs">{table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}</div>
-              {table.status !== 'available' && (
-                <div className="mt-1 text-xs font-bold uppercase">
-                  {table.status === 'reserved' ? 'Забронирован' : 'Занят'}
-                </div>
-              )}
+        {/* Столы */}
+        {tables.map((table) => {
+          const tableStyles = getTableStyle(table);
+          return (
+            <div
+              key={table.id}
+              className={tableStyles.className}
+              style={tableStyles.style}
+              onClick={() => handleTableClick(table)}
+            >
+              <div className="text-center">
+                <div className="font-bold">{table.name}</div>
+                <div className="text-xs">{table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}</div>
+                {table.status !== 'available' && (
+                  <div className="mt-1 text-xs font-bold uppercase">
+                    {table.status === 'reserved' ? 'Забронирован' : 'Занят'}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Вход */}
+        {showEntrance && (
+          <div className={`
+            absolute bottom-4 right-4 
+            ${isDark ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-blue-100 text-blue-700 border-blue-200'} 
+            rounded-md h-12 w-24 flex items-center justify-center text-sm font-medium border shadow-inner
+          `}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Вход
+          </div>
+        )}
+
+        {/* Легенда */}
+        {showLegend && (
+          <div className={`
+            absolute left-4 bottom-4 p-3 rounded-lg shadow-md
+            ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}
+          `}>
+            <div className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              Условные обозначения:
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <div className={`w-4 h-4 rounded ${isDark ? 'bg-green-900/50 border-green-700' : 'bg-green-200 border-green-400'} border mr-2`}></div>
+                <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Доступно</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-4 h-4 rounded ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-200 border-red-400'} border mr-2`}></div>
+                <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Занято</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-4 h-4 rounded ${isDark ? 'bg-yellow-900/50 border-yellow-700' : 'bg-yellow-200 border-yellow-400'} border mr-2`}></div>
+                <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Недостаточно мест</span>
+              </div>
             </div>
           </div>
-        );
-      })}
-      
-      {/* Условные обозначения */}
-      {showLegend && (
-        <div className={`
-          absolute left-4 bottom-4 p-3 rounded-lg shadow-md
-          ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}
-        `}>
-          <div className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            Условные обозначения:
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded ${isDark ? 'bg-green-900/50 border-green-700' : 'bg-green-200 border-green-400'} border mr-2`}></div>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Доступно</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-200 border-red-400'} border mr-2`}></div>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Занято</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded ${isDark ? 'bg-yellow-900/50 border-yellow-700' : 'bg-yellow-200 border-yellow-400'} border mr-2`}></div>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Недостаточно мест</span>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
