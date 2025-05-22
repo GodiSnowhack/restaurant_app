@@ -83,5 +83,8 @@ class Dish(Base):
     allergens = relationship("Allergen", secondary=dish_allergen, back_populates="dishes")
     tags = relationship("Tag", secondary=dish_tag, back_populates="dishes")
     feedbacks = relationship("Feedback", back_populates="dish", cascade="all, delete-orphan")
-    orders = relationship("Order", secondary="order_dish", back_populates="items", overlaps="order_dishes,dish")
-    order_dishes = relationship("OrderDish", back_populates="dish", overlaps="orders,items")
+    order_dishes = relationship("OrderDish", back_populates="dish")
+    
+    @property
+    def orders(self):
+        return [od.order for od in self.order_dishes]

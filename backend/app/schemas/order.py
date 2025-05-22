@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 from app.models.order import OrderStatus, PaymentStatus
@@ -35,12 +35,30 @@ class OrderItemResponse(OrderItemBase):
 
 
 # Схемы для заказов
+class OrderDishBase(BaseModel):
+    dish_id: int
+    quantity: int = 1
+    special_instructions: Optional[str] = None
+    price: float
+
+
+class OrderDishCreate(OrderDishBase):
+    pass
+
+
+class OrderDish(OrderDishBase):
+    id: int
+    order_id: int
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 class OrderBase(BaseModel):
     user_id: Optional[int] = None
     waiter_id: Optional[int] = None
-    table_number: Optional[int] = None
+    table_number: int
     status: Optional[str] = "pending"
-    payment_status: Optional[str] = "pending"
+    payment_status: Optional[PaymentStatus] = PaymentStatus.PENDING
     payment_method: Optional[str] = None
     total_amount: Optional[float] = 0.0
     comment: Optional[str] = None
@@ -54,7 +72,7 @@ class OrderBase(BaseModel):
 
 
 class OrderCreate(OrderBase):
-    items: Optional[List[OrderItemCreate]] = Field(default_factory=list, description="Список блюд в заказе")
+    items: List[OrderDishCreate]
 
 
 class OrderUpdate(OrderBase):
@@ -62,7 +80,7 @@ class OrderUpdate(OrderBase):
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
     status: Optional[str] = None
-    payment_status: Optional[str] = None
+    payment_status: Optional[PaymentStatus] = None
     payment_method: Optional[str] = None
     total_amount: Optional[float] = None
     comment: Optional[str] = None
@@ -100,7 +118,7 @@ class Order(OrderBase):
     updated_at: datetime
     completed_at: Optional[datetime] = None
     user: Optional[UserBasic] = None
-    items: List[OrderItem] = []
+    items: List[OrderDish] = []
     payments: List[Payment] = []
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
@@ -144,8 +162,14 @@ FeedbackResponse = Feedback
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
-    PROCESSING = "processing"
+    NEW = "new"
+    CONFIRMED = "confirmed"
+    COOKING = "cooking"
+    PREPARING = "preparing"
+    IN_PROGRESS = "in_progress"
+    READY = "ready"
     DELIVERED = "delivered"
+    COMPLETED = "completed"
     CANCELLED = "cancelled"
 
 
@@ -153,6 +177,13 @@ class PaymentStatus(str, Enum):
     PENDING = "pending"
     PAID = "paid"
     FAILED = "failed"
+    REFUNDED = "refunded"
+
+
+class PaymentMethod(str, Enum):
+    CASH = "cash"
+    CARD = "card"
+    ONLINE = "online"
 
 
 class OrderItem(OrderItemBase):
@@ -292,7 +323,7 @@ class OrderUpdateSchema(BaseModel):
     waiter_id: Optional[int] = None
     table_number: Optional[int] = None
     status: Optional[str] = None
-    payment_status: Optional[str] = None
+    payment_status: Optional[PaymentStatus] = None
     payment_method: Optional[str] = None
     total_amount: Optional[float] = None
     comment: Optional[str] = None

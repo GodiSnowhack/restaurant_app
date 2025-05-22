@@ -50,9 +50,9 @@ class OrderDish(Base):
     special_instructions = Column(Text, nullable=True)
     price = Column(Float, nullable=False)  # Цена блюда на момент заказа
     
-    # Связи с явным указанием overlaps
-    order = relationship("Order", back_populates="order_dishes", overlaps="items,dish")
-    dish = relationship("app.models.menu.Dish", back_populates="order_dishes", overlaps="orders,items")
+    # Связи с явным указанием back_populates
+    order = relationship("Order", back_populates="order_dishes")
+    dish = relationship("app.models.menu.Dish", back_populates="order_dishes")
 
 
 class Order(Base):
@@ -87,11 +87,14 @@ class Order(Base):
     # Отношения
     user = relationship("User", foreign_keys=[user_id], back_populates="orders")
     waiter = relationship("User", foreign_keys=[waiter_id], back_populates="served_orders")
-    items = relationship("app.models.menu.Dish", secondary="order_dish", back_populates="orders", overlaps="order_dishes,dish")
-    order_dishes = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan", overlaps="items")
+    order_dishes = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
     review = relationship("Review", back_populates="order", uselist=False)
     
+    @property
+    def items(self):
+        return [od.dish for od in self.order_dishes]
+
     def to_dict(self):
         from datetime import datetime
         # Обеспечиваем наличие значения created_at

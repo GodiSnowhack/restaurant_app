@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # Схемы для категорий
@@ -23,8 +23,7 @@ class CategoryResponse(CategoryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для аллергенов
@@ -44,8 +43,7 @@ class AllergenUpdate(AllergenBase):
 class AllergenResponse(AllergenBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для тегов
@@ -64,8 +62,7 @@ class TagUpdate(TagBase):
 class TagResponse(TagBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для блюд
@@ -105,8 +102,7 @@ class DishResponse(DishBase):
     allergens: List[AllergenResponse] = []
     tags: List[TagResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схема для списка блюд с минимальной информацией
@@ -118,8 +114,7 @@ class DishShortResponse(BaseModel):
     is_available: bool
     category_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схема для блюда с категорией (поддерживает обратную совместимость)
