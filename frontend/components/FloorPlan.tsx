@@ -31,11 +31,17 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   showEntrance = true,
   isPixelPosition = true,
   tableScaleFactor = 1.0,
-  maxWidth = 600,
-  maxHeight = 400,
+  maxWidth = 800,
+  maxHeight = 600,
   percentMultiplier = 1,
   isDark = false
 }) => {
+  // Функция для масштабирования координат
+  const scalePosition = (position: number, isX: boolean) => {
+    const scale = isX ? maxWidth / 800 : maxHeight / 600;
+    return position * scale;
+  };
+
   // Функция для получения стиля стола на основе его статуса и доступности
   const getTableStyle = (table: RestaurantTable) => {
     // Базовые стили
@@ -76,10 +82,14 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
         : 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer border-2 border-blue-300 hover:shadow-lg hover:-translate-y-1 animate-pulse';
     }
 
-    // Позиционирование стола
+    // Позиционирование стола с учетом масштабирования
     const position = {
-      left: isPixelPosition ? `${table.position_x}px` : `${table.position_x}%`,
-      top: isPixelPosition ? `${table.position_y}px` : `${table.position_y}%`
+      left: isPixelPosition 
+        ? `${scalePosition(table.position_x, true)}px` 
+        : `${table.position_x}%`,
+      top: isPixelPosition 
+        ? `${scalePosition(table.position_y, false)}px` 
+        : `${table.position_y}%`
     };
     
     return {
