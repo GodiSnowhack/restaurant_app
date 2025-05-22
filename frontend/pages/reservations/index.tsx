@@ -486,6 +486,49 @@ const ReservationsPage: NextPage = () => {
           </button>
         </div>
 
+        {/* Схема зала */}
+        <div className="mb-8">
+          <div className={`
+            border rounded-lg shadow-md p-4
+            ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-300'}
+          `}>
+            <h3 className={`
+              text-lg font-medium mb-4 flex items-center
+              ${isDark ? 'text-gray-100' : 'text-gray-900'}
+            `}>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`
+                h-5 w-5 mr-2
+                ${isDark ? 'text-primary-400' : 'text-primary'}
+              `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Схема зала
+            </h3>
+            <div className={`
+              flex justify-center rounded-lg overflow-hidden
+              ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
+            `}>
+              <FloorPlan 
+                tables={floorPlanTables}
+                height="h-[400px]"
+                containerClassName={`
+                  w-full max-w-6xl mx-auto p-4
+                  ${isDark ? 'bg-gray-900' : 'bg-white'}
+                `}
+                showBarCounter={true}
+                showLegend={true}
+                showEntrance={true}
+                isPixelPosition={false}
+                tableScaleFactor={1}
+                maxWidth={800}
+                maxHeight={400}
+                percentMultiplier={1}
+                isDark={isDark}
+              />
+            </div>
+          </div>
+        </div>
+
         {!showForm && !canCreateNewReservation() && isAuthenticated && (
           <div className="rounded-md bg-red-50 p-4 mb-4">
             <div className="flex">
