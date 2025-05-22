@@ -108,9 +108,10 @@ const useReservationsStore = create<ReservationsState>((set, get) => ({
       
       // Подготавливаем данные для API
       const apiData = {
-        table_number: data.table_id || null,
+        table_number: data.table_id || undefined,
         guests_count: data.guests_count,
         reservation_time: reservationTime,
+        reservation_date: data.reservation_date,
         guest_name: data.guest_name,
         guest_phone: data.guest_phone,
         comment: data.comments,
