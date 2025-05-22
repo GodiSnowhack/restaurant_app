@@ -55,7 +55,7 @@ export default async function usersHandler(req: NextApiRequest, res: NextApiResp
     console.log(`[API Proxy Users] ID пользователя: ${userId}, роль: ${userRole}`);
 
     // Формируем URL для запроса на бэкенд
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
     const endpoint = `${apiUrl}/users`;
     
     // Если есть ID в пути, добавляем его

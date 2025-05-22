@@ -105,8 +105,8 @@ const AdminUsersPage: NextPage = () => {
           throw new Error('Отсутствует токен авторизации');
         }
         
-        // Формируем URL для запроса напрямую к API прокси
-        let apiUrl = '/api/v1/users';
+        // Формируем URL для запроса к прямому API
+        let apiUrl = 'https://backend-production-1a78.up.railway.app/api/v1/users/direct';
         const queryParams = new URLSearchParams();
         if (showRoleFilter !== 'all') queryParams.append('role', showRoleFilter);
         if (debouncedSearchQuery) queryParams.append('query', debouncedSearchQuery);
@@ -115,7 +115,7 @@ const AdminUsersPage: NextPage = () => {
           apiUrl += `?${queryParams.toString()}`;
         }
         
-        // Выполняем запрос напрямую к API прокси
+        // Выполняем запрос к прямому API
         const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {

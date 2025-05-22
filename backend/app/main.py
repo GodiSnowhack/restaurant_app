@@ -39,7 +39,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000"
     ],
-    allow_credentials=False,  # Отключаем credentials
+    allow_credentials=True,  # Включаем credentials
     allow_methods=["*"],
     allow_headers=[
         "Content-Type",
