@@ -977,18 +977,34 @@ const AdminSettingsPage: NextPage = () => {
                       <FloorPlan 
                         tables={formData.tables || []}
                         height="h-96" 
-                        containerClassName="w-full max-w-4xl mx-auto"
+                        containerClassName={`
+                          w-full max-w-4xl mx-auto p-4
+                          ${isDark ? 'bg-gray-900' : 'bg-white'}
+                        `}
                         showBarCounter={true}
                         showLegend={true}
                         showEntrance={true}
                         isPixelPosition={false}
-                        tableScaleFactor={0.8}
-                        maxWidth={550}
+                        tableScaleFactor={0.9}
+                        maxWidth={500}
                         maxHeight={350}
                         percentMultiplier={2.5}
+                        isDark={isDark}
                       />
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className={`
+                      text-sm mt-4 p-3 rounded-lg border
+                      ${isDark 
+                        ? 'bg-gray-900 border-gray-700 text-gray-300' 
+                        : 'bg-gray-50 border-gray-200 text-gray-500'
+                      }
+                    `}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`
+                        h-5 w-5 inline-block mr-1
+                        ${isDark ? 'text-blue-400' : 'text-blue-500'}
+                      `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                       Примечание: Это схематичный просмотр. В системе бронирования расположение столов может отличаться.
                     </p>
                   </div>

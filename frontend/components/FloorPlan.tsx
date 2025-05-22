@@ -67,18 +67,28 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
     // Стили в зависимости от статуса
     let statusStyle = '';
     if (!table.is_active) {
-      statusStyle = 'bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-300';
+      statusStyle = isDark 
+        ? 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700'
+        : 'bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-300';
     } else if (table.status === 'occupied' || table.status === 'reserved') {
-      statusStyle = 'bg-red-100 text-red-700 cursor-not-allowed border-2 border-red-300';
+      statusStyle = isDark
+        ? 'bg-red-900/30 text-red-400 cursor-not-allowed border-2 border-red-800'
+        : 'bg-red-100 text-red-700 cursor-not-allowed border-2 border-red-300';
     } else if (minGuestCount > 0 && table.capacity < minGuestCount) {
-      statusStyle = 'bg-yellow-100 text-yellow-700 cursor-not-allowed border border-yellow-300';
+      statusStyle = isDark
+        ? 'bg-yellow-900/30 text-yellow-400 cursor-not-allowed border border-yellow-800'
+        : 'bg-yellow-100 text-yellow-700 cursor-not-allowed border border-yellow-300';
     } else {
-      statusStyle = 'bg-green-100 hover:bg-green-200 text-green-700 cursor-pointer border-2 border-green-300 hover:shadow-lg hover:-translate-y-1';
+      statusStyle = isDark
+        ? 'bg-green-900/30 hover:bg-green-900/50 text-green-400 cursor-pointer border-2 border-green-800 hover:shadow-lg hover:-translate-y-1'
+        : 'bg-green-100 hover:bg-green-200 text-green-700 cursor-pointer border-2 border-green-300 hover:shadow-lg hover:-translate-y-1';
     }
     
     // Выбранный стол
     if (table.id === selectedTableId) {
-      statusStyle = 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer border-2 border-blue-300 hover:shadow-lg hover:-translate-y-1 animate-pulse';
+      statusStyle = isDark
+        ? 'bg-blue-900/50 hover:bg-blue-900/70 text-blue-300 cursor-pointer border-2 border-blue-700 hover:shadow-lg hover:-translate-y-1 animate-pulse'
+        : 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer border-2 border-blue-300 hover:shadow-lg hover:-translate-y-1 animate-pulse';
     }
     
     return {
@@ -114,26 +124,26 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   const dimensions = floorPlanDimensions();
 
   return (
-    <div className={`relative ${height} bg-gray-50 overflow-auto rounded-md border border-dashed border-gray-300 bg-gradient-to-b from-gray-50 to-gray-100 ${containerClassName}`}>
+    <div className={`relative ${height} overflow-auto rounded-md border border-dashed ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-300 bg-gray-50'} ${containerClassName}`}>
       {/* Визуальная сетка для ориентации (тонкие линии) */}
       <div className="absolute inset-0" style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}>
         {Array.from({ length: 10 }).map((_, i) => (
-          <div key={`grid-hor-${i}`} className="absolute border-t border-gray-100 w-full" style={{ top: `${(i + 1) * 10}%` }}></div>
+          <div key={`grid-hor-${i}`} className={`absolute border-t ${isDark ? 'border-gray-800' : 'border-gray-100'} w-full`} style={{ top: `${(i + 1) * 10}%` }}></div>
         ))}
         {Array.from({ length: 10 }).map((_, i) => (
-          <div key={`grid-ver-${i}`} className="absolute border-l border-gray-100 h-full" style={{ left: `${(i + 1) * 10}%` }}></div>
+          <div key={`grid-ver-${i}`} className={`absolute border-l ${isDark ? 'border-gray-800' : 'border-gray-100'} h-full`} style={{ left: `${(i + 1) * 10}%` }}></div>
         ))}
       </div>
 
       {/* Декоративные элементы */}
-      <div className="absolute top-1/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-b-2 border-gray-300 w-3/4"
+      <div className={`absolute top-1/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-b-2 ${isDark ? 'border-gray-700' : 'border-gray-300'} w-3/4`}
            style={{ width: `${dimensions.width * 0.75}px` }}></div>
-      <div className="absolute top-1/3 left-0 w-24 h-24 bg-gray-200 rounded-tr-xl rounded-br-xl opacity-80"></div>
-      <div className="absolute top-2/3 right-0 w-24 h-24 bg-gray-200 rounded-tl-xl rounded-bl-xl opacity-80"></div>
+      <div className={`absolute top-1/3 left-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tr-xl rounded-br-xl opacity-80`}></div>
+      <div className={`absolute top-2/3 right-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tl-xl rounded-bl-xl opacity-80`}></div>
       
       {/* Вход */}
       {showEntrance && (
-        <div className="absolute bottom-12 right-12 bg-blue-100 rounded-md h-16 w-28 flex items-center justify-center text-sm text-blue-700 font-medium border border-blue-200 shadow-inner z-10">
+        <div className={`absolute bottom-12 right-12 ${isDark ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-blue-100 text-blue-700 border-blue-200'} rounded-md h-16 w-28 flex items-center justify-center text-sm font-medium border shadow-inner z-10`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -146,8 +156,8 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
         const tableStyles = getTableStyle(table);
         
         // Определим позицию с учетом типа координат (проценты или пиксели)
-        const posX = isPixelPosition ? table.position_x : (table.position_x * percentMultiplier); // Множитель для процентов
-        const posY = isPixelPosition ? table.position_y : (table.position_y * percentMultiplier); // Множитель для процентов
+        const posX = isPixelPosition ? table.position_x : (table.position_x * percentMultiplier);
+        const posY = isPixelPosition ? table.position_y : (table.position_y * percentMultiplier);
         
         return (
           <div
@@ -183,16 +193,16 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
             Условные обозначения:
           </div>
           <div className="space-y-2">
-          <div className="flex items-center">
-              <div className="w-4 h-4 rounded bg-green-200 border border-green-400 mr-2"></div>
-              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Доступно</span>
-          </div>
             <div className="flex items-center">
-              <div className="w-4 h-4 rounded bg-red-200 border border-red-400 mr-2"></div>
+              <div className={`w-4 h-4 rounded ${isDark ? 'bg-green-900/50 border-green-700' : 'bg-green-200 border-green-400'} border mr-2`}></div>
+              <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Доступно</span>
+            </div>
+            <div className="flex items-center">
+              <div className={`w-4 h-4 rounded ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-200 border-red-400'} border mr-2`}></div>
               <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Занято</span>
             </div>
             <div className="flex items-center">
-              <div className="w-4 h-4 rounded bg-yellow-200 border border-yellow-400 mr-2"></div>
+              <div className={`w-4 h-4 rounded ${isDark ? 'bg-yellow-900/50 border-yellow-700' : 'bg-yellow-200 border-yellow-400'} border mr-2`}></div>
               <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Недостаточно мест</span>
             </div>
           </div>
