@@ -86,62 +86,53 @@ class Settings(Base):
                     "name": "Стол 1",
                     "capacity": 2,
                     "is_active": True,
-                    "position_x": 15,
-                    "position_y": 15,
+                    "position_x": 100,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 2,
                     "name": "Стол 2",
-                    "capacity": 2,
+                    "capacity": 4,
                     "is_active": True,
-                    "position_x": 15,
-                    "position_y": 35,
+                    "position_x": 250,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 3,
                     "name": "Стол 3",
-                    "capacity": 4,
+                    "capacity": 6,
                     "is_active": True,
-                    "position_x": 35,
-                    "position_y": 15,
+                    "position_x": 400,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 4,
                     "name": "Стол 4",
-                    "capacity": 4,
+                    "capacity": 2,
                     "is_active": True,
-                    "position_x": 35,
-                    "position_y": 35,
+                    "position_x": 100,
+                    "position_y": 250,
                     "status": "available"
                 },
                 {
                     "id": 5,
                     "name": "Стол 5",
-                    "capacity": 6,
+                    "capacity": 4,
                     "is_active": True,
-                    "position_x": 55,
-                    "position_y": 15,
+                    "position_x": 250,
+                    "position_y": 250,
                     "status": "available"
                 },
                 {
                     "id": 6,
                     "name": "Стол 6",
-                    "capacity": 6,
-                    "is_active": True,
-                    "position_x": 55,
-                    "position_y": 35,
-                    "status": "available"
-                },
-                {
-                    "id": 7,
-                    "name": "Стол VIP",
                     "capacity": 8,
                     "is_active": True,
-                    "position_x": 75,
-                    "position_y": 25,
+                    "position_x": 400,
+                    "position_y": 250,
                     "status": "available"
                 }
             ],

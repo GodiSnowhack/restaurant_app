@@ -52,6 +52,7 @@
     }
   },
   "currency": "KZT",
+  "currency_symbol": "₸",
   "tax_percentage": 20,
   "service_charge_percentage": 10,
   "min_order_amount": 1000,
@@ -113,10 +114,10 @@
   "tables": [
     {
       "name": "Стол 1",
-      "capacity": 4,
+      "capacity": 2,
       "is_active": true,
-      "position_x": 20,
-      "position_y": 20,
+      "position_x": 100,
+      "position_y": 100,
       "status": "available",
       "id": 1
     },
@@ -124,38 +125,46 @@
       "name": "Стол 2",
       "capacity": 4,
       "is_active": true,
-      "position_x": 40,
-      "position_y": 20,
+      "position_x": 250,
+      "position_y": 100,
       "status": "available",
       "id": 2
     },
     {
       "name": "Стол 3",
-      "capacity": 4,
+      "capacity": 6,
       "is_active": true,
-      "position_x": 60,
-      "position_y": 20,
+      "position_x": 400,
+      "position_y": 100,
       "status": "available",
       "id": 3
     },
     {
       "name": "Стол 4",
-      "capacity": 4,
+      "capacity": 2,
       "is_active": true,
-      "position_x": 20,
-      "position_y": 50,
+      "position_x": 100,
+      "position_y": 250,
       "status": "available",
       "id": 4
     },
     {
-      "name": "VIP",
+      "name": "Стол 5",
       "capacity": 4,
       "is_active": true,
-      "position_x": 60,
-      "position_y": 50,
+      "position_x": 250,
+      "position_y": 250,
       "status": "available",
       "id": 5
+    },
+    {
+      "name": "Стол 6",
+      "capacity": 8,
+      "is_active": true,
+      "position_x": 400,
+      "position_y": 250,
+      "status": "available",
+      "id": 6
     }
-  ],
-  "currency_symbol": "₸"
+  ]
 }

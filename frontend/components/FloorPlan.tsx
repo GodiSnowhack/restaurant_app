@@ -75,14 +75,19 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
         ? 'bg-blue-900/50 hover:bg-blue-900/70 text-blue-300 cursor-pointer border-2 border-blue-700 hover:shadow-lg hover:-translate-y-1 animate-pulse'
         : 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer border-2 border-blue-300 hover:shadow-lg hover:-translate-y-1 animate-pulse';
     }
+
+    // Позиционирование стола
+    const position = {
+      left: isPixelPosition ? `${table.position_x}px` : `${table.position_x}%`,
+      top: isPixelPosition ? `${table.position_y}px` : `${table.position_y}%`
+    };
     
     return {
       className: `${baseStyle} ${statusStyle}`,
       style: {
         width: `${widthPx}px`,
         height: `${heightPx}px`,
-        left: isPixelPosition ? `${table.position_x}px` : `${table.position_x}%`,
-        top: isPixelPosition ? `${table.position_y}px` : `${table.position_y}%`
+        ...position
       }
     };
   };
