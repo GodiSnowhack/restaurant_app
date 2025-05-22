@@ -976,18 +976,18 @@ const AdminSettingsPage: NextPage = () => {
                     <div className="flex justify-center">
                       <FloorPlan 
                         tables={formData.tables || []}
-                        height="h-96" 
+                        height="h-[600px]" 
                         containerClassName={`
-                          w-full max-w-4xl mx-auto p-4
+                          w-full max-w-6xl mx-auto p-4
                           ${isDark ? 'bg-gray-900' : 'bg-white'}
                         `}
                         showBarCounter={true}
                         showLegend={true}
                         showEntrance={true}
                         isPixelPosition={false}
-                        tableScaleFactor={0.9}
-                        maxWidth={500}
-                        maxHeight={350}
+                        tableScaleFactor={1}
+                        maxWidth={800}
+                        maxHeight={600}
                         percentMultiplier={2.5}
                         isDark={isDark}
                       />
