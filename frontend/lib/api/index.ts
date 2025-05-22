@@ -1,5 +1,5 @@
 // Импорты необходимых API модулей
-import { api, getAuthToken, clearAuthTokens, isTokenExpired, retryRequest, checkConnection, isMobileDevice, fetchWithTimeout, getAuthHeaders } from './core';
+import { getAuthToken, clearAuthTokens, isTokenExpired, retryRequest, checkConnection, isMobileDevice, fetchWithTimeout, getAuthHeaders } from './core';
 import { authApi } from './auth';
 import { menuApi } from './menu';
 import type { Category, Dish, Reservation } from '@/types';
@@ -142,7 +142,7 @@ export const API_VERSION = 'v1.0.0';
 
 // Экспорты
 export { 
-  api, 
+  axiosApi as api,
   authApi,
   menuApi,
   waiterApi,
@@ -196,7 +196,7 @@ export default {
   version: API_VERSION
 }; 
 
-const api = axios.create({
+const axiosApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
@@ -205,13 +205,13 @@ const api = axios.create({
 });
 
 // Добавляем перехватчик для обработки редиректов
-api.interceptors.response.use(
+axiosApi.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
     if (error.response && error.response.status === 307) {
       // Повторяем запрос с новым URL из заголовка Location
       const newUrl = error.response.headers.location;
-      return api.request({
+      return axiosApi.request({
         ...error.config,
         url: newUrl
       });
