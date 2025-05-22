@@ -115,8 +115,8 @@
       "name": "Стол 1",
       "capacity": 4,
       "is_active": true,
-      "position_x": 200,
-      "position_y": 50,
+      "position_x": 25,
+      "position_y": 15,
       "status": "available",
       "id": 1
     },
@@ -124,8 +124,8 @@
       "name": "Стол 2",
       "capacity": 4,
       "is_active": true,
-      "position_x": 100,
-      "position_y": 100,
+      "position_x": 15,
+      "position_y": 30,
       "status": "available",
       "id": 2
     },
@@ -133,8 +133,8 @@
       "name": "Стол 3",
       "capacity": 4,
       "is_active": true,
-      "position_x": 200,
-      "position_y": 100,
+      "position_x": 35,
+      "position_y": 30,
       "status": "available",
       "id": 3
     },
@@ -142,8 +142,8 @@
       "name": "Стол 4",
       "capacity": 4,
       "is_active": true,
-      "position_x": 100,
-      "position_y": 50,
+      "position_x": 45,
+      "position_y": 15,
       "status": "available",
       "id": 4
     },
@@ -151,8 +151,8 @@
       "name": "VIP",
       "capacity": 4,
       "is_active": true,
-      "position_x": 300,
-      "position_y": 50,
+      "position_x": 55,
+      "position_y": 15,
       "status": "available",
       "id": 5
     }

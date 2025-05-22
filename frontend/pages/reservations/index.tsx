@@ -849,7 +849,7 @@ const ReservationsPage: NextPage = () => {
                   tableScaleFactor={1}
                   maxWidth={800}
                   maxHeight={600}
-                  percentMultiplier={2.5}
+                  percentMultiplier={1}
                   isDark={isDark}
                 />
               </div>
