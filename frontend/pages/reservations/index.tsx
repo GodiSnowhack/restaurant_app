@@ -220,18 +220,9 @@ const ReservationsPage: NextPage = () => {
   const getFloorPlanTables = () => {
     const tables = settings.tables || [];
     return tables.map(table => ({
-      id: table.id || 0,
-      number: table.number,
-      name: `Стол ${table.number}`,
-      capacity: table.capacity,
-      is_active: true,
-      position_x: 100 + (table.number * 50),
-      position_y: 100 + (table.id || 0) * 30,
-      status: table.status || 'available',
-      position: {
-        x: 100 + (table.number * 50),
-        y: 100 + (table.id || 0) * 30
-      }
+      ...table,
+      name: table.name || `Стол ${table.number}`,
+      is_active: true
     })) as RestaurantTable[];
   };
 
