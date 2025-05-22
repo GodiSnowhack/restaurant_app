@@ -1,32 +1,25 @@
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 // Функция для определения правильного baseURL для API
-export const getApiBaseUrl = () => {
-  // Используем URL из переменной окружения, если он задан
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // Для разработки в Docker
+const getApiBaseUrl = (): string => {
+  // В production используем Railway URL
   if (process.env.NODE_ENV === 'production') {
-    return 'http://backend:8000/api/v1';
+    return 'https://backend-production-1a78.up.railway.app/api/v1';
   }
   
-  // Для локальной разработки
-  return 'http://localhost:8000/api/v1';
+  // В development используем локальный сервер
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 };
 
-export const API_URL = getApiBaseUrl();
-
-// Создаем экземпляр axios с базовыми настройками
+// Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: getApiBaseUrl(),
+  timeout: 60000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-  withCredentials: true,
-  timeout: 30000,
+    'Accept': 'application/json'
+  }
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -110,45 +103,52 @@ export const clearAuthTokens = () => {
   }
 };
 
-// Интерцептор запросов
+// Перехватчик для добавления токена авторизации
 api.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
+  async (config: InternalAxiosRequestConfig) => {
+    // Получаем токен из localStorage
+    const token = localStorage.getItem('auth_token');
     
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Добавляем CORS заголовки для всех окружений
-    const allowedOrigins = ['http://localhost:3000', 'http://frontend:3000'];
-    const origin = typeof window !== 'undefined' ? window.location.origin : allowedOrigins[0];
-    
-    if (allowedOrigins.includes(origin)) {
-      config.headers['Access-Control-Allow-Origin'] = origin;
-      config.headers['Access-Control-Allow-Credentials'] = 'true';
+    // Добавляем X-User-ID для неаутентифицированных запросов
+    if (!token) {
+      const userProfile = localStorage.getItem('user_profile');
+      if (userProfile) {
+        const { id } = JSON.parse(userProfile);
+        config.headers['X-User-ID'] = id;
+      }
     }
     
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     return Promise.reject(error);
   }
 );
 
-// Интерцептор ответов
+// Перехватчик для обработки ответов
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    // Если ошибка сети или таймаут, пробуем использовать кеш
-    if (!error.response || error.code === 'ECONNABORTED') {
-      return Promise.reject(error);
-    }
-    
-    // Если 401, очищаем токены и перенаправляем на логин
-    if (error.response?.status === 401) {
-      clearAuthTokens();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
-        window.location.href = '/auth/login';
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    // Если ошибка связана с сетью, пробуем использовать кэш
+    if (error.message === 'Network Error') {
+      console.log('API: Ошибка сети, пробуем использовать кэш');
+      
+      // Получаем URL запроса
+      const url = error.config?.url;
+      
+      if (url) {
+        // Проверяем наличие кэша для этого URL
+        const cacheKey = `cache_${url}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        
+        if (cachedData) {
+          console.log('API: Найдены кэшированные данные');
+          return Promise.resolve({ data: JSON.parse(cachedData) });
+        }
       }
     }
     

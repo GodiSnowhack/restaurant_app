@@ -26,4 +26,10 @@ export const API_ENDPOINTS = {
         create: `${API_URL}/api/v1/orders`,
         detail: (id: number) => `${API_URL}/api/v1/orders/${id}`,
     },
+    reservations: {
+        list: `${API_URL}/api/v1/reservations`,
+        create: `${API_URL}/api/v1/reservations`,
+        detail: (id: number) => `${API_URL}/api/v1/reservations/${id}`,
+        verify: `${API_URL}/api/v1/reservations/verify-code`,
+    },
 }; 
