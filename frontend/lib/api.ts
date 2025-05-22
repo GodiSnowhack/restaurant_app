@@ -36,15 +36,21 @@ export const getApiBaseUrl = () => {
   
   // Если мы на клиенте, определим baseURL на основе текущего хоста
   if (typeof window !== 'undefined') {
-    // Получаем хост из URL (например, localhost:3000 или 192.168.0.16:3000)
+    // Получаем протокол и хост из текущего URL
+    const protocol = window.location.protocol;
     const host = window.location.hostname;
     
-    // Возвращаем API URL с текущим хостом, но портом бэкенда
-    return `http://${host}:8000/api/v1`;
+    // Для production используем HTTPS
+    if (host.includes('railway.app') || host.includes('vercel.app')) {
+      return 'https://backend-production-1a78.up.railway.app/api/v1';
+    }
+    
+    // Для локальной разработки используем текущий протокол
+    return `${protocol}//${host}:8000/api/v1`;
   }
   
-  // Если мы на сервере или не можем определить, используем стандартный URL
-  return 'http://localhost:8000/api/v1';
+  // Если мы на сервере или не можем определить, используем HTTPS для production
+  return 'https://backend-production-1a78.up.railway.app/api/v1';
 };
 
 const baseURL = getApiBaseUrl();
