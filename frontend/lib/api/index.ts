@@ -1,11 +1,11 @@
 // Импорты необходимых API модулей
-import { api, API_URL, getAuthToken, clearAuthTokens, isTokenExpired, retryRequest, checkConnection, isMobileDevice, fetchWithTimeout, getAuthHeaders } from './core';
+import { api, getAuthToken, clearAuthTokens, isTokenExpired, retryRequest, checkConnection, isMobileDevice, fetchWithTimeout, getAuthHeaders } from './core';
 import { authApi } from './auth';
 import { menuApi } from './menu';
-import type { Category, Dish } from '@/types';
+import type { Category, Dish, Reservation } from '@/types';
 import waiterApi from './waiter';
 import { settingsApi } from './settings';
-import { reservationsApi, Reservation } from './reservations';
+import { reservationsApi } from './reservations';
 import adminApi from './admin-api';
 import { usersApi, UserData } from './users-api';
 import {
@@ -142,7 +142,6 @@ export const API_VERSION = 'v1.0.0';
 // Экспорты
 export { 
   api, 
-  API_URL, 
   authApi,
   menuApi,
   waiterApi,
