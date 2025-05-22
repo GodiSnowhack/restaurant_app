@@ -242,15 +242,15 @@ const useAuthStore = create<AuthState>()(
           });
 
           const formData = new URLSearchParams();
-          formData.append('email', email);
+          formData.append('username', email);
           formData.append('password', password);
 
           const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: JSON.stringify({ email, password })
+            body: formData.toString()
           });
 
           const data = await response.json();
