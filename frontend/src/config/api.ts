@@ -16,16 +16,14 @@ export const API_ENDPOINTS = {
         register: `${API_URL}/api/v1/auth/register`,
         logout: `${API_URL}/api/v1/auth/logout`,
     },
-    dishes: {
-        list: `${API_URL}/api/v1/dishes`,
-        detail: (id: number) => `${API_URL}/api/v1/dishes/${id}`,
+    menu: {
+        dishes: `${API_URL}/api/v1/menu/dishes`,
+        categories: `${API_URL}/api/v1/menu/categories`,
+        dish: (id: number) => `${API_URL}/api/v1/menu/dishes/${id}`,
     },
     orders: {
         list: `${API_URL}/api/v1/orders`,
         create: `${API_URL}/api/v1/orders`,
         detail: (id: number) => `${API_URL}/api/v1/orders/${id}`,
-    },
-    categories: {
-        list: `${API_URL}/api/v1/categories`,
     },
 }; 

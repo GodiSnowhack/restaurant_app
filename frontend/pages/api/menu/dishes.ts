@@ -4,6 +4,20 @@ import axios from 'axios';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Настройка CORS заголовков
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  // Обработка предварительных запросов CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -37,6 +51,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json(dishes);
   } catch (error) {
     console.error('Error fetching dishes:', error);
-    res.status(500).json({ message: 'Error fetching dishes' });
+    res.status(500).json({ message: 'Error fetching dishes', error: error instanceof Error ? error.message : String(error) });
   }
 } 

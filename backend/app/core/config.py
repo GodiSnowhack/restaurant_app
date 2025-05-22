@@ -26,7 +26,9 @@ class Settings(BaseSettings):
         "http://frontend:3000",
         "https://frontend:3000",
         "http://backend:8000",
-        "https://backend:8000"
+        "https://backend:8000",
+        "https://frontend-production-8eb6.up.railway.app",
+        "https://backend-production-1a78.up.railway.app"
     ]
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)

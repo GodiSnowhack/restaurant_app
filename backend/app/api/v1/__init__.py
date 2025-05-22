@@ -3,13 +3,14 @@ API v1 router and endpoints
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import dishes, orders, categories, auth, users
+from app.api.v1.endpoints import orders, categories, auth, users
+from app.api.v1 import menu
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(dishes.router, prefix="/dishes", tags=["dishes"])
+api_router.include_router(menu.router, prefix="/menu", tags=["menu"])
 api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
 
