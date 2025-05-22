@@ -109,15 +109,15 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
 
   // Функция для вычисления подходящего размера плана зала
   const floorPlanDimensions = () => {
-    if (tables.length === 0) return { width: 100, height: 100 };
+    if (tables.length === 0) return { width: 800, height: 600 };
     
     // Находим максимальные координаты, чтобы определить размеры плана
-    const maxX = Math.max(...tables.map(t => isPixelPosition ? t.position_x : t.position_x * percentMultiplier)) + 40; // Добавим небольшой отступ справа
-    const maxY = Math.max(...tables.map(t => isPixelPosition ? t.position_y : t.position_y * percentMultiplier)) + 40; // Добавим небольшой отступ снизу
+    const maxX = Math.max(...tables.map(t => isPixelPosition ? t.position_x : t.position_x * percentMultiplier)) + 100; // Увеличиваем отступ справа
+    const maxY = Math.max(...tables.map(t => isPixelPosition ? t.position_y : t.position_y * percentMultiplier)) + 100; // Увеличиваем отступ снизу
     
     return {
-      width: Math.min(maxWidth, Math.max(100, maxX)), // Ограничиваем максимальной шириной
-      height: Math.min(maxHeight, Math.max(100, maxY))  // Ограничиваем максимальной высотой
+      width: Math.min(maxWidth, Math.max(800, maxX)), // Минимальная ширина 800px
+      height: Math.min(maxHeight, Math.max(600, maxY))  // Минимальная высота 600px
     };
   };
 
@@ -126,7 +126,7 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   return (
     <div className={`relative ${height} overflow-auto rounded-md border border-dashed ${isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-300 bg-gray-50'} ${containerClassName}`}>
       {/* Визуальная сетка для ориентации (тонкие линии) */}
-      <div className="absolute inset-0" style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}>
+      <div className="absolute inset-0" style={{ width: '100%', height: '100%', minWidth: `${dimensions.width}px`, minHeight: `${dimensions.height}px` }}>
         {Array.from({ length: 10 }).map((_, i) => (
           <div key={`grid-hor-${i}`} className={`absolute border-t ${isDark ? 'border-gray-800' : 'border-gray-100'} w-full`} style={{ top: `${(i + 1) * 10}%` }}></div>
         ))}
@@ -137,7 +137,7 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
 
       {/* Декоративные элементы */}
       <div className={`absolute top-1/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-b-2 ${isDark ? 'border-gray-700' : 'border-gray-300'} w-3/4`}
-           style={{ width: `${dimensions.width * 0.75}px` }}></div>
+           style={{ width: `${Math.max(dimensions.width * 0.75, 800)}px` }}></div>
       <div className={`absolute top-1/3 left-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tr-xl rounded-br-xl opacity-80`}></div>
       <div className={`absolute top-2/3 right-0 w-24 h-24 ${isDark ? 'bg-gray-800' : 'bg-gray-200'} rounded-tl-xl rounded-bl-xl opacity-80`}></div>
       
