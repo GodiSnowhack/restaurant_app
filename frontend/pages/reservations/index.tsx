@@ -701,7 +701,7 @@ const ReservationsPage: NextPage = () => {
                           showBarCounter={true}
                           showLegend={true}
                           showEntrance={true}
-                          isPixelPosition={false}
+                          isPixelPosition={true}
                           tableScaleFactor={0.9}
                           maxWidth={500}
                           maxHeight={350}
