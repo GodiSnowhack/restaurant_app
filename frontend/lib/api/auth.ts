@@ -170,7 +170,6 @@ export const authApi = {
           'Pragma': 'no-cache',
         },
         body: JSON.stringify(credentials),
-        credentials: 'include', // Важно для обработки cookies
         mode: 'cors', // Разрешаем CORS запросы
         cache: 'no-cache',
         redirect: 'follow',

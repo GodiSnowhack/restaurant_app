@@ -34,8 +34,8 @@ app = FastAPI(
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене заменить на конкретные домены
-    allow_credentials=True,
+    allow_origins=["https://frontend-production-8eb6.up.railway.app"],  # Разрешаем только наш фронтенд
+    allow_credentials=False,  # Отключаем credentials
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
