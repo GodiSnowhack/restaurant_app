@@ -487,85 +487,6 @@ const ReservationsPage: NextPage = () => {
           </button>
         </div>
 
-        {/* Кнопка для показа схемы зала */}
-        <div className="mb-8">
-          <button
-            onClick={() => setShowFloorPlan(!showFloorPlan)}
-            className={`
-              inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200
-              ${isDark 
-                ? showFloorPlan 
-                  ? 'bg-gray-700 text-gray-100 hover:bg-gray-600'
-                  : 'bg-primary text-white hover:bg-primary-dark'
-                : showFloorPlan
-                  ? 'btn btn-secondary'
-                  : 'btn btn-primary'
-              }
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-            {showFloorPlan ? 'Скрыть схему зала' : 'Показать схему зала'}
-          </button>
-        </div>
-
-        {/* Схема зала */}
-        {showFloorPlan && (
-          <div className="mb-8">
-            <div className={`
-              border rounded-lg shadow-md p-4
-              ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-300'}
-            `}>
-              <h3 className={`
-                text-lg font-medium mb-4 flex items-center
-                ${isDark ? 'text-gray-100' : 'text-gray-900'}
-              `}>
-                <svg xmlns="http://www.w3.org/2000/svg" className={`
-                  h-5 w-5 mr-2
-                  ${isDark ? 'text-primary-400' : 'text-primary'}
-                `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Схема зала
-                {showForm && (
-                  <span className={`
-                    ml-2 text-sm font-normal
-                    ${isDark ? 'text-gray-400' : 'text-gray-500'}
-                  `}>
-                    (кликните на стол, чтобы выбрать его для бронирования)
-                  </span>
-                )}
-              </h3>
-              <div className={`
-                flex justify-center rounded-lg overflow-hidden
-                ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
-              `}>
-                <FloorPlan 
-                  tables={floorPlanTables}
-                  selectedTableId={showForm ? formData.tableId : null}
-                  onTableSelect={showForm ? handleTableSelect : undefined}
-                  minGuestCount={showForm ? formData.guests : 0}
-                  height="h-[600px]"
-                  containerClassName={`
-                    w-full max-w-6xl mx-auto p-4
-                    ${isDark ? 'bg-gray-900' : 'bg-white'}
-                  `}
-                  showBarCounter={true}
-                  showLegend={true}
-                  showEntrance={true}
-                  isPixelPosition={false}
-                  tableScaleFactor={1}
-                  maxWidth={800}
-                  maxHeight={600}
-                  percentMultiplier={1}
-                  isDark={isDark}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         {!showForm && !canCreateNewReservation() && isAuthenticated && (
           <div className="rounded-md bg-red-50 p-4 mb-4">
             <div className="flex">
@@ -701,27 +622,49 @@ const ReservationsPage: NextPage = () => {
                       </span>
                     )}
                   </div>
-                  <select
-                    id="tableId"
-                    name="tableId"
-                    value={formData.tableId}
-                    onChange={handleInputChange}
-                    required
-                    className={`
-                      block w-full rounded-md shadow-sm sm:text-sm
-                      ${isDark 
-                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
-                        : 'border-gray-300 focus:ring-primary focus:border-primary'
-                      }
-                    `}
-                  >
-                    <option value={0}>Любой подходящий стол</option>
-                    {availableTables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      id="tableId"
+                      name="tableId"
+                      value={formData.tableId}
+                      onChange={handleInputChange}
+                      required
+                      className={`
+                        block w-full rounded-md shadow-sm sm:text-sm
+                        ${isDark 
+                          ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                          : 'border-gray-300 focus:ring-primary focus:border-primary'
+                        }
+                      `}
+                    >
+                      <option value={0}>Любой подходящий стол</option>
+                      {availableTables.map((table) => (
+                        <option key={table.id} value={table.id}>
+                          Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowFloorPlan(!showFloorPlan)}
+                      className={`
+                        inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap
+                        ${isDark 
+                          ? showFloorPlan 
+                            ? 'bg-gray-700 text-gray-100 hover:bg-gray-600'
+                            : 'bg-primary text-white hover:bg-primary-dark'
+                          : showFloorPlan
+                            ? 'btn btn-secondary'
+                            : 'btn btn-primary'
+                        }
+                      `}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      {showFloorPlan ? 'Скрыть схему зала' : 'Показать схему зала'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Контактная информация */}
@@ -855,6 +798,62 @@ const ReservationsPage: NextPage = () => {
                 </div>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Схема зала */}
+        {showFloorPlan && (
+          <div className="mb-8">
+            <div className={`
+              border rounded-lg shadow-md p-4
+              ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-300'}
+            `}>
+              <h3 className={`
+                text-lg font-medium mb-4 flex items-center
+                ${isDark ? 'text-gray-100' : 'text-gray-900'}
+              `}>
+                <svg xmlns="http://www.w3.org/2000/svg" className={`
+                  h-5 w-5 mr-2
+                  ${isDark ? 'text-primary-400' : 'text-primary'}
+                `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Схема зала
+                {showForm && (
+                  <span className={`
+                    ml-2 text-sm font-normal
+                    ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                  `}>
+                    (кликните на стол, чтобы выбрать его для бронирования)
+                  </span>
+                )}
+              </h3>
+              <div className={`
+                flex justify-center rounded-lg overflow-hidden
+                ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
+              `}>
+                <FloorPlan 
+                  tables={floorPlanTables}
+                  selectedTableId={showForm ? formData.tableId : null}
+                  onTableSelect={showForm ? handleTableSelect : undefined}
+                  minGuestCount={showForm ? formData.guests : 0}
+                  height="h-[600px]"
+                  containerClassName={`
+                    w-full max-w-6xl mx-auto p-4
+                    ${isDark ? 'bg-gray-900' : 'bg-white'}
+                  `}
+                  showBarCounter={true}
+                  showLegend={true}
+                  showEntrance={true}
+                  isPixelPosition={false}
+                  tableScaleFactor={1}
+                  maxWidth={800}
+                  maxHeight={600}
+                  percentMultiplier={1}
+                  isDark={isDark}
+                />
+              </div>
+            </div>
           </div>
         )}
 
