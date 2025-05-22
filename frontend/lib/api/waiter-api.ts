@@ -47,7 +47,7 @@ const shouldUseDemoData = () => {
   // Если явно установлено использование демо-данных или отсутствует бэкенд
   return useDemoData === 'true' || 
          process.env.NEXT_PUBLIC_USE_DEMO_DATA === 'true' || 
-         !process.env.NEXT_PUBLIC_API_URL;
+         !api.defaults.baseURL;
 };
 
 /**

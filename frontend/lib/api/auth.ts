@@ -31,8 +31,7 @@ export const authApi = {
         try {
           console.log('API login - Используем прямой запрос для мобильного устройства');
           
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-          const loginUrl = `${apiUrl}/auth/login`;
+          const loginUrl = `${api.defaults.baseURL}/auth/login`;
           
           console.log('API login - URL для мобильного:', loginUrl);
           

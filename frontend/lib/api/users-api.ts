@@ -1,4 +1,4 @@
-import { api, API_URL, getAuthHeaders, getAuthTokenFromAllSources } from './core';
+import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 interface UserParams {
@@ -32,7 +32,7 @@ const CACHE_TTL = 60000; // 1 минута
 
 // Создаем экземпляр axios для пользовательских запросов
 const usersAxios = axios.create({
-  baseURL: `${API_URL}`,
+  baseURL: api.defaults.baseURL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

@@ -5,6 +5,7 @@ import {
   OperationalMetrics,
   AnalyticsFilters
 } from '../../types/analytics';
+import { api } from './core';
 
 // Добавляем недостающие интерфейсы
 interface MenuMetrics {
@@ -83,25 +84,13 @@ export interface AnalyticsData {
   customerDemographics: CustomerDemographics;
 }
 
-// Функция для получения базового URL для API
-const getApiBaseUrl = () => {
-  // Используем URL из переменной окружения, если он задан
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return `${process.env.NEXT_PUBLIC_API_URL}/analytics`;
-  }
-  
-  // Если мы на клиенте, определим baseURL на основе текущего хоста
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    return `http://${host}:8000/api/v1/analytics`;
-  }
-  
-  // По умолчанию возвращаем стандартный URL для локальной разработки
-  return 'http://localhost:8000/api/v1/analytics';
+// Получаем базовый URL для API аналитики
+const getAnalyticsBaseUrl = () => {
+  return `${api.defaults.baseURL}/analytics`;
 };
 
 // Базовый URL для всех API аналитики
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = getAnalyticsBaseUrl();
 
 // Настройка Axios для запросов аналитики
 const analyticsAxios = axios.create({

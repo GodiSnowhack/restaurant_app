@@ -1,4 +1,5 @@
 import { Reservation } from '../../types';
+import { api } from './core';
 
 /**
  * API для работы с бронированиями
@@ -380,7 +381,7 @@ async function fetchReservationsFallback(token: string | null, queryParams: stri
   const methods = [
     // 1. Прямой запрос к бэкенду
     async () => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const apiUrl = getApiUrl();
       console.log(`[Reservations API] Прямой запрос к бэкенду: ${apiUrl}/reservations${queryParams}`);
       
       const response = await fetch(`${apiUrl}/reservations${queryParams}`, {
@@ -398,7 +399,7 @@ async function fetchReservationsFallback(token: string | null, queryParams: stri
     
     // 2. Через API администратора
     async () => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const apiUrl = getApiUrl();
       console.log(`[Reservations API] Запрос через API администратора: ${apiUrl}/admin/reservations${queryParams}`);
       
       const response = await fetch(`${apiUrl}/admin/reservations${queryParams}`, {
@@ -463,4 +464,9 @@ async function fetchReservationsFallback(token: string | null, queryParams: stri
   }
   
   return []; // Возвращаем пустой массив, если все методы не сработали
-} 
+}
+
+// Функция для получения URL API
+const getApiUrl = () => {
+  return api.defaults.baseURL;
+}; 
