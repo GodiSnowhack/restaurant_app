@@ -503,6 +503,14 @@ const ReservationsPage: NextPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               Схема зала
+              {showForm && (
+                <span className={`
+                  ml-2 text-sm font-normal
+                  ${isDark ? 'text-gray-400' : 'text-gray-500'}
+                `}>
+                  (кликните на стол, чтобы выбрать его для бронирования)
+                </span>
+              )}
             </h3>
             <div className={`
               flex justify-center rounded-lg overflow-hidden
@@ -510,7 +518,10 @@ const ReservationsPage: NextPage = () => {
             `}>
               <FloorPlan 
                 tables={floorPlanTables}
-                height="h-[400px]"
+                selectedTableId={showForm ? formData.tableId : null}
+                onTableSelect={showForm ? handleTableSelect : undefined}
+                minGuestCount={showForm ? formData.guests : 0}
+                height="h-[600px]"
                 containerClassName={`
                   w-full max-w-6xl mx-auto p-4
                   ${isDark ? 'bg-gray-900' : 'bg-white'}
@@ -521,7 +532,7 @@ const ReservationsPage: NextPage = () => {
                 isPixelPosition={false}
                 tableScaleFactor={1}
                 maxWidth={800}
-                maxHeight={400}
+                maxHeight={600}
                 percentMultiplier={1}
                 isDark={isDark}
               />
@@ -664,113 +675,28 @@ const ReservationsPage: NextPage = () => {
                       </span>
                     )}
                   </div>
-                  <div className="flex space-x-2">
-                    <select
-                      id="tableId"
-                      name="tableId"
-                      value={formData.tableId}
-                      onChange={handleInputChange}
-                      required
-                      className={`
-                        block w-full rounded-md shadow-sm sm:text-sm
-                        ${isDark 
-                          ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
-                          : 'border-gray-300 focus:ring-primary focus:border-primary'
-                        }
-                      `}
-                    >
-                      <option value={0}>Любой подходящий стол</option>
-                      {availableTables.map((table) => (
-                        <option key={table.id} value={table.id}>
-                          Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
-                        </option>
-                      ))}
-                    </select>
-                    <button 
-                      type="button"
-                      onClick={() => setShowFloorPlan(!showFloorPlan)}
-                      className={`
-                        px-3 py-2 rounded-md flex items-center justify-center transition-colors duration-200
-                        ${isDark 
-                          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600' 
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                        }
-                      `}
-                    >
-                      {showFloorPlan ? 'Скрыть' : 'Показать'} схему зала
-                    </button>
-                  </div>
-                  {availableTables.length === 0 && formData.guests > 0 && (
-                    <p className="mt-1 text-sm text-red-500">
-                      Нет доступных столов для выбранного количества гостей. Пожалуйста, выберите другую дату или уменьшите количество гостей.
-                    </p>
-                  )}
+                  <select
+                    id="tableId"
+                    name="tableId"
+                    value={formData.tableId}
+                    onChange={handleInputChange}
+                    required
+                    className={`
+                      block w-full rounded-md shadow-sm sm:text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-primary-400 focus:border-primary-400' 
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
+                      }
+                    `}
+                  >
+                    <option value={0}>Любой подходящий стол</option>
+                    {availableTables.map((table) => (
+                      <option key={table.id} value={table.id}>
+                        Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-
-                {/* Схема расположения столов в ресторане */}
-                {showFloorPlan && (
-                  <div className="md:col-span-2 my-4">
-                    <div className={`
-                      border rounded-lg shadow-md p-4
-                      ${isDark ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-300'}
-                    `}>
-                      <h3 className={`
-                        text-lg font-medium mb-4 flex items-center
-                        ${isDark ? 'text-gray-100' : 'text-gray-900'}
-                      `}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`
-                          h-5 w-5 mr-2
-                          ${isDark ? 'text-primary-400' : 'text-primary'}
-                        `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        Интерактивная схема зала
-                      </h3>
-                      
-                      <div className={`
-                        flex justify-center rounded-lg overflow-hidden
-                        ${isDark ? 'bg-gray-900' : 'bg-gray-50'}
-                      `}>
-                        <FloorPlan 
-                          tables={floorPlanTables}
-                          selectedTableId={formData.tableId}
-                          onTableSelect={handleTableSelect}
-                          minGuestCount={formData.guests}
-                          height="h-[600px]"
-                          containerClassName={`
-                            w-full max-w-6xl mx-auto p-4
-                            ${isDark ? 'bg-gray-900' : 'bg-white'}
-                          `}
-                          showBarCounter={true}
-                          showLegend={true}
-                          showEntrance={true}
-                          isPixelPosition={false}
-                          tableScaleFactor={1}
-                          maxWidth={800}
-                          maxHeight={600}
-                          percentMultiplier={2.5}
-                          isDark={isDark}
-                        />
-                      </div>
-                      
-                      <p className={`
-                        text-sm mt-4 p-3 rounded-lg border
-                        ${isDark 
-                          ? 'bg-gray-900 border-gray-700 text-gray-300' 
-                          : 'bg-gray-50 border-gray-200 text-gray-500'
-                        }
-                      `}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`
-                          h-5 w-5 inline-block mr-1
-                          ${isDark ? 'text-blue-400' : 'text-blue-500'}
-                        `} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Кликните на доступный стол (зеленый), чтобы выбрать его для бронирования.
-                      </p>
-                    </div>
-                  </div>
-                )}
 
                 {/* Контактная информация */}
                 <div>

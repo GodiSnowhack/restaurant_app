@@ -156,8 +156,8 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
         const tableStyles = getTableStyle(table);
         
         // Определим позицию с учетом типа координат (проценты или пиксели)
-        const posX = isPixelPosition ? table.position_x : (table.position_x * percentMultiplier);
-        const posY = isPixelPosition ? table.position_y : (table.position_y * percentMultiplier);
+        const posX = isPixelPosition ? `${table.position_x}px` : `${table.position_x * percentMultiplier}%`;
+        const posY = isPixelPosition ? `${table.position_y}px` : `${table.position_y * percentMultiplier}%`;
         
         return (
           <div
@@ -165,8 +165,8 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
             className={tableStyles.className}
             style={{ 
               ...tableStyles.style,
-              left: `${posX}px`, 
-              top: `${posY}px` 
+              left: posX, 
+              top: posY 
             }}
             onClick={() => handleTableClick(table)}
           >
