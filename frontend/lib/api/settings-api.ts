@@ -1,37 +1,71 @@
 import { api } from '../api';
-
-interface RestaurantSettings {
-  restaurant_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  working_hours: {
-    [key: string]: {
-      open: string;
-      close: string;
-      is_closed: boolean;
-    };
-  };
-  currency: string;
-  currency_symbol: string;
-  tax_percentage: number;
-  delivery_fee: number;
-  tables: Array<{
-    id: number;
-    name: string;
-    capacity: number;
-    position_x: number;
-    position_y: number;
-    is_active: boolean;
-    status: string;
-  }>;
-}
+import { RestaurantSettings, RestaurantTable } from './types';
 
 const SETTINGS_CACHE_KEY = 'restaurant_settings_cache';
 const SETTINGS_CACHE_TIMESTAMP = 'restaurant_settings_timestamp';
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
+// Дефолтные настройки
+const defaultSettings: RestaurantSettings = {
+  restaurant_name: 'Godi and Fast',
+  email: 'info@restaurant.com',
+  phone: '+7 (999) 123-45-66',
+  address: 'г. Петропавловск, ул. Жукова, д. 7',
+  website: 'https://restaurant.com',
+  currency: 'KZT',
+  currency_symbol: '₸',
+  tax_percentage: 12,
+  min_order_amount: 1000,
+  table_reservation_enabled: true,
+  working_hours: {
+    monday: { open: '09:00', close: '23:00', is_closed: false },
+    tuesday: { open: '09:00', close: '23:00', is_closed: false },
+    wednesday: { open: '09:00', close: '23:00', is_closed: false },
+    thursday: { open: '09:00', close: '23:00', is_closed: false },
+    friday: { open: '09:00', close: '23:00', is_closed: false },
+    saturday: { open: '09:00', close: '22:00', is_closed: false },
+    sunday: { open: '09:00', close: '22:00', is_closed: false }
+  },
+  tables: [
+    {
+      id: 1,
+      number: 1,
+      name: 'Стол 1',
+      capacity: 2,
+      is_active: true,
+      position_x: 100,
+      position_y: 100,
+      status: 'available'
+    },
+    {
+      id: 2,
+      number: 2,
+      name: 'Стол 2',
+      capacity: 4,
+      is_active: true,
+      position_x: 250,
+      position_y: 100,
+      status: 'available'
+    }
+  ],
+  payment_methods: ['cash', 'card'],
+  smtp_host: '',
+  smtp_port: 587,
+  smtp_user: '',
+  smtp_password: '',
+  smtp_from_email: '',
+  smtp_from_name: '',
+  sms_api_key: '',
+  sms_sender: '',
+  privacy_policy: 'Политика конфиденциальности',
+  terms_of_service: 'Условия использования'
+};
+
 export const settingsApi = {
+  getDefaultSettings(): RestaurantSettings {
+    return defaultSettings;
+  },
+
   async getSettings(): Promise<RestaurantSettings> {
     try {
       // Проверяем кэш
@@ -66,7 +100,9 @@ export const settingsApi = {
         return JSON.parse(cachedData);
       }
       
-      throw error;
+      // Если нет кэша, возвращаем дефолтные настройки
+      console.log('Возвращаем дефолтные настройки');
+      return defaultSettings;
     }
   },
 
@@ -86,7 +122,26 @@ export const settingsApi = {
     }
   },
 
-  clearCache() {
+  getLocalSettings(): RestaurantSettings | null {
+    try {
+      const data = localStorage.getItem(SETTINGS_CACHE_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Ошибка при чтении локальных настроек:', error);
+      return null;
+    }
+  },
+
+  saveSettingsLocally(settings: RestaurantSettings): void {
+    try {
+      localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
+      localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+    } catch (error) {
+      console.error('Ошибка при сохранении настроек локально:', error);
+    }
+  },
+
+  clearCache(): void {
     localStorage.removeItem(SETTINGS_CACHE_KEY);
     localStorage.removeItem(SETTINGS_CACHE_TIMESTAMP);
   }
