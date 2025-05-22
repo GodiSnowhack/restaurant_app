@@ -51,7 +51,8 @@ export default function RegisterPage() {
 
     try {
       // Отправляем запрос на API для регистрации
-      const response = await fetch('/api/auth/register', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+      const response = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,7 +61,7 @@ export default function RegisterPage() {
           full_name: data.name,
           email: data.email,
           password: data.password,
-          role: 'waiter' // Устанавливаем роль "waiter" для нового пользователя
+          role: 'client' // Изменил роль на client вместо waiter
         }),
       });
 

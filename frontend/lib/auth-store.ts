@@ -612,7 +612,8 @@ const useAuthStore = create<AuthState>()(
             phone: phone || undefined
           };
           
-          const response = await fetch('/api/auth/register', {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+          const response = await fetch(`${apiUrl}/auth/register`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
