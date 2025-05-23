@@ -107,18 +107,29 @@ export const settingsApi = {
     try {
       console.log('Принудительное обновление настроек с сервера...');
       const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
-      const settings = response.data.data;
       
-      if (settings) {
+      if (response.data && response.data.data) {
+        const settings = response.data.data;
         // Обновляем кэш
         settingsApi.saveSettingsLocally(settings);
         return settings;
       }
       
-      throw new Error('Не удалось получить настройки с сервера');
+      console.warn('Сервер вернул пустые настройки, используем локальные');
+      const localSettings = settingsApi.getLocalSettings();
+      if (localSettings) {
+        return localSettings;
+      }
+      
+      return settingsApi.getDefaultSettings();
     } catch (error) {
       console.error('Ошибка при принудительном обновлении настроек:', error);
-      throw error;
+      // При ошибке возвращаем локальные настройки
+      const localSettings = settingsApi.getLocalSettings();
+      if (localSettings) {
+        return localSettings;
+      }
+      return settingsApi.getDefaultSettings();
     }
   },
 
@@ -129,21 +140,20 @@ export const settingsApi = {
       const token = localStorage.getItem('token');
       if (!token) {
         console.warn('Не найден токен авторизации, используем локальные настройки');
+        const localSettings = settingsApi.getLocalSettings();
+        if (localSettings) {
+          return localSettings;
+        }
         return settingsApi.getDefaultSettings();
       }
 
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData);
       
-      const updatedSettings = response.data.data;
-      
-      if (updatedSettings) {
+      if (response.data && response.data.data) {
+        const updatedSettings = response.data.data;
         // Обновляем кэш только если это не временное сохранение при редактировании
         if (!isEditing) {
           settingsApi.saveSettingsLocally(updatedSettings);
@@ -151,10 +161,15 @@ export const settingsApi = {
         return updatedSettings;
       }
       
-      throw new Error('Не удалось обновить настройки');
+      throw new Error('Сервер вернул пустые настройки');
     } catch (error) {
       console.error('Ошибка при обновлении настроек:', error);
-      throw error;
+      // При ошибке возвращаем текущие настройки
+      const localSettings = settingsApi.getLocalSettings();
+      if (localSettings) {
+        return localSettings;
+      }
+      return settingsApi.getDefaultSettings();
     }
   },
   

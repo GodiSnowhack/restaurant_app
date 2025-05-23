@@ -31,26 +31,10 @@ export interface User {
 export const getApiBaseUrl = () => {
   // Используем URL из переменной окружения, если он задан
   if (process.env.NEXT_PUBLIC_API_URL) {
-    // Убеждаемся, что URL использует HTTPS для production
-    const url = process.env.NEXT_PUBLIC_API_URL;
-    return url.replace('http://', 'https://');
+    return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Если мы на клиенте, определим baseURL на основе текущего хоста
-  if (typeof window !== 'undefined') {
-    const protocol = 'https:';
-    const host = window.location.hostname;
-    
-    // Для production всегда используем HTTPS
-    if (host.includes('railway.app') || host.includes('vercel.app')) {
-      return 'https://backend-production-1a78.up.railway.app/api/v1';
-    }
-    
-    // Для локальной разработки используем HTTPS
-    return `${protocol}//${host}:8000/api/v1`;
-  }
-  
-  // Для production по умолчанию используем HTTPS
+  // Для production всегда используем основной URL
   return 'https://backend-production-1a78.up.railway.app/api/v1';
 };
 

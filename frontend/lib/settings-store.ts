@@ -34,45 +34,56 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       const localSettings = settingsApi.getLocalSettings();
       
       if (localSettings) {
+        console.log('Загружены локальные настройки');
         set({ 
           settings: localSettings,
           isLoading: false,
           lastUpdated: Date.now()
         });
-      }
-
-      // Затем пытаемся получить с сервера
-      const serverSettings = await settingsApi.getSettings();
-      
-      if (serverSettings) {
-        set({ 
-          settings: serverSettings, 
-          isLoading: false, 
-          lastUpdated: Date.now() 
-        });
-        settingsApi.saveSettingsLocally(serverSettings);
-      }
-    } catch (error) {
-      console.error('Ошибка при загрузке настроек:', error);
-      
-      // При ошибке используем локальный кеш или дефолтные настройки
-      const localSettings = settingsApi.getLocalSettings();
-      if (localSettings) {
-        console.log('Используем локальные настройки после ошибки');
-        set({ 
-          settings: localSettings,
-          isLoading: false,
-          error: null
-        });
       } else {
-        console.log('Используем дефолтные настройки');
+        console.log('Локальные настройки не найдены, используем дефолтные');
         const defaultSettings = settingsApi.getDefaultSettings();
         set({ 
           settings: defaultSettings,
           isLoading: false,
+          lastUpdated: Date.now()
+        });
+        settingsApi.saveSettingsLocally(defaultSettings);
+      }
+
+      // Затем пытаемся получить с сервера
+      console.log('Запрашиваем настройки с сервера...');
+      const serverSettings = await settingsApi.getSettings();
+      
+      if (serverSettings && serverSettings.tables && serverSettings.tables.length > 0) {
+        console.log('Получены настройки с сервера:', serverSettings);
+        set({ 
+          settings: serverSettings, 
+          isLoading: false, 
+          lastUpdated: Date.now(),
           error: null
         });
-        // Сохраняем дефолтные настройки локально
+        settingsApi.saveSettingsLocally(serverSettings);
+      } else {
+        console.warn('Сервер вернул пустые настройки или без столов');
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке настроек:', error);
+      
+      // При ошибке оставляем текущие настройки
+      const currentSettings = get().settings;
+      if (currentSettings) {
+        set({ 
+          isLoading: false,
+          error: 'Не удалось загрузить настройки с сервера. Используются локальные настройки.'
+        });
+      } else {
+        const defaultSettings = settingsApi.getDefaultSettings();
+        set({ 
+          settings: defaultSettings,
+          isLoading: false,
+          error: 'Не удалось загрузить настройки с сервера. Используются настройки по умолчанию.'
+        });
         settingsApi.saveSettingsLocally(defaultSettings);
       }
     }
