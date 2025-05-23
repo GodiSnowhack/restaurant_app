@@ -53,15 +53,7 @@ export const settingsApi = {
           status: 'available'
         }
       ],
-      payment_methods: ['cash', 'card'],
-      smtp_host: '',
-      smtp_port: 587,
-      smtp_user: '',
-      smtp_password: '',
-      smtp_from_email: '',
-      smtp_from_name: '',
-      sms_api_key: '',
-      sms_sender: ''
+      payment_methods: ['cash', 'card']
     };
     
     return defaultSettings;
@@ -82,7 +74,18 @@ export const settingsApi = {
         }
       }
       
-      return await settingsApi.forceRefreshSettings();
+      // Если кэш устарел или отсутствует, делаем запрос к API
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const settings = response.data.data;
+      
+      if (settings) {
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(settings);
+        return settings;
+      }
+      
+      // Если с сервера пришли пустые данные, возвращаем кэш или дефолтные настройки
+      return cachedSettings || settingsApi.getDefaultSettings();
     } catch (error) {
       console.error('Ошибка при получении настроек:', error);
       
@@ -98,30 +101,20 @@ export const settingsApi = {
     }
   },
 
-  // Принудительное обновление настроек с сервера
-  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
-    try {
-      console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
-      const settings = response.data.data;
-      
-      if (settings) {
-        // Обновляем кэш
-        settingsApi.saveSettingsLocally(settings);
-        return settings;
-      }
-      
-      throw new Error('Не удалось получить настройки с сервера');
-    } catch (error) {
-      console.error('Ошибка при принудительном обновлении настроек:', error);
-      throw error;
-    }
-  },
-
   // Обновление настроек на сервере
   updateSettings: async (settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> => {
     try {
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settings);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Не найден токен авторизации');
+      }
+
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settings, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
       const updatedSettings = response.data.data;
       
       if (updatedSettings) {

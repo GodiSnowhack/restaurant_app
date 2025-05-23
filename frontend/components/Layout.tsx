@@ -3,6 +3,8 @@ import Head from 'next/head';
 import Header from './Header';
 import Footer from './Footer';
 import { useTheme } from '@/lib/theme-context';
+import { useRouter } from 'next/router';
+import { Toaster } from 'react-hot-toast';
 
 // Вспомогательная функция для безопасного получения URL изображений с обработкой ошибок 404
 export const getSafeImageUrl = (imageUrl: string | null | undefined): string => {
@@ -43,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({
   description = 'Лучший ресторан в городе'
 }) => {
   const { isDark } = useTheme();
+  const router = useRouter();
   
   useEffect(() => {
     // Применяем dark mode в соответствии с настройками пользователя
@@ -67,7 +70,7 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <>
       <Head>
         <title>{title}</title>
         <meta name="description" content={description} />
@@ -76,16 +79,43 @@ const Layout: React.FC<LayoutProps> = ({
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <Header />
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Header />
 
-      <main className="flex-grow" suppressHydrationWarning>
-        <div className={section ? getSectionStyles() : 'w-full'} suppressHydrationWarning>
-          {children}
-        </div>
-      </main>
+        <main className="flex-grow" suppressHydrationWarning>
+          <div className={section ? getSectionStyles() : 'w-full'} suppressHydrationWarning>
+            {children}
+          </div>
+        </main>
 
-      {showFooter && <Footer />}
-    </div>
+        {showFooter && <Footer />}
+      </div>
+
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            style: {
+              background: '#68D391',
+              color: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            style: {
+              background: '#FC8181',
+              color: '#fff',
+            },
+          },
+        }}
+      />
+    </>
   );
 };
 
