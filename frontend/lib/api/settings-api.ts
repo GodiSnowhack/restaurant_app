@@ -99,7 +99,7 @@ export const settingsApi = {
   async forceRefreshSettings(): Promise<RestaurantSettings> {
     try {
       console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<RestaurantSettings>('/api/v1/settings');
+      const response = await api.get<RestaurantSettings>('/settings');
       const settings = response.data;
       
       // Сохраняем в кэш
@@ -119,7 +119,7 @@ export const settingsApi = {
 
   async updateSettings(settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> {
     try {
-      const response = await api.put<RestaurantSettings>('/api/v1/settings', settings);
+      const response = await api.put<RestaurantSettings>('/settings', settings);
       const updatedSettings = response.data;
       
       // Обновляем кэш

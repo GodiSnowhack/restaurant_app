@@ -228,6 +228,14 @@ const AdminSettingsPage: NextPage = () => {
       setIsSaving(true);
       setError(null);
       
+      // Проверяем авторизацию
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация');
+        router.push('/auth/login');
+        return;
+      }
+      
       // Сохраняем изменения без флага isEditing для финального сохранения
       await settingsApi.updateSettings(formData);
       setIsEditing(false);
@@ -236,10 +244,19 @@ const AdminSettingsPage: NextPage = () => {
       await loadSettings();
       
       toast.success('Настройки успешно сохранены');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при сохранении настроек:', error);
-      setError('Не удалось сохранить настройки');
-      toast.error('Не удалось сохранить настройки');
+      
+      // Проверяем тип ошибки
+      if (error.response?.status === 401) {
+        toast.error('Необходима авторизация');
+        router.push('/auth/login');
+      } else if (error.response?.status === 403) {
+        toast.error('Недостаточно прав для изменения настроек');
+      } else {
+        setError('Не удалось сохранить настройки');
+        toast.error('Не удалось сохранить настройки');
+      }
     } finally {
       setIsSaving(false);
     }

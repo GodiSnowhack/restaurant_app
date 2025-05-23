@@ -107,7 +107,7 @@ export const clearAuthTokens = () => {
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // Получаем токен из localStorage
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('token');
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
