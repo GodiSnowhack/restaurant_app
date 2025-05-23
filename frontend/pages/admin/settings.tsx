@@ -235,14 +235,10 @@ const AdminSettingsPage: NextPage = () => {
         router.push('/auth/login');
         return;
       }
-      
-      // Сохраняем изменения без флага isEditing для финального сохранения
-      await settingsApi.updateSettings(formData);
+
+      // Используем updateSettings из хранилища вместо прямого вызова API
+      await updateSettings(formData);
       setIsEditing(false);
-      
-      // Обновляем данные с сервера
-      await loadSettings();
-      
       toast.success('Настройки успешно сохранены');
     } catch (error: any) {
       console.error('Ошибка при сохранении настроек:', error);

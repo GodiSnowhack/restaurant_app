@@ -1,4 +1,4 @@
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 
 // Функция для определения правильного baseURL для API
 const getApiBaseUrl = (): string => {
@@ -110,7 +110,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     
     if (token) {
+      console.log('API Interceptor: Добавляем токен в заголовки');
+      if (!config.headers) {
+        config.headers = new AxiosHeaders();
+      }
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.warn('API Interceptor: Токен не найден');
     }
     
     // Добавляем X-User-ID для неаутентифицированных запросов
@@ -122,33 +128,38 @@ api.interceptors.request.use(
       }
     }
     
+    // Логируем заголовки запроса
+    console.log('API Interceptor: Заголовки запроса:', config.headers);
+    
     return config;
   },
   (error: AxiosError) => {
+    console.error('API Interceptor: Ошибка в перехватчике запроса:', error);
     return Promise.reject(error);
   }
 );
 
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    console.log(`API Interceptor: Успешный ответ от ${response.config.url}:`, response.status);
+    return response;
+  },
   async (error: AxiosError) => {
-    // Если ошибка связана с сетью, пробуем использовать кэш
-    if (error.message === 'Network Error') {
-      console.log('API: Ошибка сети, пробуем использовать кэш');
-      
-      // Получаем URL запроса
-      const url = error.config?.url;
-      
-      if (url) {
-        // Проверяем наличие кэша для этого URL
-        const cacheKey = `cache_${url}`;
-        const cachedData = localStorage.getItem(cacheKey);
-        
-        if (cachedData) {
-          console.log('API: Найдены кэшированные данные');
-          return Promise.resolve({ data: JSON.parse(cachedData) });
-        }
+    console.error('API Interceptor: Ошибка в ответе:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.message
+    });
+    
+    // Если ошибка 401, проверяем токен
+    if (error.response?.status === 401) {
+      console.log('API Interceptor: Получена ошибка 401, проверяем токен');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('API Interceptor: Токен отсутствует');
+      } else {
+        console.log('API Interceptor: Токен присутствует, возможно он невалиден');
       }
     }
     

@@ -119,20 +119,36 @@ export const settingsApi = {
 
   async updateSettings(settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> {
     try {
+      console.log('API: Отправка запроса на обновление настроек');
+      
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('API: Отсутствует токен авторизации');
+        throw new Error('Необходима авторизация');
+      }
+
+      // Добавляем заголовок авторизации
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      console.log('API: Отправляем настройки на сервер:', settings);
       const response = await api.put<RestaurantSettings>('/settings', settings);
       const updatedSettings = response.data;
+      
+      console.log('API: Получен ответ от сервера:', updatedSettings);
       
       // Обновляем кэш
       try {
         localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(updatedSettings));
         localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+        console.log('API: Кэш обновлен');
       } catch (cacheError) {
-        console.error('Ошибка при кэшировании обновленных настроек:', cacheError);
+        console.error('API: Ошибка при кэшировании обновленных настроек:', cacheError);
       }
       
       return updatedSettings;
     } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
+      console.error('API: Ошибка при обновлении настроек:', error);
       throw error;
     }
   },
