@@ -67,7 +67,7 @@ export const reservationsApi = {
       
       try {
         // Отправляем запрос через API
-        const response = await api.get<Reservation[]>(`/api/v1/reservations${queryParams}`, {
+        const response = await api.get<Reservation[]>(`/reservations${queryParams}`, {
           headers,
           signal: controller.signal
         });

@@ -1,3 +1,4 @@
+import { api } from './api';
 import { handleApiResponse, getBaseApiOptions, ApiError } from '../api';
 
 /**
@@ -11,9 +12,8 @@ const adminApi = {
    */
   async checkAdminAccess(): Promise<boolean> {
     try {
-      const response = await fetch('/api/admin/check-access', getBaseApiOptions('GET'));
-      const data = await handleApiResponse(response);
-      return data.isAdmin;
+      const response = await api.get('/admin/check-access');
+      return response.data.isAdmin;
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 401) {
         throw new ApiError(401, 'У вас нет прав администратора');
@@ -28,8 +28,8 @@ const adminApi = {
    */
   async getDashboardStats(): Promise<any> {
     try {
-      const response = await fetch('/api/admin/dashboard-stats', getBaseApiOptions('GET'));
-      return await handleApiResponse(response);
+      const response = await api.get('/admin/dashboard-stats');
+      return response.data;
     } catch (error) {
       console.error('Ошибка при получении статистики панели управления:', error);
       
@@ -64,8 +64,8 @@ const adminApi = {
    */
   async getAdminUsers(): Promise<any[]> {
     try {
-      const response = await fetch('/api/admin/users', getBaseApiOptions('GET'));
-      return await handleApiResponse(response);
+      const response = await api.get('/admin/users');
+      return response.data;
     } catch (error) {
       console.error('Ошибка при получении списка пользователей:', error);
       throw error;
@@ -79,9 +79,8 @@ const adminApi = {
    */
   async createAdminUser(userData: any): Promise<any> {
     try {
-      const options = getBaseApiOptions('POST', userData);
-      const response = await fetch('/api/admin/users', options);
-      return await handleApiResponse(response);
+      const response = await api.post('/admin/users', userData);
+      return response.data;
     } catch (error) {
       console.error('Ошибка при создании пользователя:', error);
       throw error;
@@ -96,9 +95,8 @@ const adminApi = {
    */
   async updateAdminUser(userId: number, userData: any): Promise<any> {
     try {
-      const options = getBaseApiOptions('PUT', userData);
-      const response = await fetch(`/api/admin/users/${userId}`, options);
-      return await handleApiResponse(response);
+      const response = await api.put(`/admin/users/${userId}`, userData);
+      return response.data;
     } catch (error) {
       console.error('Ошибка при обновлении пользователя:', error);
       throw error;
@@ -112,8 +110,7 @@ const adminApi = {
    */
   async deleteAdminUser(userId: number): Promise<void> {
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, getBaseApiOptions('DELETE'));
-      await handleApiResponse(response);
+      await api.delete(`/admin/users/${userId}`);
     } catch (error) {
       console.error('Ошибка при удалении пользователя:', error);
       throw error;

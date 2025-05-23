@@ -95,7 +95,7 @@ export const waiterApi = {
 
       // Пробуем сначала получить заказы через специальное API для официантов
       try {
-        const apiUrl = '/api/waiter/simple-orders';
+        const apiUrl = '/waiter/simple-orders';
         console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
         
         const headers: HeadersInit = {
@@ -106,14 +106,10 @@ export const waiterApi = {
           'X-User-ID': userId ? String(userId) : ''
         };
         
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: headers,
-          cache: 'no-store'
-        });
+        const response = await api.get(apiUrl, { headers });
         
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status === 200) {
+          const data = response.data;
           console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
           
           if (Array.isArray(data) && data.length > 0) {
@@ -128,7 +124,7 @@ export const waiterApi = {
       }
 
       // Формируем URL запроса к обычному API
-      const apiUrl = '/api/waiter/orders';
+      const apiUrl = '/waiter/orders';
       
       console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
 
@@ -142,16 +138,11 @@ export const waiterApi = {
       };
 
       try {
-        // Выполняем запрос
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: headers,
-          cache: 'no-store'
-        });
+        // Выполняем запрос через axios instance
+        const response = await api.get(apiUrl, { headers });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}: ${errorText}`);
+        if (response.status !== 200) {
+          console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}`);
           
           // Если ошибка 401 (не авторизован) или 403 (доступ запрещен), возвращаем демо-данные
           if (response.status === 401 || response.status === 403) {
@@ -159,10 +150,10 @@ export const waiterApi = {
             return demoWaiterOrders;
           }
           
-          throw new Error(`Ошибка запроса: ${response.status} ${errorText}`);
+          throw new Error(`Ошибка запроса: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = response.data;
         console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
         
         if (!Array.isArray(data)) {
@@ -214,22 +205,8 @@ export const waiterApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch('/api/waiter/assign-order-by-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ code: orderCode })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Ошибка при привязке заказа');
-      }
-
-      const result = await response.json();
-      return result;
+      const response = await api.post('/waiter/assign-order-by-code', { code: orderCode });
+      return response.data;
     } catch (error: any) {
       console.error('Ошибка при привязке заказа по коду:', error);
       throw error;
@@ -252,25 +229,8 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Формируем URL для обновления статуса
-      const url = `/api/waiter/orders/${orderId}/status`;
-      
       // Отправляем запрос
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status })
-      });
-      
-      // Обрабатываем ответ
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`waiterApi.updateOrderStatus - Ошибка: ${errorText}`);
-        throw new Error(`Не удалось обновить статус: ${errorText}`);
-      }
+      const response = await api.patch(`/waiter/orders/${orderId}/status`, { status });
       
       console.log(`waiterApi.updateOrderStatus - Статус успешно обновлен`);
       return true;
@@ -295,24 +255,8 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Формируем URL для подтверждения оплаты
-      const url = `/api/waiter/orders/${orderId}/confirm-payment`;
-      
       // Отправляем запрос
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      // Обрабатываем ответ
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`waiterApi.confirmPayment - Ошибка: ${errorText}`);
-        throw new Error(`Не удалось подтвердить оплату: ${errorText}`);
-      }
+      const response = await api.post(`/waiter/orders/${orderId}/confirm-payment`);
       
       console.log(`waiterApi.confirmPayment - Оплата успешно подтверждена`);
       return true;
@@ -337,24 +281,8 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Формируем URL для завершения заказа
-      const url = `/api/waiter/orders/${orderId}/complete`;
-      
       // Отправляем запрос
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      // Обрабатываем ответ
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`waiterApi.completeOrder - Ошибка: ${errorText}`);
-        throw new Error(`Не удалось завершить заказ: ${errorText}`);
-      }
+      const response = await api.post(`/waiter/orders/${orderId}/complete`);
       
       console.log(`waiterApi.completeOrder - Заказ успешно завершен`);
       return true;
@@ -392,23 +320,10 @@ export const waiterApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch('/api/waiter/generate-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Ошибка при генерации кода');
-      }
-
-      const result = await response.json();
+      const response = await api.post('/waiter/generate-code');
       return {
         success: true,
-        ...result
+        ...response.data
       };
     } catch (error: any) {
       console.error('Ошибка при генерации кода:', error);
@@ -445,24 +360,10 @@ export const waiterApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch(`/api/waiter/orders/${orderId}/assign-waiter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ code: waiterCode })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Ошибка при привязке официанта');
-      }
-
-      const result = await response.json();
+      const response = await api.post(`/waiter/orders/${orderId}/assign-waiter`, { code: waiterCode });
       return {
         success: true,
-        ...result
+        ...response.data
       };
     } catch (error: any) {
       console.error('Ошибка при привязке официанта:', error);

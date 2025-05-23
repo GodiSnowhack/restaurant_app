@@ -75,7 +75,7 @@ export const settingsApi = {
   getSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Запрос настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
       
       if (response.data && response.data.data) {
         const settings = response.data.data;
@@ -117,7 +117,7 @@ export const settingsApi = {
   forceRefreshSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
       
       if (response.data && response.data.data) {
         const settings = response.data.data;
@@ -155,7 +155,7 @@ export const settingsApi = {
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settingsData);
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData);
       
       if (response.data && response.data.data) {
         const updatedSettings = response.data.data;

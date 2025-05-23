@@ -35,7 +35,7 @@ export const getApiBaseUrl = () => {
   }
   
   // Для production всегда используем основной URL
-  return 'https://backend-production-1a78.up.railway.app';
+  return 'https://backend-production-1a78.up.railway.app/api/v1';
 };
 
 const baseURL = getApiBaseUrl();
@@ -169,10 +169,13 @@ api.interceptors.request.use(
       }
     }
     
+    // Добавляем интерцептор для логирования запросов
+    console.log(`[API] Отправка ${config.method?.toUpperCase()} запроса к ${config.url}`);
+    
     return config;
   },
   (error: AxiosError) => {
-    console.error('Ошибка запроса API:', error);
+    console.error('[API] Ошибка при формировании запроса:', error);
     return Promise.reject(error);
   }
 );
@@ -180,6 +183,7 @@ api.interceptors.request.use(
 // Добавляем обработчик ответов для централизованной обработки ошибок
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    console.log(`[API] Получен ответ от ${response.config.url}:`, response.status);
     return response;
   },
   async (error: AxiosError) => {
@@ -287,6 +291,9 @@ api.interceptors.response.use(
         console.log('API: Отсутствует refresh_token');
       }
     }
+    
+    // Добавляем интерцептор для логирования ответов
+    console.error(`[API] Ошибка при запросе к ${error.config?.url}:`, error.response?.status);
     
     // Для всех остальных ошибок просто возвращаем reject
     return Promise.reject(error);

@@ -15,23 +15,15 @@ export const ordersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      // Используем локальный API-прокси вместо прямого обращения к бэкенду
-      const response = await fetch(`/api/orders?start_date=${startDate}&end_date=${endDate}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
+      // Используем axios instance с базовым URL
+      const response = await api.get(`/orders`, {
+        params: {
+          start_date: startDate,
+          end_date: endDate
         }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Ошибка при получении заказов');
-      }
-
-      const data = await response.json();
-      return data;
+      return response.data;
     } catch (error: any) {
       console.error('API: Ошибка при получении заказов:', error);
 
@@ -49,8 +41,7 @@ export const ordersApi = {
           items: [
             { dish_id: 1, quantity: 2, price: 100, name: 'Демо блюдо' }
           ]
-        },
-        // ... другие демо-заказы
+        }
       ];
     }
   },
@@ -82,103 +73,21 @@ export const ordersApi = {
         return generateWaiterDemoOrders();
       }
       
-      // Сначала пробуем через API с параметром demo=true для гарантированного получения данных
-      try {
-        console.log('API: Пробуем получить демо-заказы через API прокси');
-        
-        const demoResponse = await fetch('/api/waiter/orders?demo=true', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : '',
-            'X-User-Role': 'waiter',
-            'X-Demo-Mode': 'true'
-          }
-        });
-        
-        if (demoResponse.ok) {
-          const demoData = await demoResponse.json();
-          console.log('API: Успешно получены демо-заказы через API прокси:', demoData.length);
-          return demoData;
-        }
-      } catch (demoError) {
-        console.error('API: Ошибка при получении демо-заказов:', demoError);
-      }
-      
-      // Пробуем через fetch к API прокси
-      try {
-        console.log('API: Пробуем получить заказы через fetch к API прокси');
-        
-        // Используем прямой запрос к нашему API-прокси
-        const response = await fetch('/api/waiter/orders', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : '',
-            'X-User-Role': 'waiter' // Явно указываем роль
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('API: Заказы официанта успешно получены через fetch:', data.length);
-          return data;
-        } else {
-          console.error('API: Ошибка при получении заказов через fetch:', response.status);
-          // Продолжаем выполнение и пробуем другие методы
-        }
-      } catch (fetchError) {
-        console.error('API: Ошибка при использовании fetch:', fetchError);
-        // Продолжаем выполнение и пробуем другие методы
-      }
-      
       // Пробуем через основной API
       try {
         console.log('API: Пробуем получить заказы через api.get');
-        const response = await api.get('/waiter/orders');
+        const response = await api.get('/waiter/orders', {
+          headers: {
+            'X-User-Role': 'waiter'
+          }
+        });
         return response.data;
       } catch (apiError: any) {
         console.error('API: Ошибка при вызове основного API для заказов официанта:', apiError);
-        
-        // Если получили ошибку авторизации или ошибку сервера, пробуем альтернативные способы
-        if (apiError.response?.status === 401 || apiError.response?.status === 403 || 
-            apiError.response?.status === 404 || apiError.response?.status >= 500) {
-          
-          // Пробуем запросить простой API заказов
-          try {
-            console.log('API: Пробуем получить все заказы');
-            const allOrdersResponse = await fetch('/api/orders', {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : '',
-                'X-User-Role': 'waiter' // Явно указываем роль
-              }
-            });
-            
-            if (allOrdersResponse.ok) {
-              const allOrdersData = await allOrdersResponse.json();
-              console.log('API: Получены все заказы:', allOrdersData.length);
-              return allOrdersData;
-            }
-          } catch (allOrdersError) {
-            console.error('API: Ошибка при запросе всех заказов:', allOrdersError);
-          }
-          
-          // Если все предыдущие попытки не удались, возвращаем демо-данные
-          console.log('API: Все способы получения реальных данных не сработали, возвращаем демо-заказы');
-          return generateWaiterDemoOrders();
-        }
-        
-        // Для других ошибок также возвращаем демо-данные
         return generateWaiterDemoOrders();
       }
     } catch (error: any) {
       console.error('API: Общая ошибка при получении заказов официанта:', error);
-      
-      // В случае ошибки возвращаем демо-данные
       return generateWaiterDemoOrders();
     }
   },
