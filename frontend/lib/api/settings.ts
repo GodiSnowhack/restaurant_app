@@ -74,29 +74,37 @@ export const settingsApi = {
   // Получение настроек с сервера
   getSettings: async (): Promise<RestaurantSettings> => {
     try {
-      // Проверяем кэш
-      const cachedSettings = settingsApi.getLocalSettings();
-      const timestamp = localStorage.getItem('restaurant_settings_timestamp');
+      console.log('Запрос настроек с сервера...');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
       
-      if (cachedSettings && timestamp) {
-        const age = Date.now() - parseInt(timestamp);
-        if (age < 30 * 60 * 1000) { // 30 минут
-          console.log('Используем кэшированные настройки');
-          return cachedSettings;
+      if (response.data && response.data.data) {
+        const settings = response.data.data;
+        console.log('Получены настройки с сервера:', settings);
+        
+        // Проверяем наличие столов
+        if (!settings.tables || settings.tables.length === 0) {
+          console.warn('Сервер вернул настройки без столов');
+          // Добавляем дефолтные столы
+          settings.tables = settingsApi.getDefaultSettings().tables;
         }
+        
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(settings);
+        return settings;
       }
       
-      return await settingsApi.forceRefreshSettings();
+      throw new Error('Сервер вернул пустые настройки');
     } catch (error) {
       console.error('Ошибка при получении настроек:', error);
       
-      // В случае ошибки возвращаем кэш или дефолтные настройки
+      // Пробуем получить из кэша
       const cachedSettings = settingsApi.getLocalSettings();
       if (cachedSettings) {
         console.log('Используем кэшированные настройки после ошибки');
         return cachedSettings;
       }
       
+      // Если нет в кэше, возвращаем дефолтные
       console.log('Используем дефолтные настройки');
       return settingsApi.getDefaultSettings();
     }

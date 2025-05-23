@@ -34,8 +34,8 @@ export const getApiBaseUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Для production всегда используем основной URL
-  return 'https://backend-production-1a78.up.railway.app/api/v1';
+  // Для production всегда используем основной URL без дублирования /api/v1
+  return 'https://backend-production-1a78.up.railway.app';
 };
 
 const baseURL = getApiBaseUrl();
