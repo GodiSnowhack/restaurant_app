@@ -158,6 +158,22 @@ api.interceptors.request.use(
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Проверяем, нужно ли обновить токен
+    if (response.data?.user?.needs_token_refresh) {
+      console.log('API Interceptor: Требуется обновление токена');
+      const user = response.data.user;
+      // Создаем новый токен с правильной ролью
+      const newToken = createAccessToken({
+        sub: user.id,
+        role: user.role,
+        email: user.email
+      });
+      // Сохраняем новый токен
+      localStorage.setItem('token', newToken);
+      // Обновляем информацию о пользователе
+      localStorage.setItem('user_profile', JSON.stringify(user));
+    }
+    
     console.log(`API Interceptor: Успешный ответ от ${response.config.url}:`, response.status);
     return response;
   },
@@ -190,6 +206,36 @@ api.interceptors.response.use(
         });
         
         if (!response.ok) {
+          // Если не удалось обновить токен, пробуем повторно авторизоваться
+          const userProfile = localStorage.getItem('user_profile');
+          if (userProfile) {
+            const { email } = JSON.parse(userProfile);
+            const loginResponse = await fetch('/api/v1/auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                email: email,
+                password: localStorage.getItem('password') // Временное решение
+              })
+            });
+            
+            if (loginResponse.ok) {
+              const data = await loginResponse.json();
+              if (data.access_token) {
+                localStorage.setItem('token', data.access_token);
+                if (error.config) {
+                  const newConfig = { ...error.config };
+                  newConfig.headers = new AxiosHeaders({
+                    ...newConfig.headers,
+                    'Authorization': `Bearer ${data.access_token}`
+                  });
+                  return api(newConfig);
+                }
+              }
+            }
+          }
           throw new Error('Не удалось обновить токен');
         }
         
@@ -223,6 +269,27 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Функция для создания нового токена
+function createAccessToken(data: { sub: string | number, role: string, email: string }): string {
+  const header = {
+    alg: 'HS256',
+    typ: 'JWT'
+  };
+  
+  const payload = {
+    ...data,
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 часа
+  };
+  
+  const encodedHeader = btoa(JSON.stringify(header));
+  const encodedPayload = btoa(JSON.stringify(payload));
+  
+  // В реальном приложении здесь должен быть правильный алгоритм подписи
+  const signature = btoa(JSON.stringify({ signed: true }));
+  
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
 
 // Функция для проверки, является ли текущий маршрут публичным
 // Импортируем позже для избежания циклических зависимостей

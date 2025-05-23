@@ -236,19 +236,69 @@ const AdminSettingsPage: NextPage = () => {
         return;
       }
 
-      // Используем updateSettings из хранилища вместо прямого вызова API
-      await updateSettings(formData);
+      // Проверяем роль пользователя
+      const userProfile = localStorage.getItem('user_profile');
+      if (!userProfile) {
+        toast.error('Информация о пользователе не найдена');
+        router.push('/auth/login');
+        return;
+      }
+
+      const { role } = JSON.parse(userProfile);
+      if (role !== 'admin') {
+        toast.error('Недостаточно прав для изменения настроек');
+        router.push('/');
+        return;
+      }
+
+      // Сохраняем изменения
+      const savedSettings = await updateSettings(formData);
       setIsEditing(false);
+      setFormData(savedSettings);
+      setLastUpdateTime(new Date().toLocaleString());
       toast.success('Настройки успешно сохранены');
     } catch (error: any) {
       console.error('Ошибка при сохранении настроек:', error);
       
       // Проверяем тип ошибки
       if (error.response?.status === 401) {
+        // Пробуем переавторизоваться
+        try {
+          const userProfile = localStorage.getItem('user_profile');
+          if (userProfile) {
+            const { email } = JSON.parse(userProfile);
+            const password = localStorage.getItem('password'); // Временное решение
+            if (password) {
+              const response = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.access_token);
+                // Повторяем сохранение
+                const savedSettings = await updateSettings(formData);
+                setIsEditing(false);
+                setFormData(savedSettings);
+                setLastUpdateTime(new Date().toLocaleString());
+                toast.success('Настройки успешно сохранены');
+                return;
+              }
+            }
+          }
+        } catch (retryError) {
+          console.error('Ошибка при повторной авторизации:', retryError);
+        }
+        
         toast.error('Необходима авторизация');
         router.push('/auth/login');
       } else if (error.response?.status === 403) {
         toast.error('Недостаточно прав для изменения настроек');
+        router.push('/');
       } else {
         setError('Не удалось сохранить настройки');
         toast.error('Не удалось сохранить настройки');

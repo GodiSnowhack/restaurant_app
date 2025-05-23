@@ -111,14 +111,9 @@ def get_current_user(
         # Проверяем соответствие роли в токене и в базе данных
         if role and role != user.role:
             print(f"Несоответствие ролей: токен={role}, база={user.role}")
-            # Вместо исключения, обновляем роль в токене
-            new_token = create_access_token(
-                data={"sub": str(user.id), "role": user.role},
-                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-            )
-            # Устанавливаем новый токен в заголовок
-            request = Request.get_current()
-            request.headers["Authorization"] = f"Bearer {new_token}"
+            # Вместо изменения заголовков, возвращаем пользователя с правильной ролью
+            # и добавляем информацию о необходимости обновить токен
+            user.needs_token_refresh = True
         
         print(f"Успешно получен пользователь: ID={user.id}, роль={user.role}")
         return user

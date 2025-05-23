@@ -8,7 +8,7 @@ interface SettingsState {
   error: string | null;
   lastUpdated: number | null;
   loadSettings: () => Promise<void>;
-  updateSettings: (newSettings: Partial<RestaurantSettings>) => Promise<void>;
+  updateSettings: (newSettings: Partial<RestaurantSettings>) => Promise<RestaurantSettings>;
   updateTables: (tables: RestaurantTable[]) => Promise<void>;
   addTable: (table: Omit<RestaurantTable, 'id'>) => Promise<void>;
   removeTable: (tableId: number) => Promise<void>;
@@ -131,11 +131,13 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       
       // Обновляем состояние и локальное хранилище
       set({ 
-        settings: savedSettings || updatedSettings, 
+        settings: savedSettings, 
         isLoading: false,
         lastUpdated: Date.now()
       });
-      settingsApi.saveSettingsLocally(savedSettings || updatedSettings);
+      settingsApi.saveSettingsLocally(savedSettings);
+      
+      return savedSettings;
     } catch (error) {
       console.error('Ошибка при обновлении настроек:', error);
       
@@ -152,6 +154,8 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       setTimeout(() => {
         get().updateSettings(newSettings);
       }, 10000); // Через 10 секунд
+      
+      return updatedSettings;
     }
   },
 
