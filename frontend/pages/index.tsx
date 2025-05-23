@@ -15,37 +15,27 @@ import useCartStore from '../lib/cart-store';
 import {useSettings} from '../settings-context';
 import { menuApi } from '../lib/api/';
 import type { Dish } from '../types';
-
-interface Restaurant {
-  restaurant_name: string;
-  welcome_text: string;
-  logo_url: string;
-  description?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  working_hours?: string;
-  latitude?: number; 
-  longitude?: number;
-  delivery_radius?: number;
-  min_order?: number;
-  delivery_fee?: number;
-  avg_delivery_time?: number;
-  social_links?: {
-    facebook?: string;
-    instagram?: string;
-    twitter?: string;
-  };
-}
+import type { RestaurantSettings, WorkingHours, WorkingHoursItem } from '../lib/api/types';
 
 // Дополним тип Dish для использования в компоненте
-interface ExtendedDish extends Dish {
+interface ExtendedDish extends Omit<Dish, 'description' | 'image_url'> {
   featured?: boolean;
   rating?: number;
+  description?: string;
+  image_url?: string;
+}
+
+// Интерфейс для отзывов
+interface Testimonial {
+  name: string;
+  text: string;
+  rating: number;
+  date: string;
+  avatar?: string;
 }
 
 // Отзывы
-const testimonials = [
+const testimonials: Testimonial[] = [
   {
     name: 'Иван Петров',
     text: 'Отличный ресторан! Очень вкусные блюда и отличный сервис.',
@@ -69,10 +59,18 @@ const testimonials = [
   }
 ];
 
+// Интерфейс для пользователя
+interface User {
+  id: number;
+  role?: string;
+  email: string;
+  full_name: string;
+}
+
 // Компонент для быстрого доступа к функциям
-const QuickAccess = () => {
+const QuickAccess: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   // Если пользователь не авторизован, не показываем компонент
   if (!isAuthenticated || !user) return null;
@@ -82,7 +80,7 @@ const QuickAccess = () => {
   };
 
   const getAccessLinks = () => {
-    const links = [];
+    const links: JSX.Element[] = [];
 
     // Для официанта
     if (user.role === 'waiter' || user.role === 'admin') {
@@ -131,13 +129,17 @@ const QuickAccess = () => {
   );
 };
 
-const HomePageContent = () => {
+interface HomePageContentProps {}
+
+const HomePageContent: React.FC<HomePageContentProps> = () => {
   const { isAuthenticated, user } = useAuthStore();
   const { settings: contextSettings } = useSettings();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<Restaurant | null>(null);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [popularDishes, setPopularDishes] = useState<ExtendedDish[]>([]);
+  const [showWaiterBanner, setShowWaiterBanner] = useState<boolean>(false);
+  const router = useRouter();
 
   // Выносим функцию за пределы useEffect для повторного использования
   const loadInitialData = async () => {
@@ -149,20 +151,20 @@ const HomePageContent = () => {
       }
       
       // Получаем популярные блюда
-      const getDishesForMainPage = async () => {
+      const getDishesForMainPage = async (): Promise<ExtendedDish[]> => {
         try {
           // Получаем все блюда и отбираем популярные
           const allDishesResponse = await menuApi.getDishes();
           
           // Временное решение для преобразования ответа API в нужный формат
-          let dishes: any[] = [];
+          let dishes: ExtendedDish[] = [];
           
           if (allDishesResponse && Array.isArray(allDishesResponse)) {
-            dishes = allDishesResponse;
+            dishes = allDishesResponse as ExtendedDish[];
           } else if (allDishesResponse && typeof allDishesResponse === 'object') {
             // Проверяем наличие свойства dishes в ответе
             if ('dishes' in allDishesResponse && Array.isArray((allDishesResponse as any).dishes)) {
-              dishes = (allDishesResponse as any).dishes;
+              dishes = (allDishesResponse as any).dishes as ExtendedDish[];
             }
           }
           
@@ -170,15 +172,9 @@ const HomePageContent = () => {
           const popularDishes = dishes
             .filter(dish => {
               if (!dish) return false;
-              
-              // Проверяем наличие свойств featured или rating
-              const asDish = dish as any;
-              return (
-                asDish.featured === true || 
-                (asDish.rating !== undefined && asDish.rating > 4.5)
-              );
+              return dish.featured === true || (dish.rating !== undefined && dish.rating > 4.5);
             })
-            .slice(0, 6) as ExtendedDish[];
+            .slice(0, 6);
           
           return popularDishes;
         } catch (error) {
@@ -202,9 +198,6 @@ const HomePageContent = () => {
     loadInitialData();
   }, []);
 
-  const router = useRouter();
-  const [showWaiterBanner, setShowWaiterBanner] = useState(false);
-
   useEffect(() => {
     // Показываем баннер для официантов
     if (isAuthenticated && (user?.role === 'waiter' || user?.role === 'admin')) {
@@ -216,13 +209,13 @@ const HomePageContent = () => {
     router.push('/menu');
   };
   
-  const handleAddToCart = (dish: Dish) => {
+  const handleAddToCart = (dish: ExtendedDish) => {
     // Добавление блюда в корзину
     console.log('Добавлено в корзину:', dish);
   };
   
   // Функция для форматирования рабочих часов
-  const formatWorkingHours = () => {
+  const formatWorkingHours = (): string => {
     if (!settings?.working_hours) return 'Пн-Вс: 10:00 - 22:00';
     
     // Если working_hours это строка, возвращаем её
@@ -232,8 +225,7 @@ const HomePageContent = () => {
     
     // Если working_hours это объект, форматируем его
     try {
-      // Пример простого форматирования
-      const days = {
+      const days: Record<keyof WorkingHours, string> = {
         monday: 'Пн',
         tuesday: 'Вт',
         wednesday: 'Ср',
@@ -246,12 +238,12 @@ const HomePageContent = () => {
       // Формируем строку с рабочими часами
       let formattedHours = '';
       for (const [day, value] of Object.entries(settings.working_hours)) {
-        if (days[day as keyof typeof days]) {
-          const dayData = value as any;
+        if (days[day as keyof WorkingHours]) {
+          const dayData = value as WorkingHoursItem;
           if (dayData.is_closed) {
-            formattedHours += `${days[day as keyof typeof days]}: Выходной, `;
+            formattedHours += `${days[day as keyof WorkingHours]}: Выходной, `;
           } else {
-            formattedHours += `${days[day as keyof typeof days]}: ${dayData.open}-${dayData.close}, `;
+            formattedHours += `${days[day as keyof WorkingHours]}: ${dayData.open}-${dayData.close}, `;
           }
         }
       }
@@ -290,10 +282,10 @@ const HomePageContent = () => {
             <div className="container mx-auto px-4 py-16 md:py-24 flex flex-col md:flex-row items-center">
               <div className="md:w-1/2 md:pr-12 mb-10 md:mb-0 text-center md:text-left">
                 <h1 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
-                  {settings?.welcome_text || 'Добро пожаловать в наш ресторан!'}
+                  Добро пожаловать в {settings?.restaurant_name || 'наш ресторан'}!
                 </h1>
                 <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8">
-                  {settings?.description || 'Насладитесь изысканными блюдами в атмосфере уюта и комфорта. Наше меню разработано лучшими шеф-поварами, чтобы предложить вам незабываемые вкусовые впечатления.'}
+                  Насладитесь изысканными блюдами в атмосфере уюта и комфорта. Наше меню разработано лучшими шеф-поварами, чтобы предложить вам незабываемые вкусовые впечатления.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                   <button
@@ -316,7 +308,7 @@ const HomePageContent = () => {
                   <div className="relative rounded-lg overflow-hidden shadow-2xl transform transition-transform hover:scale-105">
                     <Image 
                       src={settings.logo_url} 
-                      alt={settings?.restaurant_name || 'Ресторан'} 
+                      alt={settings.restaurant_name} 
                       width={600} 
                       height={400}
                       className="object-cover"
@@ -444,8 +436,7 @@ const HomePageContent = () => {
                     Часы работы
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300">
-                    Пн-Пт: 12:00 - 23:00<br />
-                    Сб-Вс: 12:00 - 00:00
+                    {formatWorkingHours()}
                   </p>
                 </div>
               </div>
@@ -527,8 +518,8 @@ const HomePageContent = () => {
   );
 };
 
-export default function HomePage() {
-  const [mounted, setMounted] = useState(false);
+const HomePage: React.FC = () => {
+  const [mounted, setMounted] = useState<boolean>(false);
   
   useEffect(() => {
     setMounted(true);
@@ -547,4 +538,6 @@ export default function HomePage() {
       </div>
     </Layout>
   );
-} 
+}
+
+export default HomePage; 
