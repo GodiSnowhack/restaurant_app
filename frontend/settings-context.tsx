@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import useSettingsStore from './lib/settings-store';
-import { RestaurantSettings } from './lib/api/types';
+import { RestaurantSettings } from './types';
 
 interface SettingsContextType {
-  settings: RestaurantSettings | null;
+  settings: RestaurantSettings;
   isLoading: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
-  settings: null,
+  settings: {} as RestaurantSettings,
   isLoading: true,
   error: null,
   loadSettings: async () => {}
@@ -30,8 +30,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [loadSettings, initialized]);
 
-  const value: SettingsContextType = {
-    settings: settings || null,
+  const value = {
+    settings,
     isLoading,
     error,
     loadSettings

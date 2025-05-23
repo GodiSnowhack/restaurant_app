@@ -15,7 +15,7 @@ interface DishModalProps {
   error?: string | null;
 }
 
-export const DishModal: React.FC<DishModalProps> = ({
+const DishModal: React.FC<DishModalProps> = ({
   dish,
   isOpen,
   onClose,
@@ -25,16 +25,8 @@ export const DishModal: React.FC<DishModalProps> = ({
 }) => {
   const { isDark } = useTheme();
   const { settings } = useSettings();
-  
-  if (!isOpen) return null;
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: settings?.currency || 'KZT',
-      currencyDisplay: 'symbol'
-    }).format(price);
-  };
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -180,7 +172,7 @@ export const DishModal: React.FC<DishModalProps> = ({
                   text-2xl font-bold
                   ${isDark ? 'text-primary-400' : 'text-primary'}
                 `}>
-                  {formatPrice(typeof dish.price === 'number' ? dish.price : parseFloat(dish.price))}
+                  {typeof dish.price === 'number' ? dish.price.toLocaleString() : dish.price} {settings?.currency_symbol || '₸'}
                 </span>
                 <button
                   onClick={() => {

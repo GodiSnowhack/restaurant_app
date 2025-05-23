@@ -25,11 +25,10 @@ export const formatPrice = (price: number, currency: string = '₸'): string => 
 export const formatPriceWithSettings = (amount: number | null | undefined, options: { decimals?: number } = {}): string => {
   const { settings } = useSettingsStore.getState();
   const { decimals = 2 } = options;
-  const currencySymbol = settings?.currency_symbol || '₸';
   
   if (amount === null || amount === undefined) {
-    return `0.${'0'.repeat(decimals)} ${currencySymbol}`;
+    return `0.${'0'.repeat(decimals)} ${settings.currency_symbol}`;
   }
   
-  return `${Number(amount).toFixed(decimals)} ${currencySymbol}`;
+  return `${Number(amount).toFixed(decimals)} ${settings.currency_symbol}`;
 }; 

@@ -5,6 +5,10 @@ interface ApiResponse<T> {
   data: T;
 }
 
+interface UpdateSettingsRequest extends Partial<RestaurantSettings> {
+  isEditing?: boolean;
+}
+
 // API функции для работы с настройками ресторана
 export const settingsApi = {
   // Получение настроек по умолчанию для первоначальной инициализации
@@ -53,7 +57,15 @@ export const settingsApi = {
           status: 'available'
         }
       ],
-      payment_methods: ['cash', 'card']
+      payment_methods: ['cash', 'card'],
+      smtp_host: '',
+      smtp_port: 587,
+      smtp_user: '',
+      smtp_password: '',
+      smtp_from_email: '',
+      smtp_from_name: '',
+      sms_api_key: '',
+      sms_sender: ''
     };
     
     return defaultSettings;
@@ -74,18 +86,7 @@ export const settingsApi = {
         }
       }
       
-      // Если кэш устарел или отсутствует, делаем запрос к API
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
-      const settings = response.data.data;
-      
-      if (settings) {
-        // Обновляем кэш
-        settingsApi.saveSettingsLocally(settings);
-        return settings;
-      }
-      
-      // Если с сервера пришли пустые данные, возвращаем кэш или дефолтные настройки
-      return cachedSettings || settingsApi.getDefaultSettings();
+      return await settingsApi.forceRefreshSettings();
     } catch (error) {
       console.error('Ошибка при получении настроек:', error);
       
@@ -101,25 +102,51 @@ export const settingsApi = {
     }
   },
 
-  // Обновление настроек на сервере
-  updateSettings: async (settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> => {
+  // Принудительное обновление настроек с сервера
+  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
     try {
+      console.log('Принудительное обновление настроек с сервера...');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const settings = response.data.data;
+      
+      if (settings) {
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(settings);
+        return settings;
+      }
+      
+      throw new Error('Не удалось получить настройки с сервера');
+    } catch (error) {
+      console.error('Ошибка при принудительном обновлении настроек:', error);
+      throw error;
+    }
+  },
+
+  // Обновление настроек на сервере
+  updateSettings: async (settings: UpdateSettingsRequest): Promise<RestaurantSettings> => {
+    try {
+      // Получаем токен из localStorage
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Не найден токен авторизации');
       }
 
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settings, {
+      // Удаляем служебное поле перед отправкой
+      const { isEditing, ...settingsData } = settings;
+
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settingsData, {
         headers: {
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
       
       const updatedSettings = response.data.data;
       
       if (updatedSettings) {
-        // Обновляем кэш
-        settingsApi.saveSettingsLocally(updatedSettings);
+        // Обновляем кэш только если это не временное сохранение при редактировании
+        if (!isEditing) {
+          settingsApi.saveSettingsLocally(updatedSettings);
+        }
         return updatedSettings;
       }
       

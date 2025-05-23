@@ -112,24 +112,19 @@ const Header = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4 flex-shrink-0">
             <Link href="/" className="flex items-center" onClick={handleLogoClick}>
-              {settings?.logo_url ? (
+              {settings.logo_url ? (
                 <Image
                   src={settings.logo_url}
-                  alt={settings?.restaurant_name || 'Ресторан'}
+                  alt={settings.restaurant_name || 'Ресторан'}
                   width={40}
                   height={40}
-                  className="rounded-full"
+                  className="rounded-md"
                 />
               ) : (
-                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">
-                    {settings?.restaurant_name?.[0] || 'Р'}
-                  </span>
+                <div className="text-primary font-bold text-xl uppercase dark:text-primary">
+                  {settings.restaurant_name || 'RESTAURANT'}
                 </div>
               )}
-              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
-                {settings?.restaurant_name || 'Ресторан'}
-              </span>
             </Link>
           </div>
 
