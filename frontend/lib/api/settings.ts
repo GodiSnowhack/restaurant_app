@@ -106,7 +106,7 @@ export const settingsApi = {
   forceRefreshSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
       const settings = response.data.data;
       
       if (settings) {
@@ -128,13 +128,14 @@ export const settingsApi = {
       // Получаем токен из localStorage
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Не найден токен авторизации');
+        console.warn('Не найден токен авторизации, используем локальные настройки');
+        return settingsApi.getDefaultSettings();
       }
 
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settingsData, {
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
