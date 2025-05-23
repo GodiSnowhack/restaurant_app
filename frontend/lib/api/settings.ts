@@ -31,7 +31,28 @@ export const settingsApi = {
       table_reservation_enabled: true,
       privacy_policy: 'Политика конфиденциальности ресторана',
       terms_of_service: 'Условия использования сервиса',
-      tables: [], // Пустой массив столов по умолчанию
+      tables: [
+        {
+          id: 1,
+          number: 1,
+          name: 'Стол 1',
+          capacity: 2,
+          is_active: true,
+          position_x: 100,
+          position_y: 100,
+          status: 'available'
+        },
+        {
+          id: 2,
+          number: 2,
+          name: 'Стол 2',
+          capacity: 4,
+          is_active: true,
+          position_x: 250,
+          position_y: 100,
+          status: 'available'
+        }
+      ],
       payment_methods: ['cash', 'card'],
       smtp_host: '',
       smtp_port: 587,
@@ -48,20 +69,63 @@ export const settingsApi = {
   
   // Получение настроек с сервера
   getSettings: async (): Promise<RestaurantSettings> => {
-    const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings/settings');
-    return response.data.data;
+    try {
+      // Проверяем кэш
+      const cachedSettings = settingsApi.getLocalSettings();
+      const timestamp = localStorage.getItem('restaurant_settings_timestamp');
+      
+      if (cachedSettings && timestamp) {
+        const age = Date.now() - parseInt(timestamp);
+        if (age < 30 * 60 * 1000) { // 30 минут
+          console.log('Используем кэшированные настройки');
+          return cachedSettings;
+        }
+      }
+      
+      // Если кэш устарел или отсутствует, делаем запрос к API
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
+      const settings = response.data.data; // Получаем данные из поля data
+      
+      if (settings) {
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(settings);
+        return settings;
+      }
+      
+      // Если с сервера пришли пустые данные, возвращаем кэш или дефолтные настройки
+      return cachedSettings || settingsApi.getDefaultSettings();
+    } catch (error) {
+      console.error('Ошибка при получении настроек:', error);
+      
+      // В случае ошибки возвращаем кэш или дефолтные настройки
+      const cachedSettings = settingsApi.getLocalSettings();
+      if (cachedSettings) {
+        console.log('Используем кэшированные настройки после ошибки');
+        return cachedSettings;
+      }
+      
+      console.log('Используем дефолтные настройки');
+      return settingsApi.getDefaultSettings();
+    }
   },
 
   // Обновление настроек на сервере
   updateSettings: async (settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> => {
-    const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settings);
-    return response.data.data;
-  },
-  
-  // Принудительное обновление настроек с сервера (игнорируя кеш)
-  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
-    const response = await api.get<ApiResponse<RestaurantSettings>>('/settings/refresh');
-    return response.data.data;
+    try {
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settings);
+      const updatedSettings = response.data.data; // Получаем данные из поля data
+      
+      if (updatedSettings) {
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(updatedSettings);
+        return updatedSettings;
+      }
+      
+      throw new Error('Не удалось обновить настройки');
+    } catch (error) {
+      console.error('Ошибка при обновлении настроек:', error);
+      throw error;
+    }
   },
   
   // Получение настроек из localStorage
@@ -70,21 +134,7 @@ export const settingsApi = {
       try {
         const localSettings = localStorage.getItem('restaurant_settings');
         if (localSettings) {
-          const settings = JSON.parse(localSettings);
-          const timestamp = localStorage.getItem('restaurant_settings_timestamp');
-          
-          // Проверяем срок действия кеша (30 минут)
-          if (timestamp) {
-            const now = Date.now();
-            const cacheAge = now - parseInt(timestamp);
-            if (cacheAge < 30 * 60 * 1000) { // 30 минут
-              return settings;
-            }
-          }
-          
-          // Если кеш устарел, удаляем его
-          localStorage.removeItem('restaurant_settings');
-          localStorage.removeItem('restaurant_settings_timestamp');
+          return JSON.parse(localSettings);
         }
       } catch (error) {
         console.error('Ошибка при чтении настроек из localStorage:', error);

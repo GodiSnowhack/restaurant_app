@@ -11,7 +11,7 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 
-@router.get("/settings", response_model=SettingsResponse)
+@router.get("", response_model=SettingsResponse)
 def get_settings(
     db: Session = Depends(get_db)
 ) -> Any:
@@ -40,7 +40,10 @@ def get_settings(
         return db_settings
     except Exception as e:
         logger.error(f"Ошибка при получении настроек: {e}")
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при получении настроек: {str(e)}"
+        )
 
 @router.put("", response_model=SettingsResponse)
 def update_settings(
@@ -59,21 +62,27 @@ def update_settings(
             detail="Недостаточно прав для изменения настроек ресторана",
         )
     
-    # Ищем настройки в базе данных
-    db_settings = db.query(Settings).first()
-    
-    # Если настройки не найдены, создаем их с дефолтными значениями
-    if not db_settings:
-        db_settings = Settings.create_default()
-        db.add(db_settings)
+    try:
+        # Ищем настройки в базе данных
+        db_settings = db.query(Settings).first()
+        
+        # Если настройки не найдены, создаем их с дефолтными значениями
+        if not db_settings:
+            db_settings = Settings.create_default()
+            db.add(db_settings)
+            db.commit()
+            db.refresh(db_settings)
+        
+        # Обновляем только переданные поля
+        for field, value in settings_in.dict(exclude_unset=True).items():
+            setattr(db_settings, field, value)
+        
         db.commit()
         db.refresh(db_settings)
-    
-    # Обновляем только переданные поля
-    for field, value in settings_in.dict(exclude_unset=True).items():
-        setattr(db_settings, field, value)
-    
-    db.commit()
-    db.refresh(db_settings)
-    
-    return db_settings 
+        
+        return db_settings
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении настроек: {str(e)}"
+        ) 

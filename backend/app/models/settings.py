@@ -45,11 +45,11 @@ class Settings(Base):
     smtp_from_email = Column(String(255), nullable=True)
     smtp_from_name = Column(String(255), nullable=True)
     
-    # SMS уведомления
+    # Настройки SMS
     sms_api_key = Column(String(255), nullable=True)
-    sms_sender = Column(String(255), nullable=True)
+    sms_sender = Column(String(50), nullable=True)
     
-    # Политики и условия
+    # Юридическая информация
     privacy_policy = Column(Text, nullable=True)
     terms_of_service = Column(Text, nullable=True)
     
@@ -79,46 +79,59 @@ class Settings(Base):
             phone="+7 (999) 123-45-67",
             address="ул. Пушкина, д. 10, Москва",
             website="https://restaurant.ru",
-            working_hours=cls.get_default_working_hours(),
+            working_hours={
+                "monday": {"open": "09:00", "close": "22:00", "is_closed": False},
+                "tuesday": {"open": "09:00", "close": "22:00", "is_closed": False},
+                "wednesday": {"open": "09:00", "close": "22:00", "is_closed": False},
+                "thursday": {"open": "09:00", "close": "22:00", "is_closed": False},
+                "friday": {"open": "09:00", "close": "23:00", "is_closed": False},
+                "saturday": {"open": "10:00", "close": "23:00", "is_closed": False},
+                "sunday": {"open": "10:00", "close": "22:00", "is_closed": False}
+            },
             tables=[
                 {
                     "id": 1,
+                    "number": 1,
                     "name": "Стол 1",
                     "capacity": 2,
                     "is_active": True,
-                    "position_x": 200,
-                    "position_y": 150,
+                    "position_x": 100,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 2,
+                    "number": 2,
                     "name": "Стол 2",
                     "capacity": 4,
                     "is_active": True,
-                    "position_x": 400,
-                    "position_y": 150,
+                    "position_x": 250,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 3,
+                    "number": 3,
                     "name": "Стол 3",
                     "capacity": 6,
                     "is_active": True,
-                    "position_x": 600,
-                    "position_y": 150,
+                    "position_x": 400,
+                    "position_y": 100,
                     "status": "available"
                 },
                 {
                     "id": 4,
+                    "number": 4,
                     "name": "Стол 4",
                     "capacity": 2,
                     "is_active": True,
-                    "position_x": 200,
-                    "position_y": 450,
+                    "position_x": 100,
+                    "position_y": 250,
                     "status": "available"
                 },
                 {
                     "id": 5,
+                    "number": 5,
                     "name": "Стол 5",
                     "capacity": 4,
                     "is_active": True,
@@ -128,6 +141,7 @@ class Settings(Base):
                 },
                 {
                     "id": 6,
+                    "number": 6,
                     "name": "Стол 6",
                     "capacity": 8,
                     "is_active": True,

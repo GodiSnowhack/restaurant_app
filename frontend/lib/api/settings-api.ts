@@ -75,26 +75,32 @@ export const settingsApi = {
       if (cachedData && timestamp) {
         const age = Date.now() - parseInt(timestamp);
         if (age < CACHE_TTL) {
+          console.log('Используем кэшированные настройки');
           return JSON.parse(cachedData);
         }
       }
       
       // Если кэш устарел или отсутствует, делаем запрос к API
-      const response = await api.get('/api/v1/settings/settings');
+      console.log('Загрузка настроек с сервера...');
+      const response = await api.get<RestaurantSettings>('/api/v1/settings');
       const settings = response.data;
       
-      // Обновляем кэш
-      localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
-      localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+      // Сохраняем в кэш
+      try {
+        localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
+        localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+      } catch (cacheError) {
+        console.error('Ошибка при кэшировании настроек:', cacheError);
+      }
       
       return settings;
     } catch (error) {
-      console.error('Ошибка при получении настроек:', error);
+      console.error('Ошибка при загрузке настроек:', error);
       
       // В случае ошибки пробуем использовать кэш
       const cachedData = localStorage.getItem(SETTINGS_CACHE_KEY);
       if (cachedData) {
-        console.log('Используем кэшированные настройки');
+        console.log('Используем кэшированные настройки после ошибки');
         return JSON.parse(cachedData);
       }
       
@@ -104,12 +110,16 @@ export const settingsApi = {
 
   async updateSettings(settings: Partial<RestaurantSettings>): Promise<RestaurantSettings> {
     try {
-      const response = await api.put('/api/v1/settings/settings', settings);
+      const response = await api.put<RestaurantSettings>('/api/v1/settings', settings);
       const updatedSettings = response.data;
       
       // Обновляем кэш
-      localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(updatedSettings));
-      localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+      try {
+        localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(updatedSettings));
+        localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+      } catch (cacheError) {
+        console.error('Ошибка при кэшировании обновленных настроек:', cacheError);
+      }
       
       return updatedSettings;
     } catch (error) {
