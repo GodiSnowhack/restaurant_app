@@ -80,8 +80,25 @@ export const settingsApi = {
         }
       }
       
-      // Если кэш устарел или отсутствует, делаем запрос к API
-      console.log('Загрузка настроек с сервера...');
+      return await settingsApi.forceRefreshSettings();
+    } catch (error) {
+      console.error('Ошибка при загрузке настроек:', error);
+      
+      // В случае ошибки пробуем использовать кэш
+      const cachedData = localStorage.getItem(SETTINGS_CACHE_KEY);
+      if (cachedData) {
+        console.log('Используем кэшированные настройки после ошибки');
+        return JSON.parse(cachedData);
+      }
+      
+      // Если кэш недоступен, возвращаем дефолтные настройки
+      return defaultSettings;
+    }
+  },
+
+  async forceRefreshSettings(): Promise<RestaurantSettings> {
+    try {
+      console.log('Принудительное обновление настроек с сервера...');
       const response = await api.get<RestaurantSettings>('/api/v1/settings');
       const settings = response.data;
       
@@ -95,15 +112,7 @@ export const settingsApi = {
       
       return settings;
     } catch (error) {
-      console.error('Ошибка при загрузке настроек:', error);
-      
-      // В случае ошибки пробуем использовать кэш
-      const cachedData = localStorage.getItem(SETTINGS_CACHE_KEY);
-      if (cachedData) {
-        console.log('Используем кэшированные настройки после ошибки');
-        return JSON.parse(cachedData);
-      }
-      
+      console.error('Ошибка при принудительном обновлении настроек:', error);
       throw error;
     }
   },
