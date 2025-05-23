@@ -7,14 +7,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.headers.authorization;
     const userId = req.headers['x-user-id'];
 
-    // Получаем базовый URL API
-    const baseUrl = getApiBaseUrl();
+    // Получаем базовый URL API и убеждаемся, что он использует HTTPS
+    const baseUrl = getApiBaseUrl().replace('http://', 'https://');
     const apiUrl = `${baseUrl}/api/v1/reservations`;
 
     // Формируем URL с учетом query параметров
     const url = query && Object.keys(query).length > 0
       ? `${apiUrl}?${new URLSearchParams(query as Record<string, string>).toString()}`
       : apiUrl;
+
+    console.log('API Proxy: Отправка запроса на', url);
 
     // Формируем заголовки запроса
     const headers: Record<string, string> = {

@@ -7,7 +7,7 @@ export const reservationsApi = {
   getReservations: async (): Promise<Reservation[]> => {
     try {
       console.log('API: Получение бронирований...');
-      const response = await api.get('/reservations');
+      const response = await api.get('/api/v1/reservations');
       
       if (!response.data) {
         throw new Error('Данные не получены');
@@ -43,7 +43,7 @@ export const reservationsApi = {
   // Получение бронирования по ID
   getReservationById: async (id: number): Promise<Reservation | null> => {
     try {
-      const response = await api.get(`/reservations/${id}`);
+      const response = await api.get(`/api/v1/reservations/${id}`);
       return response.data;
     } catch (error) {
       console.error(`API: Ошибка при получении бронирования ${id}:`, error);
@@ -54,7 +54,7 @@ export const reservationsApi = {
   // Создание нового бронирования
   createReservation: async (reservationData: Omit<Reservation, 'id' | 'created_at' | 'updated_at'>): Promise<Reservation> => {
     try {
-      const response = await api.post('/reservations', reservationData);
+      const response = await api.post('/api/v1/reservations', reservationData);
       return response.data;
     } catch (error) {
       console.error('API: Ошибка при создании бронирования:', error);
@@ -65,7 +65,7 @@ export const reservationsApi = {
   // Обновление бронирования
   updateReservation: async (id: number, reservationData: Partial<Reservation>): Promise<Reservation> => {
     try {
-      const response = await api.put(`/reservations/${id}`, reservationData);
+      const response = await api.put(`/api/v1/reservations/${id}`, reservationData);
       return response.data;
     } catch (error) {
       console.error(`API: Ошибка при обновлении бронирования ${id}:`, error);
@@ -76,7 +76,7 @@ export const reservationsApi = {
   // Отмена бронирования
   cancelReservation: async (id: number): Promise<void> => {
     try {
-      await api.delete(`/reservations/${id}`);
+      await api.delete(`/api/v1/reservations/${id}`);
     } catch (error) {
       console.error(`API: Ошибка при отмене бронирования ${id}:`, error);
       throw error;
@@ -86,7 +86,7 @@ export const reservationsApi = {
   // Проверка кода бронирования
   verifyReservationCode: async (code: string): Promise<any> => {
     try {
-      const response = await api.post('/reservations/verify-code', { code });
+      const response = await api.post('/api/v1/reservations/verify-code', { code });
       return response.data;
     } catch (error) {
       console.error('API: Ошибка при проверке кода бронирования:', error);

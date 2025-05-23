@@ -33,15 +33,12 @@ export const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     // Убеждаемся, что URL использует HTTPS для production
     const url = process.env.NEXT_PUBLIC_API_URL;
-    if (url.includes('railway.app') || url.includes('vercel.app')) {
-      return url.replace('http://', 'https://');
-    }
-    return url;
+    return url.replace('http://', 'https://');
   }
   
   // Если мы на клиенте, определим baseURL на основе текущего хоста
   if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol;
+    const protocol = 'https:';
     const host = window.location.hostname;
     
     // Для production всегда используем HTTPS
@@ -49,7 +46,7 @@ export const getApiBaseUrl = () => {
       return 'https://backend-production-1a78.up.railway.app/api/v1';
     }
     
-    // Для локальной разработки используем текущий протокол
+    // Для локальной разработки используем HTTPS
     return `${protocol}//${host}:8000/api/v1`;
   }
   
