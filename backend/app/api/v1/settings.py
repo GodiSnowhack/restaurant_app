@@ -11,7 +11,7 @@ from app.services.auth import get_current_user
 
 router = APIRouter()
 
-@router.get("", response_model=SettingsResponse)
+@router.get("/settings", response_model=SettingsResponse)
 def get_settings(
     db: Session = Depends(get_db)
 ) -> Any:

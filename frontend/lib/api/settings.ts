@@ -48,7 +48,7 @@ export const settingsApi = {
   
   // Получение настроек с сервера
   getSettings: async (): Promise<RestaurantSettings> => {
-    const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
+    const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings/settings');
     return response.data.data;
   },
 
