@@ -106,7 +106,10 @@ export const settingsApi = {
       
       // Если нет в кэше, возвращаем дефолтные
       console.log('Используем дефолтные настройки');
-      return settingsApi.getDefaultSettings();
+      const defaultSettings = settingsApi.getDefaultSettings();
+      // Сохраняем дефолтные настройки в кэш
+      settingsApi.saveSettingsLocally(defaultSettings);
+      return defaultSettings;
     }
   },
 
@@ -114,7 +117,7 @@ export const settingsApi = {
   forceRefreshSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
+      const response = await api.get<ApiResponse<RestaurantSettings>>('/api/v1/settings');
       
       if (response.data && response.data.data) {
         const settings = response.data.data;
@@ -123,13 +126,7 @@ export const settingsApi = {
         return settings;
       }
       
-      console.warn('Сервер вернул пустые настройки, используем локальные');
-      const localSettings = settingsApi.getLocalSettings();
-      if (localSettings) {
-        return localSettings;
-      }
-      
-      return settingsApi.getDefaultSettings();
+      throw new Error('Сервер вернул пустые настройки');
     } catch (error) {
       console.error('Ошибка при принудительном обновлении настроек:', error);
       // При ошибке возвращаем локальные настройки
@@ -158,7 +155,7 @@ export const settingsApi = {
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData);
+      const response = await api.put<ApiResponse<RestaurantSettings>>('/api/v1/settings', settingsData);
       
       if (response.data && response.data.data) {
         const updatedSettings = response.data.data;

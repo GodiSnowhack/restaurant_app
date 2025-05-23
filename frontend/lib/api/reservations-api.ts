@@ -66,30 +66,26 @@ export const reservationsApi = {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
       
       try {
-        // Отправляем запрос через наш прокси API
-        const response = await fetch(`/api/reservations${queryParams}`, {
-          method: 'GET',
+        // Отправляем запрос через API
+        const response = await api.get<Reservation[]>(`/api/v1/reservations${queryParams}`, {
           headers,
-          signal: controller.signal,
-          credentials: 'include'
+          signal: controller.signal
         });
         
         clearTimeout(timeoutId);
         
-        if (!response.ok) {
-          throw new Error(`Ошибка HTTP: ${response.status}`);
+        if (response.data) {
+          // Кэшируем результат запроса без фильтров
+          if (!params) {
+            localStorage.setItem(cacheKey, JSON.stringify(response.data));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+          }
+          
+          console.log(`[Reservations API] Получено ${response.data.length} бронирований`);
+          return response.data;
         }
         
-        const data = await response.json();
-        
-        // Кэшируем результат запроса без фильтров
-        if (!params) {
-          localStorage.setItem(cacheKey, JSON.stringify(data));
-          localStorage.setItem(cacheTimeKey, Date.now().toString());
-        }
-        
-        console.log(`[Reservations API] Получено ${data.length} бронирований`);
-        return data;
+        throw new Error('Сервер вернул пустой ответ');
       } catch (error: any) {
         clearTimeout(timeoutId);
         
@@ -100,8 +96,18 @@ export const reservationsApi = {
           console.error('[Reservations API] Ошибка при запросе бронирований:', error);
         }
         
-        // Пробуем запасной способ получения данных
-        return await fetchReservationsFallback(token, queryParams);
+        // Возвращаем кэшированные данные в случае ошибки
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          console.log('[Reservations API] Используем кэшированные данные из-за ошибки');
+          try {
+            return JSON.parse(cachedData);
+          } catch (e) {
+            console.error('[Reservations API] Ошибка при разборе кэшированных данных');
+          }
+        }
+        
+        return [];
       }
     } catch (error: any) {
       console.error('[Reservations API] Критическая ошибка:', error);
