@@ -3,7 +3,7 @@ import { settingsApi } from './api/settings';
 import { RestaurantTable, RestaurantSettings } from './api/types';
 
 interface SettingsState {
-  settings: RestaurantSettings;
+  settings: RestaurantSettings | null;
   isLoading: boolean;
   error: string | null;
   lastUpdated: number | null;
@@ -21,7 +21,7 @@ const AUTO_UPDATE_INTERVAL = 5 * 60 * 1000;
 
 // Создаем хранилище настроек ресторана
 const useSettingsStore = create<SettingsState>((set, get) => ({
-  settings: settingsApi.getDefaultSettings(),
+  settings: null,
   isLoading: true,
   error: null,
   lastUpdated: null,
@@ -52,172 +52,116 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
           });
         } else {
           // Если нет ни серверных, ни локальных данных, используем дефолтные
+          const defaultSettings = settingsApi.getDefaultSettings();
           set({ 
-            settings: settingsApi.getDefaultSettings(),
-            isLoading: false
+            settings: defaultSettings,
+            isLoading: false,
+            lastUpdated: Date.now()
           });
         }
       }
-      
-      // Настраиваем периодическую проверку обновлений
-      if (typeof window !== 'undefined') {
-        const intervalId = setInterval(() => {
-          get().checkForUpdates();
-        }, AUTO_UPDATE_INTERVAL);
-      }
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
+      set({ 
+        error: 'Ошибка при загрузке настроек',
+        isLoading: false 
+      });
       
-      // При ошибке пробуем использовать локальный кеш
+      // В случае ошибки пробуем использовать локальный кеш
       const localSettings = settingsApi.getLocalSettings();
       if (localSettings) {
         set({ 
           settings: localSettings,
-          isLoading: false,
-          error: 'Не удалось загрузить настройки с сервера. Используются локальные настройки.'
-        });
-      } else {
-        set({ 
-          settings: settingsApi.getDefaultSettings(),
-          error: 'Не удалось загрузить настройки с сервера.',
-          isLoading: false
+          lastUpdated: Date.now()
         });
       }
-    }
-  },
-
-  // Проверка обновлений с сервера
-  checkForUpdates: async () => {
-    // Пропускаем, если уже идет загрузка
-    if (get().isLoading) return;
-    
-    try {
-      // Тихая загрузка настроек с сервера
-      const serverSettings = await settingsApi.getSettings();
-      
-      if (serverSettings) {
-        console.log('Получены обновленные настройки с сервера', new Date().toLocaleTimeString());
-        // Обновляем состояние и локальное хранилище
-        set({ 
-          settings: serverSettings,
-          lastUpdated: Date.now() 
-        });
-        settingsApi.saveSettingsLocally(serverSettings);
-      }
-    } catch (error) {
-      console.error('Ошибка при проверке обновлений настроек:', error);
-      // Не устанавливаем ошибку в состояние, т.к. это фоновое обновление
     }
   },
 
   // Обновление настроек
   updateSettings: async (newSettings: Partial<RestaurantSettings>) => {
+    const currentSettings = get().settings;
+    if (!currentSettings) {
+      throw new Error('Настройки не инициализированы');
+    }
+
     set({ isLoading: true, error: null });
     try {
       // Объединяем текущие настройки с новыми
-      const updatedSettings = { ...get().settings, ...newSettings };
-      
-      // Сохраняем на сервере (ГЛАВНЫЙ ПРИОРИТЕТ)
-      const savedSettings = await settingsApi.updateSettings(updatedSettings);
-      
-      // Обновляем состояние и локальное хранилище
-      set({ 
-        settings: savedSettings || updatedSettings, 
-        isLoading: false,
-        lastUpdated: Date.now()
-      });
-      settingsApi.saveSettingsLocally(savedSettings || updatedSettings);
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      
-      // Даже при ошибке обновляем локальные настройки (временно)
-      const updatedSettings = { ...get().settings, ...newSettings };
-      set({ 
-        settings: updatedSettings,
-        error: 'Настройки сохранены локально, но возникла ошибка при сохранении на сервере. Изменения будут применены только для вас до перезагрузки страницы.',
-        isLoading: false 
-      });
-      settingsApi.saveSettingsLocally(updatedSettings);
-      
-      // Запланируем повторную попытку отправки на сервер
-      setTimeout(() => {
-        get().updateSettings(newSettings);
-      }, 10000); // Через 10 секунд
-    }
-  },
-
-  // Обновление списка столов
-  updateTables: async (tables: RestaurantTable[]) => {
-    set({ isLoading: true, error: null });
-    try {
-      const currentSettings = get().settings;
-      const updatedSettings = { ...currentSettings, tables };
+      const updatedSettings = { ...currentSettings, ...newSettings };
       
       // Сохраняем на сервере
       const savedSettings = await settingsApi.updateSettings(updatedSettings);
       
       // Обновляем состояние и локальное хранилище
       set({ 
-        settings: savedSettings || updatedSettings, 
+        settings: savedSettings, 
         isLoading: false,
         lastUpdated: Date.now()
       });
-      settingsApi.saveSettingsLocally(savedSettings || updatedSettings);
+      settingsApi.saveSettingsLocally(savedSettings);
     } catch (error) {
-      console.error('Ошибка при обновлении столов:', error);
-      
-      // Даже при ошибке обновляем локальные настройки (временно)
-      const updatedSettings = { ...get().settings, tables };
+      console.error('Ошибка при обновлении настроек:', error);
       set({ 
-        settings: updatedSettings,
-        error: 'Столы сохранены локально, но возникла ошибка при сохранении на сервере. Изменения будут применены только для вас до перезагрузки страницы.',
+        error: 'Ошибка при обновлении настроек',
         isLoading: false 
       });
-      settingsApi.saveSettingsLocally(updatedSettings);
-      
-      // Запланируем повторную попытку отправки на сервер
-      setTimeout(() => {
-        get().updateTables(tables);
-      }, 10000); // Через 10 секунд
     }
   },
 
+  // Обновление списка столов
+  updateTables: async (tables: RestaurantTable[]) => {
+    const currentSettings = get().settings;
+    if (!currentSettings) {
+      throw new Error('Настройки не инициализированы');
+    }
+
+    await get().updateSettings({ tables });
+  },
+
   // Добавление нового стола
-  addTable: async (tableData: Omit<RestaurantTable, 'id'>) => {
-    const { settings } = get();
-    const tables = settings.tables || [];
-    
-    // Генерируем id для нового стола
-    const newId = tables.length > 0 
-      ? Math.max(...tables.map(t => t.id || 0)) + 1 
-      : 1;
-    
-    const newTable = { 
-      ...tableData, 
-      id: newId,
-      status: tableData.status || 'available'
-    };
-    
-    const updatedTables = [...tables, newTable];
-    await get().updateTables(updatedTables);
+  addTable: async (table: Omit<RestaurantTable, 'id'>) => {
+    const currentSettings = get().settings;
+    if (!currentSettings) {
+      throw new Error('Настройки не инициализированы');
+    }
+
+    const maxId = Math.max(0, ...currentSettings.tables.map(t => t.id));
+    const newTable = { ...table, id: maxId + 1 };
+    const updatedTables = [...currentSettings.tables, newTable];
+    await get().updateSettings({ tables: updatedTables });
   },
 
   // Удаление стола
   removeTable: async (tableId: number) => {
-    const { settings } = get();
-    const tables = settings.tables || [];
-    const updatedTables = tables.filter(table => table.id !== tableId);
-    await get().updateTables(updatedTables);
+    const currentSettings = get().settings;
+    if (!currentSettings) {
+      throw new Error('Настройки не инициализированы');
+    }
+
+    const updatedTables = currentSettings.tables.filter(t => t.id !== tableId);
+    await get().updateSettings({ tables: updatedTables });
   },
 
   // Обновление статуса стола
   updateTableStatus: async (tableId: number, status: 'available' | 'reserved' | 'occupied') => {
-    const { settings } = get();
-    const tables = settings.tables || [];
-    const updatedTables = tables.map(table => 
-      table.id === tableId ? { ...table, status } : table
+    const currentSettings = get().settings;
+    if (!currentSettings) {
+      throw new Error('Настройки не инициализированы');
+    }
+
+    const updatedTables = currentSettings.tables.map(t =>
+      t.id === tableId ? { ...t, status } : t
     );
-    await get().updateTables(updatedTables);
+    await get().updateSettings({ tables: updatedTables });
+  },
+
+  // Проверка обновлений
+  checkForUpdates: async () => {
+    const lastUpdated = get().lastUpdated;
+    if (!lastUpdated || Date.now() - lastUpdated > AUTO_UPDATE_INTERVAL) {
+      await get().loadSettings();
+    }
   }
 }));
 

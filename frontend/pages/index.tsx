@@ -145,7 +145,7 @@ const HomePageContent = () => {
     try {
       // Используем settings из контекста вместо отдельного запроса
       if (contextSettings) {
-        setSettings(contextSettings as unknown as Restaurant);
+        setSettings(contextSettings);
       }
       
       // Получаем популярные блюда
