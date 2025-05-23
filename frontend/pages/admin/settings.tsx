@@ -64,52 +64,71 @@ const AdminSettingsPage: NextPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
   };
   
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
   };
   
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked
-    }));
+    setFormData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [name]: checked
+      };
+    });
   };
   
   const handleWorkingHoursChange = (day: string, field: string, value: string | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      working_hours: {
-        ...prev.working_hours,
-        [day as keyof typeof prev.working_hours]: {
-          ...prev.working_hours[day as keyof typeof prev.working_hours],
-          [field]: value
+    setFormData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        working_hours: {
+          ...prev.working_hours,
+          [day as keyof typeof prev.working_hours]: {
+            ...prev.working_hours[day as keyof typeof prev.working_hours],
+            [field]: value
+          }
         }
-      }
-    }));
+      };
+    });
   };
   
   const handleChange = (field: keyof RestaurantSettings, value: any) => {
     if (formData) {
       setIsEditing(true);
-      const updatedSettings = { ...formData, [field]: value };
-      setFormData(updatedSettings);
-      
-      // Автоматически сохраняем изменения с флагом isEditing
-      settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-        .catch(error => {
-          console.error('Ошибка при автосохранении:', error);
-        });
+      setFormData(prev => {
+        if (!prev) return prev;
+        const updatedSettings = {
+          ...prev,
+          [field]: value
+        };
+        
+        // Автоматически сохраняем изменения с флагом isEditing
+        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
+          .catch(error => {
+            console.error('Ошибка при автосохранении:', error);
+          });
+          
+        return updatedSettings;
+      });
     }
   };
 
@@ -127,61 +146,70 @@ const AdminSettingsPage: NextPage = () => {
         status: 'available'
       };
       
-      const updatedSettings = {
-        ...formData,
-        tables: [...tables, newTable]
-      };
-      
+      setFormData(prev => {
+        if (!prev) return prev;
+        const updatedSettings = {
+          ...prev,
+          tables: [...prev.tables, newTable]
+        };
+        
+        // Автоматически сохраняем изменения с флагом isEditing
+        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
+          .catch(error => {
+            console.error('Ошибка при автосохранении:', error);
+          });
+          
+        return updatedSettings;
+      });
       setIsEditing(true);
-      setFormData(updatedSettings);
-      
-      // Автоматически сохраняем изменения с флагом isEditing
-      settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-        .catch(error => {
-          console.error('Ошибка при автосохранении:', error);
-        });
     }
   };
 
   const handleTableChange = (tableId: number, field: keyof RestaurantTable, value: any) => {
     if (formData) {
-      const tables = formData.tables.map(table => 
-        table.id === tableId ? { ...table, [field]: value } : table
-      );
-      
-      const updatedSettings = {
-        ...formData,
-        tables
-      };
-      
+      setFormData(prev => {
+        if (!prev) return prev;
+        const tables = prev.tables.map(table => 
+          table.id === tableId ? { ...table, [field]: value } : table
+        );
+        
+        const updatedSettings = {
+          ...prev,
+          tables
+        };
+        
+        // Автоматически сохраняем изменения с флагом isEditing
+        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
+          .catch(error => {
+            console.error('Ошибка при автосохранении:', error);
+          });
+          
+        return updatedSettings;
+      });
       setIsEditing(true);
-      setFormData(updatedSettings);
-      
-      // Автоматически сохраняем изменения с флагом isEditing
-      settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-        .catch(error => {
-          console.error('Ошибка при автосохранении:', error);
-        });
     }
   };
 
   const handleDeleteTable = (tableId: number) => {
     if (formData) {
-      const tables = formData.tables.filter(table => table.id !== tableId);
-      
-      const updatedSettings = {
-        ...formData,
-        tables
-      };
-      
+      setFormData(prev => {
+        if (!prev) return prev;
+        const tables = prev.tables.filter(table => table.id !== tableId);
+        
+        const updatedSettings = {
+          ...prev,
+          tables
+        };
+        
+        // Автоматически сохраняем изменения с флагом isEditing
+        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
+          .catch(error => {
+            console.error('Ошибка при автосохранении:', error);
+          });
+          
+        return updatedSettings;
+      });
       setIsEditing(true);
-      setFormData(updatedSettings);
-      
-      // Автоматически сохраняем изменения с флагом isEditing
-      settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-        .catch(error => {
-          console.error('Ошибка при автосохранении:', error);
-        });
     }
   };
 
