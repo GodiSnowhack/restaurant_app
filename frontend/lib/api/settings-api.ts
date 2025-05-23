@@ -128,8 +128,20 @@ export const settingsApi = {
         throw new Error('Необходима авторизация');
       }
 
+      // Получаем информацию о пользователе
+      const userProfile = localStorage.getItem('user_profile');
+      if (!userProfile) {
+        throw new Error('Информация о пользователе не найдена');
+      }
+
+      const { role } = JSON.parse(userProfile);
+      if (role !== 'admin') {
+        throw new Error('Недостаточно прав для изменения настроек');
+      }
+
       // Добавляем заголовок авторизации
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['X-User-Role'] = role;
       
       console.log('API: Отправляем настройки на сервер:', settings);
       const response = await api.put<RestaurantSettings>('/settings', settings);

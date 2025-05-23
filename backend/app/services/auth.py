@@ -71,7 +71,6 @@ def get_current_user(
     try:
         # Добавляем логирование для отладки
         print(f"Получен токен: {token[:10]}...")
-        print(f"Используемый JWT_SECRET: {settings.JWT_SECRET[:10]}...")
         
         payload = jwt.decode(
             token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
@@ -112,7 +111,14 @@ def get_current_user(
         # Проверяем соответствие роли в токене и в базе данных
         if role and role != user.role:
             print(f"Несоответствие ролей: токен={role}, база={user.role}")
-            raise credentials_exception
+            # Вместо исключения, обновляем роль в токене
+            new_token = create_access_token(
+                data={"sub": str(user.id), "role": user.role},
+                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            # Устанавливаем новый токен в заголовок
+            request = Request.get_current()
+            request.headers["Authorization"] = f"Bearer {new_token}"
         
         print(f"Успешно получен пользователь: ID={user.id}, роль={user.role}")
         return user

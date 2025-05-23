@@ -115,16 +115,32 @@ api.interceptors.request.use(
         config.headers = new AxiosHeaders();
       }
       config.headers.Authorization = `Bearer ${token}`;
+      
+      // Добавляем дополнительные заголовки для авторизации
+      try {
+        const userProfile = localStorage.getItem('user_profile');
+        if (userProfile) {
+          const { id, role } = JSON.parse(userProfile);
+          config.headers['X-User-ID'] = id;
+          config.headers['X-User-Role'] = role;
+        }
+      } catch (e) {
+        console.error('API Interceptor: Ошибка при добавлении пользовательских заголовков:', e);
+      }
     } else {
       console.warn('API Interceptor: Токен не найден');
-    }
-    
-    // Добавляем X-User-ID для неаутентифицированных запросов
-    if (!token) {
+      // Пробуем получить данные пользователя без токена
       const userProfile = localStorage.getItem('user_profile');
       if (userProfile) {
-        const { id } = JSON.parse(userProfile);
-        config.headers['X-User-ID'] = id;
+        try {
+          const { id } = JSON.parse(userProfile);
+          if (!config.headers) {
+            config.headers = new AxiosHeaders();
+          }
+          config.headers['X-User-ID'] = id;
+        } catch (e) {
+          console.error('API Interceptor: Ошибка при добавлении X-User-ID:', e);
+        }
       }
     }
     
@@ -152,14 +168,55 @@ api.interceptors.response.use(
       message: error.message
     });
     
-    // Если ошибка 401, проверяем токен
+    // Если ошибка 401, пробуем обновить токен
     if (error.response?.status === 401) {
-      console.log('API Interceptor: Получена ошибка 401, проверяем токен');
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('API Interceptor: Токен отсутствует');
-      } else {
-        console.log('API Interceptor: Токен присутствует, возможно он невалиден');
+      console.log('API Interceptor: Получена ошибка 401, пробуем обновить токен');
+      
+      try {
+        // Получаем текущий токен
+        const currentToken = localStorage.getItem('token');
+        if (!currentToken) {
+          console.error('API Interceptor: Токен отсутствует');
+          throw new Error('Токен не найден');
+        }
+        
+        // Пробуем получить новый токен
+        const response = await fetch('/api/v1/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Не удалось обновить токен');
+        }
+        
+        const data = await response.json();
+        if (data.access_token) {
+          // Сохраняем новый токен
+          localStorage.setItem('token', data.access_token);
+          
+          // Повторяем исходный запрос с новым токеном
+          if (error.config) {
+            const newConfig = { ...error.config };
+            newConfig.headers = new AxiosHeaders({
+              ...newConfig.headers,
+              'Authorization': `Bearer ${data.access_token}`
+            });
+            return api(newConfig);
+          }
+        }
+      } catch (refreshError) {
+        console.error('API Interceptor: Ошибка при обновлении токена:', refreshError);
+        // Если не удалось обновить токен, очищаем данные авторизации
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_profile');
+        // Перенаправляем на страницу входа
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login';
+        }
       }
     }
     
