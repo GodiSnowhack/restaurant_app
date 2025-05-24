@@ -100,7 +100,41 @@ export const settingsApi = {
     try {
       console.log('Принудительное обновление настроек с сервера...');
       const response = await api.get<RestaurantSettings>('/settings');
-      const settings = response.data;
+      const settings = response.data as Partial<RestaurantSettings>;
+      
+      // Проверяем наличие всех обязательных полей
+      const requiredFields = [
+        'restaurant_name',
+        'email',
+        'phone',
+        'address',
+        'currency',
+        'currency_symbol',
+        'tables'
+      ] as const;
+      
+      const missingFields = requiredFields.filter(field => !settings[field]);
+      
+      if (missingFields.length > 0) {
+        console.warn(`Отсутствуют обязательные поля в ответе сервера: ${missingFields.join(', ')}`);
+        // Получаем дефолтные настройки
+        const defaultSettings = this.getDefaultSettings();
+        
+        // Заполняем отсутствующие поля дефолтными значениями
+        missingFields.forEach(field => {
+          if (field === 'tables') {
+            settings.tables = [...defaultSettings.tables];
+          } else {
+            settings[field] = defaultSettings[field];
+          }
+        });
+      }
+      
+      // Проверяем наличие столов
+      if (!settings.tables || !Array.isArray(settings.tables) || settings.tables.length === 0) {
+        console.warn('Отсутствуют данные о столах, добавляем дефолтные');
+        settings.tables = [...this.getDefaultSettings().tables];
+      }
       
       // Сохраняем в кэш
       try {
@@ -110,10 +144,15 @@ export const settingsApi = {
         console.error('Ошибка при кэшировании настроек:', cacheError);
       }
       
-      return settings;
+      return settings as RestaurantSettings;
     } catch (error) {
       console.error('Ошибка при принудительном обновлении настроек:', error);
-      throw error;
+      // При ошибке возвращаем локальные настройки
+      const localSettings = this.getLocalSettings();
+      if (localSettings) {
+        return localSettings;
+      }
+      return this.getDefaultSettings();
     }
   },
 

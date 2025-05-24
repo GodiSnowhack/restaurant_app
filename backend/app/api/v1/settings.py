@@ -31,8 +31,37 @@ def get_settings(
         # Если настройки не найдены, создаем их с дефолтными значениями
         if not db_settings:
             logger.info("Настройки не найдены, создаем дефолтные")
-            db_settings = Settings.create_default()
-            db.add(db_settings)
+            try:
+                db_settings = Settings.create_default()
+                db.add(db_settings)
+                db.commit()
+                db.refresh(db_settings)
+                logger.info("Дефолтные настройки успешно созданы")
+            except Exception as create_error:
+                logger.error(f"Ошибка при создании дефолтных настроек: {create_error}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Ошибка при создании дефолтных настроек: {str(create_error)}"
+                )
+        
+        # Проверяем обязательные поля
+        required_fields = ['restaurant_name', 'email', 'phone', 'address', 'currency', 'currency_symbol']
+        missing_fields = [field for field in required_fields if not getattr(db_settings, field)]
+        
+        if missing_fields:
+            logger.error(f"Отсутствуют обязательные поля: {missing_fields}")
+            # Пробуем исправить, обновив настройки дефолтными значениями
+            default_settings = Settings.create_default()
+            for field in missing_fields:
+                setattr(db_settings, field, getattr(default_settings, field))
+            db.commit()
+            db.refresh(db_settings)
+        
+        # Проверяем наличие столов
+        if not db_settings.tables:
+            logger.warning("Отсутствуют данные о столах, добавляем дефолтные")
+            default_settings = Settings.create_default()
+            db_settings.tables = default_settings.tables
             db.commit()
             db.refresh(db_settings)
         
