@@ -13,13 +13,13 @@ const getApiBaseUrl = (): string => {
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: getApiBaseUrl(),
-  timeout: 60000,
-  withCredentials: false,
+  baseURL: process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'https://') || 'https://backend-production-1a78.up.railway.app/api/v1',
+  timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true
 });
 
 // Функция повторных попыток для критически важных API-вызовов

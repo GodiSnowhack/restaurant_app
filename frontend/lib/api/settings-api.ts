@@ -80,7 +80,59 @@ export const settingsApi = {
         }
       }
       
-      return await settingsApi.forceRefreshSettings();
+      console.log('Запрос настроек с сервера...');
+      const response = await api.get<{ data: RestaurantSettings }>('/settings');
+      
+      if (response.data && response.data.data) {
+        const settings = response.data.data;
+        console.log('Получены настройки с сервера:', settings);
+        
+        // Проверяем наличие всех обязательных полей
+        const requiredFields = [
+          'restaurant_name',
+          'email',
+          'phone',
+          'address',
+          'currency',
+          'currency_symbol',
+          'tables'
+        ] as const;
+        
+        const missingFields = requiredFields.filter(field => !settings[field]);
+        
+        if (missingFields.length > 0) {
+          console.warn(`Отсутствуют обязательные поля в ответе сервера: ${missingFields.join(', ')}`);
+          // Получаем дефолтные настройки
+          const defaultSettings = this.getDefaultSettings();
+          
+          // Заполняем отсутствующие поля дефолтными значениями
+          missingFields.forEach(field => {
+            if (field === 'tables') {
+              settings.tables = [...defaultSettings.tables];
+            } else {
+              settings[field] = defaultSettings[field];
+            }
+          });
+        }
+        
+        // Проверяем наличие столов
+        if (!settings.tables || !Array.isArray(settings.tables) || settings.tables.length === 0) {
+          console.warn('Отсутствуют данные о столах, добавляем дефолтные');
+          settings.tables = [...this.getDefaultSettings().tables];
+        }
+        
+        // Сохраняем в кэш
+        try {
+          localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
+          localStorage.setItem(SETTINGS_CACHE_TIMESTAMP, Date.now().toString());
+        } catch (cacheError) {
+          console.error('Ошибка при кэшировании настроек:', cacheError);
+        }
+        
+        return settings;
+      }
+      
+      throw new Error('Сервер вернул пустые настройки');
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
       
@@ -92,7 +144,7 @@ export const settingsApi = {
       }
       
       // Если кэш недоступен, возвращаем дефолтные настройки
-      return defaultSettings;
+      return this.getDefaultSettings();
     }
   },
 
