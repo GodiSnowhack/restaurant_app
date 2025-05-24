@@ -144,37 +144,73 @@ export const settingsApi = {
       // Получаем токен из localStorage
       const token = localStorage.getItem('token');
       if (!token) {
-        console.warn('Не найден токен авторизации, используем локальные настройки');
-        const localSettings = settingsApi.getLocalSettings();
-        if (localSettings) {
-          return localSettings;
-        }
-        return settingsApi.getDefaultSettings();
+        throw new Error('Необходима авторизация');
       }
+
+      // Проверяем роль пользователя
+      const userProfile = localStorage.getItem('user_profile');
+      if (!userProfile) {
+        throw new Error('Информация о пользователе не найдена');
+      }
+
+      const { role } = JSON.parse(userProfile);
+      if (role !== 'admin') {
+        throw new Error('Недостаточно прав для изменения настроек');
+      }
+
+      // Устанавливаем заголовки авторизации
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['X-User-Role'] = role;
 
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
+      // Отправляем запрос на сервер
       const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData);
       
-      if (response.data && response.data.data) {
-        const updatedSettings = response.data.data;
-        // Обновляем кэш только если это не временное сохранение при редактировании
-        if (!isEditing) {
-          settingsApi.saveSettingsLocally(updatedSettings);
-        }
-        return updatedSettings;
+      if (!response.data || !response.data.data) {
+        throw new Error('Сервер вернул некорректный ответ');
+      }
+
+      const updatedSettings = response.data.data;
+
+      // Проверяем наличие всех необходимых полей
+      const requiredFields = [
+        'restaurant_name',
+        'email',
+        'phone',
+        'address',
+        'currency',
+        'currency_symbol',
+        'tables'
+      ] as const;
+
+      const missingFields = requiredFields.filter(field => !updatedSettings[field]);
+      if (missingFields.length > 0) {
+        throw new Error(`Отсутствуют обязательные поля в ответе сервера: ${missingFields.join(', ')}`);
+      }
+
+      // Обновляем кэш только если это не временное сохранение при редактировании
+      if (!isEditing) {
+        settingsApi.saveSettingsLocally(updatedSettings);
+      }
+
+      return updatedSettings;
+    } catch (error: any) {
+      console.error('Ошибка при обновлении настроек:', error);
+      
+      // Проверяем тип ошибки и формируем соответствующее сообщение
+      if (error.response) {
+        // Ошибка от сервера
+        const message = error.response.data?.message || 'Ошибка сервера при обновлении настроек';
+        throw new Error(message);
+      } else if (error.request) {
+        // Ошибка сети
+        throw new Error('Не удалось связаться с сервером. Проверьте подключение к интернету.');
       }
       
-      throw new Error('Сервер вернул пустые настройки');
-    } catch (error) {
-      console.error('Ошибка при обновлении настроек:', error);
-      // При ошибке возвращаем текущие настройки
-      const localSettings = settingsApi.getLocalSettings();
-      if (localSettings) {
-        return localSettings;
-      }
-      return settingsApi.getDefaultSettings();
+      // Прокидываем исходную ошибку дальше
+      throw error;
     }
   },
   

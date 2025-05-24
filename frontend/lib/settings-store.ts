@@ -123,39 +123,88 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   updateSettings: async (newSettings: Partial<RestaurantSettings>) => {
     set({ isLoading: true, error: null });
     try {
+      // Получаем токен для проверки авторизации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Необходима авторизация');
+      }
+
+      // Проверяем роль пользователя
+      const userProfile = localStorage.getItem('user_profile');
+      if (!userProfile) {
+        throw new Error('Информация о пользователе не найдена');
+      }
+
+      const { role } = JSON.parse(userProfile);
+      if (role !== 'admin') {
+        throw new Error('Недостаточно прав для изменения настроек');
+      }
+
       // Объединяем текущие настройки с новыми
-      const updatedSettings = { ...get().settings, ...newSettings };
+      const currentSettings = get().settings;
+      const updatedSettings = {
+        ...currentSettings,
+        ...newSettings,
+        // Убеждаемся, что рабочие часы и столы корректно обновляются
+        working_hours: {
+          ...currentSettings.working_hours,
+          ...(newSettings.working_hours || {})
+        },
+        tables: newSettings.tables || currentSettings.tables
+      };
       
-      // Сохраняем на сервере (ГЛАВНЫЙ ПРИОРИТЕТ)
+      // Сохраняем на сервере
       const savedSettings = await settingsApi.updateSettings(updatedSettings);
       
+      if (!savedSettings) {
+        throw new Error('Сервер вернул пустой ответ');
+      }
+
+      // Проверяем, что все необходимые поля присутствуют
+      const requiredFields = [
+        'restaurant_name',
+        'email',
+        'phone',
+        'address',
+        'currency',
+        'currency_symbol',
+        'tables'
+      ] as const;
+
+      type RequiredField = typeof requiredFields[number];
+      const missingFields = requiredFields.filter(
+        (field: RequiredField) => !savedSettings[field as keyof RestaurantSettings]
+      );
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Отсутствуют обязательные поля: ${missingFields.join(', ')}`);
+      }
+
       // Обновляем состояние и локальное хранилище
       set({ 
         settings: savedSettings, 
         isLoading: false,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        error: null
       });
+
+      // Сохраняем в локальное хранилище
       settingsApi.saveSettingsLocally(savedSettings);
       
       return savedSettings;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при обновлении настроек:', error);
       
-      // Даже при ошибке обновляем локальные настройки (временно)
-      const updatedSettings = { ...get().settings, ...newSettings };
+      // Устанавливаем понятное сообщение об ошибке
+      const errorMessage = error.response?.data?.message || error.message || 'Произошла ошибка при сохранении настроек';
+      
       set({ 
-        settings: updatedSettings,
-        error: 'Настройки сохранены локально, но возникла ошибка при сохранении на сервере. Изменения будут применены только для вас до перезагрузки страницы.',
+        error: errorMessage,
         isLoading: false 
       });
-      settingsApi.saveSettingsLocally(updatedSettings);
-      
-      // Запланируем повторную попытку отправки на сервер
-      setTimeout(() => {
-        get().updateSettings(newSettings);
-      }, 10000); // Через 10 секунд
-      
-      return updatedSettings;
+
+      // Возвращаем текущие настройки без изменений
+      return get().settings;
     }
   },
 
