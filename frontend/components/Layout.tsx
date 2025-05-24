@@ -33,14 +33,20 @@ interface LayoutProps {
   section?: string;
   showFooter?: boolean;
   description?: string;
+  keywords?: string;
+  noFooter?: boolean;
+  noHeader?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
-  title = 'Ресторан', 
+  title = 'Restaurant App', 
   section, 
   showFooter = true, 
-  description = 'Лучший ресторан в городе'
+  description = 'Restaurant management application',
+  keywords = 'restaurant, food, delivery, menu',
+  noFooter = false,
+  noHeader = false
 }) => {
   const { isDark } = useTheme();
   
@@ -67,16 +73,17 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       <Head>
         <title>{title}</title>
         <meta name="description" content={description} />
+        <meta name="keywords" content={keywords} />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
         <meta name="theme-color" content={isDark ? '#1f2937' : '#f9fafb'} />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <Header />
+      {!noHeader && <Header />}
 
       <main className="flex-grow" suppressHydrationWarning>
         <div className={section ? getSectionStyles() : 'w-full'} suppressHydrationWarning>
@@ -84,7 +91,7 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </main>
 
-      {showFooter && <Footer />}
+      {!noFooter && <Footer />}
     </div>
   );
 };

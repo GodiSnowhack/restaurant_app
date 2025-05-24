@@ -71,6 +71,7 @@ const AdminSettingsPage: NextPage = () => {
         [name]: value
       };
     });
+    setIsEditing(true);
   };
   
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -82,6 +83,7 @@ const AdminSettingsPage: NextPage = () => {
         [name]: value
       };
     });
+    setIsEditing(true);
   };
   
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,6 +95,7 @@ const AdminSettingsPage: NextPage = () => {
         [name]: checked
       };
     });
+    setIsEditing(true);
   };
   
   const handleWorkingHoursChange = (day: string, field: string, value: string | boolean) => {
@@ -109,26 +112,19 @@ const AdminSettingsPage: NextPage = () => {
         }
       };
     });
+    setIsEditing(true);
   };
   
   const handleChange = (field: keyof RestaurantSettings, value: any) => {
     if (formData) {
-      setIsEditing(true);
       setFormData(prev => {
         if (!prev) return prev;
-        const updatedSettings = {
+        return {
           ...prev,
           [field]: value
         };
-        
-        // Автоматически сохраняем изменения с флагом isEditing
-        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-          .catch(error => {
-            console.error('Ошибка при автосохранении:', error);
-          });
-          
-        return updatedSettings;
       });
+      setIsEditing(true);
     }
   };
 
@@ -150,23 +146,12 @@ const AdminSettingsPage: NextPage = () => {
         status: 'available'
       };
       
-      const updatedTables = [...tables, newTable];
-      
       setFormData(prev => {
         if (!prev) return prev;
-        const updatedSettings = {
+        return {
           ...prev,
-          tables: updatedTables
+          tables: [...tables, newTable]
         };
-        
-        // Автоматически сохраняем изменения
-        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-          .catch(error => {
-            console.error('Ошибка при автосохранении:', error);
-            toast.error('Не удалось сохранить изменения на сервере');
-          });
-          
-        return updatedSettings;
       });
       setIsEditing(true);
       toast.success('Стол успешно добавлен');
@@ -180,19 +165,10 @@ const AdminSettingsPage: NextPage = () => {
         const tables = prev.tables.map(table => 
           table.id === tableId ? { ...table, [field]: value } : table
         );
-        
-        const updatedSettings = {
+        return {
           ...prev,
           tables
         };
-        
-        // Автоматически сохраняем изменения с флагом isEditing
-        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-          .catch(error => {
-            console.error('Ошибка при автосохранении:', error);
-          });
-          
-        return updatedSettings;
       });
       setIsEditing(true);
     }
@@ -202,26 +178,17 @@ const AdminSettingsPage: NextPage = () => {
     if (formData) {
       setFormData(prev => {
         if (!prev) return prev;
-        const tables = prev.tables.filter(table => table.id !== tableId);
-        
-        const updatedSettings = {
+        return {
           ...prev,
-          tables
+          tables: prev.tables.filter(table => table.id !== tableId)
         };
-        
-        // Автоматически сохраняем изменения с флагом isEditing
-        settingsApi.updateSettings({ ...updatedSettings, isEditing: true })
-          .catch(error => {
-            console.error('Ошибка при автосохранении:', error);
-          });
-          
-        return updatedSettings;
       });
       setIsEditing(true);
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); // Предотвращаем отправку формы
     if (!formData) return;
 
     try {
@@ -260,40 +227,7 @@ const AdminSettingsPage: NextPage = () => {
     } catch (error: any) {
       console.error('Ошибка при сохранении настроек:', error);
       
-      // Проверяем тип ошибки
       if (error.response?.status === 401) {
-        // Пробуем переавторизоваться
-        try {
-          const userProfile = localStorage.getItem('user_profile');
-          if (userProfile) {
-            const { email } = JSON.parse(userProfile);
-            const password = localStorage.getItem('password'); // Временное решение
-            if (password) {
-              const response = await fetch('/api/v1/auth/login', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email, password })
-              });
-              
-              if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('token', data.access_token);
-                // Повторяем сохранение
-                const savedSettings = await updateSettings(formData);
-                setIsEditing(false);
-                setFormData(savedSettings);
-                setLastUpdateTime(new Date().toLocaleString());
-                toast.success('Настройки успешно сохранены');
-                return;
-              }
-            }
-          }
-        } catch (retryError) {
-          console.error('Ошибка при повторной авторизации:', retryError);
-        }
-        
         toast.error('Необходима авторизация');
         router.push('/auth/login');
       } else if (error.response?.status === 403) {
@@ -310,21 +244,18 @@ const AdminSettingsPage: NextPage = () => {
 
   const handleForceRefresh = async () => {
     setIsRefreshing(true);
-    
     try {
-      // Принудительное обновление настроек с сервера
       const refreshedSettings = await settingsApi.forceRefreshSettings();
-      
       if (refreshedSettings) {
         setFormData(refreshedSettings);
         setLastUpdateTime(new Date().toLocaleString());
-        alert('Настройки успешно обновлены с сервера!');
+        toast.success('Настройки успешно обновлены с сервера');
       } else {
-        alert('Не удалось получить обновленные настройки с сервера.');
+        toast.error('Не удалось получить обновленные настройки с сервера');
       }
     } catch (error) {
       console.error('Ошибка при принудительном обновлении настроек:', error);
-      alert('Произошла ошибка при обновлении настроек с сервера.');
+      toast.error('Произошла ошибка при обновлении настроек с сервера');
     } finally {
       setIsRefreshing(false);
     }
@@ -365,7 +296,7 @@ const AdminSettingsPage: NextPage = () => {
 
   return (
     <Layout title="Настройки | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
+      <form onSubmit={handleSave} className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link 
@@ -383,6 +314,7 @@ const AdminSettingsPage: NextPage = () => {
               Последнее обновление: {lastUpdateTime}
             </div>
             <button
+              type="button"
               onClick={handleForceRefresh}
               disabled={isRefreshing}
               className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-gray-300 bg-gray-800 hover:bg-gray-700' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'} shadow-sm text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
@@ -405,6 +337,7 @@ const AdminSettingsPage: NextPage = () => {
                 <h2 className={`text-lg font-medium mb-4 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Категории настроек</h2>
                 <nav className="space-y-2">
                   <button
+                    type="button"
                     onClick={() => setActiveTab('general')}
                     className={`flex items-center w-full px-3 py-2 rounded-md text-sm font-medium ${
                       activeTab === 'general' 
@@ -1187,28 +1120,22 @@ const AdminSettingsPage: NextPage = () => {
                 </div>
               )}
 
-              {/* Кнопка сохранения */}
-              <div className="mt-8 flex justify-end">
+              {/* Кнопки действий */}
+              <div className="mt-8 flex justify-end space-x-4">
                 {isEditing ? (
                   <>
                     <button
                       type="button"
                       onClick={handleCancel}
                       disabled={isSaving}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      className={`px-4 py-2 border ${isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
                     >
-                      {isSaving ? (
-                        <>
-                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                          Отмена
-                        </>
-                      ) : 'Отмена'}
+                      Отмена
                     </button>
                     <button
-                      type="button"
-                      onClick={handleSave}
+                      type="submit"
                       disabled={isSaving}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isDark ? 'bg-primary-500 hover:bg-primary-600' : 'bg-primary hover:bg-primary-dark'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
                     >
                       {isSaving ? (
                         <>
@@ -1222,7 +1149,7 @@ const AdminSettingsPage: NextPage = () => {
                   <button
                     type="button"
                     onClick={() => setIsEditing(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isDark ? 'bg-primary-500 hover:bg-primary-600' : 'bg-primary hover:bg-primary-dark'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
                   >
                     Редактировать
                   </button>
@@ -1231,7 +1158,7 @@ const AdminSettingsPage: NextPage = () => {
             </div>
           </div>
         </div>
-      </div>
+      </form>
     </Layout>
   );
 };

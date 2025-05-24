@@ -12,9 +12,7 @@ const getApiBaseUrl = (): string => {
 };
 
 // Создаем экземпляр axios с базовой конфигурацией
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'https://') || 'https://backend-production-1a78.up.railway.app/api/v1',
-  timeout: 10000,
+export const api = axios.create({  baseURL: process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'https://') || 'https://backend-production-1a78.up.railway.app/api/v1',  timeout: 30000, // Увеличиваем таймаут до 30 секунд
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
