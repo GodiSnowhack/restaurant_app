@@ -77,6 +77,11 @@ export const authApi: IAuthApi = {
       });
 
       // Отправляем запрос через прокси
+      console.log('Auth API: Отправка запроса на /api/login', {
+        email: credentials.email,
+        hasPassword: !!credentials.password
+      });
+
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
@@ -90,6 +95,12 @@ export const authApi: IAuthApi = {
         })
       });
 
+      console.log('Auth API: Получен ответ', {
+        status: response.status,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       // Получаем и парсим ответ
       const rawData = await response.text();
       console.log('Auth API: Сырой ответ от сервера:', rawData);
@@ -97,12 +108,25 @@ export const authApi: IAuthApi = {
       let data;
       try {
         data = JSON.parse(rawData);
+        console.log('Auth API: Распарсенный ответ:', {
+          hasData: !!data,
+          keys: data ? Object.keys(data) : [],
+          accessToken: data?.access_token ? '***' : undefined,
+          user: data?.user,
+          fullData: {
+            ...data,
+            access_token: data?.access_token ? '***' : undefined
+          }
+        });
       } catch (e) {
-        console.error('Auth API: Ошибка парсинга JSON:', e);
+        console.error('Auth API: Ошибка парсинга JSON:', {
+          error: e,
+          rawData
+        });
         throw new Error('Неверный формат ответа от сервера');
       }
 
-      console.log('Auth API: Получен ответ от сервера', {
+      console.log('Auth API: Проверка данных', {
         status: response.status,
         ok: response.ok,
         hasData: !!data,
@@ -116,20 +140,32 @@ export const authApi: IAuthApi = {
 
       // Проверяем успешность запроса
       if (!response.ok) {
+        console.error('Auth API: Ошибка запроса', {
+          status: response.status,
+          data
+        });
         throw new Error(data.detail || data.message || 'Ошибка авторизации');
       }
 
       // Проверяем наличие необходимых данных
-      if (!data.access_token || !data.user) {
-        console.error('Auth API: Отсутствуют необходимые данные в ответе', {
-          hasToken: !!data.access_token,
-          hasUser: !!data.user,
-          data: JSON.stringify({
+      if (!data.access_token) {
+        console.error('Auth API: Отсутствует токен', {
+          data: {
             ...data,
-            access_token: data.access_token ? '***' : undefined
-          })
+            access_token: data?.access_token ? '***' : undefined
+          }
         });
-        throw new Error('Неверный формат ответа от сервера');
+        throw new Error('Токен не найден в ответе сервера');
+      }
+
+      if (!data.user) {
+        console.error('Auth API: Отсутствуют данные пользователя', {
+          data: {
+            ...data,
+            access_token: data?.access_token ? '***' : undefined
+          }
+        });
+        throw new Error('Данные пользователя не найдены в ответе сервера');
       }
 
       // Проверяем обязательные поля пользователя
@@ -157,6 +193,17 @@ export const authApi: IAuthApi = {
           updated_at: data.user.updated_at || new Date().toISOString()
         }
       };
+
+      console.log('Auth API: Подготовленный ответ', {
+        hasToken: !!loginResponse.access_token,
+        hasUser: !!loginResponse.user,
+        role: loginResponse.user.role,
+        email: loginResponse.user.email,
+        fullResponse: {
+          ...loginResponse,
+          access_token: '***'
+        }
+      });
 
       // Сохраняем данные
       console.log('Auth API: Сохранение данных авторизации');
