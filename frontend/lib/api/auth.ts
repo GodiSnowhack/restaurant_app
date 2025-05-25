@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
 import { getToken } from '../utils/auth';
+import { api as apiClient } from './core';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 
@@ -61,27 +62,59 @@ api.interceptors.response.use(
 );
 
 // Определяем тип ответа от сервера
-interface ServerLoginResponse {
-  access_token: string;
-  token_type: string;
-  user: User;
+interface ServerLoginResponse extends LoginResponse {}
+
+// Определяем интерфейс для API аутентификации
+interface IAuthApi {
+  login: (credentials: LoginCredentials) => Promise<LoginResponse>;
+  register: (credentials: RegisterCredentials) => Promise<LoginResponse>;
+  getProfile: () => Promise<User>;
+  logout: () => Promise<void>;
 }
 
-export const authApi = {
+export const authApi: IAuthApi = {
   // Авторизация пользователя
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
       console.log('Auth API: Попытка входа', { email: credentials.email });
       
-      const response = await api.post<LoginResponse>('/auth/login', credentials);
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(credentials)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.message || 'Ошибка авторизации');
+      }
+
+      const data = await response.json();
+
+      // Проверяем наличие всех необходимых данных
+      if (!data.access_token || !data.user) {
+        console.error('Auth API: Неверный формат ответа:', data);
+        throw new Error('Неверный формат ответа от сервера');
+      }
+
+      // Создаем объект с правильной типизацией
+      const loginResponse: LoginResponse = {
+        access_token: data.access_token,
+        token_type: data.token_type || 'bearer',
+        user: data.user
+      };
       
       console.log('Auth API: Успешный вход', { 
         status: response.status,
-        hasToken: !!response.data.access_token,
-        role: response.data.user?.role 
+        hasToken: !!loginResponse.access_token,
+        hasUser: !!loginResponse.user,
+        role: loginResponse.user?.role 
       });
 
-      return response.data;
+      return loginResponse;
     } catch (error) {
       const serverError = error as ServerError;
       console.error('Auth API: Ошибка входа', {
@@ -97,7 +130,7 @@ export const authApi = {
   register: async (credentials: RegisterCredentials): Promise<LoginResponse> => {
     try {
       console.log('Auth API: Попытка регистрации', { email: credentials.email });
-      const response = await api.post<LoginResponse>('/auth/register', credentials);
+      const response = await apiClient.post<LoginResponse>('/auth/register', credentials);
       console.log('Auth API: Успешная регистрация', { status: response.status });
       return response.data;
     } catch (error: any) {
@@ -110,7 +143,7 @@ export const authApi = {
   getProfile: async (): Promise<User> => {
     try {
       console.log('Auth API: Запрос профиля пользователя');
-      const response = await api.get<User>('/users/me');
+      const response = await apiClient.get<User>('/users/me');
       console.log('Auth API: Профиль получен', { 
         status: response.status,
         role: response.data.role 
@@ -126,7 +159,7 @@ export const authApi = {
   logout: async (): Promise<void> => {
     try {
       console.log('Auth API: Попытка выхода');
-      await api.post('/auth/logout');
+      await apiClient.post('/auth/logout');
       console.log('Auth API: Успешный выход');
     } catch (error: any) {
       console.error('Auth API: Ошибка выхода', error.response?.data || error.message);

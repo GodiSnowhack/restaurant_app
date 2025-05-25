@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 
@@ -34,45 +35,51 @@ export default async function handler(
       body: { email: req.body.email }
     });
 
+    // Формируем данные для отправки
     const formData = new URLSearchParams();
     formData.append('username', req.body.email);
     formData.append('password', req.body.password);
 
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
+    console.log('Auth API - Отправляемые данные:', formData.toString());
+
+    const response = await axios.post(`${API_URL}/auth/login`, formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       },
-      body: formData.toString(),
+      validateStatus: function (status) {
+        return status < 500; // Разрешаем все статусы < 500
+      }
     });
 
-    const data = await response.json();
-
-    console.log('Login API - Ответ от сервера:', {
+    console.log('Auth API - Ответ от сервера:', {
       status: response.status,
-      hasData: !!data,
-      error: !response.ok ? data : null
+      hasData: !!response.data,
+      hasToken: !!response.data?.access_token,
+      hasUser: !!response.data?.user
     });
 
-    if (!response.ok) {
-      // Возвращаем ошибку с сервера в правильном формате
-      return res.status(response.status).json({
-        message: data.detail || data.message || 'Ошибка авторизации',
-        errors: data.errors || []
+    if (response.status === 401) {
+      return res.status(401).json({
+        detail: 'Неверные учетные данные'
       });
     }
 
-    // Проверяем наличие необходимых данных
-    if (!data.access_token || !data.user) {
-      console.error('Login API - Неверный формат ответа:', data);
+    // Проверяем наличие всех необходимых полей в ответе
+    if (!response.data?.access_token || !response.data?.user) {
+      console.error('Auth API - Неполный ответ от сервера:', response.data);
       return res.status(500).json({
-        message: 'Неверный формат ответа от сервера'
+        detail: 'Неверный формат ответа от сервера'
       });
     }
 
-    // Возвращаем данные клиенту
-    return res.status(200).json(data);
+    // Возвращаем полный ответ от сервера
+    return res.status(200).json({
+      access_token: response.data.access_token,
+      token_type: response.data.token_type,
+      user: response.data.user
+    });
   } catch (error: any) {
     console.error('Login API - Ошибка:', error);
     return res.status(500).json({

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authApi, api } from './api';
+import { authApi } from './api';
 import axios from 'axios';
 import { AuthState, LoginCredentials, RegisterCredentials, LoginResponse, User } from './types/auth';
 import { saveToken, saveUser, getToken, getUser, clearAuth } from './utils/auth';
@@ -288,32 +288,41 @@ const useAuthStore = create<AuthStore>()(
       },
 
       // Авторизация пользователя
-      login: async (credentials) => {
+      login: async (credentials: LoginCredentials) => {
         try {
           set({ isLoading: true, error: null });
           console.log('AuthStore: Попытка входа', { email: credentials.email });
 
-          const result = await authApi.login(credentials);
-          const loginResponse = result as LoginResponse;
-          const { access_token, user } = loginResponse;
+          type AuthResponse = {
+            access_token: string;
+            token_type: string;
+            user: User;
+          };
+
+          const response = await authApi.login(credentials) as AuthResponse;
           
-          if (!access_token || !user) {
-            throw new Error('Неверный формат ответа от сервера');
-          }
+          console.log('AuthStore: Получен ответ от сервера', {
+            hasToken: !!response.access_token,
+            hasUser: !!response.user,
+            role: response.user?.role
+          });
 
           // Сохраняем данные
-          saveToken(access_token);
-          saveUser(user);
+          saveToken(response.access_token);
+          saveUser(response.user);
 
           set({
             isAuthenticated: true,
-            token: access_token,
-            user,
+            token: response.access_token,
+            user: response.user,
             error: null,
             isLoading: false
           });
 
-          console.log('AuthStore: Успешный вход', { role: user.role });
+          console.log('AuthStore: Успешный вход', { 
+            role: response.user.role,
+            isAuthenticated: true
+          });
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);
           
