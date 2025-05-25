@@ -119,15 +119,16 @@ export default async function handler(
     };
 
     console.log('Auth API - Подготовленный ответ для клиента:', {
-      responseData: JSON.stringify(responseData),
       hasToken: !!responseData.access_token,
       hasUser: !!responseData.user,
       email: responseData.user?.email,
-      role: responseData.user?.role
+      role: responseData.user?.role,
+      responseData: JSON.stringify(responseData)
     });
 
     // Отправляем ответ клиенту
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.status(200).json(responseData);
   } catch (error: any) {
     console.error('Login API - Ошибка:', error.response?.data || error.message);

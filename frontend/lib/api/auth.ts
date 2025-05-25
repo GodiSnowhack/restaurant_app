@@ -112,6 +112,10 @@ export const authApi: IAuthApi = {
         throw new Error(data.detail || 'Неверный формат ответа от сервера');
       }
 
+      // Сохраняем токен и данные пользователя
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user_profile', JSON.stringify(data.user));
+
       // Создаем объект с правильной типизацией
       const loginResponse: LoginResponse = {
         access_token: data.access_token,
