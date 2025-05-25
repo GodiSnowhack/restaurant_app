@@ -241,7 +241,7 @@ const useAuthStore = create<AuthState>()(
             password: password ? '[HIDDEN]' : null
           });
 
-          const response = await fetch('/api/auth/login', {
+          const response = await fetch('/api/v1/auth/login', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded'
@@ -378,7 +378,7 @@ const useAuthStore = create<AuthState>()(
           
           try {
             // Выполняем запрос с таймаутом
-            const response = await fetch('/api/auth/me', {
+            const response = await fetch('/api/v1/users/me', {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
@@ -481,7 +481,7 @@ const useAuthStore = create<AuthState>()(
                         localStorage.setItem('token_refresh_success_timestamp', Date.now().toString());
                         
                         // Повторяем запрос профиля с новым токеном
-                        const newProfileResponse = await fetch('/api/auth/me', {
+                        const newProfileResponse = await fetch('/api/v1/users/me', {
                           method: 'GET',
                           headers: {
                             'Content-Type': 'application/json',

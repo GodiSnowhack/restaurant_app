@@ -139,23 +139,6 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   updateSettings: async (newSettings: Partial<RestaurantSettings>) => {
     set({ isLoading: true, error: null });
     try {
-      // Получаем токен для проверки авторизации
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-
-      // Проверяем роль пользователя
-      const userProfile = localStorage.getItem('user_profile');
-      if (!userProfile) {
-        throw new Error('Информация о пользователе не найдена');
-      }
-
-      const { role } = JSON.parse(userProfile);
-      if (role !== 'admin') {
-        throw new Error('Недостаточно прав для изменения настроек');
-      }
-
       // Объединяем текущие настройки с новыми
       const currentSettings = get().settings;
       const updatedSettings = {

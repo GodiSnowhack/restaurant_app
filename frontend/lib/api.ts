@@ -35,7 +35,7 @@ export const getApiBaseUrl = () => {
   }
   
   // Для production всегда используем основной URL
-  return 'https://backend-production-1a78.up.railway.app/api/v1';
+  return 'https://frontend-production-8eb6.up.railway.app/api/v1';
 };
 
 const baseURL = getApiBaseUrl();
@@ -194,91 +194,21 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
-    // Если у нас ошибка авторизации (401), попробуем обновить токен
-    if (error.response && error.response.status === 401 && config) {
-      console.log('API: Получена ошибка 401, пробуем обновить токен');
+    // Если у нас ошибка авторизации (401) или доступа (403)
+    if (error.response && (error.response.status === 401 || error.response.status === 403) && config) {
+      console.log(`API: Получена ошибка ${error.response.status}`);
       
-      // Предотвращаем частое обновление токена
-      const tokenRefreshKey = 'token_refresh_attempt_timestamp';
-      const lastRefreshAttempt = localStorage.getItem(tokenRefreshKey);
+      // Очищаем данные авторизации
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_profile');
       
-      if (lastRefreshAttempt) {
-        const timeSinceLastRefresh = Date.now() - parseInt(lastRefreshAttempt);
-        if (timeSinceLastRefresh < 10000) { // 10 секунд
-          console.log(`API: Предотвращение цикла обновления токена (прошло ${Math.round(timeSinceLastRefresh/1000)}с)`);
-          // Перенаправляем на страницу входа
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
+      // Перенаправляем на страницу входа
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
       }
       
-      // Сохраняем временную метку попытки обновления токена
-      localStorage.setItem(tokenRefreshKey, Date.now().toString());
-      
-      try {
-        // Пробуем обновить токен
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-          // Если нет refresh токена, перенаправляем на страницу входа
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
-
-        console.log('API: Отправляем запрос на обновление токена');
-        
-        // Отправляем запрос на обновление токена
-        const refreshResponse = await fetch('/api/auth/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken })
-        });
-        
-        if (refreshResponse.ok) {
-          const tokenData = await refreshResponse.json();
-          
-          if (tokenData.access_token) {
-            console.log('API: Токен успешно обновлен, повторяем исходный запрос');
-            
-            // Сохраняем новый токен
-            localStorage.setItem('token', tokenData.access_token);
-            
-            // Сохраняем новый refresh_token, если он есть
-            if (tokenData.refresh_token) {
-              localStorage.setItem('refresh_token', tokenData.refresh_token);
-            }
-            
-            // Обновляем заголовок Authorization
-            if (config.headers instanceof AxiosHeaders) {
-              config.headers.Authorization = `Bearer ${tokenData.access_token}`;
-            }
-            
-            // Помечаем запрос как повторный
-            config._isRetry = true;
-            
-            // Повторяем исходный запрос с новым токеном
-            return api(config);
-          }
-        }
-        
-        // Если не удалось обновить токен, перенаправляем на страницу входа
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          window.location.href = '/auth/login';
-        }
-      } catch (refreshError) {
-        console.error('API: Ошибка при обновлении токена:', refreshError);
-        // Перенаправляем на страницу входа
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          window.location.href = '/auth/login';
-        }
-      }
+      return Promise.reject(error);
     }
     
     // Добавляем интерцептор для логирования ответов

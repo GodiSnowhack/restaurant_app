@@ -195,29 +195,6 @@ const AdminSettingsPage: NextPage = () => {
       setIsSaving(true);
       setError(null);
       
-      // Проверяем авторизацию
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Необходима авторизация');
-        router.push('/auth/login');
-        return;
-      }
-
-      // Проверяем роль пользователя
-      const userProfile = localStorage.getItem('user_profile');
-      if (!userProfile) {
-        toast.error('Информация о пользователе не найдена');
-        router.push('/auth/login');
-        return;
-      }
-
-      const { role } = JSON.parse(userProfile);
-      if (role !== 'admin') {
-        toast.error('Недостаточно прав для изменения настроек');
-        router.push('/');
-        return;
-      }
-
       // Сохраняем изменения
       const savedSettings = await updateSettings(formData);
       setIsEditing(false);

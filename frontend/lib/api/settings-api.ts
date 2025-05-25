@@ -81,10 +81,10 @@ export const settingsApi = {
       }
       
       console.log('Запрос настроек с сервера...');
-      const response = await api.get<{ data: RestaurantSettings }>('/settings');
+      const response = await api.get<RestaurantSettings>('/settings');
       
-      if (response.data && response.data.data) {
-        const settings = response.data.data;
+      if (response.data) {
+        const settings = response.data;
         console.log('Получены настройки с сервера:', settings);
         
         // Проверяем наличие всех обязательных полей
@@ -152,7 +152,7 @@ export const settingsApi = {
     try {
       console.log('Принудительное обновление настроек с сервера...');
       const response = await api.get<RestaurantSettings>('/settings');
-      const settings = response.data as Partial<RestaurantSettings>;
+      const settings = response.data;
       
       // Проверяем наличие всех обязательных полей
       const requiredFields = [
@@ -196,7 +196,7 @@ export const settingsApi = {
         console.error('Ошибка при кэшировании настроек:', cacheError);
       }
       
-      return settings as RestaurantSettings;
+      return settings;
     } catch (error) {
       console.error('Ошибка при принудительном обновлении настроек:', error);
       // При ошибке возвращаем локальные настройки
@@ -229,13 +229,14 @@ export const settingsApi = {
       if (role !== 'admin') {
         throw new Error('Недостаточно прав для изменения настроек');
       }
-
-      // Добавляем заголовок авторизации
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      api.defaults.headers.common['X-User-Role'] = role;
       
       console.log('API: Отправляем настройки на сервер:', settings);
-      const response = await api.put<RestaurantSettings>('/settings', settings);
+      const response = await api.put<RestaurantSettings>('/settings', settings, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': role
+        }
+      });
       const updatedSettings = response.data;
       
       console.log('API: Получен ответ от сервера:', updatedSettings);
