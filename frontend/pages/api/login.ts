@@ -32,9 +32,21 @@ export default async function handler(
   try {
     const { email, password } = req.body;
 
+    // Проверяем наличие необходимых данных
+    if (!email || !password) {
+      console.error('Login API - Отсутствуют необходимые данные:', {
+        hasEmail: !!email,
+        hasPassword: !!password
+      });
+      return res.status(400).json({
+        detail: 'Отсутствуют необходимые данные для входа'
+      });
+    }
+
     console.log('Login API - Отправка запроса авторизации:', {
       url: `${API_URL}/auth/login`,
-      email
+      email,
+      hasPassword: !!password
     });
 
     // Формируем данные для отправки
@@ -42,7 +54,10 @@ export default async function handler(
     formData.append('username', email);
     formData.append('password', password);
 
-    console.log('Auth API - Отправляемые данные:', formData.toString());
+    console.log('Auth API - Отправляемые данные:', {
+      username: email,
+      hasPassword: !!password
+    });
 
     const response = await axios.post(`${API_URL}/auth/login`, formData, {
       headers: {
@@ -60,7 +75,8 @@ export default async function handler(
       hasData: !!response.data,
       data: {
         ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined
+        access_token: response.data?.access_token ? '***' : undefined,
+        password: undefined
       },
       hasToken: !!response.data?.access_token,
       hasUser: !!response.data?.user
@@ -76,7 +92,8 @@ export default async function handler(
     if (!response.data?.access_token || !response.data?.user) {
       console.error('Auth API - Неполный ответ от сервера:', {
         ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined
+        access_token: response.data?.access_token ? '***' : undefined,
+        password: undefined
       });
       return res.status(500).json({
         detail: 'Неверный формат ответа от сервера',
@@ -97,7 +114,8 @@ export default async function handler(
     console.log('Auth API - Отправка ответа клиенту:', {
       hasToken: !!responseData.access_token,
       hasUser: !!responseData.user,
-      user: responseData.user
+      email: responseData.user.email,
+      role: responseData.user.role
     });
 
     return res.status(200).json(responseData);

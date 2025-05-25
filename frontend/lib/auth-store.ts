@@ -291,7 +291,15 @@ const useAuthStore = create<AuthStore>()(
       login: async (credentials: LoginCredentials) => {
         try {
           set({ isLoading: true, error: null });
-          console.log('AuthStore: Попытка входа', { email: credentials.email });
+          console.log('AuthStore: Попытка входа', { 
+            email: credentials.email,
+            hasPassword: !!credentials.password
+          });
+
+          // Проверяем наличие пароля
+          if (!credentials.password) {
+            throw new Error('Пароль не может быть пустым');
+          }
 
           const response = await authApi.login(credentials) as LoginResponse;
           
@@ -299,7 +307,7 @@ const useAuthStore = create<AuthStore>()(
             hasToken: !!response.access_token,
             hasUser: !!response.user,
             role: response.user?.role,
-            user: response.user
+            email: response.user?.email
           });
 
           if (!response.access_token || !response.user) {
@@ -329,7 +337,7 @@ const useAuthStore = create<AuthStore>()(
           console.log('AuthStore: Успешный вход', { 
             role: response.user.role,
             isAuthenticated: true,
-            user: response.user
+            email: response.user.email
           });
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);

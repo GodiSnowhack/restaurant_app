@@ -76,8 +76,16 @@ export const authApi: IAuthApi = {
   // Авторизация пользователя
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
-      console.log('Auth API: Попытка входа', { email: credentials.email });
+      console.log('Auth API: Попытка входа', { 
+        email: credentials.email,
+        hasPassword: !!credentials.password
+      });
       
+      // Проверяем наличие пароля
+      if (!credentials.password) {
+        throw new Error('Пароль не может быть пустым');
+      }
+
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
@@ -96,7 +104,8 @@ export const authApi: IAuthApi = {
         status: response.status,
         data: {
           ...data,
-          access_token: data.access_token ? '***' : undefined
+          access_token: data.access_token ? '***' : undefined,
+          password: undefined
         }
       });
 
@@ -111,7 +120,8 @@ export const authApi: IAuthApi = {
           hasUser: !!data.user,
           data: {
             ...data,
-            access_token: data.access_token ? '***' : undefined
+            access_token: data.access_token ? '***' : undefined,
+            password: undefined
           }
         });
         throw new Error(data.detail || 'Неверный формат ответа от сервера');
@@ -127,7 +137,8 @@ export const authApi: IAuthApi = {
       console.log('Auth API: Успешный вход', { 
         hasToken: !!loginResponse.access_token,
         hasUser: !!loginResponse.user,
-        role: loginResponse.user?.role 
+        role: loginResponse.user?.role,
+        email: loginResponse.user?.email
       });
 
       return loginResponse;
