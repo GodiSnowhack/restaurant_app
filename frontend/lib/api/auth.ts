@@ -77,23 +77,26 @@ export const authApi: IAuthApi = {
       });
 
       // Отправляем запрос на сервер
-      const response = await fetch('/api/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
         },
-        body: JSON.stringify({
-          email: credentials.email,
+        body: new URLSearchParams({
+          username: credentials.email,
           password: credentials.password
-        })
+        }).toString()
       });
 
       // Получаем и парсим ответ
       const rawData = await response.json();
 
       console.log('API login - Сырые данные от сервера:', rawData);
+
+      // Добавляем небольшую задержку перед проверкой данных
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Проверяем успешность запроса
       if (!response.ok) {
@@ -111,7 +114,7 @@ export const authApi: IAuthApi = {
       }
 
       // Проверяем наличие токена в разных возможных местах
-      const accessToken = rawData.access_token || rawData.accessToken || rawData.token || (rawData.data && rawData.data.access_token);
+      const accessToken = rawData.access_token || (rawData.data && rawData.data.access_token);
       
       if (!accessToken) {
         console.error('API login - Токен не найден в ответе:', rawData);
@@ -119,23 +122,26 @@ export const authApi: IAuthApi = {
       }
 
       // Проверяем наличие данных пользователя в разных возможных местах
-      const userData = rawData.user || rawData.data?.user || rawData;
+      const userData = rawData.user || (rawData.data && rawData.data.user);
+
+      if (!userData) {
+        console.error('API login - Данные пользователя не найдены:', rawData);
+        throw new Error('Данные пользователя не найдены в ответе сервера');
+      }
 
       // Формируем объект ответа в соответствии с типом LoginResponse
       const data: LoginResponse = {
         access_token: accessToken,
-        token_type: rawData.token_type || 'bearer',
+        token_type: rawData.token_type || rawData.data?.token_type || 'bearer',
         user: {
           id: userData.id,
           email: userData.email,
-          full_name: userData.full_name || userData.fullName || userData.name || '',
-          role: userData.role || 'client',
-          is_active: userData.is_active ?? true,
-          created_at: userData.created_at || userData.createdAt || new Date().toISOString(),
-          updated_at: userData.updated_at || userData.updatedAt || new Date().toISOString()
-        },
-        detail: rawData.detail,
-        message: rawData.message
+          full_name: userData.full_name,
+          role: userData.role,
+          is_active: userData.is_active,
+          created_at: userData.created_at || new Date().toISOString(),
+          updated_at: userData.updated_at || new Date().toISOString()
+        }
       };
 
       console.log('API login - Преобразованные данные:', {
@@ -143,16 +149,6 @@ export const authApi: IAuthApi = {
         hasUser: !!data.user,
         userData: data.user
       });
-
-      // Проверяем наличие необходимых данных
-      if (!data.access_token || !data.user) {
-        console.error('Auth API: Отсутствуют необходимые данные в ответе', {
-          hasToken: !!data.access_token,
-          hasUser: !!data.user,
-          data: JSON.stringify(data)
-        });
-        throw new Error('Неверный формат ответа от сервера');
-      }
 
       // Сохраняем данные
       console.log('Auth API: Сохранение данных авторизации');
