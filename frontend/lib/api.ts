@@ -31,11 +31,13 @@ export interface User {
 export const getApiBaseUrl = () => {
   // Используем URL из переменной окружения, если он задан
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    const url = process.env.NEXT_PUBLIC_API_URL;
+    // Убеждаемся, что URL заканчивается на /api/v1
+    return url.endsWith('/api/v1') ? url : `${url}/api/v1`;
   }
   
   // Для production всегда используем основной URL
-  return 'https://frontend-production-8eb6.up.railway.app/api/v1';
+  return 'https://backend-production-1a78.up.railway.app/api/v1';
 };
 
 const baseURL = getApiBaseUrl();
@@ -43,7 +45,7 @@ const baseURL = getApiBaseUrl();
 const API_URL = baseURL;
 
 export const api = axios.create({
-  baseURL: 'https://backend-production-1a78.up.railway.app',
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

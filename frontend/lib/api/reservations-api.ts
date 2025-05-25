@@ -16,8 +16,12 @@ export const reservationsApi = {
     const cacheTimeKey = 'reservations_cache_timestamp';
     
     try {
+      console.log('[Reservations API] Начало запроса бронирований');
+      
       // Получаем токен авторизации
       const token = await getAuthToken();
+      console.log('[Reservations API] Токен авторизации:', token ? 'получен' : 'отсутствует');
+      
       if (!token) {
         console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
         return [];
@@ -34,6 +38,9 @@ export const reservationsApi = {
           queryParams = `?${queryParts.join('&')}`;
         }
       }
+      
+      console.log(`[Reservations API] Отправка запроса на /reservations${queryParams}`);
+      console.log('[Reservations API] Базовый URL:', api.defaults.baseURL);
       
       // Проверяем кэш (используем его, если данные не старше 2 минут)
       const cachedData = localStorage.getItem(cacheKey);
@@ -74,6 +81,11 @@ export const reservationsApi = {
         
         clearTimeout(timeoutId);
         
+        console.log('[Reservations API] Ответ получен:', {
+          status: response.status,
+          dataLength: response.data?.length || 0
+        });
+        
         if (response.data) {
           // Кэшируем результат запроса без фильтров
           if (!params) {
@@ -89,11 +101,34 @@ export const reservationsApi = {
       } catch (error: any) {
         clearTimeout(timeoutId);
         
-        // Если ошибка связана с таймаутом
-        if (error.name === 'AbortError') {
-          console.error('[Reservations API] Превышено время ожидания запроса');
-        } else {
-          console.error('[Reservations API] Ошибка при запросе бронирований:', error);
+        console.error('[Reservations API] Ошибка при запросе бронирований:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
+        
+        // Если сервер недоступен, пробуем альтернативный URL
+        if (error.response?.status === 404 || error.code === 'ECONNREFUSED') {
+          console.log('[Reservations API] Пробуем альтернативный URL');
+          try {
+            const alternativeUrl = 'https://frontend-production-8eb6.up.railway.app/api/v1';
+            const fallbackResponse = await fetch(`${alternativeUrl}/reservations${queryParams}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (fallbackResponse.ok) {
+              const data = await fallbackResponse.json();
+              console.log('[Reservations API] Получены данные через альтернативный URL');
+              return data;
+            }
+          } catch (fallbackError) {
+            console.error('[Reservations API] Ошибка при использовании альтернативного URL:', fallbackError);
+          }
         }
         
         // Возвращаем кэшированные данные в случае ошибки
