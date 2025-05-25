@@ -67,7 +67,7 @@ export const reservationsApi = {
       
       try {
         // Отправляем запрос через API
-        const response = await api.get<Reservation[]>(`/reservations${queryParams}`, {
+        const response = await api.get<Reservation[]>(`/api/v1/reservations${queryParams}`, {
           headers,
           signal: controller.signal
         });
@@ -241,6 +241,18 @@ export const reservationsApi = {
     } catch (error) {
       console.error(`[Reservations API] Ошибка при удалении бронирования #${id}:`, error);
       return false;
+    }
+  },
+
+  // Создание нового бронирования
+  createReservation: async (data: any) => {
+    console.log('API: Создание бронирования...');
+    try {
+      const response = await api.post('/api/v1/reservations', data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Ошибка при создании бронирования:', error);
+      throw error;
     }
   }
 };
