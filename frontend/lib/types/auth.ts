@@ -17,6 +17,8 @@ export interface LoginResponse {
   access_token: string;
   token_type: string;
   user: User;
+  detail?: string;
+  message?: string;
 }
 
 export interface AuthState {

@@ -1,64 +1,79 @@
 import { User } from '../types/auth';
 
-const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'auth_user';
+// Ключи для хранения данных
+const TOKEN_KEY = 'token';
+const USER_KEY = 'user_profile';
+const AUTH_TIMESTAMP_KEY = 'auth_timestamp';
 
+// Функция для сохранения токена
 export const saveToken = (token: string): void => {
   try {
     localStorage.setItem(TOKEN_KEY, token);
-  } catch (e) {
-    console.error('Ошибка при сохранении токена:', e);
+    localStorage.setItem(AUTH_TIMESTAMP_KEY, Date.now().toString());
+    console.log('Auth Utils: Токен успешно сохранен');
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при сохранении токена:', error);
   }
 };
 
+// Функция для получения токена
 export const getToken = (): string | null => {
   try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch (e) {
-    console.error('Ошибка при получении токена:', e);
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      console.log('Auth Utils: Токен не найден');
+      return null;
+    }
+    return token;
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при получении токена:', error);
     return null;
   }
 };
 
-export const removeToken = (): void => {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch (e) {
-    console.error('Ошибка при удалении токена:', e);
-  }
-};
-
+// Функция для сохранения данных пользователя
 export const saveUser = (user: User): void => {
   try {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch (e) {
-    console.error('Ошибка при сохранении пользователя:', e);
+    console.log('Auth Utils: Данные пользователя успешно сохранены', {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при сохранении данных пользователя:', error);
   }
 };
 
+// Функция для получения данных пользователя
 export const getUser = (): User | null => {
   try {
-    const user = localStorage.getItem(USER_KEY);
-    return user ? JSON.parse(user) : null;
-  } catch (e) {
-    console.error('Ошибка при получении пользователя:', e);
+    const userStr = localStorage.getItem(USER_KEY);
+    if (!userStr) {
+      console.log('Auth Utils: Данные пользователя не найдены');
+      return null;
+    }
+    const user = JSON.parse(userStr) as User;
+    return user;
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при получении данных пользователя:', error);
     return null;
   }
 };
 
-export const removeUser = (): void => {
+// Функция для очистки данных авторизации
+export const clearAuth = (): void => {
   try {
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-  } catch (e) {
-    console.error('Ошибка при удалении пользователя:', e);
+    localStorage.removeItem(AUTH_TIMESTAMP_KEY);
+    console.log('Auth Utils: Данные авторизации успешно очищены');
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при очистке данных авторизации:', error);
   }
 };
 
-export const clearAuth = (): void => {
-  removeToken();
-  removeUser();
-};
-
+// Функция для проверки срока действия токена
 export const isTokenExpired = (token: string): boolean => {
   try {
     const base64Url = token.split('.')[1];
@@ -68,9 +83,48 @@ export const isTokenExpired = (token: string): boolean => {
     }).join(''));
 
     const { exp } = JSON.parse(jsonPayload);
-    return Date.now() >= exp * 1000;
-  } catch (e) {
-    console.error('Ошибка при проверке срока действия токена:', e);
+    const expired = Date.now() >= exp * 1000;
+    
+    if (expired) {
+      console.log('Auth Utils: Токен истек');
+    }
+    
+    return expired;
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при проверке срока действия токена:', error);
+    return true; // В случае ошибки считаем токен истекшим
+  }
+};
+
+// Функция для проверки валидности данных авторизации
+export const validateAuthData = (): boolean => {
+  try {
+    const token = getToken();
+    const user = getUser();
+    const timestamp = localStorage.getItem(AUTH_TIMESTAMP_KEY);
+
+    if (!token || !user || !timestamp) {
+      console.log('Auth Utils: Отсутствуют необходимые данные авторизации');
+      return false;
+    }
+
+    // Проверяем срок действия токена
+    if (isTokenExpired(token)) {
+      console.log('Auth Utils: Токен истек');
+      return false;
+    }
+
+    // Проверяем время последней авторизации (24 часа)
+    const lastAuth = parseInt(timestamp);
+    const now = Date.now();
+    if (now - lastAuth > 24 * 60 * 60 * 1000) {
+      console.log('Auth Utils: Истек срок сессии');
+      return false;
+    }
+
     return true;
+  } catch (error) {
+    console.error('Auth Utils: Ошибка при валидации данных авторизации:', error);
+    return false;
   }
 }; 

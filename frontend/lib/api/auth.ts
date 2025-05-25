@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
-import { getToken } from '../utils/auth';
+import { LoginCredentials, RegisterCredentials, LoginResponse, User, UserRole } from '../types/auth';
+import { getToken, saveToken, saveUser } from '../utils/auth';
 import { api as apiClient } from './core';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
@@ -44,7 +44,6 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.data) {
-      // Если есть данные об ошибке от сервера, используем их
       const serverError = new Error(
         (error.response.data as any).message || 
         (error.response.data as any).detail || 
@@ -56,13 +55,9 @@ api.interceptors.response.use(
       };
       return Promise.reject(serverError);
     }
-    // Если нет данных от сервера, возвращаем исходную ошибку
     return Promise.reject(error);
   }
 );
-
-// Определяем тип ответа от сервера
-interface ServerLoginResponse extends LoginResponse {}
 
 // Определяем интерфейс для API аутентификации
 interface IAuthApi {
@@ -76,62 +71,81 @@ export const authApi: IAuthApi = {
   // Авторизация пользователя
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
-      console.log('Auth API: Попытка входа', { 
+      console.log('Auth API: Начало процесса входа', { 
         email: credentials.email,
         hasPassword: !!credentials.password
       });
 
+      // Отправляем запрос на сервер
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password
+        })
       });
 
-      const data = await response.json();
+      // Получаем и парсим ответ
+      const rawData = await response.json();
 
-      console.log('Auth API: Сырой ответ от сервера', {
+      // Проверяем успешность запроса
+      if (!response.ok) {
+        throw new Error(rawData.detail || rawData.message || 'Ошибка авторизации');
+      }
+
+      // Формируем объект ответа в соответствии с типом LoginResponse
+      const data: LoginResponse = {
+        access_token: rawData.access_token,
+        token_type: rawData.token_type || 'bearer',
+        user: {
+          id: rawData.user.id,
+          email: rawData.user.email,
+          full_name: rawData.user.full_name,
+          role: rawData.user.role,
+          is_active: rawData.user.is_active,
+          created_at: rawData.user.created_at || new Date().toISOString(),
+          updated_at: rawData.user.updated_at || new Date().toISOString()
+        },
+        detail: rawData.detail,
+        message: rawData.message
+      };
+
+      console.log('Auth API: Получен ответ от сервера', {
         status: response.status,
         ok: response.ok,
-        data: JSON.stringify(data)
+        hasData: !!data,
+        hasToken: !!data.access_token,
+        hasUser: !!data.user
       });
 
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || 'Ошибка авторизации');
-      }
-
-      // Проверяем наличие всех необходимых данных
+      // Проверяем наличие необходимых данных
       if (!data.access_token || !data.user) {
-        console.error('Auth API: Неверный формат ответа:', {
-          responseData: JSON.stringify(data),
+        console.error('Auth API: Отсутствуют необходимые данные в ответе', {
           hasToken: !!data.access_token,
-          hasUser: !!data.user
+          hasUser: !!data.user,
+          data: JSON.stringify(data)
         });
-        throw new Error(data.detail || 'Неверный формат ответа от сервера');
+        throw new Error('Неверный формат ответа от сервера');
       }
 
-      // Сохраняем токен и данные пользователя
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user_profile', JSON.stringify(data.user));
+      // Сохраняем данные
+      console.log('Auth API: Сохранение данных авторизации');
+      saveToken(data.access_token);
+      saveUser(data.user);
 
-      // Создаем объект с правильной типизацией
-      const loginResponse: LoginResponse = {
-        access_token: data.access_token,
-        token_type: data.token_type || 'bearer',
-        user: data.user
-      };
-      
-      console.log('Auth API: Успешный вход', { 
-        hasToken: !!loginResponse.access_token,
-        hasUser: !!loginResponse.user,
-        role: loginResponse.user?.role,
-        email: loginResponse.user?.email,
-        responseData: JSON.stringify(loginResponse)
+      console.log('Auth API: Успешный вход', {
+        hasToken: !!data.access_token,
+        hasUser: !!data.user,
+        role: data.user.role,
+        email: data.user.email
       });
 
-      return loginResponse;
+      return data;
     } catch (error) {
       console.error('Auth API: Ошибка входа', error);
       throw error;
@@ -143,7 +157,18 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Попытка регистрации', { email: credentials.email });
       const response = await apiClient.post<LoginResponse>('/auth/register', credentials);
-      console.log('Auth API: Успешная регистрация', { status: response.status });
+      
+      if (response.data.access_token && response.data.user) {
+        saveToken(response.data.access_token);
+        saveUser(response.data.user);
+      }
+      
+      console.log('Auth API: Успешная регистрация', { 
+        hasToken: !!response.data.access_token,
+        hasUser: !!response.data.user,
+        role: response.data.user?.role 
+      });
+      
       return response.data;
     } catch (error: any) {
       console.error('Auth API: Ошибка регистрации', error.response?.data || error.message);
@@ -156,10 +181,16 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Запрос профиля пользователя');
       const response = await apiClient.get<User>('/users/me');
+      
+      if (response.data) {
+        saveUser(response.data);
+      }
+      
       console.log('Auth API: Профиль получен', { 
-        status: response.status,
-        role: response.data.role 
+        hasData: !!response.data,
+        role: response.data?.role 
       });
+      
       return response.data;
     } catch (error: any) {
       console.error('Auth API: Ошибка получения профиля', error.response?.data || error.message);
@@ -172,10 +203,14 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Попытка выхода');
       await apiClient.post('/auth/logout');
+      localStorage.clear();
+      sessionStorage.clear();
       console.log('Auth API: Успешный выход');
     } catch (error: any) {
       console.error('Auth API: Ошибка выхода', error.response?.data || error.message);
-      // Даже если запрос не удался, мы все равно разлогиниваем пользователя локально
+      // Даже если запрос не удался, очищаем локальное хранилище
+      localStorage.clear();
+      sessionStorage.clear();
     }
   }
 }; 

@@ -192,6 +192,7 @@ const sendAuthErrorLog = async (error: any, endpoint: string, diagnosticInfo?: a
   }
 };
 
+// Начальное состояние
 const initialState: AuthState = {
   isAuthenticated: false,
   user: null,
@@ -221,104 +222,96 @@ const useAuthStore = create<AuthStore>()(
     (set, get) => ({
       ...initialState,
 
-      fetchUserProfile: async () => {
-        try {
-          const currentUser = await authApi.getProfile();
-          saveUser(currentUser);
-          set({ user: currentUser });
-        } catch (error) {
-          console.error('AuthStore: Ошибка при получении профиля', error);
-          throw error;
-        }
-      },
-
-      refreshProfile: async () => {
-        try {
-          console.log('AuthStore: Обновление профиля пользователя');
-          const currentUser = await authApi.getProfile();
-          saveUser(currentUser);
-          set({ user: currentUser });
-          return currentUser;
-        } catch (error) {
-          console.error('AuthStore: Ошибка при обновлении профиля', error);
-          throw error;
-        }
-      },
-
-      isMobileDevice: () => {
-        return typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
-      },
-
       setInitialAuthState: () => {
         const token = getToken();
         const user = getUser();
         if (token && user) {
-          set({ isAuthenticated: true, token, user });
+          set({ 
+            isAuthenticated: true, 
+            token, 
+            user,
+            error: null 
+          });
+          console.log('AuthStore: Установлено начальное состояние', {
+            hasToken: !!token,
+            hasUser: !!user,
+            role: user.role
+          });
+        } else {
+          console.log('AuthStore: Нет сохраненных данных авторизации');
         }
       },
 
-      // Инициализация состояния авторизации
       initialize: async () => {
         try {
           const token = getToken();
           const user = getUser();
 
           if (token && user) {
-            console.log('AuthStore: Инициализация с сохраненными данными', { role: user.role });
-            set({ isAuthenticated: true, token, user });
+            console.log('AuthStore: Инициализация с сохраненными данными', { 
+              hasToken: !!token,
+              hasUser: !!user,
+              role: user.role 
+            });
             
+            set({ 
+              isAuthenticated: true, 
+              token, 
+              user,
+              error: null 
+            });
+
             // Проверяем актуальность данных пользователя
             try {
               const currentUser = await authApi.getProfile();
-              console.log('AuthStore: Обновление профиля пользователя', { role: currentUser.role });
+              console.log('AuthStore: Обновление профиля пользователя', { 
+                hasUser: !!currentUser,
+                role: currentUser.role 
+              });
+              
               saveUser(currentUser);
               set({ user: currentUser });
             } catch (error) {
               console.error('AuthStore: Ошибка при обновлении профиля', error);
-              // Если не удалось получить актуальные данные, используем сохраненные
+              // Если не удалось получить актуальные данные, оставляем сохраненные
             }
           } else {
             console.log('AuthStore: Нет сохраненных данных авторизации');
-            set({ isAuthenticated: false, token: null, user: null });
+            set({ 
+              isAuthenticated: false, 
+              token: null, 
+              user: null,
+              error: null 
+            });
           }
         } catch (error) {
           console.error('AuthStore: Ошибка при инициализации', error);
-          set({ isAuthenticated: false, token: null, user: null });
+          set({ 
+            isAuthenticated: false, 
+            token: null, 
+            user: null,
+            error: null 
+          });
         }
       },
 
-      // Авторизация пользователя
       login: async (credentials: LoginCredentials) => {
         try {
           set({ isLoading: true, error: null });
-          console.log('AuthStore: Попытка входа', { 
+          console.log('AuthStore: Начало процесса входа', { 
             email: credentials.email,
             hasPassword: !!credentials.password
           });
-
-          // Проверяем наличие пароля
-          if (!credentials.password) {
-            throw new Error('Пароль не может быть пустым');
-          }
 
           const response = await authApi.login(credentials) as LoginResponse;
           
           console.log('AuthStore: Получен ответ от сервера', {
             hasToken: !!response.access_token,
             hasUser: !!response.user,
-            role: response.user?.role,
-            email: response.user?.email
+            role: response.user?.role
           });
 
           if (!response.access_token || !response.user) {
-            console.error('AuthStore: Неверный формат ответа:', {
-              hasToken: !!response.access_token,
-              hasUser: !!response.user,
-              response: {
-                ...response,
-                access_token: response.access_token ? '***' : undefined
-              }
-            });
             throw new Error('Неверный формат ответа от сервера');
           }
 
@@ -335,39 +328,38 @@ const useAuthStore = create<AuthStore>()(
           });
 
           console.log('AuthStore: Успешный вход', { 
-            role: response.user.role,
             isAuthenticated: true,
+            role: response.user.role,
             email: response.user.email
           });
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);
           
-          // Формируем понятное сообщение об ошибке
-          let errorMessage = 'Произошла ошибка при входе';
-          
-          if (typeof error === 'object' && error !== null) {
-            errorMessage = error.message || errorMessage;
-          }
+          // Очищаем данные при ошибке
+          clearAuth();
           
           set({ 
             isAuthenticated: false,
             token: null,
             user: null,
-            error: errorMessage,
+            error: error.message || 'Произошла ошибка при входе',
             isLoading: false
           });
           
-          throw new Error(errorMessage);
+          throw error;
         }
       },
 
-      // Регистрация пользователя
-      register: async (credentials) => {
+      register: async (credentials: RegisterCredentials) => {
         try {
           set({ isLoading: true, error: null });
           console.log('AuthStore: Попытка регистрации', { email: credentials.email });
 
           const response = await authApi.register(credentials);
+
+          if (!response.access_token || !response.user) {
+            throw new Error('Неверный формат ответа от сервера');
+          }
 
           // Сохраняем данные
           saveToken(response.access_token);
@@ -381,30 +373,38 @@ const useAuthStore = create<AuthStore>()(
             isLoading: false
           });
 
-          console.log('AuthStore: Успешная регистрация', { role: response.user.role });
+          console.log('AuthStore: Успешная регистрация', { 
+            isAuthenticated: true,
+            role: response.user.role 
+          });
         } catch (error: any) {
           console.error('AuthStore: Ошибка регистрации', error);
+          
+          // Очищаем данные при ошибке
+          clearAuth();
+          
           set({
             isAuthenticated: false,
             token: null,
             user: null,
-            error: error.message,
+            error: error.message || 'Произошла ошибка при регистрации',
             isLoading: false
           });
+          
           throw error;
         }
       },
 
-      // Выход из системы
       logout: async () => {
         try {
-          console.log('AuthStore: Попытка выхода');
+          console.log('AuthStore: Начало процесса выхода');
+          set({ isLoading: true });
+          
           await authApi.logout();
-        } catch (error) {
-          console.error('AuthStore: Ошибка при выходе', error);
-        } finally {
-          // Очищаем данные независимо от результата запроса
+          
+          // Очищаем все данные
           clearAuth();
+          
           set({
             isAuthenticated: false,
             token: null,
@@ -412,9 +412,71 @@ const useAuthStore = create<AuthStore>()(
             error: null,
             isLoading: false
           });
-          console.log('AuthStore: Выход выполнен');
+          
+          console.log('AuthStore: Успешный выход');
+        } catch (error) {
+          console.error('AuthStore: Ошибка при выходе', error);
+          
+          // Очищаем данные даже при ошибке
+          clearAuth();
+          
+          set({
+            isAuthenticated: false,
+            token: null,
+            user: null,
+            error: null,
+            isLoading: false
+          });
         }
-      }
+      },
+
+      fetchUserProfile: async () => {
+        try {
+          console.log('AuthStore: Запрос профиля пользователя');
+          const currentUser = await authApi.getProfile();
+          
+          if (!currentUser) {
+            throw new Error('Не удалось получить данные пользователя');
+          }
+          
+          saveUser(currentUser);
+          set({ user: currentUser });
+          
+          console.log('AuthStore: Профиль успешно получен', {
+            hasUser: !!currentUser,
+            role: currentUser.role
+          });
+        } catch (error: any) {
+          console.error('AuthStore: Ошибка при получении профиля', error);
+          throw error;
+        }
+      },
+
+      refreshProfile: async () => {
+        try {
+          console.log('AuthStore: Обновление профиля пользователя');
+          const currentUser = await authApi.getProfile();
+          
+          if (!currentUser) {
+            throw new Error('Не удалось получить данные пользователя');
+          }
+          
+          saveUser(currentUser);
+          set({ user: currentUser });
+          
+          console.log('AuthStore: Профиль успешно обновлен', {
+            hasUser: !!currentUser,
+            role: currentUser.role
+          });
+          
+          return currentUser;
+        } catch (error: any) {
+          console.error('AuthStore: Ошибка при обновлении профиля', error);
+          throw error;
+        }
+      },
+
+      isMobileDevice
     }),
     {
       name: STORE_NAME,
