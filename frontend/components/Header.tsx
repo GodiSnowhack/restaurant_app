@@ -112,19 +112,9 @@ const Header = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4 flex-shrink-0">
             <Link href="/" className="flex items-center" onClick={handleLogoClick}>
-              {settings.logo_url ? (
-                <Image
-                  src={settings.logo_url}
-                  alt={settings.restaurant_name || 'Ресторан'}
-                  width={40}
-                  height={40}
-                  className="rounded-md"
-                />
-              ) : (
-                <div className="text-primary font-bold text-xl uppercase dark:text-primary">
-                  {settings.restaurant_name || 'RESTAURANT'}
-                </div>
-              )}
+              <div className="text-primary font-bold text-xl uppercase dark:text-primary">
+                {settings.restaurant_name || 'RESTAURANT'}
+              </div>
             </Link>
           </div>
 
