@@ -98,10 +98,10 @@ export default function LoginPage() {
     // Обновляем статус для более подробной обратной связи
     setLoginStatus('Отправка данных на сервер...');
     
-    console.log(`Login Page - Попытка входа #${submitAttempts + 1}`, { 
+    console.log('Login: Начало процесса входа', { 
       email: data.email, 
       hasPassword: !!data.password,
-      isMobile: isMobileDevice() 
+      isMobile: typeof isMobileDevice === 'function' ? isMobileDevice() : false
     });
     
     try {
@@ -233,7 +233,7 @@ export default function LoginPage() {
           </form>
           
           {/* Информация для отладки на мобильных устройствах */}
-          {isMobileDevice() && process.env.NODE_ENV !== 'production' && (
+          {typeof isMobileDevice === 'function' && isMobileDevice() && process.env.NODE_ENV !== 'production' && (
             <div className="mt-6 p-2 border border-gray-200 rounded-md text-xs text-gray-500">
               <details>
                 <summary className="cursor-pointer">Информация для отладки</summary>
