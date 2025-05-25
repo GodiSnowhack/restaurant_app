@@ -114,17 +114,20 @@ export default async function handler(
     // Возвращаем полный ответ от сервера
     const responseData = {
       access_token: response.data.access_token,
-      token_type: response.data.token_type,
+      token_type: response.data.token_type || 'bearer',
       user: response.data.user
     };
 
-    console.log('Auth API - Отправка ответа клиенту:', {
+    console.log('Auth API - Подготовленный ответ для клиента:', {
+      responseData: JSON.stringify(responseData),
       hasToken: !!responseData.access_token,
       hasUser: !!responseData.user,
-      email: responseData.user.email,
-      role: responseData.user.role
+      email: responseData.user?.email,
+      role: responseData.user?.role
     });
 
+    // Отправляем ответ клиенту
+    res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(responseData);
   } catch (error: any) {
     console.error('Login API - Ошибка:', error.response?.data || error.message);

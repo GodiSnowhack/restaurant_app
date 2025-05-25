@@ -78,8 +78,7 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Попытка входа', { 
         email: credentials.email,
-        hasPassword: !!credentials.password,
-        password: credentials.password // временно для отладки
+        hasPassword: !!credentials.password
       });
 
       const response = await fetch('/api/login', {
@@ -93,13 +92,10 @@ export const authApi: IAuthApi = {
 
       const data = await response.json();
 
-      console.log('Auth API: Получен ответ', {
+      console.log('Auth API: Сырой ответ от сервера', {
         status: response.status,
         ok: response.ok,
-        data: {
-          ...data,
-          access_token: data.access_token ? '***' : undefined
-        }
+        data: JSON.stringify(data)
       });
 
       if (!response.ok) {
@@ -109,12 +105,9 @@ export const authApi: IAuthApi = {
       // Проверяем наличие всех необходимых данных
       if (!data.access_token || !data.user) {
         console.error('Auth API: Неверный формат ответа:', {
+          responseData: JSON.stringify(data),
           hasToken: !!data.access_token,
-          hasUser: !!data.user,
-          data: {
-            ...data,
-            access_token: data.access_token ? '***' : undefined
-          }
+          hasUser: !!data.user
         });
         throw new Error(data.detail || 'Неверный формат ответа от сервера');
       }
@@ -130,7 +123,8 @@ export const authApi: IAuthApi = {
         hasToken: !!loginResponse.access_token,
         hasUser: !!loginResponse.user,
         role: loginResponse.user?.role,
-        email: loginResponse.user?.email
+        email: loginResponse.user?.email,
+        responseData: JSON.stringify(loginResponse)
       });
 
       return loginResponse;
