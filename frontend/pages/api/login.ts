@@ -32,6 +32,12 @@ export default async function handler(
   try {
     const { email, password } = req.body;
 
+    console.log('Login API - Получены данные:', { 
+      email,
+      hasPassword: !!password,
+      password // временно для отладки
+    });
+
     // Проверяем наличие необходимых данных
     if (!email || !password) {
       console.error('Login API - Отсутствуют необходимые данные:', {
@@ -46,7 +52,8 @@ export default async function handler(
     console.log('Login API - Отправка запроса авторизации:', {
       url: `${API_URL}/auth/login`,
       email,
-      hasPassword: !!password
+      hasPassword: !!password,
+      password // временно для отладки
     });
 
     // Формируем данные для отправки
@@ -55,8 +62,10 @@ export default async function handler(
     formData.append('password', password);
 
     console.log('Auth API - Отправляемые данные:', {
+      formData: formData.toString(),
       username: email,
-      hasPassword: !!password
+      hasPassword: !!password,
+      password // временно для отладки
     });
 
     const response = await axios.post(`${API_URL}/auth/login`, formData, {
@@ -75,8 +84,7 @@ export default async function handler(
       hasData: !!response.data,
       data: {
         ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined,
-        password: undefined
+        access_token: response.data?.access_token ? '***' : undefined
       },
       hasToken: !!response.data?.access_token,
       hasUser: !!response.data?.user
@@ -92,8 +100,7 @@ export default async function handler(
     if (!response.data?.access_token || !response.data?.user) {
       console.error('Auth API - Неполный ответ от сервера:', {
         ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined,
-        password: undefined
+        access_token: response.data?.access_token ? '***' : undefined
       });
       return res.status(500).json({
         detail: 'Неверный формат ответа от сервера',
