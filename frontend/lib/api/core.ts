@@ -1,4 +1,5 @@
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
+import jwt from 'jsonwebtoken';
 
 // Функция для определения правильного baseURL для API
 const getApiBaseUrl = (): string => {
@@ -280,13 +281,11 @@ function createAccessToken(data: { sub: string | number, role: string, email: st
     exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 часа
   };
   
-  const encodedHeader = btoa(JSON.stringify(header));
-  const encodedPayload = btoa(JSON.stringify(payload));
+  // Используем строку в качестве секретного ключа
+  const secret = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-secret-key';
+  const token = jwt.sign(payload, secret, { algorithm: 'HS256' });
   
-  // В реальном приложении здесь должен быть правильный алгоритм подписи
-  const signature = btoa(JSON.stringify({ signed: true }));
-  
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
+  return token;
 }
 
 // Функция для проверки, является ли текущий маршрут публичным

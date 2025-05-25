@@ -16,7 +16,25 @@ def read_user_me(
     current_user: User = Depends(get_current_user)
 ):
     """Получение информации о текущем пользователе"""
-    return current_user
+    # Проверяем, нужно ли обновить токен
+    if hasattr(current_user, 'needs_token_refresh') and current_user.needs_token_refresh:
+        return {
+            **current_user.__dict__,
+            "needs_token_refresh": True
+        }
+    
+    # Возвращаем полные данные пользователя
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+        "full_name": current_user.full_name,
+        "phone": current_user.phone,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+        "needs_token_refresh": False
+    }
 
 
 @router.put("/me", response_model=UserResponse)
