@@ -251,7 +251,8 @@ const useAuthStore = create<AuthState>()(
           console.log('AuthStore - Ответ от сервера:', {
             status: response.status,
             hasData: !!data,
-            hasToken: !!data.access_token
+            hasToken: !!data.access_token,
+            role: data.user?.role
           });
 
           if (!response.ok) {
@@ -267,21 +268,33 @@ const useAuthStore = create<AuthState>()(
           
           // Если в ответе есть данные пользователя, сохраняем их
           if (data.user) {
+            const userProfile = {
+              id: data.user.id,
+              email: data.user.email,
+              role: data.user.role,
+              full_name: data.user.full_name,
+              is_active: data.user.is_active,
+              phone: data.user.phone
+            };
+
             set({ 
               isAuthenticated: true, 
               token: data.access_token,
-              user: data.user,
+              user: userProfile,
               error: null 
             });
             
             // Сохраняем данные пользователя в localStorage
-            localStorage.setItem('user_profile', JSON.stringify(data.user));
-            localStorage.setItem('user_role', data.user.role);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user_profile', JSON.stringify(userProfile));
+            localStorage.setItem('user_role', userProfile.role);
+            localStorage.setItem('user', JSON.stringify(userProfile));
             
-            console.log('AuthStore - Авторизация успешна, роль:', data.user.role);
+            console.log('AuthStore - Авторизация успешна, сохранен профиль:', {
+              role: userProfile.role,
+              id: userProfile.id
+            });
           } else {
-            // Если данных пользователя нет, устанавливаем только токен и получаем профиль
+            // Если данных пользователя нет, получаем профиль отдельным запросом
             set({ 
               isAuthenticated: true, 
               token: data.access_token,

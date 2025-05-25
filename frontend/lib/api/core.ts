@@ -119,32 +119,24 @@ api.interceptors.request.use(
       try {
         const userProfile = localStorage.getItem('user_profile');
         if (userProfile) {
-          const { id, role } = JSON.parse(userProfile);
-          config.headers['X-User-ID'] = id;
-          config.headers['X-User-Role'] = role;
+          const user = JSON.parse(userProfile);
+          if (user && user.id && user.role) {
+            config.headers['X-User-ID'] = user.id.toString();
+            config.headers['X-User-Role'] = user.role;
+            console.log('API Interceptor: Добавлены пользовательские заголовки:', {
+              userId: user.id,
+              role: user.role
+            });
+          } else {
+            console.warn('API Interceptor: Неполные данные пользователя в профиле');
+          }
         }
       } catch (e) {
         console.error('API Interceptor: Ошибка при добавлении пользовательских заголовков:', e);
       }
     } else {
       console.warn('API Interceptor: Токен не найден');
-      // Пробуем получить данные пользователя без токена
-      const userProfile = localStorage.getItem('user_profile');
-      if (userProfile) {
-        try {
-          const { id } = JSON.parse(userProfile);
-          if (!config.headers) {
-            config.headers = new AxiosHeaders();
-          }
-          config.headers['X-User-ID'] = id;
-        } catch (e) {
-          console.error('API Interceptor: Ошибка при добавлении X-User-ID:', e);
-        }
-      }
     }
-    
-    // Логируем заголовки запроса
-    console.log('API Interceptor: Заголовки запроса:', config.headers);
     
     return config;
   },
