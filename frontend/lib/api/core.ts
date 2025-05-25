@@ -124,18 +124,36 @@ api.interceptors.request.use(
       
       // Добавляем дополнительные заголовки для авторизации
       try {
-        const userProfile = localStorage.getItem('user_profile');
-        if (userProfile) {
-          const user = JSON.parse(userProfile);
-          if (user && user.id && user.role) {
-            config.headers['X-User-ID'] = user.id.toString();
-            config.headers['X-User-Role'] = user.role;
-            console.log('API Interceptor: Добавлены пользовательские заголовки:', {
-              userId: user.id,
-              role: user.role
-            });
-          } else {
-            console.warn('API Interceptor: Неполные данные пользователя в профиле');
+        const userId = localStorage.getItem('user_id');
+        const userRole = localStorage.getItem('user_role');
+        
+        if (userId && userRole) {
+          config.headers['X-User-ID'] = userId;
+          config.headers['X-User-Role'] = userRole;
+          console.log('API Interceptor: Добавлены пользовательские заголовки:', {
+            userId,
+            role: userRole
+          });
+        } else {
+          // Пробуем получить данные из профиля
+          const userProfile = localStorage.getItem('user_profile');
+          if (userProfile) {
+            const user = JSON.parse(userProfile);
+            if (user && user.id && user.role) {
+              config.headers['X-User-ID'] = user.id.toString();
+              config.headers['X-User-Role'] = user.role;
+              
+              // Сохраняем данные отдельно для будущего использования
+              localStorage.setItem('user_id', user.id.toString());
+              localStorage.setItem('user_role', user.role);
+              
+              console.log('API Interceptor: Добавлены пользовательские заголовки из профиля:', {
+                userId: user.id,
+                role: user.role
+              });
+            } else {
+              console.warn('API Interceptor: Неполные данные пользователя в профиле');
+            }
           }
         }
       } catch (e) {

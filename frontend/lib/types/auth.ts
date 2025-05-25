@@ -1,16 +1,17 @@
-export type UserRole = 'admin' | 'waiter' | 'client';
+export type UserRole = 'admin' | 'waiter' | 'guest' | 'user';
 
 export interface User {
   id: number;
   email: string;
-  role: UserRole;
   full_name: string;
-  phone?: string;
-  birthday?: string;
-  age_group?: string;
+  role: 'admin' | 'waiter' | 'guest' | 'user';
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_login?: string;
+  orders_count?: number;
+  reservations_count?: number;
 }
 
 export interface LoginResponse {

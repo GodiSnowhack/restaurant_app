@@ -34,7 +34,29 @@ export const getToken = (): string | null => {
 // Функция для сохранения данных пользователя
 export const saveUser = (user: User): void => {
   try {
+    if (!user) {
+      console.error('Auth Utils: Попытка сохранить пустые данные пользователя');
+      return;
+    }
+
+    // Проверяем наличие необходимых полей
+    if (!user.id || !user.email || !user.role) {
+      console.error('Auth Utils: Неполные данные пользователя:', {
+        hasId: !!user.id,
+        hasEmail: !!user.email,
+        hasRole: !!user.role
+      });
+      return;
+    }
+
+    // Сохраняем полный объект пользователя
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    
+    // Дополнительно сохраняем важные поля отдельно для надежности
+    localStorage.setItem('user_id', user.id.toString());
+    localStorage.setItem('user_role', user.role);
+    localStorage.setItem('user_email', user.email);
+
     console.log('Auth Utils: Данные пользователя успешно сохранены', {
       id: user.id,
       email: user.email,

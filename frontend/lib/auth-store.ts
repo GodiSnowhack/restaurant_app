@@ -62,7 +62,12 @@ const useAuthStore = create<AuthStore>()(
 
           console.log('AuthStore: Проверка данных авторизации', {
             hasToken: !!token,
-            hasUser: !!user
+            hasUser: !!user,
+            userData: user ? {
+              id: user.id,
+              email: user.email,
+              role: user.role
+            } : null
           });
 
           if (token) {
@@ -72,13 +77,19 @@ const useAuthStore = create<AuthStore>()(
             try {
               // Проверяем валидность токена, получая профиль пользователя
               const currentUser = await authApi.getProfile();
+              
+              if (!currentUser || !currentUser.id || !currentUser.email || !currentUser.role) {
+                throw new Error('Получен неполный профиль пользователя');
+              }
+
               console.log('AuthStore: Получен текущий профиль', {
                 userId: currentUser.id,
+                email: currentUser.email,
                 role: currentUser.role
               });
               
               // Обновляем данные в localStorage
-              localStorage.setItem('user_profile', JSON.stringify(currentUser));
+              saveUser(currentUser);
               localStorage.setItem('token', token);
               
               // Обновляем состояние
@@ -91,8 +102,12 @@ const useAuthStore = create<AuthStore>()(
             } catch (error) {
               console.error('AuthStore: Ошибка при получении профиля', error);
               // Если не удалось получить профиль, но есть сохраненные данные
-              if (user) {
-                console.log('AuthStore: Используем сохраненные данные пользователя');
+              if (user && user.id && user.email && user.role) {
+                console.log('AuthStore: Используем сохраненные данные пользователя', {
+                  id: user.id,
+                  email: user.email,
+                  role: user.role
+                });
                 set({ 
                   isAuthenticated: true, 
                   token, 
@@ -230,9 +245,17 @@ const useAuthStore = create<AuthStore>()(
       fetchUserProfile: async () => {
         try {
           const currentUser = await authApi.getProfile();
-          if (!currentUser) {
-            throw new Error('Не удалось получить данные пользователя');
+          
+          if (!currentUser || !currentUser.id || !currentUser.email || !currentUser.role) {
+            throw new Error('Получен неполный профиль пользователя');
           }
+
+          console.log('AuthStore: Получен профиль пользователя', {
+            id: currentUser.id,
+            email: currentUser.email,
+            role: currentUser.role
+          });
+
           saveUser(currentUser);
           set({ user: currentUser });
         } catch (error: any) {
