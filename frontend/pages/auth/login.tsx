@@ -101,12 +101,15 @@ export default function LoginPage() {
     console.log(`Login Page - Попытка входа #${submitAttempts + 1}`, { 
       email: data.email, 
       hasPassword: !!data.password,
-      isMobile: isMobileDevice 
+      isMobile: isMobileDevice() 
     });
     
     try {
       // Отправляем запрос на авторизацию
-      await login(data.email, data.password);
+      await login({ 
+        email: data.email, 
+        password: data.password 
+      });
       
       setLoginStatus('Авторизация успешна, перенаправление...');
       
@@ -153,22 +156,17 @@ export default function LoginPage() {
             </div>
           )}
           
-          {/* Отображение общих ошибок */}
-          {(generalError || error) && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
-              <div className="flex items-start">
-                <svg className="h-5 w-5 text-red-500 mr-2 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <p className="font-medium">{generalError || error}</p>
-                  {generalError && isMobileDevice && (
-                    <p className="text-sm mt-1">
-                      Проверьте подключение к интернету и попробуйте обновить страницу.
-                    </p>
-                  )}
-                </div>
-              </div>
+          {/* Показываем индикатор загрузки */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          )}
+
+          {/* Показываем сообщение об ошибке */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+              <span className="block sm:inline">{error}</span>
             </div>
           )}
           
@@ -235,7 +233,7 @@ export default function LoginPage() {
           </form>
           
           {/* Информация для отладки на мобильных устройствах */}
-          {isMobileDevice && process.env.NODE_ENV !== 'production' && (
+          {isMobileDevice() && process.env.NODE_ENV !== 'production' && (
             <div className="mt-6 p-2 border border-gray-200 rounded-md text-xs text-gray-500">
               <details>
                 <summary className="cursor-pointer">Информация для отладки</summary>
