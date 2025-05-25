@@ -34,8 +34,27 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       console.log('Запрашиваем настройки с сервера...');
       const serverSettings = await settingsApi.getSettings();
       
-      if (serverSettings && serverSettings.tables && serverSettings.tables.length > 0) {
+      if (serverSettings && Object.keys(serverSettings).length > 0) {
         console.log('Получены настройки с сервера:', serverSettings);
+        
+        // Проверяем обязательные поля
+        const requiredFields = [
+          'restaurant_name',
+          'email',
+          'phone',
+          'address',
+          'currency',
+          'currency_symbol',
+          'tables'
+        ] as const;
+        
+        const missingFields = requiredFields.filter(field => !serverSettings[field]);
+        
+        if (missingFields.length > 0) {
+          console.warn(`Отсутствуют обязательные поля: ${missingFields.join(', ')}`);
+          throw new Error(`Сервер вернул неполные данные: отсутствуют поля ${missingFields.join(', ')}`);
+        }
+        
         set({ 
           settings: serverSettings, 
           isLoading: false, 
@@ -46,40 +65,18 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
         return;
       }
 
-      // Если с сервера не получили данные, используем локальные
-      console.log('Не удалось получить настройки с сервера, проверяем локальные...');
-      const localSettings = settingsApi.getLocalSettings();
-      
-      if (localSettings && localSettings.tables && localSettings.tables.length > 0) {
-        console.log('Используем локальные настройки');
-        set({ 
-          settings: localSettings,
-          isLoading: false,
-          lastUpdated: Date.now()
-        });
-        return;
-      }
-
-      // Если нет ни серверных, ни локальных настроек, используем дефолтные
-      console.log('Используем дефолтные настройки');
-      const defaultSettings = settingsApi.getDefaultSettings();
-      set({ 
-        settings: defaultSettings,
-        isLoading: false,
-        lastUpdated: Date.now()
-      });
-      settingsApi.saveSettingsLocally(defaultSettings);
-    } catch (error) {
+      throw new Error('Сервер вернул пустые настройки');
+    } catch (error: any) {
       console.error('Ошибка при загрузке настроек:', error);
       
       // При ошибке пробуем использовать локальные настройки
       const localSettings = settingsApi.getLocalSettings();
-      if (localSettings && localSettings.tables && localSettings.tables.length > 0) {
+      if (localSettings && Object.keys(localSettings).length > 0) {
         console.log('Используем локальные настройки после ошибки');
         set({ 
           settings: localSettings,
           isLoading: false,
-          error: 'Не удалось загрузить настройки с сервера. Используются локальные настройки.'
+          error: `Не удалось загрузить настройки с сервера: ${error.message}. Используются локальные настройки.`
         });
         return;
       }
@@ -89,7 +86,7 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ 
         settings: defaultSettings,
         isLoading: false,
-        error: 'Не удалось загрузить настройки с сервера. Используются настройки по умолчанию.'
+        error: `Не удалось загрузить настройки с сервера: ${error.message}. Используются настройки по умолчанию.`
       });
       settingsApi.saveSettingsLocally(defaultSettings);
     }
@@ -104,12 +101,31 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       // Тихая загрузка настроек с сервера
       const serverSettings = await settingsApi.getSettings();
       
-      if (serverSettings) {
+      if (serverSettings && Object.keys(serverSettings).length > 0) {
+        // Проверяем обязательные поля
+        const requiredFields = [
+          'restaurant_name',
+          'email',
+          'phone',
+          'address',
+          'currency',
+          'currency_symbol',
+          'tables'
+        ] as const;
+        
+        const missingFields = requiredFields.filter(field => !serverSettings[field]);
+        
+        if (missingFields.length > 0) {
+          console.warn(`Отсутствуют обязательные поля: ${missingFields.join(', ')}`);
+          return;
+        }
+        
         console.log('Получены обновленные настройки с сервера', new Date().toLocaleTimeString());
         // Обновляем состояние и локальное хранилище
         set({ 
           settings: serverSettings,
-          lastUpdated: Date.now() 
+          lastUpdated: Date.now(),
+          error: null
         });
         settingsApi.saveSettingsLocally(serverSettings);
       }

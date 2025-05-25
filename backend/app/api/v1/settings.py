@@ -65,8 +65,42 @@ def get_settings(
             db.commit()
             db.refresh(db_settings)
         
-        logger.info(f"Возвращаем настройки: {db_settings}")
-        return db_settings
+        # Преобразуем модель в словарь для создания схемы ответа
+        settings_dict = {
+            "id": db_settings.id,
+            "restaurant_name": db_settings.restaurant_name,
+            "email": db_settings.email,
+            "phone": db_settings.phone,
+            "address": db_settings.address,
+            "website": db_settings.website,
+            "working_hours": db_settings.working_hours,
+            "tables": db_settings.tables,
+            "currency": db_settings.currency,
+            "currency_symbol": db_settings.currency_symbol,
+            "tax_percentage": db_settings.tax_percentage,
+            "min_order_amount": db_settings.min_order_amount,
+            "delivery_fee": db_settings.delivery_fee,
+            "free_delivery_threshold": db_settings.free_delivery_threshold,
+            "table_reservation_enabled": db_settings.table_reservation_enabled,
+            "delivery_enabled": db_settings.delivery_enabled,
+            "pickup_enabled": db_settings.pickup_enabled,
+            "smtp_host": db_settings.smtp_host,
+            "smtp_port": db_settings.smtp_port,
+            "smtp_user": db_settings.smtp_user,
+            "smtp_password": db_settings.smtp_password,
+            "smtp_from_email": db_settings.smtp_from_email,
+            "smtp_from_name": db_settings.smtp_from_name,
+            "sms_api_key": db_settings.sms_api_key,
+            "sms_sender": db_settings.sms_sender,
+            "privacy_policy": db_settings.privacy_policy,
+            "terms_of_service": db_settings.terms_of_service
+        }
+        
+        # Создаем и возвращаем объект SettingsResponse
+        response = SettingsResponse(**settings_dict)
+        logger.info(f"Возвращаем настройки: {response}")
+        return response
+        
     except Exception as e:
         logger.error(f"Ошибка при получении настроек: {e}")
         raise HTTPException(
@@ -103,13 +137,48 @@ def update_settings(
             db.refresh(db_settings)
         
         # Обновляем только переданные поля
-        for field, value in settings_in.dict(exclude_unset=True).items():
+        update_data = settings_in.dict(exclude_unset=True)
+        for field, value in update_data.items():
             setattr(db_settings, field, value)
         
         db.commit()
         db.refresh(db_settings)
         
-        return db_settings
+        # Преобразуем модель в словарь для создания схемы ответа
+        settings_dict = {
+            "id": db_settings.id,
+            "restaurant_name": db_settings.restaurant_name,
+            "email": db_settings.email,
+            "phone": db_settings.phone,
+            "address": db_settings.address,
+            "website": db_settings.website,
+            "working_hours": db_settings.working_hours,
+            "tables": db_settings.tables,
+            "currency": db_settings.currency,
+            "currency_symbol": db_settings.currency_symbol,
+            "tax_percentage": db_settings.tax_percentage,
+            "min_order_amount": db_settings.min_order_amount,
+            "delivery_fee": db_settings.delivery_fee,
+            "free_delivery_threshold": db_settings.free_delivery_threshold,
+            "table_reservation_enabled": db_settings.table_reservation_enabled,
+            "delivery_enabled": db_settings.delivery_enabled,
+            "pickup_enabled": db_settings.pickup_enabled,
+            "smtp_host": db_settings.smtp_host,
+            "smtp_port": db_settings.smtp_port,
+            "smtp_user": db_settings.smtp_user,
+            "smtp_password": db_settings.smtp_password,
+            "smtp_from_email": db_settings.smtp_from_email,
+            "smtp_from_name": db_settings.smtp_from_name,
+            "sms_api_key": db_settings.sms_api_key,
+            "sms_sender": db_settings.sms_sender,
+            "privacy_policy": db_settings.privacy_policy,
+            "terms_of_service": db_settings.terms_of_service
+        }
+        
+        # Создаем и возвращаем объект SettingsResponse
+        response = SettingsResponse(**settings_dict)
+        return response
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

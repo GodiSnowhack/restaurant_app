@@ -27,25 +27,34 @@ class RestaurantTable(BaseModel):
 
 class SettingsBase(BaseModel):
     """Базовая схема настроек ресторана"""
-    restaurant_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
+    restaurant_name: str = Field(default="Вкусно и Точка")
+    email: EmailStr = Field(default="info@restaurant.ru")
+    phone: str = Field(default="+7 (999) 123-45-67")
+    address: str = Field(default="ул. Пушкина, д. 10, Москва")
     website: Optional[HttpUrl] = None
     
-    working_hours: Optional[Dict[str, Dict[str, Any]]] = None
-    tables: Optional[List[RestaurantTable]] = None
+    working_hours: Dict[str, Dict[str, Any]] = Field(default_factory=lambda: {
+        "monday": {"open": "09:00", "close": "22:00", "is_closed": False},
+        "tuesday": {"open": "09:00", "close": "22:00", "is_closed": False},
+        "wednesday": {"open": "09:00", "close": "22:00", "is_closed": False},
+        "thursday": {"open": "09:00", "close": "22:00", "is_closed": False},
+        "friday": {"open": "09:00", "close": "23:00", "is_closed": False},
+        "saturday": {"open": "10:00", "close": "23:00", "is_closed": False},
+        "sunday": {"open": "10:00", "close": "22:00", "is_closed": False}
+    })
     
-    currency: Optional[str] = None
-    currency_symbol: Optional[str] = None
-    tax_percentage: Optional[int] = None
-    min_order_amount: Optional[int] = None
-    delivery_fee: Optional[int] = None
-    free_delivery_threshold: Optional[int] = None
+    tables: List[RestaurantTable] = Field(default_factory=list)
     
-    table_reservation_enabled: Optional[bool] = None
-    delivery_enabled: Optional[bool] = None
-    pickup_enabled: Optional[bool] = None
+    currency: str = Field(default="KZT")
+    currency_symbol: str = Field(default="₸")
+    tax_percentage: int = Field(default=20)
+    min_order_amount: int = Field(default=1000)
+    delivery_fee: int = Field(default=300)
+    free_delivery_threshold: int = Field(default=3000)
+    
+    table_reservation_enabled: bool = Field(default=True)
+    delivery_enabled: bool = Field(default=True)
+    pickup_enabled: bool = Field(default=True)
     
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None
@@ -62,27 +71,23 @@ class SettingsBase(BaseModel):
 
 class SettingsCreate(SettingsBase):
     """Схема для создания настроек"""
-    restaurant_name: str
-    email: EmailStr
-    phone: str
-    address: str
-    
-    working_hours: Dict[str, Dict[str, Any]]
-    
-    currency: str
-    currency_symbol: str
-    tax_percentage: int
-    min_order_amount: int
-    delivery_fee: int
-    free_delivery_threshold: int
-    
-    table_reservation_enabled: bool
-    delivery_enabled: bool
-    pickup_enabled: bool
+    pass
 
 class SettingsUpdate(SettingsBase):
     """Схема для обновления настроек"""
-    pass
+    restaurant_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    currency: Optional[str] = None
+    currency_symbol: Optional[str] = None
+    tax_percentage: Optional[int] = None
+    min_order_amount: Optional[int] = None
+    delivery_fee: Optional[int] = None
+    free_delivery_threshold: Optional[int] = None
+    table_reservation_enabled: Optional[bool] = None
+    delivery_enabled: Optional[bool] = None
+    pickup_enabled: Optional[bool] = None
 
 class SettingsResponse(SettingsBase):
     """Схема для ответа с настройками"""

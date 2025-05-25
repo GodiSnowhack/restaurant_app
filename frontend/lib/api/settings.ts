@@ -1,10 +1,6 @@
 import { RestaurantSettings } from './types';
 import { api } from '../api/api';
 
-interface ApiResponse<T> {
-  data: T;
-}
-
 interface UpdateSettingsRequest extends Partial<RestaurantSettings> {
   isEditing?: boolean;
 }
@@ -75,10 +71,10 @@ export const settingsApi = {
   getSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Запрос настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
+      const response = await api.get<RestaurantSettings>('/settings');
       
-      if (response.data && response.data.data) {
-        const settings = response.data.data;
+      if (response.data) {
+        const settings = response.data;
         console.log('Получены настройки с сервера:', settings);
         
         // Проверяем наличие столов
@@ -117,10 +113,10 @@ export const settingsApi = {
   forceRefreshSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<ApiResponse<RestaurantSettings>>('/settings');
+      const response = await api.get<RestaurantSettings>('/settings');
       
-      if (response.data && response.data.data) {
-        const settings = response.data.data;
+      if (response.data) {
+        const settings = response.data;
         // Обновляем кэш
         settingsApi.saveSettingsLocally(settings);
         return settings;
@@ -166,13 +162,13 @@ export const settingsApi = {
       const { isEditing, ...settingsData } = settings;
 
       // Отправляем запрос на сервер
-      const response = await api.put<ApiResponse<RestaurantSettings>>('/settings', settingsData);
+      const response = await api.put<RestaurantSettings>('/settings', settingsData);
       
-      if (!response.data || !response.data.data) {
+      if (!response.data) {
         throw new Error('Сервер вернул некорректный ответ');
       }
 
-      const updatedSettings = response.data.data;
+      const updatedSettings = response.data;
 
       // Проверяем наличие всех необходимых полей
       const requiredFields = [
