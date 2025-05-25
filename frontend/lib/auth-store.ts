@@ -300,7 +300,8 @@ const useAuthStore = create<AuthStore>()(
           set({ isLoading: true, error: null });
           console.log('AuthStore: Начало процесса входа', { 
             email: credentials.email,
-            hasPassword: !!credentials.password
+            hasPassword: !!credentials.password,
+            isMobile: isMobileDevice()
           });
 
           const response = await authApi.login(credentials) as LoginResponse;
@@ -308,11 +309,23 @@ const useAuthStore = create<AuthStore>()(
           console.log('AuthStore: Получен ответ от сервера', {
             hasToken: !!response.access_token,
             hasUser: !!response.user,
-            role: response.user?.role
+            role: response.user?.role,
+            email: response.user?.email
           });
 
-          if (!response.access_token || !response.user) {
-            throw new Error('Неверный формат ответа от сервера');
+          if (!response.access_token) {
+            console.error('AuthStore: Отсутствует токен в ответе');
+            throw new Error('Токен не найден в ответе сервера');
+          }
+
+          if (!response.user) {
+            console.error('AuthStore: Отсутствуют данные пользователя в ответе');
+            throw new Error('Данные пользователя не найдены в ответе сервера');
+          }
+
+          if (!response.user.email || !response.user.role) {
+            console.error('AuthStore: Неполные данные пользователя', response.user);
+            throw new Error('Неполные данные пользователя в ответе сервера');
           }
 
           // Сохраняем данные

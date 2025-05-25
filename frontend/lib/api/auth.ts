@@ -93,34 +93,55 @@ export const authApi: IAuthApi = {
       // Получаем и парсим ответ
       const rawData = await response.json();
 
+      console.log('API login - Сырые данные от сервера:', rawData);
+
       // Проверяем успешность запроса
       if (!response.ok) {
+        console.error('API login - Ошибка запроса:', {
+          status: response.status,
+          data: rawData
+        });
         throw new Error(rawData.detail || rawData.message || 'Ошибка авторизации');
       }
 
+      // Проверяем структуру данных
+      if (!rawData || typeof rawData !== 'object') {
+        console.error('API login - Неверный формат данных:', rawData);
+        throw new Error('Неверный формат ответа от сервера');
+      }
+
+      // Проверяем наличие токена в разных возможных местах
+      const accessToken = rawData.access_token || rawData.accessToken || rawData.token || (rawData.data && rawData.data.access_token);
+      
+      if (!accessToken) {
+        console.error('API login - Токен не найден в ответе:', rawData);
+        throw new Error('Токен не найден в ответе сервера');
+      }
+
+      // Проверяем наличие данных пользователя в разных возможных местах
+      const userData = rawData.user || rawData.data?.user || rawData;
+
       // Формируем объект ответа в соответствии с типом LoginResponse
       const data: LoginResponse = {
-        access_token: rawData.access_token,
+        access_token: accessToken,
         token_type: rawData.token_type || 'bearer',
         user: {
-          id: rawData.user.id,
-          email: rawData.user.email,
-          full_name: rawData.user.full_name,
-          role: rawData.user.role,
-          is_active: rawData.user.is_active,
-          created_at: rawData.user.created_at || new Date().toISOString(),
-          updated_at: rawData.user.updated_at || new Date().toISOString()
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.full_name || userData.fullName || userData.name || '',
+          role: userData.role || 'client',
+          is_active: userData.is_active ?? true,
+          created_at: userData.created_at || userData.createdAt || new Date().toISOString(),
+          updated_at: userData.updated_at || userData.updatedAt || new Date().toISOString()
         },
         detail: rawData.detail,
         message: rawData.message
       };
 
-      console.log('Auth API: Получен ответ от сервера', {
-        status: response.status,
-        ok: response.ok,
-        hasData: !!data,
+      console.log('API login - Преобразованные данные:', {
         hasToken: !!data.access_token,
-        hasUser: !!data.user
+        hasUser: !!data.user,
+        userData: data.user
       });
 
       // Проверяем наличие необходимых данных
