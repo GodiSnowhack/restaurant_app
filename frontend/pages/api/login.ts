@@ -23,13 +23,13 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Метод не поддерживается' });
+    return res.status(405).json({ detail: 'Метод не поддерживается' });
   }
 
-  const { username, password } = req.body;
+  const { email, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Отсутствуют учетные данные' });
+  if (!email || !password) {
+    return res.status(400).json({ detail: 'Email и пароль обязательны' });
   }
 
   try {
@@ -56,7 +56,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     try {
       // Для формы авторизации используем form-data формат
       const formData = new URLSearchParams();
-      formData.append('username', username);
+      formData.append('username', email);
       formData.append('password', password);
 
       const response = await axios.post(loginUrl, formData.toString(), {
@@ -67,9 +67,15 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
           'Accept': 'application/json'
         },
         timeout: 30000,
+        validateStatus: (status) => status < 500
       });
 
-      // Успешный ответ с токеном
+      // Если авторизация не удалась
+      if (response.status === 401) {
+        return res.status(401).json({ detail: 'Неверные учетные данные' });
+      }
+
+      // Если получили успешный ответ
       if (response.data && response.data.access_token) {
         console.log('Login Proxy - Успешная авторизация, установлен cookie');
 
@@ -111,11 +117,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       } else {
         console.error('Login Proxy - Ответ сервера не содержит токен');
         
-        return res.status(401).json({
-          message: 'Неверный ответ от сервера авторизации',
-          error: 'no_token',
-          serverResponse: response.data || 'Ответ отсутствует'
-        });
+        return res.status(400).json({ detail: 'Не удалось получить токен доступа' });
       }
     } catch (error: any) {
       // Обработка ошибок от сервера авторизации
@@ -156,7 +158,7 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
           
           // Пробуем отправить запрос напрямую с fetch
           const formData = new URLSearchParams();
-          formData.append('username', username);
+          formData.append('username', email);
           formData.append('password', password);
           
           const directResponse = await fetch(loginUrl, {

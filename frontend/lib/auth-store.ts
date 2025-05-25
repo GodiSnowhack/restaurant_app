@@ -236,51 +236,44 @@ const useAuthStore = create<AuthState>()(
       // Авторизация пользователя
       login: async (email: string, password: string) => {
         try {
-          console.log('AuthStore - Отправляемые данные:', {
-            email,
-            password: password ? '[HIDDEN]' : null
-          });
-
-          const response = await fetch('/api/v1/auth/login', {
+          console.log('Login Page - Попытка входа', { email, hasPassword: !!password, isMobile: false });
+          
+          // Отправляем данные на сервер
+          console.log('AuthStore - Отправляемые данные:', { email, password: '[HIDDEN]' });
+          
+          // Используем прокси-эндпоинт вместо прямого обращения к API
+          const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
+              'Content-Type': 'application/json',
             },
-            body: new URLSearchParams({
-              email: email,
-              password: password
-            }).toString()
+            body: JSON.stringify({ email, password }),
           });
 
-          const data = await response.json();
-
           if (!response.ok) {
-            console.log('AuthStore - Ответ от сервера:', {
-              status: response.status,
-              ok: response.ok,
-              data
-            });
-            throw new Error(data.detail || 'Ошибка авторизации');
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Ошибка авторизации');
           }
 
-          // Сохраняем токен
+          const data = await response.json();
+          
           if (data.access_token) {
-            saveAuthToken(data.access_token);
-            
-            // Сохраняем информацию о пользователе
-            if (data.user) {
-              localStorage.setItem('user', JSON.stringify(data.user));
-            }
-            
-            set({
-              isAuthenticated: true,
+            // Сохраняем токен
+            localStorage.setItem('token', data.access_token);
+            // Устанавливаем состояние авторизации
+            set({ 
+              isAuthenticated: true, 
               token: data.access_token,
-              user: data.user,
-              error: null
+              error: null 
             });
+            
+            // Получаем профиль пользователя
+            await get().fetchUserProfile();
+          } else {
+            throw new Error('Не получен токен доступа');
           }
         } catch (error: any) {
-          console.log('AuthStore: Ошибка авторизации:', error.message);
+          console.error('AuthStore: Ошибка авторизации:', error);
           set({ error: error.message });
           throw error;
         }
