@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 
@@ -32,114 +31,55 @@ export default async function handler(
   try {
     const { email, password } = req.body;
 
-    console.log('Login API - Получены данные:', { 
-      email,
-      hasPassword: !!password,
-      password // временно для отладки
-    });
-
-    // Проверяем наличие необходимых данных
     if (!email || !password) {
-      console.error('Login API - Отсутствуют необходимые данные:', {
-        hasEmail: !!email,
-        hasPassword: !!password
-      });
       return res.status(400).json({
-        detail: 'Отсутствуют необходимые данные для входа'
+        detail: 'Необходимо указать email и пароль'
       });
     }
-
-    console.log('Login API - Отправка запроса авторизации:', {
-      url: `${API_URL}/auth/login`,
-      email,
-      hasPassword: !!password,
-      password // временно для отладки
-    });
 
     // Формируем данные для отправки
     const formData = new URLSearchParams();
     formData.append('username', email);
     formData.append('password', password);
+    formData.append('grant_type', 'password');
 
-    console.log('Auth API - Отправляемые данные:', {
-      formData: formData.toString(),
-      username: email,
-      hasPassword: !!password,
-      password // временно для отладки
-    });
-
-    const response = await axios.post(`${API_URL}/auth/login`, formData, {
+    // Отправляем запрос на бэкенд
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
+        'Accept': 'application/json'
       },
-      validateStatus: function (status) {
-        return status < 500; // Разрешаем все статусы < 500
-      }
+      body: formData.toString()
     });
 
-    console.log('Auth API - Ответ от сервера:', {
-      status: response.status,
-      hasData: !!response.data,
-      data: {
-        ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined
-      },
-      hasToken: !!response.data?.access_token,
-      hasUser: !!response.data?.user
-    });
+    const data = await response.json();
 
-    if (response.status === 401) {
-      return res.status(401).json({
-        detail: 'Неверные учетные данные'
+    // Проверяем статус ответа
+    if (!response.ok) {
+      return res.status(response.status).json({
+        detail: data.detail || 'Ошибка авторизации'
       });
     }
 
-    // Проверяем наличие данных
-    if (!response.data?.access_token || !response.data?.user) {
-      console.error('Auth API - Неполный ответ от сервера:', {
-        hasToken: !!response.data?.access_token,
-        hasUser: !!response.data?.user,
-        data: {
-          ...response.data,
-          access_token: response.data?.access_token ? '***' : undefined
-        }
-      });
+    // Проверяем наличие необходимых данных
+    if (!data.access_token || !data.user) {
       return res.status(500).json({
         detail: 'Неполные данные от сервера авторизации'
       });
     }
 
-    // Формируем ответ
-    const authResponse = {
-      access_token: response.data.access_token,
-      token_type: response.data.token_type || 'bearer',
-      user: {
-        id: response.data.user.id,
-        email: response.data.user.email,
-        full_name: response.data.user.full_name,
-        role: response.data.user.role,
-        is_active: response.data.user.is_active
-      }
-    };
-
-    console.log('Auth API - Отправка ответа клиенту:', {
-      hasToken: true,
-      hasUser: true,
-      userEmail: authResponse.user.email,
-      userRole: authResponse.user.role
+    // Возвращаем данные клиенту
+    return res.status(200).json({
+      access_token: data.access_token,
+      token_type: data.token_type,
+      user: data.user
     });
 
-    // Добавляем задержку перед отправкой ответа
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return res.status(200).json(authResponse);
   } catch (error: any) {
-    console.error('Login API - Ошибка:', error.response?.data || error.message);
+    console.error('Login API - Ошибка:', error);
     return res.status(500).json({
-      message: error.response?.data?.detail || error.message || 'Внутренняя ошибка сервера',
-      error: process.env.NODE_ENV === 'development' ? error.response?.data || error.message : undefined
+      detail: 'Внутренняя ошибка сервера'
     });
   }
 } 
