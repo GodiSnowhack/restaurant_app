@@ -76,93 +76,88 @@ export const authApi: IAuthApi = {
         hasPassword: !!credentials.password
       });
 
-      // Отправляем запрос на сервер
-      const response = await fetch(`${API_URL}/auth/login`, {
+      // Отправляем запрос через прокси
+      const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
         },
-        body: new URLSearchParams({
-          username: credentials.email,
+        body: JSON.stringify({
+          email: credentials.email,
           password: credentials.password
-        }).toString()
+        })
       });
 
       // Получаем и парсим ответ
-      const rawData = await response.json();
+      const data = await response.json();
 
-      console.log('API login - Сырые данные от сервера:', rawData);
-
-      // Добавляем небольшую задержку перед проверкой данных
-      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('Auth API: Получен ответ от сервера', {
+        status: response.status,
+        ok: response.ok,
+        hasData: !!data,
+        hasToken: !!data?.access_token,
+        hasUser: !!data?.user
+      });
 
       // Проверяем успешность запроса
       if (!response.ok) {
-        console.error('API login - Ошибка запроса:', {
-          status: response.status,
-          data: rawData
-        });
-        throw new Error(rawData.detail || rawData.message || 'Ошибка авторизации');
+        throw new Error(data.detail || data.message || 'Ошибка авторизации');
       }
 
-      // Проверяем структуру данных
-      if (!rawData || typeof rawData !== 'object') {
-        console.error('API login - Неверный формат данных:', rawData);
+      // Проверяем наличие необходимых данных
+      if (!data.access_token || !data.user) {
+        console.error('Auth API: Отсутствуют необходимые данные в ответе', {
+          hasToken: !!data.access_token,
+          hasUser: !!data.user,
+          data: JSON.stringify({
+            ...data,
+            access_token: data.access_token ? '***' : undefined
+          })
+        });
         throw new Error('Неверный формат ответа от сервера');
       }
 
-      // Проверяем наличие токена в разных возможных местах
-      const accessToken = rawData.access_token || (rawData.data && rawData.data.access_token);
-      
-      if (!accessToken) {
-        console.error('API login - Токен не найден в ответе:', rawData);
-        throw new Error('Токен не найден в ответе сервера');
+      // Проверяем обязательные поля пользователя
+      if (!data.user.email || !data.user.role) {
+        console.error('Auth API: Неполные данные пользователя', {
+          user: {
+            ...data.user,
+            email: data.user.email ? '***' : undefined
+          }
+        });
+        throw new Error('Неполные данные пользователя в ответе сервера');
       }
 
-      // Проверяем наличие данных пользователя в разных возможных местах
-      const userData = rawData.user || (rawData.data && rawData.data.user);
-
-      if (!userData) {
-        console.error('API login - Данные пользователя не найдены:', rawData);
-        throw new Error('Данные пользователя не найдены в ответе сервера');
-      }
-
-      // Формируем объект ответа в соответствии с типом LoginResponse
-      const data: LoginResponse = {
-        access_token: accessToken,
-        token_type: rawData.token_type || rawData.data?.token_type || 'bearer',
+      // Формируем объект ответа
+      const loginResponse: LoginResponse = {
+        access_token: data.access_token,
+        token_type: data.token_type || 'bearer',
         user: {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.full_name,
-          role: userData.role,
-          is_active: userData.is_active,
-          created_at: userData.created_at || new Date().toISOString(),
-          updated_at: userData.updated_at || new Date().toISOString()
+          id: data.user.id,
+          email: data.user.email,
+          full_name: data.user.full_name,
+          role: data.user.role,
+          is_active: data.user.is_active,
+          created_at: data.user.created_at || new Date().toISOString(),
+          updated_at: data.user.updated_at || new Date().toISOString()
         }
       };
 
-      console.log('API login - Преобразованные данные:', {
-        hasToken: !!data.access_token,
-        hasUser: !!data.user,
-        userData: data.user
-      });
-
       // Сохраняем данные
       console.log('Auth API: Сохранение данных авторизации');
-      saveToken(data.access_token);
-      saveUser(data.user);
+      saveToken(loginResponse.access_token);
+      saveUser(loginResponse.user);
 
       console.log('Auth API: Успешный вход', {
-        hasToken: !!data.access_token,
-        hasUser: !!data.user,
-        role: data.user.role,
-        email: data.user.email
+        hasToken: !!loginResponse.access_token,
+        hasUser: !!loginResponse.user,
+        role: loginResponse.user.role,
+        email: loginResponse.user.email
       });
 
-      return data;
+      return loginResponse;
     } catch (error) {
       console.error('Auth API: Ошибка входа', error);
       throw error;
