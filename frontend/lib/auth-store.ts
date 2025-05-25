@@ -241,7 +241,6 @@ const useAuthStore = create<AuthState>()(
           // Отправляем данные на сервер
           console.log('AuthStore - Отправляемые данные:', { email, password: '[HIDDEN]' });
           
-          // Используем прокси-эндпоинт вместо прямого обращения к API
           const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
@@ -250,16 +249,16 @@ const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ email, password }),
           });
 
+          const data = await response.json();
+
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Ошибка авторизации');
+            throw new Error(data.detail || data.error || 'Ошибка авторизации');
           }
 
-          const data = await response.json();
-          
           if (data.access_token) {
             // Сохраняем токен
-            localStorage.setItem('token', data.access_token);
+            saveAuthToken(data.access_token);
+            
             // Устанавливаем состояние авторизации
             set({ 
               isAuthenticated: true, 
