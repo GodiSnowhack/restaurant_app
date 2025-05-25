@@ -383,180 +383,36 @@ const useAuthStore = create<AuthState>()(
           
           try {
             // Выполняем запрос с таймаутом
-            const response = await fetch('https://backend-production-1a78.up.railway.app/api/v1/users/me', {
+            const response = await fetch('/api/profile', {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-                'X-Client-Type': isMobileDeviceFn() ? 'mobile' : 'desktop',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Origin': typeof window !== 'undefined' ? window.location.origin : '*'
+                'Accept': 'application/json'
               },
-              signal: controller.signal,
-              cache: 'no-store',
               credentials: 'include'
             });
             
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-              const data = await response.json();
-              set({ user: data, isAuthenticated: true });
-              
-              // Кэшируем профиль для офлайн-доступа
-              try {
-                localStorage.setItem('user_profile', JSON.stringify(data));
-                // Сохраняем временную метку получения профиля
-                localStorage.setItem('user_profile_timestamp', Date.now().toString());
-                // Явно сохраняем роль пользователя
-                localStorage.setItem('user_role', data.role);
-                // Сохраняем данные пользователя под ключом 'user'
-                localStorage.setItem('user', JSON.stringify(data));
-                
-                console.log('AuthStore: Профиль успешно получен и сохранен в кэше, роль:', data.role);
-              } catch (e) {
-                console.error('AuthStore: Ошибка при кэшировании профиля:', e);
-              }
-              return;
-            } else {
-              // Если токен недействителен, пробуем обновить его
-              if (response.status === 401) {
-                console.log('AuthStore: Ошибка авторизации (401), пробуем обновить токен');
-                
-                // Проверяем, не было ли недавних попыток обновления токена
-                const tokenRefreshKey = 'token_refresh_attempt_timestamp';
-                const lastRefreshAttempt = localStorage.getItem(tokenRefreshKey);
-                
-                if (lastRefreshAttempt) {
-                  const timeSinceLastRefresh = Date.now() - parseInt(lastRefreshAttempt);
-                  // Если последняя попытка обновления была менее 5 секунд назад
-                  if (timeSinceLastRefresh < 5000) {
-                    console.log(`AuthStore: Предотвращение цикла обновления токена (прошло ${Math.round(timeSinceLastRefresh/1000)}с)`);
-                    
-                    // Используем кэшированный профиль вместо нового запроса
-                    const cachedProfile = localStorage.getItem('user_profile');
-                    if (cachedProfile) {
-                      try {
-                        console.log('AuthStore: Используем кэшированный профиль после предотвращения цикла обновления токена');
-                        const profile = JSON.parse(cachedProfile);
-                        set({ user: profile, isAuthenticated: true });
-                        
-                        // Убедимся, что роль пользователя сохранена под общим ключом
-                        localStorage.setItem('user_role', profile.role);
-                        localStorage.setItem('user', JSON.stringify(profile));
-                        
-                        return;
-                      } catch (e) {
-                        console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
-                      }
-                    }
-                    
-                    // Если нет кэшированного профиля, выходим из системы
-                    console.log('AuthStore: Нет кэшированного профиля, выходим из системы');
-                    get().logout();
-                    return;
-                  }
-                }
-                
-                // Сохраняем временную метку попытки обновления токена
-                localStorage.setItem(tokenRefreshKey, Date.now().toString());
-                
-                // Пробуем обновить токен
-                try {
-                  const refreshToken = localStorage.getItem('refresh_token');
-                  if (refreshToken) {
-                    const refreshResponse = await fetch('/api/auth/refresh', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ refresh_token: refreshToken })
-                    });
-                    
-                    if (refreshResponse.ok) {
-                      const tokenData = await refreshResponse.json();
-                      
-                      if (tokenData.access_token) {
-                        console.log('AuthStore: Токен успешно обновлен, повторяем запрос профиля');
-                        
-                        // Сохраняем новый токен
-                        saveAuthToken(tokenData.access_token);
-                        if (tokenData.refresh_token) {
-                          localStorage.setItem('refresh_token', tokenData.refresh_token);
-                        }
-                        
-                        // Сохраняем временную метку успешного обновления токена
-                        localStorage.setItem('token_refresh_success_timestamp', Date.now().toString());
-                        
-                        // Повторяем запрос профиля с новым токеном
-                        const newProfileResponse = await fetch('/api/v1/users/me', {
-                          method: 'GET',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${tokenData.access_token}`,
-                            'Accept': 'application/json'
-                          }
-                        });
-                        
-                        if (newProfileResponse.ok) {
-                          const profileData = await newProfileResponse.json();
-                          set({ user: profileData, isAuthenticated: true });
-                          
-                          // Кэшируем обновленный профиль
-                          localStorage.setItem('user_profile', JSON.stringify(profileData));
-                          localStorage.setItem('user_profile_timestamp', Date.now().toString());
-                          // Явно сохраняем роль пользователя
-                          localStorage.setItem('user_role', profileData.role);
-                          localStorage.setItem('user', JSON.stringify(profileData));
-                          console.log('AuthStore: Профиль успешно получен после обновления токена, роль:', profileData.role);
-                          return;
-                        }
-                      }
-                    }
-                  }
-                } catch (refreshError) {
-                  console.error('AuthStore: Ошибка при обновлении токена:', refreshError);
-                }
-                
-                // Если обновление токена не помогло, пробуем использовать кэшированный профиль
-                const cachedProfile = localStorage.getItem('user_profile');
-                if (cachedProfile) {
-                  console.log('AuthStore: Используем кэшированный профиль после неудачного обновления токена');
-                  try {
-                    const profile = JSON.parse(cachedProfile);
-                    set({ user: profile, isAuthenticated: true });
-                    
-                    // Убедимся, что роль пользователя сохранена под общим ключом
-                    localStorage.setItem('user_role', profile.role);
-                    localStorage.setItem('user', JSON.stringify(profile));
-                    
-                    return;
-                  } catch (e) {
-                    console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
-                  }
-                }
-                
-                // Если все методы не сработали, только тогда выходим из системы
-                console.log('AuthStore: Все методы восстановления сессии не сработали, выходим из системы');
-                get().logout();
-                return;
-              }
-              
-              // Если сервер недоступен, используем кэшированный профиль
-              if (response.status >= 500) {
-                console.log('AuthStore: Сервер недоступен, пробуем использовать кэшированный профиль');
-                const cachedProfile = localStorage.getItem('user_profile');
-                if (cachedProfile) {
-                  const profile = JSON.parse(cachedProfile);
-                  set({ user: profile, isAuthenticated: true });
-                  
-                  // Убедимся, что роль пользователя сохранена под общим ключом
-                  localStorage.setItem('user_role', profile.role);
-                  localStorage.setItem('user', JSON.stringify(profile));
-                  
-                  return;
-                }
-              }
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.detail || 'Ошибка получения профиля');
             }
+
+            const data = await response.json();
+            set({ user: data, isAuthenticated: true });
+            
+            // Кэшируем профиль для офлайн-доступа
+            try {
+              localStorage.setItem('user_profile', JSON.stringify(data));
+              localStorage.setItem('user_profile_timestamp', Date.now().toString());
+              localStorage.setItem('user_role', data.role);
+              localStorage.setItem('user', JSON.stringify(data));
+              
+              console.log('AuthStore: Профиль успешно получен и сохранен в кэше, роль:', data.role);
+            } catch (e) {
+              console.error('AuthStore: Ошибка при кэшировании профиля:', e);
+            }
+            return;
           } catch (fetchError) {
             clearTimeout(timeoutId);
             console.error('AuthStore: Ошибка при запросе профиля:', fetchError);
