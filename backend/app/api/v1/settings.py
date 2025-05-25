@@ -57,13 +57,29 @@ def get_settings(
             db.commit()
             db.refresh(db_settings)
         
-        # Проверяем наличие столов
-        if not db_settings.tables:
+        # Проверяем наличие столов и их корректность
+        if not db_settings.tables or not isinstance(db_settings.tables, list):
             logger.warning("Отсутствуют данные о столах, добавляем дефолтные")
             default_settings = Settings.create_default()
             db_settings.tables = default_settings.tables
             db.commit()
             db.refresh(db_settings)
+        else:
+            # Проверяем наличие обязательных полей у столов
+            need_update = False
+            for table in db_settings.tables:
+                if 'number' not in table:
+                    table['number'] = table.get('id', 0)
+                    need_update = True
+                if 'position_x' not in table or 'position_y' not in table:
+                    table['position_x'] = 15 + (table.get('id', 1) - 1) * 20
+                    table['position_y'] = 15 + (table.get('id', 1) % 2) * 20
+                    need_update = True
+            
+            if need_update:
+                logger.info("Обновляем данные столов")
+                db.commit()
+                db.refresh(db_settings)
         
         # Преобразуем модель в словарь для создания схемы ответа
         settings_dict = {

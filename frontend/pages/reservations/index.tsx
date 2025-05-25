@@ -640,7 +640,7 @@ const ReservationsPage: NextPage = () => {
                       <option value={0}>Любой подходящий стол</option>
                       {availableTables.map((table) => (
                         <option key={table.id} value={table.id}>
-                          Стол {table.number} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
+                          {table.name} - {table.capacity} {table.capacity === 1 ? 'место' : table.capacity < 5 ? 'места' : 'мест'}
                         </option>
                       ))}
                     </select>
