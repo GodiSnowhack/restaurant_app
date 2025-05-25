@@ -104,6 +104,11 @@ export const clearAuthTokens = () => {
   }
 };
 
+// Расширяем тип конфигурации axios
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
 // Перехватчик для добавления токена авторизации
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -151,108 +156,53 @@ api.interceptors.request.use(
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    // Проверяем, нужно ли обновить токен
-    if (response.data?.user?.needs_token_refresh) {
-      console.log('API Interceptor: Требуется обновление токена');
-      const user = response.data.user;
-      // Создаем новый токен с правильной ролью
-      const newToken = createAccessToken({
-        sub: user.id,
-        role: user.role,
-        email: user.email
-      });
-      // Сохраняем новый токен
-      localStorage.setItem('token', newToken);
-      // Обновляем информацию о пользователе
-      localStorage.setItem('user_profile', JSON.stringify(user));
-    }
-    
-    console.log(`API Interceptor: Успешный ответ от ${response.config.url}:`, response.status);
+    console.log(`[API] Получен ответ от ${response.config.url}:`, response.status);
     return response;
   },
   async (error: AxiosError) => {
-    console.error('API Interceptor: Ошибка в ответе:', {
+    const config = error.config as ExtendedAxiosRequestConfig;
+    
+    console.error('[API] Ошибка в ответе:', {
       status: error.response?.status,
-      url: error.config?.url,
+      url: config?.url,
       message: error.message
     });
     
     // Если ошибка 401, пробуем обновить токен
     if (error.response?.status === 401) {
-      console.log('API Interceptor: Получена ошибка 401, пробуем обновить токен');
+      console.log('[API] Получена ошибка 401, проверяем авторизацию');
       
       try {
-        // Получаем текущий токен
-        const currentToken = localStorage.getItem('token');
-        if (!currentToken) {
-          console.error('API Interceptor: Токен отсутствует');
-          throw new Error('Токен не найден');
+        // Проверяем наличие токена
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('[API] Токен отсутствует');
+          clearAuthTokens();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login';
+          }
+          return Promise.reject(error);
         }
         
-        // Пробуем получить новый токен
-        const response = await fetch('/api/v1/auth/refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentToken}`
+        // Проверяем валидность токена
+        if (isTokenExpired(token)) {
+          console.log('[API] Токен истек, выполняем выход');
+          clearAuthTokens();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/auth/login';
           }
-        });
-        
-        if (!response.ok) {
-          // Если не удалось обновить токен, пробуем повторно авторизоваться
-          const userProfile = localStorage.getItem('user_profile');
-          if (userProfile) {
-            const { email } = JSON.parse(userProfile);
-            const loginResponse = await fetch('/api/v1/auth/login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                email: email,
-                password: localStorage.getItem('password') // Временное решение
-              })
-            });
-            
-            if (loginResponse.ok) {
-              const data = await loginResponse.json();
-              if (data.access_token) {
-                localStorage.setItem('token', data.access_token);
-                if (error.config) {
-                  const newConfig = { ...error.config };
-                  newConfig.headers = new AxiosHeaders({
-                    ...newConfig.headers,
-                    'Authorization': `Bearer ${data.access_token}`
-                  });
-                  return api(newConfig);
-                }
-              }
-            }
-          }
-          throw new Error('Не удалось обновить токен');
+          return Promise.reject(error);
         }
         
-        const data = await response.json();
-        if (data.access_token) {
-          // Сохраняем новый токен
-          localStorage.setItem('token', data.access_token);
-          
-          // Повторяем исходный запрос с новым токеном
-          if (error.config) {
-            const newConfig = { ...error.config };
-            newConfig.headers = new AxiosHeaders({
-              ...newConfig.headers,
-              'Authorization': `Bearer ${data.access_token}`
-            });
-            return api(newConfig);
-          }
+        // Если токен валиден, но все равно получаем 401,
+        // возможно, проблема с сервером. Пробуем повторить запрос
+        if (config && !config._retry) {
+          config._retry = true;
+          return api(config);
         }
       } catch (refreshError) {
-        console.error('API Interceptor: Ошибка при обновлении токена:', refreshError);
-        // Если не удалось обновить токен, очищаем данные авторизации
-        localStorage.removeItem('token');
-        localStorage.removeItem('user_profile');
-        // Перенаправляем на страницу входа
+        console.error('[API] Ошибка при обработке 401:', refreshError);
+        clearAuthTokens();
         if (typeof window !== 'undefined') {
           window.location.href = '/auth/login';
         }

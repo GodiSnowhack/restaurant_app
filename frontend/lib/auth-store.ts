@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { authApi } from './api/auth';
 import { AuthState, LoginCredentials, RegisterCredentials, LoginResponse, User } from './types/auth';
 import { saveToken, saveUser, clearAuth } from './utils/auth';
+import { api } from './api/api';
 
 // Начальное состояние
 const initialState: AuthState = {
@@ -31,28 +32,87 @@ const useAuthStore = create<AuthStore>()(
 
       initialize: async () => {
         try {
-          const token = localStorage.getItem('token');
-          const userStr = localStorage.getItem('user');
+          console.log('AuthStore: Начало инициализации');
+          
+          // Проверяем все возможные источники токена
+          let token = localStorage.getItem('token');
+          if (!token) {
+            token = sessionStorage.getItem('token');
+            if (token) {
+              localStorage.setItem('token', token);
+            }
+          }
+          
+          // Проверяем куки
+          if (!token) {
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+              const [name, value] = cookie.trim().split('=');
+              if (name === 'auth_token' && value) {
+                token = value;
+                localStorage.setItem('token', token);
+                break;
+              }
+            }
+          }
+
+          // Получаем сохраненные данные пользователя
+          const userStr = localStorage.getItem('user_profile');
           const user = userStr ? JSON.parse(userStr) : null;
 
-          if (token && user) {
-            set({ 
-              isAuthenticated: true, 
-              token, 
-              user,
-              error: null 
-            });
+          console.log('AuthStore: Проверка данных авторизации', {
+            hasToken: !!token,
+            hasUser: !!user
+          });
 
-            // Проверяем актуальность данных пользователя
+          if (token) {
+            // Устанавливаем токен в axios
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            
             try {
+              // Проверяем валидность токена, получая профиль пользователя
               const currentUser = await authApi.getProfile();
-              saveUser(currentUser);
-              set({ user: currentUser });
+              console.log('AuthStore: Получен текущий профиль', {
+                userId: currentUser.id,
+                role: currentUser.role
+              });
+              
+              // Обновляем данные в localStorage
+              localStorage.setItem('user_profile', JSON.stringify(currentUser));
+              localStorage.setItem('token', token);
+              
+              // Обновляем состояние
+              set({ 
+                isAuthenticated: true, 
+                token, 
+                user: currentUser,
+                error: null 
+              });
             } catch (error) {
-              console.error('AuthStore: Ошибка при обновлении профиля', error);
-              // Если не удалось получить актуальные данные, оставляем сохраненные
+              console.error('AuthStore: Ошибка при получении профиля', error);
+              // Если не удалось получить профиль, но есть сохраненные данные
+              if (user) {
+                console.log('AuthStore: Используем сохраненные данные пользователя');
+                set({ 
+                  isAuthenticated: true, 
+                  token, 
+                  user,
+                  error: null 
+                });
+              } else {
+                console.log('AuthStore: Очистка невалидных данных авторизации');
+                clearAuth();
+                set({ 
+                  isAuthenticated: false, 
+                  token: null, 
+                  user: null,
+                  error: null 
+                });
+              }
             }
           } else {
+            console.log('AuthStore: Токен не найден, сброс состояния');
+            clearAuth();
             set({ 
               isAuthenticated: false, 
               token: null, 
@@ -61,7 +121,7 @@ const useAuthStore = create<AuthStore>()(
             });
           }
         } catch (error) {
-          console.error('AuthStore: Ошибка при инициализации', error);
+          console.error('AuthStore: Критическая ошибка при инициализации', error);
           clearAuth();
           set({ 
             isAuthenticated: false, 

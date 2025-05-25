@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Header from './Header';
 import Footer from './Footer';
 import { useTheme } from '@/lib/theme-context';
+import useAuthStore from '../lib/auth-store';
 
 // Вспомогательная функция для безопасного получения URL изображений с обработкой ошибок 404
 export const getSafeImageUrl = (imageUrl: string | null | undefined): string => {
@@ -49,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({
   noHeader = false
 }) => {
   const { isDark } = useTheme();
+  const { isAuthenticated, user, initialize } = useAuthStore();
   
   useEffect(() => {
     // Применяем dark mode в соответствии с настройками пользователя
@@ -58,6 +60,13 @@ const Layout: React.FC<LayoutProps> = ({
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
+
+  useEffect(() => {
+    // Проверяем авторизацию при монтировании компонента
+    if (!isAuthenticated) {
+      initialize();
+    }
+  }, []);
 
   const getSectionStyles = () => {
     switch (section) {

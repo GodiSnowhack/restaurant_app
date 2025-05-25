@@ -93,7 +93,7 @@ export const renderMode = 'force-dynamic';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const { isAuthenticated, user, fetchUserProfile, isMobileDevice } = useAuthStore();
+  const { isAuthenticated, user, fetchUserProfile, isMobileDevice, initialize } = useAuthStore();
   const { loadSettings } = useSettingsStore();
   const [previousPath, setPreviousPath] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
