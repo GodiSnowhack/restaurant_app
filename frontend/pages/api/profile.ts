@@ -1,76 +1,55 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-const BACKEND_URL = 'https://backend-production-1a78.up.railway.app';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 
-export default async function profileProxy(req: NextApiRequest, res: NextApiResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ detail: 'Метод не поддерживается' });
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    // Получаем токен из заголовка
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ detail: 'Отсутствует токен авторизации' });
+    const token = req.headers.authorization;
+
+    if (!token) {
+      return res.status(401).json({ message: 'No authorization token' });
     }
 
-    console.log('Profile Proxy - Отправка запроса на', `${BACKEND_URL}/api/v1/users/me`);
+    console.log('Profile Proxy - Отправка запроса на', `${API_URL}/users/me`);
 
-    const response = await axios.get(
-      `${BACKEND_URL}/api/v1/users/me`,
-      {
-        headers: {
-          'Authorization': authHeader,
-          'Accept': 'application/json',
-          'Origin': process.env.NEXT_PUBLIC_FRONTEND_URL || '*'
-        },
-        maxRedirects: 5,
-        timeout: 10000
+    const response = await fetch(`${API_URL}/users/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
       }
-    );
+    });
+
+    const data = await response.json();
 
     console.log('Profile Proxy - Ответ от сервера:', {
       status: response.status,
-      hasData: !!response.data
+      hasData: !!data,
+      role: data?.role
     });
 
-    // Возвращаем данные профиля
-    return res.status(200).json(response.data);
-
-  } catch (error: any) {
-    console.error('Profile Proxy - Ошибка:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    });
-
-    // Если есть ответ от сервера с ошибкой
-    if (error.response) {
-      return res.status(error.response.status).json({
-        detail: error.response.data?.detail || 'Ошибка получения профиля',
-        error: error.response.data
-      });
+    if (!response.ok) {
+      throw new Error(data.detail || 'Ошибка получения профиля');
     }
 
-    // Если ошибка сети или другая
-    return res.status(500).json({
-      detail: 'Ошибка сервера при получении профиля',
-      error: error.message
+    // Проверяем наличие необходимых данных
+    if (!data.id || !data.role) {
+      throw new Error('Неверный формат данных профиля');
+    }
+
+    // Возвращаем данные клиенту
+    return res.status(200).json(data);
+  } catch (error: any) {
+    console.error('Profile Proxy - Ошибка:', error.message);
+    return res.status(error.status || 500).json({
+      message: error.message || 'Internal server error'
     });
   }
 } 

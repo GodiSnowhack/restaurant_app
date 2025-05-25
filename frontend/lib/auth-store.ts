@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, api } from './api';
 import axios from 'axios';
+import { AuthState, LoginCredentials, RegisterCredentials, LoginResponse, User } from './types/auth';
+import { saveToken, saveUser, getToken, getUser, clearAuth } from './utils/auth';
 
 // Функция определения мобильного устройства
 const isMobileDevice = (): boolean => {
@@ -190,375 +192,176 @@ const sendAuthErrorLog = async (error: any, endpoint: string, diagnosticInfo?: a
   }
 };
 
-export interface AuthState {
-  isAuthenticated: boolean;
-  token: string | null;
-  user: any | null;
-  error: string | null;
-  isLoading: boolean;
-  isMobileDevice: boolean;
-  networkDiagnostics: any[];
-  refreshToken: string | null;
-  
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, phone?: string) => Promise<void>;
-  logout: () => void;
-  fetchUserProfile: () => Promise<void>;
-  setInitialAuthState: (isAuth: boolean, token: string | null) => void;
-  clearError: () => void;
-  refreshProfile: () => Promise<void>;
-}
+const initialState: AuthState = {
+  isAuthenticated: false,
+  user: null,
+  token: null,
+  error: null,
+  isLoading: false
+};
 
 // Имя для хранения состояния в localStorage
 const STORE_NAME = 'auth-store';
 
 // Создаем хранилище с поддержкой персистентности
-const useAuthStore = create<AuthState>()(
+const useAuthStore = create<AuthState & {
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (credentials: RegisterCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  initialize: () => Promise<void>;
+  fetchUserProfile: () => Promise<void>;
+  isMobileDevice: () => boolean;
+  setInitialAuthState: () => void;
+}>()(
   persist(
     (set, get) => ({
-      isAuthenticated: typeof window !== 'undefined' && !!localStorage.getItem('token'),
-      token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
-      refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null,
-      user: null,
-      error: null,
-      isLoading: false,
-      isMobileDevice: typeof window !== 'undefined' ? isMobileDeviceFn() : false,
-      networkDiagnostics: [],
-      
-      // Устанавливаем начальное состояние авторизации
-      setInitialAuthState: (isAuth: boolean, token: string | null) => {
-        console.log('AuthStore: Установка начального состояния авторизации', { isAuth, token: !!token });
-        set({ isAuthenticated: isAuth, token });
-        
-        // Не вызываем fetchUserProfile здесь, эта функция будет вызвана из App компонента
-      },
-      
-      // Авторизация пользователя
-      login: async (email: string, password: string) => {
+      ...initialState,
+
+      fetchUserProfile: async () => {
         try {
-          console.log('Login Page - Попытка входа', { email, hasPassword: !!password });
-          
-          const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password }),
-            credentials: 'include'
-          });
+          const currentUser = await authApi.getProfile();
+          saveUser(currentUser);
+          set({ user: currentUser });
+        } catch (error) {
+          console.error('AuthStore: Ошибка при получении профиля', error);
+          throw error;
+        }
+      },
 
-          const data = await response.json();
-          console.log('AuthStore - Ответ от сервера:', {
-            status: response.status,
-            hasData: !!data,
-            hasToken: !!data.access_token,
-            role: data.user?.role
-          });
+      isMobileDevice: () => {
+        return typeof navigator !== 'undefined' && /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+      },
 
-          if (!response.ok) {
-            throw new Error(data.detail || 'Ошибка авторизации');
-          }
+      setInitialAuthState: () => {
+        const token = getToken();
+        const user = getUser();
+        if (token && user) {
+          set({ isAuthenticated: true, token, user });
+        }
+      },
 
-          if (!data.access_token) {
-            throw new Error('Не получен токен доступа');
-          }
+      // Инициализация состояния авторизации
+      initialize: async () => {
+        try {
+          const token = getToken();
+          const user = getUser();
 
-          // Сохраняем токен
-          saveAuthToken(data.access_token);
-          
-          // Если в ответе есть данные пользователя, сохраняем их
-          if (data.user) {
-            const userProfile = {
-              id: data.user.id,
-              email: data.user.email,
-              role: data.user.role,
-              full_name: data.user.full_name,
-              is_active: data.user.is_active,
-              phone: data.user.phone
-            };
-
-            set({ 
-              isAuthenticated: true, 
-              token: data.access_token,
-              user: userProfile,
-              error: null 
-            });
+          if (token && user) {
+            console.log('AuthStore: Инициализация с сохраненными данными', { role: user.role });
+            set({ isAuthenticated: true, token, user });
             
-            // Сохраняем данные пользователя в localStorage
-            localStorage.setItem('user_profile', JSON.stringify(userProfile));
-            localStorage.setItem('user_role', userProfile.role);
-            localStorage.setItem('user', JSON.stringify(userProfile));
-            
-            console.log('AuthStore - Авторизация успешна, сохранен профиль:', {
-              role: userProfile.role,
-              id: userProfile.id
-            });
+            // Проверяем актуальность данных пользователя
+            try {
+              const currentUser = await authApi.getProfile();
+              console.log('AuthStore: Обновление профиля пользователя', { role: currentUser.role });
+              saveUser(currentUser);
+              set({ user: currentUser });
+            } catch (error) {
+              console.error('AuthStore: Ошибка при обновлении профиля', error);
+              // Если не удалось получить актуальные данные, используем сохраненные
+            }
           } else {
-            // Если данных пользователя нет, получаем профиль отдельным запросом
-            set({ 
-              isAuthenticated: true, 
-              token: data.access_token,
-              error: null 
-            });
-            
-            // Получаем профиль пользователя
-            await get().fetchUserProfile();
+            console.log('AuthStore: Нет сохраненных данных авторизации');
+            set({ isAuthenticated: false, token: null, user: null });
           }
+        } catch (error) {
+          console.error('AuthStore: Ошибка при инициализации', error);
+          set({ isAuthenticated: false, token: null, user: null });
+        }
+      },
+
+      // Авторизация пользователя
+      login: async (credentials) => {
+        try {
+          set({ isLoading: true, error: null });
+          console.log('AuthStore: Попытка входа', { email: credentials.email });
+
+          type LoginResult = { access_token: string; token_type: string; user: User };
+          const { access_token, user } = await authApi.login(credentials) as LoginResult;
+          
+          // Проверяем наличие необходимых данных
+          if (!access_token || !user) {
+            throw new Error('Неверный формат ответа от сервера');
+          }
+
+          // Сохраняем данные
+          saveToken(access_token);
+          saveUser(user);
+
+          set({
+            isAuthenticated: true,
+            token: access_token,
+            user,
+            error: null,
+            isLoading: false
+          });
+
+          console.log('AuthStore: Успешный вход', { role: user.role });
         } catch (error: any) {
-          console.error('AuthStore: Ошибка авторизации:', error);
-          set({ 
+          console.error('AuthStore: Ошибка входа', error);
+          set({
             isAuthenticated: false,
             token: null,
             user: null,
-            error: error.message || 'Ошибка авторизации'
+            error: error.message,
+            isLoading: false
           });
           throw error;
         }
       },
-      
-      // Получение профиля пользователя
-      fetchUserProfile: async () => {
-        try {
-          // Предотвращаем циклические запросы на получение профиля
-          const profileFetchKey = 'profile_fetch_attempt_timestamp';
-          const now = Date.now();
-          const lastFetchAttempt = localStorage.getItem(profileFetchKey);
-          
-          if (lastFetchAttempt) {
-            const timeSinceLastFetch = now - parseInt(lastFetchAttempt);
-            // Если запрос был менее 3 секунд назад, используем кэшированный профиль
-            if (timeSinceLastFetch < 3000) {
-              console.log(`AuthStore: Предотвращение цикла запросов профиля (прошло ${Math.round(timeSinceLastFetch/1000)}с)`);
-              
-              // Проверяем наличие кэшированного профиля
-              const cachedProfile = localStorage.getItem('user_profile');
-              if (cachedProfile) {
-                try {
-                  console.log('AuthStore: Используем кэшированный профиль из-за предотвращения цикла запросов');
-                  const profile = JSON.parse(cachedProfile);
-                  set({ user: profile, isAuthenticated: true });
-                  return;
-                } catch (e) {
-                  console.error('AuthStore: Ошибка при использовании кэшированного профиля:', e);
-                }
-              }
-            }
-          }
-          
-          // Сохраняем временную метку запроса
-          localStorage.setItem(profileFetchKey, now.toString());
-          
-          const token = getAuthToken();
-          
-          if (!token) {
-            console.log('AuthStore: Токен отсутствует, сохраняем состояние неаутентифицированного пользователя');
-            set({ user: null, isAuthenticated: false });
-            return;
-          }
-          
-          console.log('AuthStore: Начало запроса профиля пользователя');
-          
-          // Выполняем запрос с таймаутом
-          const response = await fetch('/api/profile', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/json'
-            },
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Ошибка получения профиля');
-          }
 
-          const data = await response.json();
-          
-          // Проверяем, нужно ли обновить токен
-          if (data.needs_token_refresh) {
-            console.log('AuthStore: Требуется обновление токена');
-            try {
-              // Запрашиваем новый токен
-              const refreshResponse = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                }
-              });
-              
-              if (refreshResponse.ok) {
-                const refreshData = await refreshResponse.json();
-                if (refreshData.access_token) {
-                  // Сохраняем новый токен
-                  localStorage.setItem('token', refreshData.access_token);
-                  console.log('AuthStore: Токен успешно обновлен');
-                }
-              }
-            } catch (e) {
-              console.error('AuthStore: Ошибка при обновлении токена:', e);
-            }
-          }
-          
-          set({ user: data, isAuthenticated: true });
-          
-          // Кэшируем профиль для офлайн-доступа
-          try {
-            localStorage.setItem('user_profile', JSON.stringify(data));
-            localStorage.setItem('user_profile_timestamp', Date.now().toString());
-            localStorage.setItem('user_role', data.role);
-            localStorage.setItem('user', JSON.stringify(data));
-            
-            console.log('AuthStore: Профиль успешно получен и сохранен в кэше, роль:', data.role);
-          } catch (e) {
-            console.error('AuthStore: Ошибка при кэшировании профиля:', e);
-          }
-        } catch (error) {
-          console.error('AuthStore: Ошибка при получении профиля:', error);
-          set({ user: null, isAuthenticated: false });
-        }
-      },
-      
       // Регистрация пользователя
-      register: async (email, password, fullName, phone) => {
+      register: async (credentials) => {
         try {
           set({ isLoading: true, error: null });
-          
-          // Правильно формируем данные для API
-          const credentials = {
-            email,
-            password,
-            full_name: fullName,
-            phone: phone || undefined
-          };
-          
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-          const response = await fetch(`${apiUrl}/auth/register`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(credentials)
+          console.log('AuthStore: Попытка регистрации', { email: credentials.email });
+
+          const response = await authApi.register(credentials);
+
+          // Сохраняем данные
+          saveToken(response.access_token);
+          saveUser(response.user);
+
+          set({
+            isAuthenticated: true,
+            token: response.access_token,
+            user: response.user,
+            error: null,
+            isLoading: false
           });
-          
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Ошибка регистрации');
-          }
-          
-          const data = await response.json();
-          
-          // Сохраняем токен, если он есть в ответе
-          if (data.access_token) {
-            saveAuthToken(data.access_token);
-            
-            set({ 
-              isAuthenticated: true, 
-              token: data.access_token, 
-              error: null, 
-              isLoading: false 
-            });
-            
-            // Получаем профиль пользователя
-            await get().fetchUserProfile();
-          } else {
-            // Если токена нет, просто заканчиваем регистрацию
-            set({ 
-              isLoading: false,
-              error: null
-            });
-          }
+
+          console.log('AuthStore: Успешная регистрация', { role: response.user.role });
         } catch (error: any) {
-          console.error('Ошибка регистрации:', error);
-          set({ 
-            isLoading: false, 
-            error: `Ошибка регистрации: ${error.message}` 
+          console.error('AuthStore: Ошибка регистрации', error);
+          set({
+            isAuthenticated: false,
+            token: null,
+            user: null,
+            error: error.message,
+            isLoading: false
           });
+          throw error;
         }
       },
-      
-      // Выход пользователя из системы
-      logout: () => {
-        console.log('AuthStore: Начало процесса выхода из системы');
-        
-        // Сохраняем копии важных данных перед удалением (для возможного восстановления)
+
+      // Выход из системы
+      logout: async () => {
         try {
-          const profile = localStorage.getItem('user_profile');
-          const token = localStorage.getItem('token');
-          const refreshToken = localStorage.getItem('refresh_token');
-          
-          if (profile || token || refreshToken) {
-            localStorage.setItem('user_profile_backup', profile || '');
-            localStorage.setItem('token_backup', token || '');
-            localStorage.setItem('refresh_token_backup', refreshToken || '');
-            localStorage.setItem('logout_timestamp', Date.now().toString());
-            console.log('AuthStore: Сохранены резервные копии данных авторизации');
-          }
-        } catch (e) {
-          console.error('AuthStore: Ошибка при сохранении резервных копий:', e);
-        }
-        
-        try {
-          // Отправляем запрос на выход, если есть активный токен
-          const token = getAuthToken();
-          if (token) {
-            console.log('AuthStore: Отправка запроса выхода из системы с токеном');
-            // Используем fetch вместо axios для более надежного выполнения
-            fetch('/api/auth/logout', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              }
-            }).catch(e => {
-              console.warn('AuthStore: Ошибка при выходе из системы на сервере:', e);
-            });
-          }
-        } catch (e) {
-          console.error('AuthStore: Ошибка при отправке запроса выхода:', e);
-        }
-        
-        // Очищаем состояние авторизации
-        set({ 
-          isAuthenticated: false,
-          token: null,
-          user: null 
-        });
-        
-        console.log('AuthStore: Токен удален из всех хранилищ');
-        
-        // Удаляем токены из localStorage и sessionStorage
-        try {
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          localStorage.removeItem('refresh_token');
-        } catch (e) {
-          console.error('AuthStore: Ошибка при удалении токенов:', e);
-        }
-      },
-      
-      // Очистка ошибки
-      clearError: () => set({ error: null }),
-      
-      refreshProfile: async () => {
-        try {
-          const response = await api.get('/users/me');
-          const userProfile = response.data;
-          
-          // Обновляем профиль в хранилище
-          set({ user: userProfile });
-          
-          // Также обновляем в localStorage для сохранения между сессиями
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('user_profile', JSON.stringify(userProfile));
-            localStorage.setItem('user_role', userProfile.role);
-            localStorage.setItem('user', JSON.stringify(userProfile));
-            console.log('AuthStore: Профиль обновлен, роль:', userProfile.role);
-          }
+          console.log('AuthStore: Попытка выхода');
+          await authApi.logout();
         } catch (error) {
-          console.error('Ошибка при обновлении профиля пользователя:', error);
+          console.error('AuthStore: Ошибка при выходе', error);
+        } finally {
+          // Очищаем данные независимо от результата запроса
+          clearAuth();
+          set({
+            isAuthenticated: false,
+            token: null,
+            user: null,
+            error: null,
+            isLoading: false
+          });
+          console.log('AuthStore: Выход выполнен');
         }
       }
     }),
@@ -567,7 +370,6 @@ const useAuthStore = create<AuthState>()(
       // Исключаем из персистентности некоторые поля
       partialize: (state) => ({
         token: state.token,
-        refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated
       })

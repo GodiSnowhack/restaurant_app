@@ -109,7 +109,7 @@ export default function App({ Component, pageProps }: AppProps) {
       // Если есть токен, считаем пользователя предварительно авторизованным
       if (token) {
         console.log('App: Токен найден, устанавливаем начальное состояние авторизации');
-        setInitialAuthState(true, token);
+        setInitialAuthState();
       } else {
         console.log('App: Токен не найден');
       }
@@ -158,8 +158,8 @@ export default function App({ Component, pageProps }: AppProps) {
             } else {
               console.log('Метод init не найден в хранилище бронирований');
             }
-          } catch (error) {
-            console.error('Ошибка при инициализации хранилища бронирований:', error);
+          } catch (e: unknown) {
+            console.error('Ошибка при инициализации хранилища бронирований:', e);
           }
         }
       }
@@ -299,7 +299,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <div suppressHydrationWarning>
             <Component {...pageProps} />
             {renderAuthDebugger()}
-            {isMobileDevice && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
+            {isMobileDevice() && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
           </div>
         </SessionProvider>
       </ThemeProvider>
