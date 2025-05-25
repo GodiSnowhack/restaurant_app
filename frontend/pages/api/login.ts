@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import cookie from 'cookie';
 
 const BACKEND_URL = 'https://backend-production-1a78.up.railway.app';
 
@@ -67,23 +66,12 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
       return res.status(400).json({ detail: 'Не получен токен доступа' });
     }
 
-    const token = response.data.access_token;
-
-    // Устанавливаем cookie
-    res.setHeader('Set-Cookie', [
-      cookie.serialize('auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-        domain: process.env.COOKIE_DOMAIN || undefined
-      })
-    ]);
+    // Устанавливаем auth cookie
+    res.setHeader('Set-Cookie', `auth_token=${response.data.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
 
     // Возвращаем успешный ответ
     return res.status(200).json({
-      access_token: token,
+      access_token: response.data.access_token,
       token_type: 'bearer'
     });
 

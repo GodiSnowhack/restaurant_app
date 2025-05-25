@@ -278,9 +278,15 @@ const useAuthStore = create<AuthState>()(
           // Получаем профиль пользователя
           await get().fetchUserProfile();
           
+          console.log('AuthStore - Авторизация успешна');
+          
         } catch (error: any) {
           console.error('AuthStore: Ошибка авторизации:', error);
-          set({ error: error.message || 'Ошибка авторизации' });
+          set({ 
+            isAuthenticated: false,
+            token: null,
+            error: error.message || 'Ошибка авторизации'
+          });
           throw error;
         }
       },
