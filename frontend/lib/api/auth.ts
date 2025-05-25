@@ -84,14 +84,20 @@ export const authApi: IAuthApi = {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password
+        })
       });
 
       const data = await response.json();
 
       console.log('Auth API: Получен ответ', {
         status: response.status,
-        data
+        data: {
+          ...data,
+          access_token: data.access_token ? '***' : undefined
+        }
       });
 
       if (!response.ok) {
@@ -100,7 +106,14 @@ export const authApi: IAuthApi = {
 
       // Проверяем наличие всех необходимых данных
       if (!data.access_token || !data.user) {
-        console.error('Auth API: Неверный формат ответа:', data);
+        console.error('Auth API: Неверный формат ответа:', {
+          hasToken: !!data.access_token,
+          hasUser: !!data.user,
+          data: {
+            ...data,
+            access_token: data.access_token ? '***' : undefined
+          }
+        });
         throw new Error(data.detail || 'Неверный формат ответа от сервера');
       }
 

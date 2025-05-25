@@ -298,10 +298,19 @@ const useAuthStore = create<AuthStore>()(
           console.log('AuthStore: Получен ответ от сервера', {
             hasToken: !!response.access_token,
             hasUser: !!response.user,
-            role: response.user?.role
+            role: response.user?.role,
+            user: response.user
           });
 
           if (!response.access_token || !response.user) {
+            console.error('AuthStore: Неверный формат ответа:', {
+              hasToken: !!response.access_token,
+              hasUser: !!response.user,
+              response: {
+                ...response,
+                access_token: response.access_token ? '***' : undefined
+              }
+            });
             throw new Error('Неверный формат ответа от сервера');
           }
 
@@ -319,7 +328,8 @@ const useAuthStore = create<AuthStore>()(
 
           console.log('AuthStore: Успешный вход', { 
             role: response.user.role,
-            isAuthenticated: true
+            isAuthenticated: true,
+            user: response.user
           });
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);
