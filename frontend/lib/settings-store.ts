@@ -198,29 +198,20 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
 
       // Обновляем состояние и локальное хранилище
       set({ 
-        settings: savedSettings, 
+        settings: savedSettings,
         isLoading: false,
-        lastUpdated: Date.now(),
-        error: null
+        error: null,
+        lastUpdated: Date.now()
       });
 
-      // Сохраняем в локальное хранилище
-      settingsApi.saveSettingsLocally(savedSettings);
-      
       return savedSettings;
     } catch (error: any) {
       console.error('Ошибка при обновлении настроек:', error);
-      
-      // Устанавливаем понятное сообщение об ошибке
-      const errorMessage = error.response?.data?.message || error.message || 'Произошла ошибка при сохранении настроек';
-      
       set({ 
-        error: errorMessage,
-        isLoading: false 
+        isLoading: false,
+        error: error.message || 'Произошла ошибка при обновлении настроек'
       });
-
-      // Возвращаем текущие настройки без изменений
-      return get().settings;
+      throw error;
     }
   },
 

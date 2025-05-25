@@ -118,8 +118,15 @@ def update_settings(
     Обновление настроек ресторана.
     Доступно только для администраторов.
     """
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    logger.info("Вызов функции update_settings")
+    logger.info(f"Пользователь: {current_user.email}, роль: {current_user.role}")
+    
     # Проверяем права доступа
     if current_user.role != UserRole.ADMIN:
+        logger.warning(f"Попытка обновления настроек пользователем без прав администратора: {current_user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для изменения настроек ресторана",
@@ -127,22 +134,34 @@ def update_settings(
     
     try:
         # Ищем настройки в базе данных
+        logger.info("Поиск настроек в базе данных")
         db_settings = db.query(Settings).first()
         
         # Если настройки не найдены, создаем их с дефолтными значениями
         if not db_settings:
+            logger.info("Настройки не найдены, создаем дефолтные")
             db_settings = Settings.create_default()
             db.add(db_settings)
             db.commit()
             db.refresh(db_settings)
+            logger.info("Дефолтные настройки успешно созданы")
         
         # Обновляем только переданные поля
         update_data = settings_in.dict(exclude_unset=True)
+        logger.info(f"Обновляемые поля: {list(update_data.keys())}")
+        
         for field, value in update_data.items():
+            logger.debug(f"Обновление поля {field}: {value}")
             setattr(db_settings, field, value)
         
-        db.commit()
-        db.refresh(db_settings)
+        try:
+            db.commit()
+            db.refresh(db_settings)
+            logger.info("Настройки успешно обновлены в базе данных")
+        except Exception as db_error:
+            logger.error(f"Ошибка при сохранении в базу данных: {db_error}")
+            db.rollback()
+            raise
         
         # Преобразуем модель в словарь для создания схемы ответа
         settings_dict = {
@@ -177,9 +196,11 @@ def update_settings(
         
         # Создаем и возвращаем объект SettingsResponse
         response = SettingsResponse(**settings_dict)
+        logger.info("Настройки успешно обновлены и возвращены")
         return response
         
     except Exception as e:
+        logger.error(f"Ошибка при обновлении настроек: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при обновлении настроек: {str(e)}"

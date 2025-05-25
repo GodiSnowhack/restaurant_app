@@ -154,15 +154,16 @@ export const settingsApi = {
         throw new Error('Недостаточно прав для изменения настроек');
       }
 
-      // Устанавливаем заголовки авторизации
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      api.defaults.headers.common['X-User-Role'] = role;
-
       // Удаляем служебное поле перед отправкой
       const { isEditing, ...settingsData } = settings;
 
-      // Отправляем запрос на сервер
-      const response = await api.put<RestaurantSettings>('/settings', settingsData);
+      // Отправляем запрос на сервер с заголовками авторизации
+      const response = await api.put<RestaurantSettings>('/settings', settingsData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': role
+        }
+      });
       
       if (!response.data) {
         throw new Error('Сервер вернул некорректный ответ');
