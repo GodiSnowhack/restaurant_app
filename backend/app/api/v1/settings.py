@@ -87,10 +87,10 @@ def get_settings(
             "smtp_host": db_settings.smtp_host,
             "smtp_port": db_settings.smtp_port,
             "smtp_user": db_settings.smtp_user,
-            "smtp_password": db_settings.smtp_password,
+            "smtp_password": "********" if db_settings.smtp_password else None,
             "smtp_from_email": db_settings.smtp_from_email,
             "smtp_from_name": db_settings.smtp_from_name,
-            "sms_api_key": db_settings.sms_api_key,
+            "sms_api_key": "********" if db_settings.sms_api_key else None,
             "sms_sender": db_settings.sms_sender,
             "privacy_policy": db_settings.privacy_policy,
             "terms_of_service": db_settings.terms_of_service
@@ -98,7 +98,34 @@ def get_settings(
         
         # Создаем и возвращаем объект SettingsResponse
         response = SettingsResponse(**settings_dict)
-        logger.info(f"Возвращаем настройки: {response}")
+        
+        # Создаем безопасную версию настроек для логирования
+        safe_settings = {
+            "restaurant_name": response.restaurant_name,
+            "email": response.email,
+            "phone": response.phone,
+            "address": response.address,
+            "website": response.website,
+            "working_hours": response.working_hours,
+            "tables_count": len(response.tables) if response.tables else 0,
+            "currency": response.currency,
+            "currency_symbol": response.currency_symbol,
+            "tax_percentage": response.tax_percentage,
+            "min_order_amount": response.min_order_amount,
+            "delivery_fee": response.delivery_fee,
+            "free_delivery_threshold": response.free_delivery_threshold,
+            "table_reservation_enabled": response.table_reservation_enabled,
+            "delivery_enabled": response.delivery_enabled,
+            "pickup_enabled": response.pickup_enabled,
+            "smtp_host": response.smtp_host,
+            "smtp_port": response.smtp_port,
+            "smtp_user": response.smtp_user,
+            "smtp_from_email": response.smtp_from_email,
+            "smtp_from_name": response.smtp_from_name,
+            "sms_sender": response.sms_sender
+        }
+        
+        logger.info(f"Возвращаем настройки: {safe_settings}")
         return response
         
     except Exception as e:

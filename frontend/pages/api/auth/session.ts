@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Запрос к API для проверки сессии
     const response = await axios({
       method: 'GET',
-      url: `${API_BASE_URL}/auth/me`,
+      url: `${API_BASE_URL}/users/me`,
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -64,33 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Если первый запрос не удался, пробуем альтернативный эндпоинт
-    const altResponse = await axios({
-      method: 'GET',
-      url: `${API_BASE_URL}/users/me`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      validateStatus: () => true,
-    });
-
-    if (altResponse.status === 200) {
-      const user = altResponse.data;
-      
-      return res.status(200).json({
-        user: {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          role: user.role,
-          image: user.avatar || null,
-        },
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      });
-    }
-
-    // Если оба запроса не удались
+    // Если запрос не удался
     console.log(`[Auth Session API] Ошибка проверки профиля: ${response.status}`);
     
     return res.status(200).json({

@@ -89,8 +89,7 @@ export default async function profileProxy(req: NextApiRequest, res: NextApiResp
     
     // Формируем различные URL для получения профиля
     let endpoints = [
-      { name: 'users/me', url: `${apiUrl}/users/me` },
-      { name: 'auth/me', url: `${apiUrl}/auth/me` }
+      { name: 'users/me', url: `${apiUrl}/users/me` }
     ];
     
     // Для мобильных устройств изменяем порядок, чтобы сначала пробовать работающий эндпоинт
