@@ -67,7 +67,7 @@ export const reservationsApi = {
       
       try {
         // Отправляем запрос через API
-        const response = await api.get<Reservation[]>(`/api/v1/reservations${queryParams}`, {
+        const response = await api.get<Reservation[]>(`/reservations${queryParams}`, {
           headers,
           signal: controller.signal
         });
@@ -140,7 +140,7 @@ export const reservationsApi = {
       }
       
       // Отправляем запрос на получение бронирования
-      const response = await fetch(`/api/reservations/${id}`, {
+      const response = await fetch(`/reservations/${id}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,7 +176,7 @@ export const reservationsApi = {
       console.log(`[Reservations API] Обновление статуса бронирования #${id} на "${status}"`);
       
       // Отправляем запрос на обновление статуса
-      const response = await fetch(`/api/reservations/${id}/status`, {
+      const response = await fetch(`/reservations/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -218,7 +218,7 @@ export const reservationsApi = {
       console.log(`[Reservations API] Удаление бронирования #${id}`);
       
       // Отправляем запрос на удаление бронирования
-      const response = await fetch(`/api/reservations?id=${id}`, {
+      const response = await fetch(`/reservations?id=${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -248,7 +248,7 @@ export const reservationsApi = {
   createReservation: async (data: any) => {
     console.log('API: Создание бронирования...');
     try {
-      const response = await api.post('/api/v1/reservations', data);
+      const response = await api.post('/reservations', data);
       return response.data;
     } catch (error) {
       console.error('API: Ошибка при создании бронирования:', error);
