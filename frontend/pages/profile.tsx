@@ -26,12 +26,7 @@ const ProfilePage: NextPage = () => {
   const [ageGroup, setAgeGroup] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!isAuthenticated) {
-        router.push('/auth/login');
-        return;
-      }
-
+    const loadProfile = async () => {
       try {
         setIsLoading(true);
         await fetchUserProfile();
@@ -42,8 +37,10 @@ const ProfilePage: NextPage = () => {
       }
     };
 
-    checkAuth();
-  }, [isAuthenticated, router, fetchUserProfile]);
+    if (isAuthenticated) {
+      loadProfile();
+    }
+  }, [isAuthenticated, fetchUserProfile]);
 
   useEffect(() => {
     if (user) {

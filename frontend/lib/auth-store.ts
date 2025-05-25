@@ -203,16 +203,20 @@ const initialState: AuthState = {
 // Имя для хранения состояния в localStorage
 const STORE_NAME = 'auth-store';
 
-// Создаем хранилище с поддержкой персистентности
-const useAuthStore = create<AuthState & {
+// Определяем тип для store с методами
+interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   isMobileDevice: () => boolean;
   setInitialAuthState: () => void;
-}>()(
+}
+
+// Создаем хранилище с поддержкой персистентности
+const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       ...initialState,
@@ -224,6 +228,19 @@ const useAuthStore = create<AuthState & {
           set({ user: currentUser });
         } catch (error) {
           console.error('AuthStore: Ошибка при получении профиля', error);
+          throw error;
+        }
+      },
+
+      refreshProfile: async () => {
+        try {
+          console.log('AuthStore: Обновление профиля пользователя');
+          const currentUser = await authApi.getProfile();
+          saveUser(currentUser);
+          set({ user: currentUser });
+          return currentUser;
+        } catch (error) {
+          console.error('AuthStore: Ошибка при обновлении профиля', error);
           throw error;
         }
       },

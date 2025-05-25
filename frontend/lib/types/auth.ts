@@ -6,6 +6,8 @@ export interface User {
   role: UserRole;
   full_name: string;
   phone?: string;
+  birthday?: string;
+  age_group?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
