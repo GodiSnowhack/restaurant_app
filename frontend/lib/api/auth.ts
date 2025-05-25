@@ -91,14 +91,27 @@ export const authApi: IAuthApi = {
       });
 
       // Получаем и парсим ответ
-      const data = await response.json();
+      const rawData = await response.text();
+      console.log('Auth API: Сырой ответ от сервера:', rawData);
+
+      let data;
+      try {
+        data = JSON.parse(rawData);
+      } catch (e) {
+        console.error('Auth API: Ошибка парсинга JSON:', e);
+        throw new Error('Неверный формат ответа от сервера');
+      }
 
       console.log('Auth API: Получен ответ от сервера', {
         status: response.status,
         ok: response.ok,
         hasData: !!data,
         hasToken: !!data?.access_token,
-        hasUser: !!data?.user
+        hasUser: !!data?.user,
+        data: {
+          ...data,
+          access_token: data?.access_token ? '***' : undefined
+        }
       });
 
       // Проверяем успешность запроса

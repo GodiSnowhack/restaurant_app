@@ -115,7 +115,15 @@ export default async function handler(
     const responseData = {
       access_token: response.data.access_token,
       token_type: response.data.token_type || 'bearer',
-      user: response.data.user
+      user: {
+        id: response.data.user.id,
+        email: response.data.user.email,
+        full_name: response.data.user.full_name,
+        role: response.data.user.role,
+        is_active: response.data.user.is_active,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
     };
 
     console.log('Auth API - Подготовленный ответ для клиента:', {
@@ -126,10 +134,15 @@ export default async function handler(
       responseData: JSON.stringify(responseData)
     });
 
-    // Отправляем ответ клиенту
+    // Отправляем ответ клиенту с правильными заголовками
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    return res.status(200).json(responseData);
+    
+    // Добавляем задержку перед отправкой ответа
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Отправляем ответ как есть, без дополнительной обработки
+    return res.status(200).send(JSON.stringify(responseData));
   } catch (error: any) {
     console.error('Login API - Ошибка:', error.response?.data || error.message);
     return res.status(500).json({
