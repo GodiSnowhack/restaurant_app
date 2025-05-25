@@ -206,7 +206,7 @@ const STORE_NAME = 'auth-store';
 
 // Определяем тип для store с методами
 interface AuthStore extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<LoginResponse>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
@@ -295,7 +295,7 @@ const useAuthStore = create<AuthStore>()(
         }
       },
 
-      login: async (credentials: LoginCredentials) => {
+      login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
         try {
           set({ isLoading: true, error: null });
           console.log('AuthStore: Начало процесса входа', { 
@@ -309,28 +309,13 @@ const useAuthStore = create<AuthStore>()(
           console.log('AuthStore: Получен ответ от сервера', {
             hasToken: !!response.access_token,
             hasUser: !!response.user,
-            role: response.user?.role,
-            email: response.user?.email
+            userEmail: response.user?.email,
+            userRole: response.user?.role
           });
 
-          if (!response.access_token) {
-            console.error('AuthStore: Отсутствует токен в ответе');
-            throw new Error('Токен не найден в ответе сервера');
+          if (!response.access_token || !response.user) {
+            throw new Error('Неполные данные в ответе сервера');
           }
-
-          if (!response.user) {
-            console.error('AuthStore: Отсутствуют данные пользователя в ответе');
-            throw new Error('Данные пользователя не найдены в ответе сервера');
-          }
-
-          if (!response.user.email || !response.user.role) {
-            console.error('AuthStore: Неполные данные пользователя', response.user);
-            throw new Error('Неполные данные пользователя в ответе сервера');
-          }
-
-          // Сохраняем данные
-          saveToken(response.access_token);
-          saveUser(response.user);
 
           set({
             isAuthenticated: true,
@@ -340,11 +325,7 @@ const useAuthStore = create<AuthStore>()(
             isLoading: false
           });
 
-          console.log('AuthStore: Успешный вход', { 
-            isAuthenticated: true,
-            role: response.user.role,
-            email: response.user.email
-          });
+          return response;
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);
           

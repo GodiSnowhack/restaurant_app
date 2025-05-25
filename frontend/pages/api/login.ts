@@ -96,53 +96,85 @@ export default async function handler(
       });
     }
 
-    // Проверяем наличие всех необходимых полей в ответе
-    if (!response.data?.access_token || !response.data?.user) {
-      console.error('Auth API - Неполный ответ от сервера:', {
-        ...response.data,
-        access_token: response.data?.access_token ? '***' : undefined
-      });
-      return res.status(500).json({
-        detail: 'Неверный формат ответа от сервера',
-        debug: {
-          hasToken: !!response.data?.access_token,
-          hasUser: !!response.data?.user
-        }
-      });
-    }
-
-    // Возвращаем полный ответ от сервера
-    const responseData = {
-      access_token: response.data.access_token,
-      token_type: response.data.token_type || 'bearer',
-      user: {
-        id: response.data.user.id,
-        email: response.data.user.email,
-        full_name: response.data.user.full_name,
-        role: response.data.user.role,
-        is_active: response.data.user.is_active,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+    if (response.data && response.data.access_token) {
+      // Проверяем наличие данных пользователя
+      if (!response.data.user) {
+        console.error('Auth API - Отсутствуют данные пользователя в ответе:', response.data);
+        return res.status(500).json({
+          detail: 'Неполные данные от сервера авторизации'
+        });
       }
-    };
 
-    console.log('Auth API - Подготовленный ответ для клиента:', {
-      hasToken: !!responseData.access_token,
-      hasUser: !!responseData.user,
-      email: responseData.user?.email,
-      role: responseData.user?.role,
-      responseData: JSON.stringify(responseData)
-    });
+      // Формируем полный ответ с данными пользователя
+      const authResponse = {
+        access_token: response.data.access_token,
+        token_type: response.data.token_type || 'bearer',
+        user: {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          full_name: response.data.user.full_name,
+          role: response.data.user.role,
+          is_active: response.data.user.is_active
+        }
+      };
 
-    // Отправляем ответ клиенту с правильными заголовками
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    
-    // Добавляем задержку перед отправкой ответа
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Отправляем ответ как есть, без дополнительной обработки
-    return res.status(200).send(JSON.stringify(responseData));
+      console.log('Auth API - Отправка полного ответа клиенту:', {
+        hasToken: true,
+        hasUser: true,
+        userEmail: authResponse.user.email,
+        userRole: authResponse.user.role
+      });
+
+      return res.status(200).json(authResponse);
+    } else {
+      // Проверяем наличие всех необходимых полей в ответе
+      if (!response.data?.access_token || !response.data?.user) {
+        console.error('Auth API - Неполный ответ от сервера:', {
+          ...response.data,
+          access_token: response.data?.access_token ? '***' : undefined
+        });
+        return res.status(500).json({
+          detail: 'Неверный формат ответа от сервера',
+          debug: {
+            hasToken: !!response.data?.access_token,
+            hasUser: !!response.data?.user
+          }
+        });
+      }
+
+      // Возвращаем полный ответ от сервера
+      const responseData = {
+        access_token: response.data.access_token,
+        token_type: response.data.token_type || 'bearer',
+        user: {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          full_name: response.data.user.full_name,
+          role: response.data.user.role,
+          is_active: response.data.user.is_active,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      };
+
+      console.log('Auth API - Подготовленный ответ для клиента:', {
+        hasToken: !!responseData.access_token,
+        hasUser: !!responseData.user,
+        email: responseData.user?.email,
+        role: responseData.user?.role,
+        responseData: JSON.stringify(responseData)
+      });
+
+      // Отправляем ответ клиенту с правильными заголовками
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      
+      // Добавляем задержку перед отправкой ответа
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Отправляем ответ как есть, без дополнительной обработки
+      return res.status(200).send(JSON.stringify(responseData));
+    }
   } catch (error: any) {
     console.error('Login API - Ошибка:', error.response?.data || error.message);
     return res.status(500).json({
