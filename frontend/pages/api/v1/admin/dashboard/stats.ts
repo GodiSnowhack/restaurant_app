@@ -38,11 +38,28 @@ export default async function adminDashboardStats(req: NextApiRequest, res: Next
       message: 'Требуется авторизация'
     });
   }
-  
-  // Получаем ID пользователя из заголовка или тела запроса
-  const userId = req.headers['x-user-id'] || '1';
-  const userRole = req.headers['x-user-role'] || 'admin';
-  console.log(`[Admin API] Используем ID пользователя: ${userId}, роль: ${userRole}`);
+
+  // Получаем роль пользователя из заголовка
+  const userRole = req.headers['x-user-role'];
+  if (!userRole || userRole !== 'admin') {
+    console.log('[Admin API] Недостаточно прав для доступа к статистике');
+    return res.status(403).json({
+      success: false,
+      message: 'Недостаточно прав для доступа к статистике'
+    });
+  }
+
+  // Получаем ID пользователя из заголовка
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    console.log('[Admin API] Отсутствует ID пользователя');
+    return res.status(400).json({
+      success: false,
+      message: 'Отсутствует ID пользователя'
+    });
+  }
+
+  console.log(`[Admin API] Запрос статистики от пользователя: ${userId}, роль: ${userRole}`);
   
   try {
     // Определяем URL для бэкенда на основе окружения

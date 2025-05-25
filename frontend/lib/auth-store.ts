@@ -238,9 +238,6 @@ const useAuthStore = create<AuthState>()(
         try {
           console.log('Login Page - Попытка входа', { email, hasPassword: !!password });
           
-          // Отправляем данные на сервер
-          console.log('AuthStore - Отправляемые данные:', { email, password: '[HIDDEN]' });
-          
           const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
@@ -268,23 +265,38 @@ const useAuthStore = create<AuthState>()(
           // Сохраняем токен
           saveAuthToken(data.access_token);
           
-          // Устанавливаем состояние авторизации
-          set({ 
-            isAuthenticated: true, 
-            token: data.access_token,
-            error: null 
-          });
-          
-          // Получаем профиль пользователя
-          await get().fetchUserProfile();
-          
-          console.log('AuthStore - Авторизация успешна');
-          
+          // Если в ответе есть данные пользователя, сохраняем их
+          if (data.user) {
+            set({ 
+              isAuthenticated: true, 
+              token: data.access_token,
+              user: data.user,
+              error: null 
+            });
+            
+            // Сохраняем данные пользователя в localStorage
+            localStorage.setItem('user_profile', JSON.stringify(data.user));
+            localStorage.setItem('user_role', data.user.role);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            
+            console.log('AuthStore - Авторизация успешна, роль:', data.user.role);
+          } else {
+            // Если данных пользователя нет, устанавливаем только токен и получаем профиль
+            set({ 
+              isAuthenticated: true, 
+              token: data.access_token,
+              error: null 
+            });
+            
+            // Получаем профиль пользователя
+            await get().fetchUserProfile();
+          }
         } catch (error: any) {
           console.error('AuthStore: Ошибка авторизации:', error);
           set({ 
             isAuthenticated: false,
             token: null,
+            user: null,
             error: error.message || 'Ошибка авторизации'
           });
           throw error;

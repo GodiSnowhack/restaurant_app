@@ -121,53 +121,14 @@ export default async function reservationsHandler(req: NextApiRequest, res: Next
     } catch (error: any) {
       console.error('[API Proxy] Ошибка при запросе к бэкенду:', error.message);
       
-      // Если ошибка 401 (Unauthorized) и мы админ, пробуем использовать прямой доступ
-      if (error.response?.status === 401 && userRole === 'admin') {
-        try {
-          console.log('[API Proxy] Пробуем использовать прямой доступ после ошибки авторизации');
-          
-          // Используем прямой эндпоинт для обхода проверки авторизации
-          const directUrl = `${apiUrl}/reservations/raw`;
-          const directQueryParams = new URLSearchParams(queryParams);
-          directQueryParams.append('bypass_auth', 'true');
-          directQueryParams.append('admin_access', 'true');
-          
-          const finalDirectUrl = `${directUrl}?${directQueryParams.toString()}`;
-          
-          const directResponse = await axios({
-            method: 'GET',
-            url: finalDirectUrl,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-User-ID': userId as string,
-              'X-User-Role': 'admin'
-            },
-            timeout: 15000
-          });
-          
-          console.log(`[API Proxy] Успешно получены данные через прямой доступ: ${directResponse.status}`);
-          return res.status(directResponse.status).json(directResponse.data);
-        } catch (directError: any) {
-          console.error('[API Proxy] Ошибка при прямом доступе:', directError.message);
-        }
-      }
+      // Возвращаем ошибку клиенту
+      const statusCode = error.response?.status || 500;
+      const errorMessage = error.response?.data?.detail || error.message || 'Внутренняя ошибка сервера';
       
-      if (error.response) {
-        // Передаем ошибку от бэкенда клиенту
-        console.log(`[API Proxy] Ошибка от бэкенда: ${error.response.status}`);
-        return res.status(error.response.status).json({
-          success: false,
-          message: error.response.data?.detail || error.response.statusText || 'Ошибка сервера',
-          error: error.response.data
-        });
-      } else {
-        // Ошибка сети или таймаут
-        return res.status(500).json({
-          success: false,
-          message: error.message || 'Ошибка соединения с сервером'
-        });
-      }
+      return res.status(statusCode).json({
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      });
     }
   } catch (error: any) {
     console.error('[API Proxy] Критическая ошибка при обработке запроса:', error);

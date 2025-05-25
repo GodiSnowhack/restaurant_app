@@ -114,146 +114,23 @@ def read_order(
     *,
     db: Session = Depends(get_db),
     order_id: int,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Получение заказа по ID
+    Получить информацию о конкретном заказе
     """
-    try:
-        logger.info(f"Запрос заказа ID {order_id}. Пользователь: {current_user.id}, роль: {current_user.role}")
+    order = order_service.get_order_detailed(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Проверяем права доступа
+    if current_user.role not in [UserRole.ADMIN, UserRole.WAITER] and order.get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="У вас нет прав для просмотра этого заказа"
+        )
         
-        # Создаем минимальную структуру заказа на случай ошибки
-        fallback_order = {
-            "id": order_id,
-            "status": "pending",
-            "payment_status": "pending",
-            "payment_method": "cash",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "total_amount": 0.0,
-            "total_price": 0.0,
-            "customer_name": "",
-            "customer_phone": "",
-            "comment": "",
-            "special_instructions": "",
-            "items": []
-        }
-        
-        # Получаем заказ из базы данных с помощью усовершенствованной безопасной функции
-        try:
-            order_data = order_service.get_order_detailed(db, order_id)
-            
-            if not order_data:
-                # Если заказ не найден, возвращаем 404 ошибку
-                logger.warning(f"Заказ с ID {order_id} не найден")
-                raise HTTPException(
-                    status_code=http_status.HTTP_404_NOT_FOUND, 
-                    detail=f"Заказ с ID {order_id} не найден"
-                )
-        except Exception as detail_error:
-            logger.error(f"Ошибка при получении детальной информации о заказе {order_id}: {str(detail_error)}")
-            logger.exception(detail_error)
-            
-            # В случае ошибки пробуем получить базовую информацию о заказе
-            try:
-                basic_order = db.query(Order).filter(Order.id == order_id).first()
-                if basic_order:
-                    fallback_order.update({
-                        "status": basic_order.status.value if basic_order.status else "pending",
-                        "payment_status": basic_order.payment_status.value if basic_order.payment_status else "pending",
-                        "payment_method": basic_order.payment_method.value if basic_order.payment_method else "cash",
-                        "created_at": basic_order.created_at.isoformat() if basic_order.created_at else datetime.utcnow().isoformat(),
-                        "total_amount": float(basic_order.total_amount) if basic_order.total_amount else 0.0,
-                        "total_price": float(basic_order.total_amount) if basic_order.total_amount else 0.0,
-                        "customer_name": basic_order.customer_name or "",
-                        "customer_phone": basic_order.customer_phone or "",
-                        "comment": basic_order.comment or "",
-                        "special_instructions": basic_order.comment or "",
-                    })
-                    logger.info(f"Использую базовую информацию о заказе {order_id}")
-                else:
-                    logger.warning(f"Заказ с ID {order_id} не найден при резервной проверке")
-            except Exception as basic_error:
-                logger.error(f"Не удалось получить даже базовую информацию о заказе {order_id}: {str(basic_error)}")
-            
-            # Используем fallback данные
-            order_data = fallback_order
-            
-        # Проверяем права доступа только если получили полные данные о заказе
-        if order_data != fallback_order:
-            # Проверяем права доступа: обычный пользователь может видеть только свои заказы
-            # Нужно проверить user_id безопасно, т.к. он может быть None
-            user_id_from_order = order_data.get("user_id")
-            if (current_user.role not in [UserRole.ADMIN, UserRole.WAITER] and
-               user_id_from_order is not None and user_id_from_order != current_user.id):
-                logger.warning(f"Доступ запрещен: пользователь {current_user.id} пытается просмотреть заказ {order_id}")
-                raise HTTPException(
-                    status_code=http_status.HTTP_403_FORBIDDEN, 
-                    detail="У вас нет прав на просмотр этого заказа"
-                )
-        
-        # Проверяем, что возвращаемая структура соответствует схеме
-        # Для безопасности, если каких-то полей нет, добавляем их
-        required_fields = {
-            "id": order_id,
-            "status": "pending",
-            "payment_status": "pending",
-            "payment_method": "cash",
-            "total_amount": 0.0,
-            "total_price": 0.0,
-            "customer_name": "",
-            "customer_phone": "",
-            "comment": "",
-            "special_instructions": "",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "items": []
-        }
-        
-        for field, default_value in required_fields.items():
-            if field not in order_data or order_data[field] is None:
-                order_data[field] = default_value
-                
-        # Проверяем все элементы заказа на наличие обязательных полей
-        if "items" in order_data and order_data["items"]:
-            for item in order_data["items"]:
-                if "created_at" not in item or not item["created_at"]:
-                    item["created_at"] = order_data["created_at"]
-        
-        logger.info(f"Заказ ID {order_id} успешно получен и отправлен клиенту")
-        return order_data
-        
-    except HTTPException:
-        # Пробрасываем HTTP-исключения как есть
-        raise
-    except Exception as e:
-        # Логируем ошибку и возвращаем минимальную структуру заказа
-        logger.exception(f"Критическая ошибка при получении заказа {order_id}: {str(e)}")
-        
-        # Создаем минимальную структуру заказа, чтобы предотвратить ошибку 500
-        fallback_order = {
-            "id": order_id,
-            "status": "pending",
-            "payment_status": "pending",
-            "payment_method": "cash",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "total_amount": 0.0,
-            "total_price": 0.0,
-            "customer_name": "",
-            "customer_phone": "",
-            "comment": "",
-            "special_instructions": "",
-            "items": []
-        }
-        
-        # Проверяем, доступен ли user_id
-        if hasattr(current_user, 'id'):
-            fallback_order["user_id"] = current_user.id
-        
-        # Возвращаем базовую структуру вместо ошибки 500
-        logger.info(f"Возвращаем минимальную структуру заказа {order_id} для предотвращения ошибки 500")
-        return fallback_order
+    return order
 
 
 @router.put("/update/{order_id}", response_model=OrderReadSchema)

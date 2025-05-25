@@ -379,10 +379,24 @@ export const getAuthHeaders = () => {
     return {};
   }
   
+  // Получаем данные пользователя из токена
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]));
+      return {
+        'Authorization': `Bearer ${token}`,
+        'X-User-ID': payload.sub || '',
+        'X-User-Role': payload.role || ''
+      };
+    }
+  } catch (e) {
+    console.error('Ошибка при декодировании токена:', e);
+  }
+  
+  // Если не удалось получить данные из токена, используем только Authorization
   return {
-    'Authorization': `Bearer ${token}`,
-    'X-User-ID': localStorage.getItem('user_id') || '1',
-    'X-User-Role': localStorage.getItem('user_role') || 'admin'
+    'Authorization': `Bearer ${token}`
   };
 };
 

@@ -293,58 +293,29 @@ async def delete_reservation_endpoint(
     request: Request,
     reservation_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_optional_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Удаление бронирования"""
-    # Проверяем авторизацию через X-User-ID если нет JWT
-    if not current_user:
-        user_id = request.headers.get("X-User-ID")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Не удалось подтвердить учетные данные",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        try:
-            user_id_int = int(user_id)
-            current_user = db.query(User).filter(User.id == user_id_int).first()
-            
-            if not current_user:
-                current_user = User(
-                    id=user_id_int,
-                    email=f"temp_{user_id_int}@example.com",
-                    full_name="Временный пользователь",
-                    role=UserRole.CLIENT,
-                    is_active=True
-                )
-        except (ValueError, TypeError):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Неверный формат ID пользователя",
-            )
-    
-    # Получаем бронирование
     reservation = get_reservation(db, reservation_id)
     
     if not reservation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Бронирование не найдено",
+            detail="Бронирование не найдено"
         )
     
     # Проверяем права доступа
     if current_user.id != reservation.user_id and current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Недостаточно прав для удаления этого бронирования",
+            detail="Недостаточно прав для удаления этого бронирования"
         )
     
     # Проверяем статус бронирования
     if reservation.status == ReservationStatus.COMPLETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Нельзя удалить завершенное бронирование",
+            detail="Нельзя удалить завершенное бронирование"
         )
     
     delete_reservation(db, reservation_id)

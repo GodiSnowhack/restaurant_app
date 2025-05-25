@@ -226,91 +226,35 @@ export default function App({ Component, pageProps }: AppProps) {
     
     const path = router.pathname;
     
-    // Проверка разрешения для роли официанта с учетом всех возможных источников
-    const hasWaiterPermission = () => {
-      try {
-        // 1. Проверка из объекта user в стейте
-        if (user && (user.role === 'waiter' || user.role === 'admin')) {
-          console.log('_app: Доступ разрешен по роли из стейта:', user.role);
-          return true;
-        }
-        
-        // 2. Проверка прямого ключа user_role из localStorage
-        if (typeof localStorage !== 'undefined') {
-          const userRole = localStorage.getItem('user_role');
-          if (userRole && (userRole === 'waiter' || userRole === 'admin')) {
-            console.log('_app: Доступ разрешен по роли из localStorage (user_role):', userRole);
-            return true;
-          }
-        }
-        
-        // 3. Проверка из объекта user в localStorage
-        if (typeof localStorage !== 'undefined') {
-          const userStr = localStorage.getItem('user');
-          if (userStr) {
-            try {
-              const userData = JSON.parse(userStr);
-              if (userData && (userData.role === 'waiter' || userData.role === 'admin')) {
-                console.log('_app: Доступ разрешен по роли из localStorage (user):', userData.role);
-                return true;
-              }
-            } catch (e) {
-              console.error('_app: Ошибка при парсинге user из localStorage', e);
-            }
-          }
-        }
-        
-        // 4. Проверка из объекта user_profile в localStorage
-        if (typeof localStorage !== 'undefined') {
-          const profileStr = localStorage.getItem('user_profile');
-          if (profileStr) {
-            try {
-              const profileData = JSON.parse(profileStr);
-              if (profileData && (profileData.role === 'waiter' || profileData.role === 'admin')) {
-                console.log('_app: Доступ разрешен по роли из localStorage (user_profile):', profileData.role);
-                return true;
-              }
-            } catch (e) {
-              console.error('_app: Ошибка при парсинге user_profile из localStorage', e);
-            }
-          }
-        }
-        
-        return false;
-      } catch (e) {
-        console.error('_app: Ошибка при проверке прав доступа к панели официанта', e);
-        return false;
-      }
-    };
+    // Проверяем права доступа
+    if (!isAuthenticated) {
+      console.log('_app: Пользователь не авторизован, перенаправляем на страницу входа');
+      router.push('/auth/login');
+      return;
+    }
+    
+    // Проверяем роль пользователя
+    if (!user) {
+      console.log('_app: Нет данных о пользователе, загружаем профиль');
+      fetchUserProfile();
+      return;
+    }
     
     // Защита роутов админки
-    if (isAuthenticated && adminRoutes.includes(path) && user?.role !== 'admin') {
-      console.log('Попытка доступа к админке без прав');
+    if (adminRoutes.includes(path) && user.role !== 'admin') {
+      console.log('_app: Попытка доступа к админке без прав');
       router.push('/');
       return;
     }
     
     // Защита роутов официанта
-    if (isAuthenticated && 
-        waiterRoutes.some(route => path === route || (route.endsWith('[id]') && path.startsWith(route.replace('[id]', '')))) && 
-        !hasWaiterPermission()) {
-      console.log('Попытка доступа к панели официанта без прав');
+    if (waiterRoutes.some(route => path === route || (route.endsWith('[id]') && path.startsWith(route.replace('[id]', '')))) && 
+        user.role !== 'waiter' && user.role !== 'admin') {
+      console.log('_app: Попытка доступа к панели официанта без прав');
       router.push('/');
       return;
     }
-    
-    // Перенаправляем на авторизацию только если пользователь пытается открыть защищенный роут
-    // и точно не авторизован (нет токена)
-    if (!isAuthenticated && 
-        !PUBLIC_ROUTES.includes(path) && 
-        !path.startsWith('/menu/') && 
-        !getAppToken() && 
-        path !== '/auth/login' && 
-        path !== '/auth/register') {
-      console.log('Перенаправление на логин с:', path);
-      router.push('/auth/login');
-    }
-  }, [router.pathname, isAuthenticated, router, user, isClient, previousPath]);
+  }, [isAuthenticated, user, router.pathname, fetchUserProfile]);
   
   // Обернем отображение AuthDebugger в дополнительную проверку
   const renderAuthDebugger = () => {
