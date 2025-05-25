@@ -223,10 +223,16 @@ export default function App({ Component, pageProps }: AppProps) {
     
     const adminRoutes = ['/admin', '/admin/users', '/admin/orders', '/admin/settings', '/admin/menu', '/admin/reservations'];
     const waiterRoutes = ['/waiter', '/waiter/scan', '/waiter/orders', '/waiter/orders/[id]'];
+    const publicRoutes = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
     
     const path = router.pathname;
+
+    // Если это публичный маршрут, разрешаем доступ
+    if (publicRoutes.includes(path) || path.startsWith('/menu/')) {
+      return;
+    }
     
-    // Проверяем права доступа
+    // Проверяем права доступа для защищенных маршрутов
     if (!isAuthenticated) {
       console.log('_app: Пользователь не авторизован, перенаправляем на страницу входа');
       router.push('/auth/login');

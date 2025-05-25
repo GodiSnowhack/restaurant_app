@@ -286,10 +286,10 @@ let PUBLIC_ROUTES: string[] = [];
 try {
   // Динамический импорт, если файл существует
   if (typeof window !== 'undefined') {
-    PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/'];
+    PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
   }
 } catch (e) {
-  PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/'];
+  PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
 }
 
 export const checkIfPublicRoute = (): boolean => {
@@ -303,7 +303,7 @@ export const checkIfPublicRoute = (): boolean => {
   }
   
   // Проверяем начало пути (для маршрутов с параметрами)
-  if (path.startsWith('/menu/')) {
+  if (path.startsWith('/menu/') || path.startsWith('/reservations/')) {
     return true;
   }
   
