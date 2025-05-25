@@ -14,7 +14,7 @@ const initialState: AuthState = {
 };
 
 // Определяем тип для store с методами
-interface AuthStore extends AuthState {
+export interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<LoginResponse>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;

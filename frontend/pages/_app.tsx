@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import '../styles/globals.css';
-import useAuthStore from '../lib/auth-store';
+import useAuthStore, { type AuthStore } from '../lib/auth-store';
 import useSettingsStore from '../lib/settings-store';
 import useReservationsStore from '../lib/reservations-store';
 import { SettingsProvider } from '../settings-context';
@@ -93,7 +93,7 @@ export const renderMode = 'force-dynamic';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const { isAuthenticated, user, fetchUserProfile, isMobileDevice, setInitialAuthState } = useAuthStore();
+  const { isAuthenticated, user, fetchUserProfile, isMobileDevice } = useAuthStore();
   const { loadSettings } = useSettingsStore();
   const [previousPath, setPreviousPath] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
@@ -101,20 +101,26 @@ export default function App({ Component, pageProps }: AppProps) {
   
   // Определяем, что мы на клиенте
   useEffect(() => {
-    setIsClient(true);
-    
-    // Сразу устанавливаем начальное состояние авторизации по наличию токена
-    if (typeof window !== 'undefined') {
-      const token = getAppToken();
-      // Если есть токен, считаем пользователя предварительно авторизованным
-      if (token) {
-        console.log('App: Токен найден, устанавливаем начальное состояние авторизации');
-        setInitialAuthState();
-      } else {
-        console.log('App: Токен не найден');
+    const init = async () => {
+      setIsClient(true);
+      if (typeof window !== 'undefined') {
+        const token = getAppToken();
+        if (token) {
+          console.log('App: Токен найден, инициализируем состояние авторизации');
+          try {
+            const store = useAuthStore.getState() as { initialize: () => Promise<void> };
+            await store.initialize();
+          } catch (error) {
+            console.error('Ошибка при инициализации авторизации:', error);
+          }
+        } else {
+          console.log('App: Токен не найден');
+        }
       }
-    }
-  }, [setInitialAuthState]);
+    };
+
+    init();
+  }, []);
   
   // Отдельный эффект для загрузки профиля пользователя
   useEffect(() => {
@@ -305,7 +311,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <div suppressHydrationWarning>
             <Component {...pageProps} />
             {renderAuthDebugger()}
-            {isMobileDevice() && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
+            {typeof isMobileDevice === 'function' && isMobileDevice() && process.env.NODE_ENV === 'development' && <MobileDetectorIndicator />}
           </div>
         </SessionProvider>
       </ThemeProvider>
