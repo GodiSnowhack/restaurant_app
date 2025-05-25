@@ -177,6 +177,10 @@ def update_settings(
         update_data = settings_in.dict(exclude_unset=True)
         logger.info(f"Обновляемые поля: {list(update_data.keys())}")
         
+        # Преобразуем URL в строку, если он есть
+        if 'website' in update_data and update_data['website']:
+            update_data['website'] = str(update_data['website'])
+        
         for field, value in update_data.items():
             logger.debug(f"Обновление поля {field}: {value}")
             setattr(db_settings, field, value)
@@ -212,10 +216,10 @@ def update_settings(
             "smtp_host": db_settings.smtp_host,
             "smtp_port": db_settings.smtp_port,
             "smtp_user": db_settings.smtp_user,
-            "smtp_password": db_settings.smtp_password,
+            "smtp_password": "********" if db_settings.smtp_password else None,
             "smtp_from_email": db_settings.smtp_from_email,
             "smtp_from_name": db_settings.smtp_from_name,
-            "sms_api_key": db_settings.sms_api_key,
+            "sms_api_key": "********" if db_settings.sms_api_key else None,
             "sms_sender": db_settings.sms_sender,
             "privacy_policy": db_settings.privacy_policy,
             "terms_of_service": db_settings.terms_of_service

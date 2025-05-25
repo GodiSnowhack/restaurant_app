@@ -31,7 +31,7 @@ class SettingsBase(BaseModel):
     email: EmailStr = Field(default="info@restaurant.ru")
     phone: str = Field(default="+7 (999) 123-45-67")
     address: str = Field(default="ул. Пушкина, д. 10, Москва")
-    website: Optional[HttpUrl] = None
+    website: Optional[str] = None
     
     working_hours: Dict[str, Dict[str, Any]] = Field(default_factory=lambda: {
         "monday": {"open": "09:00", "close": "22:00", "is_closed": False},
