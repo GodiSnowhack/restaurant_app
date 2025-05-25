@@ -79,25 +79,25 @@ export interface RestaurantSettings {
   email: string;
   phone: string;
   address: string;
-  website: string;
+  website?: string;
+  working_hours: WorkingHours;
+  tables: RestaurantTable[];
   currency: string;
   currency_symbol: string;
   tax_percentage: number;
   min_order_amount: number;
   table_reservation_enabled: boolean;
-  working_hours: WorkingHours;
-  tables: RestaurantTable[];
-  payment_methods: string[];
-  smtp_host: string;
-  smtp_port: number;
-  smtp_user: string;
-  smtp_password: string;
-  smtp_from_email: string;
-  smtp_from_name: string;
-  sms_api_key: string;
-  sms_sender: string;
-  privacy_policy: string;
-  terms_of_service: string;
+  payment_methods?: string[];
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  smtp_from_email?: string;
+  smtp_from_name?: string;
+  sms_api_key?: string;
+  sms_sender?: string;
+  privacy_policy?: string;
+  terms_of_service?: string;
 }
 
 export interface OrderItem {
