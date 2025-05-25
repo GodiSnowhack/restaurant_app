@@ -87,17 +87,21 @@ export const authApi: IAuthApi = {
         body: JSON.stringify(credentials)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Ошибка авторизации');
-      }
-
       const data = await response.json();
+
+      console.log('Auth API: Получен ответ', {
+        status: response.status,
+        data
+      });
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || 'Ошибка авторизации');
+      }
 
       // Проверяем наличие всех необходимых данных
       if (!data.access_token || !data.user) {
         console.error('Auth API: Неверный формат ответа:', data);
-        throw new Error('Неверный формат ответа от сервера');
+        throw new Error(data.detail || 'Неверный формат ответа от сервера');
       }
 
       // Создаем объект с правильной типизацией
@@ -108,7 +112,6 @@ export const authApi: IAuthApi = {
       };
       
       console.log('Auth API: Успешный вход', { 
-        status: response.status,
         hasToken: !!loginResponse.access_token,
         hasUser: !!loginResponse.user,
         role: loginResponse.user?.role 
@@ -116,13 +119,8 @@ export const authApi: IAuthApi = {
 
       return loginResponse;
     } catch (error) {
-      const serverError = error as ServerError;
-      console.error('Auth API: Ошибка входа', {
-        status: serverError.response?.status,
-        data: serverError.response?.data,
-        message: serverError.message
-      });
-      throw serverError;
+      console.error('Auth API: Ошибка входа', error);
+      throw error;
     }
   },
 

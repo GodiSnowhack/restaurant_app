@@ -30,15 +30,17 @@ export default async function handler(
   }
 
   try {
+    const { email, password } = req.body;
+
     console.log('Login API - Отправка запроса авторизации:', {
       url: `${API_URL}/auth/login`,
-      body: { email: req.body.email }
+      email
     });
 
     // Формируем данные для отправки
     const formData = new URLSearchParams();
-    formData.append('username', req.body.email);
-    formData.append('password', req.body.password);
+    formData.append('username', email);
+    formData.append('password', password);
 
     console.log('Auth API - Отправляемые данные:', formData.toString());
 
@@ -56,6 +58,7 @@ export default async function handler(
     console.log('Auth API - Ответ от сервера:', {
       status: response.status,
       hasData: !!response.data,
+      data: response.data,
       hasToken: !!response.data?.access_token,
       hasUser: !!response.data?.user
     });
@@ -70,7 +73,8 @@ export default async function handler(
     if (!response.data?.access_token || !response.data?.user) {
       console.error('Auth API - Неполный ответ от сервера:', response.data);
       return res.status(500).json({
-        detail: 'Неверный формат ответа от сервера'
+        detail: 'Неверный формат ответа от сервера',
+        debug: response.data
       });
     }
 
@@ -81,10 +85,10 @@ export default async function handler(
       user: response.data.user
     });
   } catch (error: any) {
-    console.error('Login API - Ошибка:', error);
+    console.error('Login API - Ошибка:', error.response?.data || error.message);
     return res.status(500).json({
-      message: error.message || 'Внутренняя ошибка сервера',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
+      message: error.response?.data?.detail || error.message || 'Внутренняя ошибка сервера',
+      error: process.env.NODE_ENV === 'development' ? error.response?.data || error.message : undefined
     });
   }
 } 
