@@ -43,7 +43,7 @@ const baseURL = getApiBaseUrl();
 const API_URL = baseURL;
 
 export const api = axios.create({
-  baseURL,
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

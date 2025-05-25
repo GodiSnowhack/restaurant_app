@@ -2,7 +2,7 @@ import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHead
 
 // Функция для определения правильного baseURL для API
 const getApiBaseUrl = (): string => {
-  // В production используем Railway URL
+  // В production используем Railway URL для бэкенда
   if (process.env.NODE_ENV === 'production') {
     return 'https://backend-production-1a78.up.railway.app/api/v1';
   }
