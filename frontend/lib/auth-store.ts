@@ -236,7 +236,7 @@ const useAuthStore = create<AuthState>()(
       // Авторизация пользователя
       login: async (email: string, password: string) => {
         try {
-          console.log('Login Page - Попытка входа', { email, hasPassword: !!password, isMobile: false });
+          console.log('Login Page - Попытка входа', { email, hasPassword: !!password });
           
           // Отправляем данные на сервер
           console.log('AuthStore - Отправляемые данные:', { email, password: '[HIDDEN]' });
@@ -247,33 +247,40 @@ const useAuthStore = create<AuthState>()(
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ email, password }),
+            credentials: 'include'
           });
 
           const data = await response.json();
+          console.log('AuthStore - Ответ от сервера:', {
+            status: response.status,
+            hasData: !!data,
+            hasToken: !!data.access_token
+          });
 
           if (!response.ok) {
-            throw new Error(data.detail || data.error || 'Ошибка авторизации');
+            throw new Error(data.detail || 'Ошибка авторизации');
           }
 
-          if (data.access_token) {
-            // Сохраняем токен
-            saveAuthToken(data.access_token);
-            
-            // Устанавливаем состояние авторизации
-            set({ 
-              isAuthenticated: true, 
-              token: data.access_token,
-              error: null 
-            });
-            
-            // Получаем профиль пользователя
-            await get().fetchUserProfile();
-          } else {
+          if (!data.access_token) {
             throw new Error('Не получен токен доступа');
           }
+
+          // Сохраняем токен
+          saveAuthToken(data.access_token);
+          
+          // Устанавливаем состояние авторизации
+          set({ 
+            isAuthenticated: true, 
+            token: data.access_token,
+            error: null 
+          });
+          
+          // Получаем профиль пользователя
+          await get().fetchUserProfile();
+          
         } catch (error: any) {
           console.error('AuthStore: Ошибка авторизации:', error);
-          set({ error: error.message });
+          set({ error: error.message || 'Ошибка авторизации' });
           throw error;
         }
       },
@@ -370,17 +377,19 @@ const useAuthStore = create<AuthState>()(
           
           try {
             // Выполняем запрос с таймаутом
-            const response = await fetch('/api/v1/users/me', {
+            const response = await fetch('https://backend-production-1a78.up.railway.app/api/v1/users/me', {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json',
                 'X-Client-Type': isMobileDeviceFn() ? 'mobile' : 'desktop',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Origin': typeof window !== 'undefined' ? window.location.origin : '*'
               },
               signal: controller.signal,
-              cache: 'no-store'
+              cache: 'no-store',
+              credentials: 'include'
             });
             
             clearTimeout(timeoutId);

@@ -2,12 +2,14 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import cookie from 'cookie';
 
+const BACKEND_URL = 'https://backend-production-1a78.up.railway.app';
+
 /**
  * API-прокси для авторизации пользователей
  * Обрабатывает авторизацию для всех типов клиентов, включая мобильные устройства
  */
 export default async function loginProxy(req: NextApiRequest, res: NextApiResponse) {
-  // Разрешаем CORS для всех клиентов
+  // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -16,7 +18,6 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // Обрабатываем предварительные запросы CORS
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -38,40 +39,31 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
     formData.append('username', email);
     formData.append('password', password);
 
-    console.log('Login Proxy - Отправка запроса авторизации');
+    console.log('Login Proxy - Отправка запроса авторизации на', `${BACKEND_URL}/api/v1/auth/login`);
 
     const response = await axios.post(
-      'https://backend-production-1a78.up.railway.app/api/v1/auth/login',
+      `${BACKEND_URL}/api/v1/auth/login`,
       formData,
       {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Origin': process.env.NEXT_PUBLIC_FRONTEND_URL || '*'
         },
-        validateStatus: (status) => true // Принимаем любой статус для обработки ошибок
+        maxRedirects: 5,
+        timeout: 10000
       }
     );
 
-    console.log('Login Proxy - Получен ответ:', {
+    console.log('Login Proxy - Ответ от сервера:', {
       status: response.status,
       hasData: !!response.data,
-      hasToken: response.data?.access_token ? 'yes' : 'no'
+      hasToken: !!response.data?.access_token
     });
 
-    // Проверяем статус ответа
-    if (response.status === 401) {
-      return res.status(401).json({ detail: 'Неверные учетные данные' });
-    }
-
-    if (response.status !== 200) {
-      return res.status(response.status).json({ 
-        detail: response.data?.detail || 'Ошибка авторизации',
-        status: response.status
-      });
-    }
-
-    // Проверяем наличие токена
+    // Проверяем наличие токена в ответе
     if (!response.data?.access_token) {
+      console.error('Login Proxy - Нет токена в ответе:', response.data);
       return res.status(400).json({ detail: 'Не получен токен доступа' });
     }
 
@@ -84,23 +76,41 @@ export default async function loginProxy(req: NextApiRequest, res: NextApiRespon
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7,
-        path: '/'
+        path: '/',
+        domain: process.env.COOKIE_DOMAIN || undefined
       })
     ]);
 
-    // Возвращаем токен
+    // Возвращаем успешный ответ
     return res.status(200).json({
       access_token: token,
       token_type: 'bearer'
     });
 
   } catch (error: any) {
-    console.error('Login Proxy - Ошибка:', error.response?.data || error.message);
+    console.error('Login Proxy - Ошибка:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers
+      }
+    });
 
-    // Возвращаем информативную ошибку
+    // Если есть ответ от сервера с ошибкой
+    if (error.response) {
+      return res.status(error.response.status).json({
+        detail: error.response.data?.detail || 'Ошибка авторизации',
+        error: error.response.data
+      });
+    }
+
+    // Если ошибка сети или другая
     return res.status(500).json({
       detail: 'Ошибка сервера при авторизации',
-      error: error.response?.data?.detail || error.message
+      error: error.message
     });
   }
 } 
