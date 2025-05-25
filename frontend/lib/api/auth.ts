@@ -1,8 +1,19 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
 import { getToken } from '../utils/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+
+// Создаем тип для ошибки сервера
+interface ServerError extends Error {
+  response?: {
+    data: {
+      message?: string;
+      detail?: string;
+    };
+    status: number;
+  };
+}
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({
@@ -27,6 +38,28 @@ api.interceptors.request.use(
   }
 );
 
+// Добавляем перехватчик для обработки ошибок
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.data) {
+      // Если есть данные об ошибке от сервера, используем их
+      const serverError = new Error(
+        (error.response.data as any).message || 
+        (error.response.data as any).detail || 
+        'Ошибка сервера'
+      ) as ServerError;
+      serverError.response = {
+        data: error.response.data as any,
+        status: error.response.status
+      };
+      return Promise.reject(serverError);
+    }
+    // Если нет данных от сервера, возвращаем исходную ошибку
+    return Promise.reject(error);
+  }
+);
+
 // Определяем тип ответа от сервера
 interface ServerLoginResponse {
   access_token: string;
@@ -36,21 +69,27 @@ interface ServerLoginResponse {
 
 export const authApi = {
   // Авторизация пользователя
-  login: async (credentials: LoginCredentials): Promise<{ access_token: string; token_type: string; user: User }> => {
+  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
       console.log('Auth API: Попытка входа', { email: credentials.email });
-      const { data } = await api.post<{ access_token: string; token_type: string; user: User }>('/auth/login', credentials);
-
+      
+      const response = await api.post<LoginResponse>('/auth/login', credentials);
+      
       console.log('Auth API: Успешный вход', { 
-        status: 200,
-        hasToken: !!data.access_token,
-        role: data.user?.role 
+        status: response.status,
+        hasToken: !!response.data.access_token,
+        role: response.data.user?.role 
       });
 
-      return data;
-    } catch (error: any) {
-      console.error('Auth API: Ошибка входа', error.response?.data || error.message);
-      throw new Error(error.response?.data?.detail || 'Ошибка авторизации');
+      return response.data;
+    } catch (error) {
+      const serverError = error as ServerError;
+      console.error('Auth API: Ошибка входа', {
+        status: serverError.response?.status,
+        data: serverError.response?.data,
+        message: serverError.message
+      });
+      throw serverError;
     }
   },
 

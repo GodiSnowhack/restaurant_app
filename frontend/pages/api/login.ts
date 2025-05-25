@@ -29,7 +29,10 @@ export default async function handler(
   }
 
   try {
-    console.log('Login Proxy - Отправка запроса авторизации на', `${API_URL}/auth/login`);
+    console.log('Login API - Отправка запроса авторизации:', {
+      url: `${API_URL}/auth/login`,
+      body: { email: req.body.email }
+    });
 
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
@@ -41,28 +44,35 @@ export default async function handler(
 
     const data = await response.json();
 
-    console.log('Login Proxy - Ответ от сервера:', {
+    console.log('Login API - Ответ от сервера:', {
       status: response.status,
       hasData: !!data,
-      hasToken: !!data.access_token,
-      role: data.user?.role
+      error: !response.ok ? data : null
     });
 
     if (!response.ok) {
-      throw new Error(data.detail || 'Ошибка авторизации');
+      // Возвращаем ошибку с сервера в правильном формате
+      return res.status(response.status).json({
+        message: data.detail || data.message || 'Ошибка авторизации',
+        errors: data.errors || []
+      });
     }
 
     // Проверяем наличие необходимых данных
     if (!data.access_token || !data.user) {
-      throw new Error('Неверный формат ответа от сервера');
+      console.error('Login API - Неверный формат ответа:', data);
+      return res.status(500).json({
+        message: 'Неверный формат ответа от сервера'
+      });
     }
 
     // Возвращаем данные клиенту
     return res.status(200).json(data);
   } catch (error: any) {
-    console.error('Login Proxy - Ошибка:', error.message);
-    return res.status(error.status || 500).json({
-      message: error.message || 'Internal server error'
+    console.error('Login API - Ошибка:', error);
+    return res.status(500).json({
+      message: error.message || 'Внутренняя ошибка сервера',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
     });
   }
 } 

@@ -293,10 +293,10 @@ const useAuthStore = create<AuthStore>()(
           set({ isLoading: true, error: null });
           console.log('AuthStore: Попытка входа', { email: credentials.email });
 
-          type LoginResult = { access_token: string; token_type: string; user: User };
-          const { access_token, user } = await authApi.login(credentials) as LoginResult;
+          const result = await authApi.login(credentials);
+          const loginResponse = result as LoginResponse;
+          const { access_token, user } = loginResponse;
           
-          // Проверяем наличие необходимых данных
           if (!access_token || !user) {
             throw new Error('Неверный формат ответа от сервера');
           }
@@ -316,14 +316,25 @@ const useAuthStore = create<AuthStore>()(
           console.log('AuthStore: Успешный вход', { role: user.role });
         } catch (error: any) {
           console.error('AuthStore: Ошибка входа', error);
-          set({
+          
+          // Формируем понятное сообщение об ошибке
+          let errorMessage = 'Произошла ошибка при входе';
+          
+          if (error.response?.data) {
+            errorMessage = error.response.data.message || error.response.data.detail || errorMessage;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          
+          set({ 
             isAuthenticated: false,
             token: null,
             user: null,
-            error: error.message,
+            error: errorMessage,
             isLoading: false
           });
-          throw error;
+          
+          throw new Error(errorMessage);
         }
       },
 
