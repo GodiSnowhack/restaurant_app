@@ -195,7 +195,7 @@ export const usersApi = {
 
       // Проверяем кэш
       const now = Date.now();
-      if (usersCache && (now - lastFetchTime < CACHE_TTL)) {
+      if (usersCache.length > 0 && (now - lastFetchTime < CACHE_TTL)) {
         console.log('Возвращаем пользователей из кэша');
         return usersCache;
       }

@@ -40,7 +40,8 @@ app.add_middleware(
         "http://localhost:3000",
         "https://localhost:3000",
         "http://localhost:8000",
-        "https://localhost:8000"
+        "https://localhost:8000",
+        "*"  # Разрешаем все источники в режиме разработки
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -50,7 +51,11 @@ app.add_middleware(
         "Accept",
         "Origin",
         "X-User-ID",
-        "X-User-Role"
+        "X-User-Role",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
     ],
     expose_headers=["*"],
     max_age=3600,
