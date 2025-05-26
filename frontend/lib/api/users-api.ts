@@ -313,5 +313,91 @@ export const usersApi = {
     }
     
     return randomUsers;
+  },
+
+  // Получение пользователя по ID
+  async getUserById(userId: number): Promise<UserData> {
+    try {
+      const response = await usersAxios.get(`/api/users/${userId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Ошибка при получении пользователя #${userId}:`, error);
+      throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
+    }
+  },
+
+  // Обновление данных пользователя
+  async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
+    try {
+      console.log(`Обновление пользователя #${userId}:`, userData);
+      const response = await usersAxios.put(`/api/users/${userId}`, userData);
+      
+      // Инвалидируем кэш после обновления
+      usersCache = null;
+      lastFetchTime = 0;
+      
+      return response.data;
+    } catch (error: any) {
+      console.error(`Ошибка при обновлении пользователя #${userId}:`, error);
+      throw new Error(`Не удалось обновить данные пользователя: ${error.message}`);
+    }
+  },
+
+  // Удаление пользователя
+  async deleteUser(userId: number): Promise<boolean> {
+    try {
+      await usersAxios.delete(`/api/users/${userId}`);
+      
+      // Инвалидируем кэш после удаления
+      usersCache = null;
+      lastFetchTime = 0;
+      
+      return true;
+    } catch (error: any) {
+      console.error(`Ошибка при удалении пользователя #${userId}:`, error);
+      throw new Error(`Не удалось удалить пользователя: ${error.message}`);
+    }
+  },
+
+  // Создание нового пользователя
+  async createUser(userData: UserData): Promise<UserData> {
+    try {
+      const response = await usersAxios.post('/api/users', userData);
+      
+      // Инвалидируем кэш после создания
+      usersCache = null;
+      lastFetchTime = 0;
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Ошибка при создании пользователя:', error);
+      throw new Error(`Не удалось создать пользователя: ${error.message}`);
+    }
+  },
+
+  // Обновление статуса пользователя
+  async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
+    try {
+      console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
+      const response = await usersAxios.patch(`/api/users/${userId}/status`, {
+        is_active: isActive
+      });
+      
+      // Инвалидируем кэш после обновления
+      usersCache = null;
+      lastFetchTime = 0;
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Ошибка при обновлении статуса пользователя:', error);
+      throw new Error(`Не удалось обновить статус пользователя: ${error.message}`);
+    }
+  },
+
+  // Очистка кэша
+  clearCache() {
+    usersCache = null;
+    lastFetchTime = 0;
+    console.log('Кэш пользователей очищен');
   }
 };
