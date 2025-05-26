@@ -6,7 +6,7 @@ export const getSecureApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
   
   if (isProduction) {
-    return 'https://backend-production-1a78.up.railway.app/api/v1';
+    return process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
   }
   
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -17,7 +17,7 @@ export const getFrontendUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
   
   if (isProduction) {
-    return 'https://frontend-production-8eb6.up.railway.app';
+    return process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app';
   }
   
   return process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
@@ -25,6 +25,9 @@ export const getFrontendUrl = (): string => {
 
 // Проверка, является ли URL безопасным (HTTPS)
 export const isSecureUrl = (url: string): boolean => {
+  if (process.env.NODE_ENV !== 'production') {
+    return true; // В режиме разработки разрешаем HTTP
+  }
   return url.startsWith('https://');
 };
 

@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Получаем токен авторизации
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = req.headers.authorization;
   if (!token) {
     return res.status(401).json({
       success: false,
@@ -46,13 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseUrl = getSecureApiUrl();
     
     // Формируем URL с параметрами
-    const queryParams = new URLSearchParams();
-    Object.entries(req.query).forEach(([key, value]) => {
-      if (value) {
-        queryParams.append(key, value as string);
-      }
-    });
-    
+    const queryParams = new URLSearchParams(req.query as Record<string, string>);
     const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     console.log('Прокси: отправка запроса к:', url);
@@ -62,14 +56,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       hasToken: !!token
     });
     
-    const response = await axios.get(url, {
+    const response = await axios({
+      method: req.method,
+      url: url,
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': token,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'X-User-ID': userId as string,
         'X-User-Role': userRole as string
       },
+      data: req.body,
       validateStatus: function (status) {
         return status < 500; // Разрешаем все статусы < 500
       }
@@ -96,10 +93,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Прокси: неожиданный статус ответа:', response.status);
       return res.status(response.status).json({
         success: false,
-        message: 'Ошибка при получении данных'
+        message: 'Ошибка при получении данных',
+        error: response.data
       });
     }
 
+    // Возвращаем данные
     return res.status(200).json(response.data);
   } catch (error: any) {
     console.error('Прокси: ошибка при получении пользователей:', error);

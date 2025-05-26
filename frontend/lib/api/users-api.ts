@@ -198,13 +198,15 @@ export const usersApi = {
       try {
         console.log('Получение пользователей через прокси...');
         const proxyResponse = await fetch('/api/v1/users', {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-User-Role': userRole,
             'X-User-ID': userId,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-          }
+          },
+          credentials: 'include'
         });
 
         if (!proxyResponse.ok) {
@@ -212,6 +214,8 @@ export const usersApi = {
         }
 
         const proxyData = await proxyResponse.json();
+        console.log('Получены данные пользователей:', proxyData);
+        
         const proxyUsers = Array.isArray(proxyData) ? proxyData : proxyData.items || [];
         
         return proxyUsers.map((user: any) => ({
@@ -230,14 +234,11 @@ export const usersApi = {
         }));
       } catch (proxyError) {
         console.error('Ошибка при получении пользователей через прокси:', proxyError);
-        
-        // Если прокси не сработал, возвращаем мок-данные
-        console.log('Возвращаем мок-данные из-за ошибки API');
-        return usersApi.getMockUsers();
+        throw proxyError; // Пробрасываем ошибку дальше
       }
     } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
-      return [];
+      throw error; // Пробрасываем ошибку для обработки на уровне компонента
     }
   },
   
