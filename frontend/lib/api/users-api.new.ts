@@ -203,19 +203,9 @@ export const usersApi = {
       try {
         console.log('Отправка запроса на получение пользователей...');
         
-        // Формируем URL с учетом параметров
-        const url = createApiUrl(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
-        console.log('URL запроса:', url);
-        
-        const response = await axios.get(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'X-User-Role': userRole,
-            'X-User-ID': getUserId() || '1',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
+        // Используем usersAxios для запроса
+        const response = await usersAxios.get(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+        console.log('URL запроса:', response.config.url);
 
         if (!response.data) {
           console.error('Получен пустой ответ от сервера');

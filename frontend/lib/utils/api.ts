@@ -4,9 +4,21 @@ import { getDefaultApiUrl, getDefaultFrontendUrl } from '../../src/config/defaul
  * Возвращает безопасный URL для API запросов
  */
 export const getSecureApiUrl = () => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+  const defaultUrl = 'https://backend-production-1a78.up.railway.app/api/v1';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || defaultUrl;
+  
   // Убеждаемся, что URL использует HTTPS
-  return apiUrl.replace('http://', 'https://');
+  if (apiUrl.startsWith('http://')) {
+    console.warn('Обнаружен небезопасный URL, преобразуем в HTTPS:', apiUrl);
+    return apiUrl.replace('http://', 'https://');
+  }
+  
+  if (!apiUrl.startsWith('https://')) {
+    console.warn('URL без протокола, добавляем HTTPS:', apiUrl);
+    return `https://${apiUrl}`;
+  }
+  
+  return apiUrl;
 };
 
 /**
