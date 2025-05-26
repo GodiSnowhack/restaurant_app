@@ -25,7 +25,6 @@ const nextConfig = {
   skipMiddlewareUrlNormalize: true,
   images: {
     domains: [
-      'localhost',
       'backend-production-1a78.up.railway.app',
       'res.cloudinary.com',
       'placekitten.com',
@@ -36,11 +35,6 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'backend-production-1a78.up.railway.app',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'localhost',
         pathname: '/**',
       },
       {
@@ -114,9 +108,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production'
-          ? 'https://backend-production-1a78.up.railway.app/api/:path*'
-          : 'https://localhost:8000/api/:path*',
+        destination: 'https://backend-production-1a78.up.railway.app/api/:path*'
       },
     ];
   },

@@ -3,43 +3,30 @@ import { getDefaultApiUrl, getDefaultFrontendUrl } from '../../src/config/defaul
 /**
  * Возвращает безопасный URL для API запросов
  */
-export const getSecureApiUrl = () => {
-  const defaultUrl = 'https://backend-production-1a78.up.railway.app/api/v1';
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || defaultUrl;
-  
-  // Убеждаемся, что URL использует HTTPS
-  if (apiUrl.startsWith('http://')) {
-    console.warn('Обнаружен небезопасный URL, преобразуем в HTTPS:', apiUrl);
-    return apiUrl.replace('http://', 'https://');
-  }
-  
-  if (!apiUrl.startsWith('https://')) {
-    console.warn('URL без протокола, добавляем HTTPS:', apiUrl);
-    return `https://${apiUrl}`;
-  }
-  
-  return apiUrl;
+export const getSecureApiUrl = (): string => {
+  // Принудительно используем HTTPS URL
+  return 'https://backend-production-1a78.up.railway.app/api/v1';
 };
 
 /**
  * Создает базовый URL для API запросов
  */
-export const createApiUrl = (endpoint: string) => {
+export const createApiUrl = (endpoint: string): string => {
   const baseUrl = getSecureApiUrl();
-  return `${baseUrl}${endpoint}`;
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  return url;
 };
 
 /**
  * Проверяет, является ли URL безопасным (HTTPS)
  */
-export const isSecureUrl = (url: string) => {
+export const isSecureUrl = (url: string): boolean => {
   return url.startsWith('https://');
 };
 
 // Получение базового URL для фронтенда
 export const getFrontendUrl = (): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || getDefaultFrontendUrl();
-  return ensureSecureUrl(baseUrl);
+  return 'https://frontend-production-8eb6.up.railway.app';
 };
 
 // Преобразование URL в безопасный (HTTPS)
@@ -54,5 +41,5 @@ export const ensureSecureUrl = (url: string): string => {
 export const getApiUrl = (endpoint: string): string => {
   const baseUrl = getSecureApiUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  return ensureSecureUrl(url);
+  return url;
 }; 

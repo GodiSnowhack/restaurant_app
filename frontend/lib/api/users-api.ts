@@ -26,7 +26,7 @@ export interface UserParams {
 
 // Создаем экземпляр axios с предустановленными параметрами
 const api = axios.create({
-  baseURL: getSecureApiUrl(),
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -36,6 +36,14 @@ const api = axios.create({
 // Добавляем перехватчик для установки заголовков авторизации
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   try {
+    // Проверяем и принудительно устанавливаем HTTPS
+    if (config.baseURL && config.baseURL.startsWith('http://')) {
+      config.baseURL = config.baseURL.replace('http://', 'https://');
+    }
+    if (config.url && config.url.startsWith('http://')) {
+      config.url = config.url.replace('http://', 'https://');
+    }
+
     const headers = await getAuthHeaders();
     Object.entries(headers).forEach(([key, value]) => {
       if (value) {
