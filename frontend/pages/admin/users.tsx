@@ -98,40 +98,12 @@ const AdminUsersPage: NextPage = () => {
           role: showRoleFilter !== 'all' ? showRoleFilter : undefined,
           query: debouncedSearchQuery || undefined
         });
-        
-        // Получаем токен авторизации из localStorage
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Отсутствует токен авторизации');
-        }
-        
-        // Формируем URL для запроса к прямому API
-        let apiUrl = 'https://backend-production-1a78.up.railway.app/api/v1/users/direct';
-        const queryParams = new URLSearchParams();
-        if (showRoleFilter !== 'all') queryParams.append('role', showRoleFilter);
-        if (debouncedSearchQuery) queryParams.append('query', debouncedSearchQuery);
-        
-        if (queryParams.toString()) {
-          apiUrl += `?${queryParams.toString()}`;
-        }
-        
-        // Выполняем запрос к прямому API
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': 'admin',
-            'X-User-ID': '1'
-          }
+
+        // Используем usersApi вместо прямого fetch
+        const data = await usersApi.getUsers({
+          role: showRoleFilter !== 'all' ? showRoleFilter : undefined,
+          query: debouncedSearchQuery || undefined
         });
-        
-        if (!response.ok) {
-          throw new Error(`Ошибка API прокси: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
         
         // Преобразуем полученные данные
         const typedUsers = data.map((user: any) => ({
