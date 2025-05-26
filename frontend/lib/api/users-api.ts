@@ -105,6 +105,25 @@ class UsersAPI {
     }
   }
 
+  async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
+    try {
+      if (!isAdmin()) {
+        throw new Error('Недостаточно прав для изменения статуса пользователя');
+      }
+
+      return await this.request<UserData>(`/users/${id}/toggle-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ is_active: isActive })
+      });
+    } catch (error) {
+      console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
+      throw error;
+    }
+  }
+
   async deleteUser(id: number): Promise<void> {
     try {
       await this.request(`/users/${id}`, {
