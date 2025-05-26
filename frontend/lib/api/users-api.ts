@@ -172,73 +172,85 @@ export const usersApi = {
     try {
       console.log('Запрос пользователей с параметрами:', params);
       
-      // Проверяем, есть ли кэш и не истек ли он
-      const now = Date.now();
-      if (usersCache && (now - lastFetchTime < CACHE_TTL) && !params.role && !params.query) {
-        console.log('Используем кэшированные данные пользователей');
-        return usersCache;
-      }
-      
       // Проверяем наличие токена авторизации
       const token = getAuthTokenFromAllSources();
-      console.log('Токен авторизации:', token ? 'Присутствует' : 'Отсутствует');
+      if (!token) {
+        console.error('Отсутствует токен авторизации');
+        return [];
+      }
       
+      // Получаем роль пользователя
+      const userRole = getUserRole();
+      if (userRole !== 'admin') {
+        console.error('Недостаточно прав для просмотра списка пользователей');
+        return [];
+      }
+
       // Строим параметры запроса
       const queryParams = new URLSearchParams();
-      if (params.skip) queryParams.append('skip', params.skip.toString());
-      if (params.limit) queryParams.append('limit', params.limit.toString());
       if (params.role) queryParams.append('role', params.role);
-      if (params.query) queryParams.append('query', params.query);
-      
-      // Получаем роль и ID пользователя
-      const userRole = getUserRole();
-      const userId = getUserId();
-      
+      if (params.query) queryParams.append('search', params.query);
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+      if (params.skip) queryParams.append('offset', params.skip.toString());
+
+      // В режиме разработки используем моковые данные
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Используем моковые данные в режиме разработки');
+        return this.getMockUsers();
+      }
+
       try {
+        console.log('Отправка запроса на получение пользователей...');
+        
         // Формируем URL с учетом параметров
-        const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        console.log('Отправка запроса на:', url);
+        const url = `/admin/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log('URL запроса:', url);
         
         const response = await usersAxios.get(url, {
           headers: {
-            ...getAuthHeaders(),
-            'X-User-Role': userRole || 'client',
-            'X-User-ID': userId || '1'
+            Authorization: `Bearer ${token}`,
+            'X-User-Role': userRole,
+            'X-User-ID': getUserId() || '1'
           }
         });
-        
-        if (response.data) {
-          // Кэшируем результат только если нет фильтров
-          if (!params.role && !params.query) {
-            usersCache = response.data;
-            lastFetchTime = now;
-          }
-          return response.data;
-        }
-        
-        throw new Error('Пустой ответ от сервера');
-      } catch (error: any) {
-        console.error('Ошибка при получении пользователей:', error);
-        
-        // Если ошибка 404, возвращаем пустой массив
-        if (error.response?.status === 404) {
-          console.log('Пользователи не найдены, возвращаем пустой массив');
+
+        if (!response.data) {
+          console.error('Получен пустой ответ от сервера');
           return [];
         }
+
+        // Преобразуем данные в нужный формат
+        const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+        console.log(`Получено ${users.length} пользователей`);
         
-        // Если ошибка авторизации, пробуем использовать кэш
-        if (error.response?.status === 401 && usersCache) {
-          console.log('Ошибка авторизации, используем кэшированные данные');
-          return usersCache;
+        return users.map((user: any) => ({
+          id: user.id,
+          full_name: user.full_name || user.name || 'Без имени',
+          email: user.email,
+          phone: user.phone || null,
+          role: user.role || 'client',
+          is_active: user.is_active ?? true,
+          created_at: user.created_at || new Date().toISOString(),
+          updated_at: user.updated_at || new Date().toISOString(),
+          birthday: user.birthday || null,
+          age_group: user.age_group || null,
+          orders_count: user.orders_count || 0,
+          reservations_count: user.reservations_count || 0
+        }));
+      } catch (error: any) {
+        console.error('Ошибка при получении списка пользователей:', error);
+        
+        // Если сервер недоступен или другая ошибка - возвращаем моковые данные
+        if (error.response?.status === 404 || error.code === 'ERR_NETWORK') {
+          console.log('Сервер недоступен, используем моковые данные');
+          return this.getMockUsers();
         }
         
-        throw new Error(`Ошибка при получении списка пользователей: ${error.message}`);
+        throw error;
       }
     } catch (error: any) {
       console.error('Критическая ошибка при получении пользователей:', error);
-      
-      // В случае критической ошибки возвращаем пустой массив
-      return [];
+      return this.getMockUsers();
     }
   },
   
@@ -246,8 +258,7 @@ export const usersApi = {
   getMockUsers(): UserData[] {
     console.log('Генерация мок-данных пользователей');
     
-    // Базовые пользователи, которые всегда присутствуют в мок-данных
-    const baseUsers = [
+    return [
       {
         id: 1,
         full_name: 'Администратор Системы',
@@ -258,61 +269,53 @@ export const usersApi = {
         updated_at: new Date().toISOString(),
         is_active: true,
         birthday: null,
-        age_group: null
+        age_group: null,
+        orders_count: 0,
+        reservations_count: 0
       },
       {
         id: 2,
         full_name: 'Иван Петров',
-        email: 'user@example.com',
-        phone: '+7 (999) 765-43-21',
+        email: 'ivan@example.com',
+        phone: '+7 (999) 234-56-78',
         role: 'client',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_active: true,
-        birthday: null,
-        age_group: 'MIDDLE'
+        birthday: '1990-01-01',
+        age_group: 'MIDDLE',
+        orders_count: 5,
+        reservations_count: 3
       },
       {
         id: 3,
-        full_name: 'Официант Сергей',
-        email: 'waiter@example.com',
-        phone: '+7 (999) 111-22-33',
+        full_name: 'Мария Сидорова',
+        email: 'maria@example.com',
+        phone: '+7 (999) 345-67-89',
         role: 'waiter',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_active: true,
-        birthday: null,
-        age_group: 'YOUNG'
+        birthday: '1995-05-15',
+        age_group: 'YOUNG',
+        orders_count: 150,
+        reservations_count: 0
+      },
+      {
+        id: 4,
+        full_name: 'Алексей Николаев',
+        email: 'alex@example.com',
+        phone: '+7 (999) 456-78-90',
+        role: 'client',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_active: false,
+        birthday: '1975-12-31',
+        age_group: 'OLD',
+        orders_count: 2,
+        reservations_count: 1
       }
     ];
-    
-    // Генерируем дополнительных случайных пользователей
-    const roles = ['admin', 'client', 'waiter'];
-    const ageGroups = ['YOUNG', 'MIDDLE', 'OLD', null];
-    const randomUsers = [];
-    
-    // Добавляем от 5 до 10 случайных пользователей
-    const additionalUsersCount = Math.floor(Math.random() * 5) + 5;
-    
-    for (let i = 0; i < additionalUsersCount; i++) {
-      const id = baseUsers.length + i + 1;
-      const role = roles[Math.floor(Math.random() * roles.length)];
-      const isActive = Math.random() > 0.2; // 80% шанс, что пользователь активен
-      const ageGroup = ageGroups[Math.floor(Math.random() * ageGroups.length)];
-      
-      randomUsers.push({
-        id,
-        full_name: `Тестовый ${role === 'admin' ? 'Админ' : role === 'waiter' ? 'Официант' : 'Клиент'} ${id}`,
-        email: `test${id}@example.com`,
-        phone: `+7 (999) 111-22-33`,
-        role: role,
-        is_active: isActive,
-        birthday: null,
-        age_group: ageGroup
-      });
-    }
-    
-    return randomUsers;
   },
 
   // Получение пользователя по ID
