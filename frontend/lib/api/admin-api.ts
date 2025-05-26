@@ -1,5 +1,5 @@
 import { api } from './core';
-import { getSecureApiUrl } from '../utils/api';
+import { getSecureApiUrl, createApiUrl } from '../utils/api';
 import axios from 'axios';
 import { handleApiResponse, getBaseApiOptions, ApiError } from '../api';
 
@@ -67,7 +67,7 @@ const adminApi = {
    */
   async getAdminUsers(): Promise<any[]> {
     try {
-      const url = `${getSecureApiUrl()}/admin/users`;
+      const url = createApiUrl('/admin/users');
       const response = await axios.get(url);
       return response.data;
     } catch (error) {

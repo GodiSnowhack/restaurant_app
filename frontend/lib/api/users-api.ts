@@ -1,5 +1,5 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
-import { getSecureApiUrl } from '../utils/api';
+import { getSecureApiUrl, createApiUrl } from '../utils/api';
 
 export interface UserData {
   id: number;
@@ -31,29 +31,22 @@ class UsersAPI {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const authHeaders = getAuthHeaders();
+    const url = createApiUrl(endpoint);
+    const authHeaders = await getAuthHeaders();
     
-    // Преобразуем объект заголовков в Record<string, string>
-    const headersObject: Record<string, string> = {
-      ...Object.entries(authHeaders).reduce((acc, [key, value]) => ({
-        ...acc,
-        [key]: value || ''
-      }), {}),
-      ...Object.entries(options.headers || {}).reduce((acc, [key, value]) => ({
-        ...acc,
-        [key]: value || ''
-      }), {})
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...authHeaders as Record<string, string>,
+      ...(options.headers as Record<string, string> || {})
     };
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
-      headers: headersObject,
-      credentials: 'include'
+      headers
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Неизвестная ошибка' }));
-      throw new Error(error.message || `HTTP ошибка! Статус: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     return response.json();
@@ -65,7 +58,6 @@ class UsersAPI {
         throw new Error('Недостаточно прав для просмотра списка пользователей');
       }
 
-      // Формируем строку запроса
       const queryParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value) queryParams.append(key, value.toString());
@@ -94,9 +86,6 @@ class UsersAPI {
     try {
       return await this.request<UserData>(`/users/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(data)
       });
     } catch (error) {
@@ -107,15 +96,8 @@ class UsersAPI {
 
   async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
     try {
-      if (!isAdmin()) {
-        throw new Error('Недостаточно прав для изменения статуса пользователя');
-      }
-
       return await this.request<UserData>(`/users/${id}/toggle-status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ is_active: isActive })
       });
     } catch (error) {
@@ -139,9 +121,6 @@ class UsersAPI {
     try {
       return await this.request<UserData>('/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(data)
       });
     } catch (error) {

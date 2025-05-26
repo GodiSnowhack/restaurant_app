@@ -1,5 +1,6 @@
 import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import { getSecureApiUrl, createApiUrl } from '../utils/api';
 
 interface UserParams {
   role?: string;
@@ -32,7 +33,7 @@ const CACHE_TTL = 60000; // 1 минута
 
 // Создаем экземпляр axios для пользовательских запросов
 const usersAxios = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
+  baseURL: getSecureApiUrl(),
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -203,8 +204,7 @@ export const usersApi = {
         console.log('Отправка запроса на получение пользователей...');
         
         // Формируем URL с учетом параметров
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-        const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        const url = createApiUrl(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
         console.log('URL запроса:', url);
         
         const response = await axios.get(url, {
