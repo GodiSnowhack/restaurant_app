@@ -163,8 +163,8 @@ const nextConfig = {
   },
   // Переменные окружения, доступные на клиенте
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-production-1a78.up.railway.app',
+    NEXT_PUBLIC_API_URL: 'https://backend-production-1a78.up.railway.app/api/v1',
+    NEXT_PUBLIC_BACKEND_URL: 'https://backend-production-1a78.up.railway.app',
   },
   // Добавляем поддержку SVG
   webpack(config) {

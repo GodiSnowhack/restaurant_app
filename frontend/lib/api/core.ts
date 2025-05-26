@@ -9,12 +9,15 @@ const getApiBaseUrl = (): string => {
   }
   
   // В development используем локальный сервер
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  return apiUrl.startsWith('http://') && !apiUrl.includes('localhost') 
+    ? apiUrl.replace('http://', 'https://') 
+    : apiUrl;
 };
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: (process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'https://') || 'https://backend-production-1a78.up.railway.app'),
+  baseURL: getApiBaseUrl(),
   timeout: 30000, // Увеличиваем таймаут до 30 секунд
   headers: {
     'Accept': 'application/json',
