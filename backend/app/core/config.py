@@ -1,11 +1,6 @@
-import os
-import secrets
-from typing import Any, Dict, List, Optional, Union
-from pathlib import Path
-
-from pydantic import validator, BaseModel, EmailStr, Field, ConfigDict
-from pydantic_settings import BaseSettings
-
+from typing import List, Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import EmailStr
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Restaurant App"
@@ -19,7 +14,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./restaurant.db"
     
     # Настройки CORS
-    BACKEND_CORS_ORIGINS: list = [
+    BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8000",
         "http://localhost",
@@ -66,11 +61,10 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True
     )
-
 
 settings = Settings() 
