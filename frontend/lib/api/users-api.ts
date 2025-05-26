@@ -196,7 +196,7 @@ export const usersApi = {
       
       try {
         // Формируем URL с учетом параметров
-        const url = `/api/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         console.log('Отправка запроса на:', url);
         
         const response = await usersAxios.get(url, {
@@ -318,7 +318,7 @@ export const usersApi = {
   // Получение пользователя по ID
   async getUserById(userId: number): Promise<UserData> {
     try {
-      const response = await usersAxios.get(`/api/users/${userId}`);
+      const response = await usersAxios.get(`/users/${userId}`);
       return response.data;
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${userId}:`, error);
@@ -330,7 +330,7 @@ export const usersApi = {
   async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
     try {
       console.log(`Обновление пользователя #${userId}:`, userData);
-      const response = await usersAxios.put(`/api/users/${userId}`, userData);
+      const response = await usersAxios.put(`/users/${userId}`, userData);
       
       // Инвалидируем кэш после обновления
       usersCache = null;
@@ -346,7 +346,7 @@ export const usersApi = {
   // Удаление пользователя
   async deleteUser(userId: number): Promise<boolean> {
     try {
-      await usersAxios.delete(`/api/users/${userId}`);
+      await usersAxios.delete(`/users/${userId}`);
       
       // Инвалидируем кэш после удаления
       usersCache = null;
@@ -362,7 +362,7 @@ export const usersApi = {
   // Создание нового пользователя
   async createUser(userData: UserData): Promise<UserData> {
     try {
-      const response = await usersAxios.post('/api/users', userData);
+      const response = await usersAxios.post('/users', userData);
       
       // Инвалидируем кэш после создания
       usersCache = null;
@@ -379,7 +379,7 @@ export const usersApi = {
   async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
     try {
       console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
-      const response = await usersAxios.patch(`/api/users/${userId}/status`, {
+      const response = await usersAxios.patch(`/users/${userId}/status`, {
         is_active: isActive
       });
       
