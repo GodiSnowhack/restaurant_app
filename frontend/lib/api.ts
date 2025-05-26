@@ -31,23 +31,31 @@ export interface User {
 // Функция для определения правильного baseURL для API
 export const getApiBaseUrl = () => {
   const baseUrl = getSecureApiUrl();
-  // Всегда проверяем и обеспечиваем HTTPS
-  return baseUrl.startsWith('https://') ? baseUrl : baseUrl.replace('http://', 'https://');
+  // Проверяем, что URL уже использует HTTPS
+  if (baseUrl.startsWith('https://')) {
+    return baseUrl;
+  }
+  // Если нет, заменяем HTTP на HTTPS
+  return baseUrl.replace('http://', 'https://');
 };
 
 const baseURL = getApiBaseUrl();
 // Используем baseURL как API_URL для унификации
 const API_URL = baseURL;
 
+// Создаем axios инстанс с настройками
 export const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   },
-  withCredentials: true, // Включаем отправку куки для поддержки авторизации
-  timeout: 60000, // Увеличиваем таймаут для мобильных устройств до 60 секунд
-  maxRedirects: 5, // Максимальное количество редиректов
+  withCredentials: true,
+  timeout: 60000,
+  maxRedirects: 2, // Уменьшаем количество редиректов
+  validateStatus: function (status) {
+    return status >= 200 && status < 300; // Принимаем только успешные статусы
+  }
 });
 
 // Добавляем интерфейс для расширенной конфигурации
@@ -125,12 +133,18 @@ const getAuthToken = (): string | null => {
 // Interceptor для добавления токена в заголовки
 api.interceptors.request.use(
   async (config: ExtendedAxiosRequestConfig) => {
-    // Убеждаемся, что все URL используют HTTPS
+    // Проверяем и обеспечиваем HTTPS для URL
     if (config.url) {
-      config.url = config.url.replace('http://', 'https://');
+      config.url = config.url.startsWith('https://') 
+        ? config.url 
+        : config.url.replace('http://', 'https://');
     }
+
+    // Проверяем и обеспечиваем HTTPS для baseURL
     if (config.baseURL) {
-      config.baseURL = config.baseURL.replace('http://', 'https://');
+      config.baseURL = config.baseURL.startsWith('https://')
+        ? config.baseURL
+        : config.baseURL.replace('http://', 'https://');
     }
 
     const token = getAuthToken();
@@ -184,23 +198,29 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
+    // Если ошибка связана с SSL/HTTPS, логируем её
+    if (error.code === 'ECONNABORTED' || error.message?.includes('SSL')) {
+      console.error('[API] Ошибка SSL/HTTPS:', error);
+    }
+
     const config = error.config as ExtendedAxiosRequestConfig;
     
-    // Если это повторный запрос после обновления токена, не пытаемся обновить токен снова
-    if (config._isRetry) {
+    if (error.response?.status === 301 || error.response?.status === 302) {
+      console.log('[API] Получен редирект, пропускаем повторную попытку');
       return Promise.reject(error);
     }
     
-    // Если у нас ошибка авторизации (401) или доступа (403)
+    if (config._isRetry) {
+      return Promise.reject(error);
+    }
+
     if (error.response && (error.response.status === 401 || error.response.status === 403) && config) {
       console.log(`API: Получена ошибка ${error.response.status}`);
       
-      // Очищаем данные авторизации
       localStorage.removeItem('token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user_profile');
       
-      // Перенаправляем на страницу входа
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login';
       }
@@ -208,10 +228,8 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
-    // Добавляем интерцептор для логирования ответов
     console.error(`[API] Ошибка при запросе к ${error.config?.url}:`, error.response?.status);
     
-    // Для всех остальных ошибок просто возвращаем reject
     return Promise.reject(error);
   }
 );

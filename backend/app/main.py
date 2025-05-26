@@ -19,9 +19,26 @@ logger = logging.getLogger(__name__)
 # Middleware для принудительного HTTPS
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if settings.FORCE_HTTPS and request.url.scheme == "http":
-            https_url = str(request.url).replace("http://", "https://", 1)
-            return RedirectResponse(https_url, status_code=301)
+        # Проверяем заголовок X-Forwarded-Proto
+        forwarded_proto = request.headers.get('X-Forwarded-Proto')
+        
+        # Если запрос уже идет через HTTPS или мы на Railway (они автоматически обрабатывают HTTPS)
+        if (forwarded_proto == 'https' or 
+            'railway.app' in request.headers.get('host', '') or
+            not settings.FORCE_HTTPS):
+            return await call_next(request)
+            
+        # Для локальной разработки
+        if request.url.hostname in ['localhost', '127.0.0.1']:
+            return await call_next(request)
+            
+        # Для всех остальных случаев делаем редирект на HTTPS
+        if request.url.scheme == "http":
+            return RedirectResponse(
+                request.url.replace(scheme="https"),
+                status_code=301
+            )
+            
         return await call_next(request)
 
 # Инициализируем базу данных при запуске
@@ -61,7 +78,9 @@ app.add_middleware(
         "Accept",
         "Origin",
         "X-User-ID",
-        "X-User-Role"
+        "X-User-Role",
+        "X-Forwarded-Proto",
+        "X-Forwarded-For"
     ],
     expose_headers=["*"],
     max_age=3600,
@@ -81,6 +100,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Request: {request.method} {request.url}")
     logger.info(f"Client host: {request.client.host}")
     logger.info(f"Headers: {request.headers}")
+    logger.info(f"Forwarded Proto: {request.headers.get('X-Forwarded-Proto')}")
     response = await call_next(request)
     logger.info(f"Response status: {response.status_code}")
     return response
@@ -96,7 +116,5 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         reload=settings.DEBUG,
-        workers=settings.WORKERS_COUNT,
-        ssl_keyfile="key.pem",  # Добавляем SSL
-        ssl_certfile="cert.pem"  # Добавляем SSL
+        workers=settings.WORKERS_COUNT
     ) 
