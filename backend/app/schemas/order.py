@@ -98,8 +98,7 @@ class OrderItemInDB(OrderItemBase):
     name: Optional[str] = None
     price: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserBasic(BaseModel):
@@ -108,8 +107,7 @@ class UserBasic(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Order(OrderBase):
@@ -124,8 +122,7 @@ class Order(OrderBase):
     table_number: Optional[int] = None
     user_id: Optional[int] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Класс для обратной совместимости
@@ -152,8 +149,7 @@ class Feedback(FeedbackBase):
     user_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Alias for backward compatibility
@@ -202,8 +198,7 @@ class OrderItem(OrderItemBase):
     price_formatted: Optional[str] = None
     total_price_formatted: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderResponse(BaseModel):
@@ -228,8 +223,7 @@ class OrderResponse(BaseModel):
     items: List[OrderItem] = []
     user: Optional[UserBasic] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @classmethod
     def from_orm(cls, obj):
@@ -290,8 +284,7 @@ class OrderReadSchema(OrderBase):
     completed_at: Optional[datetime] = None
     items: Optional[List[OrderItemResponse]] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
         
     def to_dict(self):
         """Преобразует модель в словарь для ответа API"""
@@ -333,5 +326,4 @@ class OrderUpdateSchema(BaseModel):
     customer_phone: Optional[str] = None
     items: Optional[List[OrderItemUpdate]] = None
     
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True) 

@@ -1,5 +1,5 @@
 from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, EmailStr, HttpUrl, Field
+from pydantic import BaseModel, EmailStr, HttpUrl, Field, ConfigDict
 
 class WorkingHoursModel(BaseModel):
     open: str
@@ -93,5 +93,4 @@ class SettingsResponse(SettingsBase):
     """Схема для ответа с настройками"""
     id: int
     
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True) 
