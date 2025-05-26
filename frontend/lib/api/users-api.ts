@@ -26,13 +26,13 @@ export interface UserData {
 }
 
 // Кэш пользователей для уменьшения числа запросов
-let usersCache: UserData[] | null = null;
+let usersCache: UserData[] = [];
 let lastFetchTime = 0;
 const CACHE_TTL = 60000; // 1 минута
 
 // Создаем экземпляр axios для пользовательских запросов
 const usersAxios = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -105,7 +105,7 @@ const getUserDataFromToken = (): any => {
 };
 
 // Добавляем перехватчик для авторизации
-usersAxios.interceptors.request.use((config) => {
+usersAxios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // Получаем токен из всех возможных источников
   const token = getAuthTokenFromAllSources();
   
@@ -152,7 +152,7 @@ usersAxios.interceptors.response.use(
         console.warn('Ошибка авторизации! Заголовки запроса:', error.config?.headers);
         
         // Удаляем кэш пользователей при ошибке авторизации
-        usersCache = null;
+        usersCache = [];
         lastFetchTime = 0;
       }
     } else if (error.request) {
@@ -193,10 +193,11 @@ export const usersApi = {
       if (params.limit) queryParams.append('limit', params.limit.toString());
       if (params.skip) queryParams.append('offset', params.skip.toString());
 
-      // В режиме разработки используем моковые данные
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Используем моковые данные в режиме разработки');
-        return this.getMockUsers();
+      // Проверяем кэш
+      const now = Date.now();
+      if (usersCache && (now - lastFetchTime < CACHE_TTL)) {
+        console.log('Возвращаем пользователей из кэша');
+        return usersCache;
       }
 
       try {
@@ -206,13 +207,7 @@ export const usersApi = {
         const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         console.log('URL запроса:', url);
         
-        const response = await usersAxios.get(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'X-User-Role': userRole,
-            'X-User-ID': getUserId() || '1'
-          }
-        });
+        const response = await usersAxios.get(url);
 
         if (!response.data) {
           console.error('Получен пустой ответ от сервера');
@@ -223,7 +218,8 @@ export const usersApi = {
         const users = Array.isArray(response.data) ? response.data : response.data.items || [];
         console.log(`Получено ${users.length} пользователей`);
         
-        return users.map((user: any) => ({
+        // Обновляем кэш
+        usersCache = users.map((user: any) => ({
           id: user.id,
           full_name: user.full_name || user.name || 'Без имени',
           email: user.email,
@@ -237,6 +233,9 @@ export const usersApi = {
           orders_count: user.orders_count || 0,
           reservations_count: user.reservations_count || 0
         }));
+        lastFetchTime = now;
+        
+        return usersCache;
       } catch (error: any) {
         console.error('Ошибка при получении списка пользователей:', error);
         
@@ -336,7 +335,7 @@ export const usersApi = {
       const response = await usersAxios.put(`/users/${userId}`, userData);
       
       // Инвалидируем кэш после обновления
-      usersCache = null;
+      usersCache = [];
       lastFetchTime = 0;
       
       return response.data;
@@ -352,7 +351,7 @@ export const usersApi = {
       await usersAxios.delete(`/users/${userId}`);
       
       // Инвалидируем кэш после удаления
-      usersCache = null;
+      usersCache = [];
       lastFetchTime = 0;
       
       return true;
@@ -368,7 +367,7 @@ export const usersApi = {
       const response = await usersAxios.post('/users', userData);
       
       // Инвалидируем кэш после создания
-      usersCache = null;
+      usersCache = [];
       lastFetchTime = 0;
       
       return response.data;
@@ -387,7 +386,7 @@ export const usersApi = {
       });
       
       // Инвалидируем кэш после обновления
-      usersCache = null;
+      usersCache = [];
       lastFetchTime = 0;
       
       return response.data;
@@ -399,7 +398,7 @@ export const usersApi = {
 
   // Очистка кэша
   clearCache() {
-    usersCache = null;
+    usersCache = [];
     lastFetchTime = 0;
     console.log('Кэш пользователей очищен');
   }
