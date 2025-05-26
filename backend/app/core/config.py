@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: str = "admin1@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "admin123"
 
+    # Настройки безопасности
+    SECURITY_HEADERS = {
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin'
+    }
+
     class Config:
         case_sensitive = True
         env_file = ".env"

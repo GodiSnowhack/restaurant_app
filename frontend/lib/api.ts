@@ -30,7 +30,9 @@ export interface User {
 
 // Функция для определения правильного baseURL для API
 export const getApiBaseUrl = () => {
-  return getSecureApiUrl();
+  const baseUrl = getSecureApiUrl();
+  // Всегда проверяем и обеспечиваем HTTPS
+  return baseUrl.startsWith('https://') ? baseUrl : baseUrl.replace('http://', 'https://');
 };
 
 const baseURL = getApiBaseUrl();
@@ -125,10 +127,10 @@ api.interceptors.request.use(
   async (config: ExtendedAxiosRequestConfig) => {
     // Убеждаемся, что все URL используют HTTPS
     if (config.url) {
-      config.url = ensureSecureUrl(config.url);
+      config.url = config.url.replace('http://', 'https://');
     }
     if (config.baseURL) {
-      config.baseURL = ensureSecureUrl(config.baseURL);
+      config.baseURL = config.baseURL.replace('http://', 'https://');
     }
 
     const token = getAuthToken();
@@ -155,15 +157,15 @@ api.interceptors.request.use(
         console.error('Ошибка при добавлении ID пользователя из токена:', e);
       }
     }
-    
-    if (config.url === '/auth/register' && config.method === 'post') {
-      if (config.data && typeof config.data === 'object') {
-        if (!config.data.role || config.data.role === 'user') {
-          config.data.role = 'guest';
-          console.log('API Interceptor: Установлена роль "guest" для запроса регистрации');
-        }
-      }
+
+    // Добавляем дополнительные заголовки безопасности
+    if (!config.headers) {
+      config.headers = new AxiosHeaders();
     }
+    config.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+    config.headers['X-Content-Type-Options'] = 'nosniff';
+    config.headers['X-Frame-Options'] = 'DENY';
+    config.headers['X-XSS-Protection'] = '1; mode=block';
     
     console.log(`[API] Отправка ${config.method?.toUpperCase()} запроса к ${config.url}`);
     
