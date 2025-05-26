@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getSecureApiUrl } from '../../../lib/utils/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = getSecureApiUrl();
 
 /**
  * API-прокси для работы с конкретным заказом

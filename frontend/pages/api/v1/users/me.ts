@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getSecureApiUrl } from '../../../../lib/utils/api';
 
-const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const backendUrl = getSecureApiUrl();
 
 export default async function handler(
   req: NextApiRequest,

@@ -74,7 +74,8 @@ const nextConfig = {
       '172.16.0.4',
       '172.16.0.5',
       '172.16.0.6',
-      '172.16.0.7'
+      '172.16.0.7',
+      'backend-production-1a78.up.railway.app'
     ],
     remotePatterns: [
       {
@@ -159,11 +160,43 @@ const nextConfig = {
           }
         ],
       },
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
+          }
+        ],
+      },
     ];
   },
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
-    return [];  // Отключаем rewrites, чтобы запросы шли напрямую к бэкенду
+    return [
+      {
+        source: '/api/:path*',
+        destination: process.env.NODE_ENV === 'production'
+          ? 'https://backend-production-1a78.up.railway.app/api/:path*'
+          : 'https://localhost:8000/api/:path*',
+      },
+    ];
   },
   // Переменные окружения, доступные на клиенте
   env: {
