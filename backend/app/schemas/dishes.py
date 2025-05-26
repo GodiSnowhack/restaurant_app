@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class DishBase(BaseModel):
@@ -7,11 +7,12 @@ class DishBase(BaseModel):
     price: float
     category_id: int
 
+    model_config = ConfigDict(from_attributes=True)
+
 class DishCreate(DishBase):
     pass
 
 class DishOut(DishBase):
     id: int
 
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True) 

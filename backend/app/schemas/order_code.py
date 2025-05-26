@@ -1,11 +1,14 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class OrderCodeBase(BaseModel):
     code: str
-    table_number: Optional[int] = None
+    order_id: int
+    expires_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderCodeCreate(OrderCodeBase):
@@ -20,12 +23,9 @@ class OrderCodeUpdate(BaseModel):
 class OrderCodeResponse(OrderCodeBase):
     id: int
     created_at: datetime
-    is_used: bool
-    waiter_id: int
-    order_id: Optional[int] = None
+    updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderCodeVerify(BaseModel):

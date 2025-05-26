@@ -33,5 +33,4 @@ class OrderItem(OrderItemInDB):
     dish_name: str
     dish_image: Optional[str] = None
 
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True) 

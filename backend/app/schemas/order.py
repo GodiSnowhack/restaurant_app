@@ -30,8 +30,7 @@ class OrderItemResponse(OrderItemBase):
     price: float
     dish: DishShortResponse
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Схемы для заказов
