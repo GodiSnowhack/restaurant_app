@@ -1,6 +1,6 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
-import axios, { InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosHeaders, AxiosResponse, AxiosError } from 'axios';
 
 export interface UserData {
   id: number;
@@ -32,7 +32,8 @@ const api = axios.create({
     'Accept': 'application/json'
   },
   withCredentials: true,
-  timeout: 30000
+  timeout: 30000,
+  maxRedirects: 5
 });
 
 // Добавляем перехватчик для установки заголовков авторизации
@@ -75,6 +76,27 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   }
 });
 
+// Добавляем перехватчик для обработки ответов
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    if (error.response?.status === 307) {
+      const newUrl = error.response.headers.location;
+      if (newUrl) {
+        // Убеждаемся, что новый URL использует HTTPS
+        const secureUrl = newUrl.replace('http://', 'https://');
+        // Повторяем запрос с новым URL
+        const config = error.config;
+        if (config) {
+          config.url = secureUrl;
+          return api(config);
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 class UsersAPI {
   // Получение списка пользователей
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
@@ -94,47 +116,66 @@ class UsersAPI {
       const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('Отправка запроса на получение пользователей:', url);
 
-      // Выполняем запрос
-      const response = await api.get(url);
+      // Выполняем запрос с повторными попытками
+      let retries = 3;
+      let lastError;
 
-      // Проверяем ответ
-      if (!response.data) {
-        console.warn('Получен пустой ответ от сервера');
-        return [];
+      while (retries > 0) {
+        try {
+          const response = await api.get(url);
+          
+          // Проверяем ответ
+          if (!response.data) {
+            console.warn('Получен пустой ответ от сервера');
+            return [];
+          }
+
+          // Преобразуем данные
+          const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+          
+          // Маппим данные в нужный формат
+          return users.map((user: any) => ({
+            id: user.id,
+            email: user.email,
+            full_name: user.full_name || user.name || 'Без имени',
+            phone: user.phone || null,
+            role: user.role || 'client',
+            is_active: user.is_active ?? true,
+            created_at: user.created_at || new Date().toISOString(),
+            updated_at: user.updated_at || new Date().toISOString(),
+            birthday: user.birthday || null,
+            age_group: user.age_group || null,
+            orders_count: user.orders_count || 0,
+            reservations_count: user.reservations_count || 0
+          }));
+        } catch (error: any) {
+          lastError = error;
+          if (error.response?.status === 307) {
+            // Для 307 редиректа не уменьшаем количество попыток
+            continue;
+          }
+          retries--;
+          if (retries > 0) {
+            // Ждем перед следующей попыткой
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+        }
       }
 
-      // Преобразуем данные
-      const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+      // Если все попытки исчерпаны, обрабатываем последнюю ошибку
+      console.error('Ошибка при получении списка пользователей:', lastError);
       
-      // Маппим данные в нужный формат
-      return users.map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name || user.name || 'Без имени',
-        phone: user.phone || null,
-        role: user.role || 'client',
-        is_active: user.is_active ?? true,
-        created_at: user.created_at || new Date().toISOString(),
-        updated_at: user.updated_at || new Date().toISOString(),
-        birthday: user.birthday || null,
-        age_group: user.age_group || null,
-        orders_count: user.orders_count || 0,
-        reservations_count: user.reservations_count || 0
-      }));
-    } catch (error: any) {
-      console.error('Ошибка при получении списка пользователей:', error);
-      
-      // Проверяем тип ошибки
-      if (error.response) {
-        // Если получили ответ от сервера с ошибкой
-        throw new Error(`Ошибка сервера: ${error.response.status} - ${error.response.data?.message || error.message}`);
-      } else if (error.request) {
-        // Если не получили ответ
+      if (lastError.response) {
+        throw new Error(`Ошибка сервера: ${lastError.response.status} - ${lastError.response.data?.message || lastError.message}`);
+      } else if (lastError.request) {
         throw new Error('Сервер недоступен. Проверьте подключение к интернету.');
       } else {
-        // Если произошла ошибка при подготовке запроса
-        throw new Error(`Ошибка запроса: ${error.message}`);
+        throw new Error(`Ошибка запроса: ${lastError.message}`);
       }
+    } catch (error: any) {
+      console.error('Ошибка при получении списка пользователей:', error);
+      throw error;
     }
   }
 
