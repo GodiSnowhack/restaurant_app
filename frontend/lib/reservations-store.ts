@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { reservationsApi } from './api/reservations';
+import { reservationsApi } from './api/reservations-api';
 import type { Reservation } from '@/types';
 
 interface ReservationCreateData {

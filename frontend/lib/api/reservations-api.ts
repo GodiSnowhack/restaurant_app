@@ -40,42 +40,19 @@ export const reservationsApi = {
       }
       
       console.log(`[Reservations API] Отправка запроса на /reservations${queryParams}`);
-      console.log('[Reservations API] Базовый URL:', api.defaults.baseURL);
       
-      // Проверяем кэш (используем его, если данные не старше 2 минут)
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTimestamp = localStorage.getItem(cacheTimeKey);
-      
-      if (cachedData && cacheTimestamp && !params) { // Используем кэш только для запроса без фильтров
-        const cacheAge = Date.now() - parseInt(cacheTimestamp);
-        if (cacheAge < 2 * 60 * 1000) { // 2 минуты
-          console.log(`[Reservations API] Используем кэшированные данные (возраст: ${Math.round(cacheAge/1000)}с)`);
-          try {
-            return JSON.parse(cachedData);
-          } catch (e) {
-            console.error('[Reservations API] Ошибка при разборе кэшированных данных');
-          }
-        }
-      }
-      
-      // Подготавливаем URL и заголовки запроса
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
-      };
-      
-      console.log(`[Reservations API] Запрос бронирований${queryParams ? ` с параметрами: ${queryParams}` : ''}`);
-      
-      // Устанавливаем таймаут для запроса
+      // Создаем контроллер для отмены запроса
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
       
       try {
         // Отправляем запрос через API
         const response = await api.get<Reservation[]>(`/reservations${queryParams}`, {
-          headers,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           signal: controller.signal
         });
         
@@ -98,51 +75,9 @@ export const reservationsApi = {
         }
         
         throw new Error('Сервер вернул пустой ответ');
-      } catch (error: any) {
+      } catch (error) {
         clearTimeout(timeoutId);
-        
-        console.error('[Reservations API] Ошибка при запросе бронирований:', {
-          message: error.message,
-          status: error.response?.status,
-          data: error.response?.data
-        });
-        
-        // Если сервер недоступен, пробуем альтернативный URL
-        if (error.response?.status === 404 || error.code === 'ECONNREFUSED') {
-          console.log('[Reservations API] Пробуем альтернативный URL');
-          try {
-            const alternativeUrl = 'https://frontend-production-8eb6.up.railway.app/api/v1';
-            const fallbackResponse = await fetch(`${alternativeUrl}/reservations${queryParams}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (fallbackResponse.ok) {
-              const data = await fallbackResponse.json();
-              console.log('[Reservations API] Получены данные через альтернативный URL');
-              return data;
-            }
-          } catch (fallbackError) {
-            console.error('[Reservations API] Ошибка при использовании альтернативного URL:', fallbackError);
-          }
-        }
-        
-        // Возвращаем кэшированные данные в случае ошибки
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          console.log('[Reservations API] Используем кэшированные данные из-за ошибки');
-          try {
-            return JSON.parse(cachedData);
-          } catch (e) {
-            console.error('[Reservations API] Ошибка при разборе кэшированных данных');
-          }
-        }
-        
-        return [];
+        throw error;
       }
     } catch (error: any) {
       console.error('[Reservations API] Критическая ошибка:', error);
@@ -167,29 +102,8 @@ export const reservationsApi = {
    */
   getReservationById: async (id: number): Promise<Reservation | null> => {
     try {
-      // Получаем токен авторизации
-      const token = await getAuthToken();
-      if (!token) {
-        console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
-        return null;
-      }
-      
-      // Отправляем запрос на получение бронирования
-      const response = await fetch(`/reservations/${id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Ошибка HTTP: ${response.status}`);
-      }
-      
-      return await response.json();
+      const response = await api.get(`/reservations/${id}`);
+      return response.data;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при получении бронирования #${id}:`, error);
       return null;
@@ -201,36 +115,7 @@ export const reservationsApi = {
    */
   updateReservationStatus: async (id: number, status: string): Promise<boolean> => {
     try {
-      // Получаем токен авторизации
-      const token = await getAuthToken();
-      if (!token) {
-        console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
-        return false;
-      }
-      
-      console.log(`[Reservations API] Обновление статуса бронирования #${id} на "${status}"`);
-      
-      // Отправляем запрос на обновление статуса
-      const response = await fetch(`/reservations/${id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ status }),
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Ошибка HTTP: ${response.status} - ${errorText}`);
-      }
-      
-      // Очищаем кэш бронирований при успешном обновлении
-      localStorage.removeItem('reservations_data_cache');
-      console.log(`[Reservations API] Статус бронирования #${id} успешно обновлен на "${status}"`);
-      
+      const response = await api.patch(`/reservations/${id}/status`, { status });
       return true;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при обновлении статуса бронирования #${id}:`, error);
@@ -243,35 +128,7 @@ export const reservationsApi = {
    */
   deleteReservation: async (id: number): Promise<boolean> => {
     try {
-      // Получаем токен авторизации
-      const token = await getAuthToken();
-      if (!token) {
-        console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
-        return false;
-      }
-      
-      console.log(`[Reservations API] Удаление бронирования #${id}`);
-      
-      // Отправляем запрос на удаление бронирования
-      const response = await fetch(`/reservations?id=${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Ошибка HTTP: ${response.status} - ${errorText}`);
-      }
-      
-      // Очищаем кэш бронирований при успешном удалении
-      localStorage.removeItem('reservations_data_cache');
-      console.log(`[Reservations API] Бронирование #${id} успешно удалено`);
-      
+      await api.delete(`/reservations/${id}`);
       return true;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при удалении бронирования #${id}:`, error);
@@ -279,14 +136,53 @@ export const reservationsApi = {
     }
   },
 
-  // Создание нового бронирования
-  createReservation: async (data: any) => {
-    console.log('API: Создание бронирования...');
+  /**
+   * Создание нового бронирования
+   */
+  createReservation: async (data: any): Promise<Reservation> => {
     try {
       const response = await api.post('/reservations', data);
       return response.data;
     } catch (error) {
-      console.error('API: Ошибка при создании бронирования:', error);
+      console.error('[Reservations API] Ошибка при создании бронирования:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Обновление бронирования
+   */
+  updateReservation: async (id: number, data: Partial<Reservation>): Promise<Reservation> => {
+    try {
+      const response = await api.put(`/reservations/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`[Reservations API] Ошибка при обновлении бронирования #${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Отмена бронирования
+   */
+  cancelReservation: async (id: number): Promise<void> => {
+    try {
+      await api.delete(`/reservations/${id}`);
+    } catch (error) {
+      console.error(`[Reservations API] Ошибка при отмене бронирования #${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Проверка кода бронирования
+   */
+  verifyReservationCode: async (code: string): Promise<any> => {
+    try {
+      const response = await api.post('/reservations/verify-code', { code });
+      return response.data;
+    } catch (error) {
+      console.error('[Reservations API] Ошибка при проверке кода бронирования:', error);
       throw error;
     }
   }
