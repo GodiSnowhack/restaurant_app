@@ -3,18 +3,19 @@ API v1 router and endpoints
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import orders, categories, auth, users, reservations, menu, settings, admin
+from app.api.v1 import menu, settings
+from app.api.v1.endpoints import orders, categories, auth, reservations
+from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(menu.router, prefix="/menu", tags=["menu"])
 api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
 api_router.include_router(reservations.router, prefix="/reservations", tags=["reservations"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
-api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 @api_router.get("/health", tags=["system"])
 async def health_check():

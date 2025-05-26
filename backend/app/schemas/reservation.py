@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 from app.models.reservation import ReservationStatus
 
@@ -34,7 +34,8 @@ class ReservationResponse(ReservationBase):
     updated_at: datetime
     reservation_code: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True 
 
 
 # Создаем специальную схему для обхода проблемы валидации
@@ -46,4 +47,5 @@ class ReservationRawResponse(ReservationBase):
     updated_at: datetime
     reservation_code: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True) 
+    class Config:
+        from_attributes = True 

@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, date
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.user import UserRole, AgeGroup
 
@@ -15,12 +15,12 @@ class UserBase(BaseModel):
     birthday: Optional[date] = None
     age_group: Optional[AgeGroup] = None
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 # Схема для создания пользователя
 class UserCreate(UserBase):
+    email: EmailStr
     password: str
+    full_name: str
 
 
 # Схема для обновления пользователя
@@ -29,12 +29,13 @@ class UserUpdate(UserBase):
 
 
 # Схема для ответа пользователю
-class UserInDBBase(UserBase):
+class UserResponse(UserBase):
     id: int
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 # Схема для JWT токена
@@ -63,7 +64,7 @@ class UserLogin(BaseModel):
 
 
 # Класс для ответа с токеном
-class UserResponseWithToken(UserInDBBase):
+class UserResponseWithToken(UserResponse):
     token: Token
 
 
@@ -75,19 +76,4 @@ class UserRoleUpdate(BaseModel):
 # Класс для обновления пароля пользователя
 class UserPasswordUpdate(BaseModel):
     current_password: str
-    new_password: str
-
-
-# Класс для хранения пользователя в базе данных
-class UserInDB(UserInDBBase):
-    hashed_password: str
-
-
-# Класс для пользователя
-class User(UserInDBBase):
-    pass
-
-
-# Схема для ответа пользователю
-class UserResponse(UserInDBBase):
-    pass 
+    new_password: str 

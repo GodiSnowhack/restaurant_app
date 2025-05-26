@@ -1,13 +1,10 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime
+from typing import List, Optional
 
 class OrderBase(BaseModel):
-    user_id: int
-    items: List[dict]
-    total: float
-
-    model_config = ConfigDict(from_attributes=True)
+    table_number: int
+    status: str = "pending"
 
 class OrderCreate(OrderBase):
     dishes: List[int]  # список ID блюд
@@ -15,6 +12,8 @@ class OrderCreate(OrderBase):
 class OrderOut(OrderBase):
     id: int
     created_at: datetime
-    updated_at: datetime
+    total_price: float
+    dishes: List[int]  # список ID блюд
 
-    model_config = ConfigDict(from_attributes=True) 
+    class Config:
+        from_attributes = True 

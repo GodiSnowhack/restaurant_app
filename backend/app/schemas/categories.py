@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from typing import Optional
 
 class CategoryBase(BaseModel):
@@ -11,4 +11,5 @@ class CategoryCreate(CategoryBase):
 class CategoryOut(CategoryBase):
     id: int
 
-    model_config = ConfigDict(from_attributes=True) 
+    class Config:
+        from_attributes = True 
