@@ -19,25 +19,26 @@ class Settings(BaseSettings):
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
         "https://localhost:3000",
-        "http://localhost:8000",
         "https://localhost:8000",
-        "http://frontend:3000",
         "https://frontend:3000",
-        "http://backend:8000",
         "https://backend:8000",
         "https://frontend-production-8eb6.up.railway.app",
         "https://backend-production-1a78.up.railway.app"
     ]
 
+    # Принудительное использование HTTPS
+    FORCE_HTTPS: bool = True
+
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
+            origins = [i.strip() for i in v.split(",")]
+            # Преобразуем все HTTP в HTTPS
+            return [origin.replace("http://", "https://") for origin in origins]
+        elif isinstance(v, list):
+            return [origin.replace("http://", "https://") for origin in v]
+        return v
 
     PROJECT_NAME: str = "Restaurant SPPR"
     

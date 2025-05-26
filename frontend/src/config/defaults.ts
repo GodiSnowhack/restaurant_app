@@ -1,3 +1,5 @@
+import { ensureSecureUrl } from '../../lib/utils/api';
+
 // Базовые URL для разных окружений
 export const DEFAULT_URLS = {
   development: {
@@ -14,12 +16,12 @@ export const DEFAULT_URLS = {
 export const getDefaultApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
   const baseUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
-  return baseUrl.replace('http://', 'https://');
+  return ensureSecureUrl(baseUrl);
 };
 
 // Получение базового URL фронтенда
 export const getDefaultFrontendUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
   const baseUrl = isProduction ? DEFAULT_URLS.production.frontend : DEFAULT_URLS.development.frontend;
-  return baseUrl.replace('http://', 'https://');
+  return ensureSecureUrl(baseUrl);
 }; 

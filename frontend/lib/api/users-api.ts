@@ -1,4 +1,5 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
+import { getSecureApiUrl, createApiUrl } from '../utils/api';
 
 const BASE_URL = 'https://backend-production-1a78.up.railway.app/api/v1';
 
@@ -61,7 +62,11 @@ class UsersAPI {
     for (let attempt = 0; attempt < this.retryCount; attempt++) {
       try {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${BASE_URL}${endpoint}`, {
+        const url = createApiUrl(endpoint);
+        
+        console.log('Отправка запроса на URL:', url);
+        
+        const response = await fetch(url, {
           ...options,
           headers: {
             ...headers,
@@ -80,7 +85,6 @@ class UsersAPI {
         console.warn(`Попытка ${attempt + 1}/${this.retryCount} не удалась:`, error);
         lastError = error;
         
-        // Если это последняя попытка, возвращаем демо-данные в режиме разработки
         if (attempt === this.retryCount - 1) {
           if (this.isDevMode) {
             console.warn('Возвращаем демо-данные из-за ошибки API');
@@ -89,7 +93,6 @@ class UsersAPI {
           throw error;
         }
         
-        // Ждем перед следующей попыткой
         await new Promise(resolve => setTimeout(resolve, this.retryDelay));
       }
     }
@@ -116,10 +119,10 @@ class UsersAPI {
         if (value) queryParams.append(key, value.toString());
       });
 
-      const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log('Отправка запроса на получение пользователей:', url);
+      const endpoint = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      console.log('Отправка запроса на получение пользователей:', endpoint);
 
-      const data = await this.request<UserData[]>(url);
+      const data = await this.request<UserData[]>(endpoint);
       
       if (!Array.isArray(data)) {
         console.warn('Получен неверный формат данных от сервера');

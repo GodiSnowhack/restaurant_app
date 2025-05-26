@@ -11,6 +11,7 @@ import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
 import { settingsApi } from '@/lib/api/settings-api';
 // Импортируем menuApi из правильного файла
 import { menuApi } from './api/menu';
+import { getSecureApiUrl, ensureSecureUrl } from './utils/api';
 
 // Интерфейс для типа пользователя
 export interface User {
@@ -29,15 +30,7 @@ export interface User {
 
 // Функция для определения правильного baseURL для API
 export const getApiBaseUrl = () => {
-  // Используем URL из переменной окружения, если он задан
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    const url = process.env.NEXT_PUBLIC_API_URL;
-    // Убеждаемся, что URL заканчивается на /api/v1
-    return url.endsWith('/api/v1') ? url : `${url}/api/v1`;
-  }
-  
-  // Для production всегда используем основной URL
-  return 'https://backend-production-1a78.up.railway.app/api/v1';
+  return getSecureApiUrl();
 };
 
 const baseURL = getApiBaseUrl();
@@ -45,7 +38,7 @@ const baseURL = getApiBaseUrl();
 const API_URL = baseURL;
 
 export const api = axios.create({
-  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -130,19 +123,23 @@ const getAuthToken = (): string | null => {
 // Interceptor для добавления токена в заголовки
 api.interceptors.request.use(
   async (config: ExtendedAxiosRequestConfig) => {
+    // Убеждаемся, что все URL используют HTTPS
+    if (config.url) {
+      config.url = ensureSecureUrl(config.url);
+    }
+    if (config.baseURL) {
+      config.baseURL = ensureSecureUrl(config.baseURL);
+    }
+
     const token = getAuthToken();
     
-    // Проверяем, есть ли токен
     if (token) {
-      // Инициализируем заголовки, если их нет
       if (!config.headers) {
         config.headers = new AxiosHeaders();
       }
       
-      // Добавляем токен в заголовок авторизации без проверки истечения срока
       config.headers.Authorization = `Bearer ${token}`;
       
-      // Также пробуем добавить ID пользователя из токена
       try {
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -159,11 +156,8 @@ api.interceptors.request.use(
       }
     }
     
-    // Проверяем, является ли запрос регистрацией
     if (config.url === '/auth/register' && config.method === 'post') {
-      // Если это запрос на регистрацию, проверяем, что роль установлена как 'guest'
       if (config.data && typeof config.data === 'object') {
-        // Если роль не указана или указана как 'user', устанавливаем её как 'guest'
         if (!config.data.role || config.data.role === 'user') {
           config.data.role = 'guest';
           console.log('API Interceptor: Установлена роль "guest" для запроса регистрации');
@@ -171,7 +165,6 @@ api.interceptors.request.use(
       }
     }
     
-    // Добавляем интерцептор для логирования запросов
     console.log(`[API] Отправка ${config.method?.toUpperCase()} запроса к ${config.url}`);
     
     return config;
