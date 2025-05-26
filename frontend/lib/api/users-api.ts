@@ -182,53 +182,39 @@ export const usersApi = {
       
       // Получаем роль пользователя
       const userRole = getUserRole();
+      const userId = getUserId();
+      
+      if (!userRole || !userId) {
+        console.error('Отсутствуют данные пользователя');
+        return [];
+      }
+
       if (userRole !== 'admin') {
         console.error('Недостаточно прав для просмотра списка пользователей');
         return [];
       }
 
-      // Строим параметры запроса
-      const queryParams = new URLSearchParams();
-      if (params.role) queryParams.append('role', params.role);
-      if (params.query) queryParams.append('search', params.query);
-      if (params.limit) queryParams.append('limit', params.limit.toString());
-      if (params.skip) queryParams.append('offset', params.skip.toString());
-
-      // Проверяем кэш
-      const now = Date.now();
-      if (usersCache && (now - lastFetchTime < CACHE_TTL)) {
-        console.log('Возвращаем пользователей из кэша');
-        return usersCache;
-      }
-
+      // Сначала пробуем через прокси
       try {
-        console.log('Отправка запроса на получение пользователей...');
-        
-        // Формируем URL с учетом параметров
-        const url = `${getSecureApiUrl()}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        console.log('URL запроса:', url);
-        
-        const response = await axios.get(url, {
+        console.log('Получение пользователей через прокси...');
+        const proxyResponse = await fetch('/api/v1/users', {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
             'X-User-Role': userRole,
-            'X-User-ID': getUserId() || '1',
+            'X-User-ID': userId,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           }
         });
 
-        if (!response.data) {
-          console.error('Получен пустой ответ от сервера');
-          return [];
+        if (!proxyResponse.ok) {
+          throw new Error(`HTTP ошибка! Статус: ${proxyResponse.status}`);
         }
 
-        // Преобразуем данные в нужный формат
-        const users = Array.isArray(response.data) ? response.data : response.data.items || [];
-        console.log(`Получено ${users.length} пользователей`);
+        const proxyData = await proxyResponse.json();
+        const proxyUsers = Array.isArray(proxyData) ? proxyData : proxyData.items || [];
         
-        // Обновляем кэш
-        usersCache = users.map((user: any) => ({
+        return proxyUsers.map((user: any) => ({
           id: user.id,
           full_name: user.full_name || user.name || 'Без имени',
           email: user.email,
@@ -242,53 +228,41 @@ export const usersApi = {
           orders_count: user.orders_count || 0,
           reservations_count: user.reservations_count || 0
         }));
-        lastFetchTime = now;
+      } catch (proxyError) {
+        console.error('Ошибка при получении пользователей через прокси:', proxyError);
         
-        return usersCache;
-      } catch (error: any) {
-        console.error('Ошибка при получении списка пользователей:', error);
+        // Если прокси не сработал, пробуем прямой запрос
+        console.log('Пробуем прямой запрос к API...');
         
-        // Пробуем через прокси если прямой запрос не удался
-        try {
-          console.log('Пробуем получить пользователей через прокси...');
-          const proxyResponse = await fetch('/api/v1/users', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'X-User-Role': userRole,
-              'X-User-ID': getUserId() || '1',
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          });
-
-          if (!proxyResponse.ok) {
-            throw new Error(`HTTP ошибка! Статус: ${proxyResponse.status}`);
+        const url = `${getSecureApiUrl()}/users`;
+        const response = await axios.get(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': userRole,
+            'X-User-ID': userId,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
+        });
 
-          const proxyData = await proxyResponse.json();
-          const proxyUsers = Array.isArray(proxyData) ? proxyData : proxyData.items || [];
-          
-          return proxyUsers.map((user: any) => ({
-            id: user.id,
-            full_name: user.full_name || user.name || 'Без имени',
-            email: user.email,
-            phone: user.phone || null,
-            role: user.role || 'client',
-            is_active: user.is_active ?? true,
-            created_at: user.created_at || new Date().toISOString(),
-            updated_at: user.updated_at || new Date().toISOString(),
-            birthday: user.birthday || null,
-            age_group: user.age_group || null,
-            orders_count: user.orders_count || 0,
-            reservations_count: user.reservations_count || 0
-          }));
-        } catch (proxyError) {
-          console.error('Ошибка при получении пользователей через прокси:', proxyError);
-          return [];
-        }
+        const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+        return users.map((user: any) => ({
+          id: user.id,
+          full_name: user.full_name || user.name || 'Без имени',
+          email: user.email,
+          phone: user.phone || null,
+          role: user.role || 'client',
+          is_active: user.is_active ?? true,
+          created_at: user.created_at || new Date().toISOString(),
+          updated_at: user.updated_at || new Date().toISOString(),
+          birthday: user.birthday || null,
+          age_group: user.age_group || null,
+          orders_count: user.orders_count || 0,
+          reservations_count: user.reservations_count || 0
+        }));
       }
     } catch (error: any) {
-      console.error('Ошибка при обработке запроса пользователей:', error);
+      console.error('Ошибка при получении списка пользователей:', error);
       return [];
     }
   },

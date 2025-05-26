@@ -6,7 +6,7 @@ import { getSecureApiUrl } from '../../../../lib/utils/api';
  * API-прокси для управления пользователями
  * Перенаправляет запросы с фронтенда на бэкенд с авторизацией
  */
-export default async function usersHandler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,7 +22,7 @@ export default async function usersHandler(req: NextApiRequest, res: NextApiResp
   }
 
   // Получаем токен авторизации
-  const token = req.headers.authorization;
+  const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
     return res.status(401).json({
       success: false,
@@ -55,26 +55,77 @@ export default async function usersHandler(req: NextApiRequest, res: NextApiResp
     
     const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    console.log('Отправка запроса к:', url);
+    console.log('Прокси: отправка запроса к:', url);
+    console.log('Прокси: заголовки:', {
+      userId,
+      userRole,
+      hasToken: !!token
+    });
     
     const response = await axios.get(url, {
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'X-User-ID': userId as string,
         'X-User-Role': userRole as string
+      },
+      validateStatus: function (status) {
+        return status < 500; // Разрешаем все статусы < 500
       }
     });
 
+    // Проверяем статус ответа
+    if (response.status === 401) {
+      console.log('Прокси: ошибка авторизации');
+      return res.status(401).json({
+        success: false,
+        message: 'Ошибка авторизации'
+      });
+    }
+
+    if (response.status === 403) {
+      console.log('Прокси: недостаточно прав');
+      return res.status(403).json({
+        success: false,
+        message: 'Недостаточно прав для выполнения операции'
+      });
+    }
+
+    if (response.status !== 200) {
+      console.log('Прокси: неожиданный статус ответа:', response.status);
+      return res.status(response.status).json({
+        success: false,
+        message: 'Ошибка при получении данных'
+      });
+    }
+
     return res.status(200).json(response.data);
   } catch (error: any) {
-    console.error('Ошибка при получении пользователей:', error);
+    console.error('Прокси: ошибка при получении пользователей:', error);
     
-    return res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || 'Внутренняя ошибка сервера',
-      error: error.message
-    });
+    // Проверяем тип ошибки
+    if (error.response) {
+      // Ответ получен, но статус не 2xx
+      return res.status(error.response.status).json({
+        success: false,
+        message: error.response.data?.message || 'Ошибка при получении данных',
+        error: error.message
+      });
+    } else if (error.request) {
+      // Запрос отправлен, но ответ не получен
+      return res.status(503).json({
+        success: false,
+        message: 'Сервер недоступен',
+        error: error.message
+      });
+    } else {
+      // Ошибка при настройке запроса
+      return res.status(500).json({
+        success: false,
+        message: 'Внутренняя ошибка сервера',
+        error: error.message
+      });
+    }
   }
 } 
