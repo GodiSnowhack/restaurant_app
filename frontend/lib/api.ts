@@ -6,6 +6,7 @@ import { ordersApi } from './api/orders';
 import adminApi from './api/admin-api';
 // Импортируем список публичных маршрутов
 import { PUBLIC_ROUTES } from '../pages/_app';
+import { usersApi } from './api/users-api';
 import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
 import { settingsApi } from '@/lib/api/settings-api';
 // Импортируем menuApi из правильного файла
@@ -38,15 +39,18 @@ const API_URL = baseURL;
 
 // Создаем axios инстанс с настройками
 export const api = axios.create({
-  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'X-Forwarded-Proto': 'https'
+    'Accept': 'application/json'
   },
   withCredentials: true,
   timeout: 30000,
-  maxRedirects: 0
+  maxRedirects: 5, // Разрешаем до 5 редиректов
+  validateStatus: function (status) {
+    // Принимаем все успешные статусы и редиректы
+    return (status >= 200 && status < 300) || (status >= 300 && status < 400);
+  }
 });
 
 // Добавляем интерфейс для расширенной конфигурации
@@ -110,6 +114,18 @@ api.interceptors.request.use(
       }
       config.headers.set('Authorization', `Bearer ${token}`);
     }
+
+    // Добавляем заголовки безопасности
+    if (!config.headers) {
+      config.headers = new AxiosHeaders();
+    }
+    
+    // Добавляем дополнительные заголовки для Railway
+    const isRailway = typeof window !== 'undefined' && window.location.hostname.includes('railway.app');
+    if (isRailway) {
+      config.headers.set('X-Forwarded-Proto', 'https');
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -145,7 +161,7 @@ export const authApi = {
       throw error;
     }
   },
-
+  
   register: async (data: any) => {
     try {
       const response = await api.post('/auth/register', data);
@@ -155,29 +171,30 @@ export const authApi = {
       throw error;
     }
   },
-
+  
   logout: () => {
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
     localStorage.removeItem('user_profile');
   },
-
+  
   getProfile: async () => {
     try {
       // Проверяем наличие кэшированного профиля
       const cachedProfile = localStorage.getItem('user_profile');
       if (cachedProfile) {
+        console.log('Используем кэшированный профиль');
         return JSON.parse(cachedProfile);
       }
 
       const response = await api.get('/users/me');
       const profile = response.data;
-
+      
       // Кэшируем профиль
       if (profile) {
-        localStorage.setItem('user_profile', JSON.stringify(profile));
+          localStorage.setItem('user_profile', JSON.stringify(profile));
       }
-
+      
       return profile;
     } catch (error) {
       console.error('Ошибка при получении профиля:', error);
@@ -185,6 +202,7 @@ export const authApi = {
       // В случае ошибки пробуем использовать кэшированный профиль
       const cachedProfile = localStorage.getItem('user_profile');
       if (cachedProfile) {
+        console.log('Используем кэшированный профиль после ошибки');
         return JSON.parse(cachedProfile);
       }
       
@@ -312,7 +330,7 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   return options;
 };
 
-export {  settingsApi};
+export {  usersApi,  settingsApi};
 
 export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
   try {
@@ -351,48 +369,5 @@ export const createCombinedReview = async (data: any): Promise<any> => {
   } catch (error: any) {
     console.error('Error creating combined review:', error);
     throw error;
-  }
-};
-
-// API для работы с пользователями
-export const usersApi = {
-  getUsers: async () => {
-    try {
-      const response = await api.get('/users');
-      return response.data;
-    } catch (error) {
-      console.error('Ошибка при получении списка пользователей:', error);
-      throw error;
-    }
-  },
-
-  getUser: async (id: number) => {
-    try {
-      const response = await api.get(`/users/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при получении пользователя ${id}:`, error);
-      throw error;
-    }
-  },
-
-  updateUser: async (id: number, data: any) => {
-    try {
-      const response = await api.put(`/users/${id}`, data);
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при обновлении пользователя ${id}:`, error);
-      throw error;
-    }
-  },
-
-  deleteUser: async (id: number) => {
-    try {
-      const response = await api.delete(`/users/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Ошибка при удалении пользователя ${id}:`, error);
-      throw error;
-    }
   }
 };
