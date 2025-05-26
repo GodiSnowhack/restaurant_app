@@ -39,7 +39,7 @@ export const reservationsApi = {
         }
       }
       
-      console.log(`[Reservations API] Отправка запроса на /reservations${queryParams}`);
+      console.log(`[Reservations API] Отправка запроса на /api/reservations${queryParams}`);
       
       // Создаем контроллер для отмены запроса
       const controller = new AbortController();
@@ -47,7 +47,7 @@ export const reservationsApi = {
       
       try {
         // Отправляем запрос через API
-        const response = await api.get<Reservation[]>(`/reservations${queryParams}`, {
+        const response = await api.get<Reservation[]>(`/api/reservations${queryParams}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ export const reservationsApi = {
    */
   getReservationById: async (id: number): Promise<Reservation | null> => {
     try {
-      const response = await api.get(`/reservations/${id}`);
+      const response = await api.get(`/api/reservations/${id}`);
       return response.data;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при получении бронирования #${id}:`, error);
@@ -115,7 +115,7 @@ export const reservationsApi = {
    */
   updateReservationStatus: async (id: number, status: string): Promise<boolean> => {
     try {
-      const response = await api.patch(`/reservations/${id}/status`, { status });
+      const response = await api.patch(`/api/reservations/${id}/status`, { status });
       return true;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при обновлении статуса бронирования #${id}:`, error);
@@ -128,7 +128,7 @@ export const reservationsApi = {
    */
   deleteReservation: async (id: number): Promise<boolean> => {
     try {
-      await api.delete(`/reservations/${id}`);
+      await api.delete(`/api/reservations/${id}`);
       return true;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при удалении бронирования #${id}:`, error);
@@ -141,7 +141,7 @@ export const reservationsApi = {
    */
   createReservation: async (data: any): Promise<Reservation> => {
     try {
-      const response = await api.post('/reservations', data);
+      const response = await api.post('/api/reservations', data);
       return response.data;
     } catch (error) {
       console.error('[Reservations API] Ошибка при создании бронирования:', error);
@@ -154,7 +154,7 @@ export const reservationsApi = {
    */
   updateReservation: async (id: number, data: Partial<Reservation>): Promise<Reservation> => {
     try {
-      const response = await api.put(`/reservations/${id}`, data);
+      const response = await api.put(`/api/reservations/${id}`, data);
       return response.data;
     } catch (error) {
       console.error(`[Reservations API] Ошибка при обновлении бронирования #${id}:`, error);
@@ -167,7 +167,7 @@ export const reservationsApi = {
    */
   cancelReservation: async (id: number): Promise<void> => {
     try {
-      await api.delete(`/reservations/${id}`);
+      await api.delete(`/api/reservations/${id}`);
     } catch (error) {
       console.error(`[Reservations API] Ошибка при отмене бронирования #${id}:`, error);
       throw error;
@@ -179,7 +179,7 @@ export const reservationsApi = {
    */
   verifyReservationCode: async (code: string): Promise<any> => {
     try {
-      const response = await api.post('/reservations/verify-code', { code });
+      const response = await api.post('/api/reservations/verify-code', { code });
       return response.data;
     } catch (error) {
       console.error('[Reservations API] Ошибка при проверке кода бронирования:', error);
