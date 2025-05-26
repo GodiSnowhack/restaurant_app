@@ -32,7 +32,7 @@ const CACHE_TTL = 60000; // 1 минута
 
 // Создаем экземпляр axios для пользовательских запросов
 const usersAxios = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'https://') || 'https://backend-production-1a78.up.railway.app',
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -304,8 +304,8 @@ export const usersApi = {
         id,
         full_name: `Тестовый ${role === 'admin' ? 'Админ' : role === 'waiter' ? 'Официант' : 'Клиент'} ${id}`,
         email: `test${id}@example.com`,
-        phone: `+7 (999) ${Math.floor(Math.random() * 1000) + 100}-${Math.floor(Math.random() * 100) + 10}-${Math.floor(Math.random() * 100) + 10}`,
-        role,
+        phone: `+7 (999) 111-22-33`,
+        role: role,
         is_active: isActive,
         birthday: null,
         age_group: ageGroup
