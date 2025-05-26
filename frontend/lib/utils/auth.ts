@@ -222,13 +222,19 @@ export const getAuthHeaders = () => {
   const token = getAuthToken();
   const user = getUserFromToken();
   
-  if (!token || !user) return {};
-  
-  return {
-    'Authorization': `Bearer ${token}`,
-    'X-User-ID': user.id,
-    'X-User-Role': user.role,
+  const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
+  
+  if (token && user) {
+    return {
+      ...headers,
+      'Authorization': `Bearer ${token}`,
+      'X-User-ID': user.id,
+      'X-User-Role': user.role
+    };
+  }
+  
+  return headers;
 }; 

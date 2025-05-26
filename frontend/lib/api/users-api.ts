@@ -1,6 +1,6 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
 
 export interface UserData {
   id: number;
@@ -31,7 +31,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   },
-  withCredentials: true
+  withCredentials: true,
+  timeout: 30000
 });
 
 // Добавляем перехватчик для установки заголовков авторизации
@@ -40,17 +41,33 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     // Принудительно устанавливаем HTTPS
     config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
     
+    // Получаем заголовки авторизации
+    const headers = await getAuthHeaders();
+    
+    // Создаем новый объект AxiosHeaders
+    const axiosHeaders = new AxiosHeaders();
+    
+    // Добавляем все заголовки
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value) {
+        axiosHeaders.set(key, value);
+      }
+    });
+    
+    // Устанавливаем заголовки
+    config.headers = axiosHeaders;
+
     // Проверяем и принудительно устанавливаем HTTPS для всех URL
     if (config.url && config.url.startsWith('http://')) {
       config.url = config.url.replace('http://', 'https://');
     }
 
-    const headers = await getAuthHeaders();
-    Object.entries(headers).forEach(([key, value]) => {
-      if (value) {
-        config.headers.set(key, value);
-      }
-    });
+    // Проверяем полный URL запроса
+    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
+    if (fullUrl && fullUrl.startsWith('http://')) {
+      throw new Error('Небезопасный HTTP запрос не разрешен');
+    }
+
     return config;
   } catch (error) {
     console.error('Ошибка при установке заголовков:', error);
