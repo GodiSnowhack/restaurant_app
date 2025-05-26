@@ -1,7 +1,32 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
-import axios from 'axios';
 
 const BASE_URL = 'https://backend-production-1a78.up.railway.app/api/v1';
+
+// Демо-данные для тестирования
+const DEMO_USERS: UserData[] = [
+  {
+    id: 1,
+    email: 'admin@example.com',
+    full_name: 'Администратор',
+    role: 'admin',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    orders_count: 0,
+    reservations_count: 0
+  },
+  {
+    id: 2,
+    email: 'user@example.com',
+    full_name: 'Тестовый Пользователь',
+    role: 'client',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    orders_count: 5,
+    reservations_count: 2
+  }
+];
 
 export interface UserData {
   id: number;
@@ -26,24 +51,58 @@ export interface UserParams {
 }
 
 class UsersAPI {
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      credentials: 'include'
-    });
+  private isDevMode = process.env.NODE_ENV === 'development';
+  private retryCount = 3;
+  private retryDelay = 1000;
 
-    if (!response.ok) {
-      throw new Error(`Ошибка HTTP: ${response.status}`);
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < this.retryCount; attempt++) {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${BASE_URL}${endpoint}`, {
+          ...options,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ошибка: ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error: any) {
+        console.warn(`Попытка ${attempt + 1}/${this.retryCount} не удалась:`, error);
+        lastError = error;
+        
+        // Если это последняя попытка, возвращаем демо-данные в режиме разработки
+        if (attempt === this.retryCount - 1) {
+          if (this.isDevMode) {
+            console.warn('Возвращаем демо-данные из-за ошибки API');
+            return this.getDemoData(endpoint) as T;
+          }
+          throw error;
+        }
+        
+        // Ждем перед следующей попыткой
+        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+      }
     }
 
-    return response.json();
+    throw lastError;
+  }
+
+  private getDemoData(endpoint: string): UserData | UserData[] {
+    if (endpoint.includes('/users/')) {
+      const id = parseInt(endpoint.split('/').pop() || '1');
+      return DEMO_USERS.find(u => u.id === id) || DEMO_USERS[0];
+    }
+    return DEMO_USERS;
   }
 
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
@@ -64,7 +123,7 @@ class UsersAPI {
       
       if (!Array.isArray(data)) {
         console.warn('Получен неверный формат данных от сервера');
-        return [];
+        return this.isDevMode ? DEMO_USERS : [];
       }
 
       return data.map(user => ({
@@ -83,6 +142,10 @@ class UsersAPI {
       }));
     } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
+      if (this.isDevMode) {
+        console.warn('Возвращаем демо-данные из-за ошибки');
+        return DEMO_USERS;
+      }
       throw new Error(error.message || 'Не удалось загрузить список пользователей');
     }
   }
