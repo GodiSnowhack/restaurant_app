@@ -4,7 +4,7 @@ import { getSecureApiUrl } from '../utils/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: getSecureApiUrl(),
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
@@ -120,10 +120,10 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Принудительно используем HTTPS для всех запросов
-    if (config.baseURL && config.baseURL.startsWith('http://')) {
-      config.baseURL = config.baseURL.replace('http://', 'https://');
-    }
+    // Принудительно используем HTTPS
+    config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
+    
+    // Проверяем и принудительно устанавливаем HTTPS для всех URL
     if (config.url && config.url.startsWith('http://')) {
       config.url = config.url.replace('http://', 'https://');
     }
