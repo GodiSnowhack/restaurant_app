@@ -1,9 +1,17 @@
 import { User } from '../types/auth';
+import { jwtDecode } from 'jwt-decode';
 
 // Ключи для хранения данных
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user_profile';
 const AUTH_TIMESTAMP_KEY = 'auth_timestamp';
+
+interface JWTPayload {
+  sub: string;
+  email: string;
+  role: string;
+  exp: number;
+}
 
 // Функция для сохранения токена
 export const saveToken = (token: string): void => {
@@ -85,10 +93,23 @@ export const getUser = (): User | null => {
 
 // Функция для очистки данных авторизации
 export const clearAuth = (): void => {
+  if (typeof window === 'undefined') return;
+
   try {
+    // Очищаем основные данные авторизации
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(AUTH_TIMESTAMP_KEY);
+
+    // Очищаем дополнительные данные
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+
     console.log('Auth Utils: Данные авторизации успешно очищены');
   } catch (error) {
     console.error('Auth Utils: Ошибка при очистке данных авторизации:', error);
@@ -98,15 +119,10 @@ export const clearAuth = (): void => {
 // Функция для проверки срока действия токена
 export const isTokenExpired = (token: string): boolean => {
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    const { exp } = JSON.parse(jsonPayload);
-    const expired = Date.now() >= exp * 1000;
+    const decoded = jwtDecode<JWTPayload>(token);
+    const currentTime = Date.now() / 1000;
     
+    const expired = decoded.exp < currentTime;
     if (expired) {
       console.log('Auth Utils: Токен истек');
     }
@@ -149,4 +165,70 @@ export const validateAuthData = (): boolean => {
     console.error('Auth Utils: Ошибка при валидации данных авторизации:', error);
     return false;
   }
+};
+
+export const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) return null;
+
+    // Проверяем валидность токена
+    const decoded = jwtDecode<JWTPayload>(token);
+    const currentTime = Date.now() / 1000;
+    
+    if (decoded.exp < currentTime) {
+      // Токен истек, удаляем его
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      return null;
+    }
+
+    return token;
+  } catch (e) {
+    console.error('Ошибка при получении токена:', e);
+    return null;
+  }
+};
+
+export const getUserFromToken = (): { id: string; email: string; role: string } | null => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const decoded = jwtDecode<JWTPayload>(token);
+    return {
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.role
+    };
+  } catch (e) {
+    console.error('Ошибка при декодировании токена:', e);
+    return null;
+  }
+};
+
+export const isAuthenticated = (): boolean => {
+  return !!getAuthToken();
+};
+
+export const isAdmin = (): boolean => {
+  const user = getUserFromToken();
+  return user?.role === 'admin';
+};
+
+export const getAuthHeaders = () => {
+  const token = getAuthToken();
+  const user = getUserFromToken();
+  
+  if (!token || !user) return {};
+  
+  return {
+    'Authorization': `Bearer ${token}`,
+    'X-User-ID': user.id,
+    'X-User-Role': user.role,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
 }; 

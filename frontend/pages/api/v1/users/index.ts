@@ -41,6 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
+  // Проверяем права доступа
+  if (userRole !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Недостаточно прав для доступа к API пользователей'
+    });
+  }
+
   try {
     // Используем безопасный URL для API
     const baseUrl = getSecureApiUrl();

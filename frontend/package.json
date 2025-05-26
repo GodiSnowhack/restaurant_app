@@ -41,6 +41,7 @@
     "formidable": "^3.5.2",
     "i18next": "^23.5.0",
     "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.292.0",
     "mysql2": "^3.14.1",
     "next": "^14.1.0",

@@ -1,405 +1,135 @@
-import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import { getAuthHeaders, isAdmin } from '../utils/auth';
 import { getSecureApiUrl } from '../utils/api';
 
-interface UserParams {
-  role?: string;
-  query?: string;
-  page?: number;
-  limit?: number;
-  skip?: number;
-}
-
 export interface UserData {
-  id?: number;
+  id: number;
+  email: string;
   full_name?: string;
-  email?: string;
   phone?: string;
-  role?: string;
-  is_active?: boolean;
-  birthday?: string | null;
-  age_group?: string | null;
-  password?: string;
-  created_at?: string;
-  updated_at?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  birthday?: string;
+  age_group?: string;
   orders_count?: number;
   reservations_count?: number;
 }
 
-// Кэш пользователей для уменьшения числа запросов
-let usersCache: UserData[] = [];
-let lastFetchTime = 0;
-const CACHE_TTL = 60000; // 1 минута
+export interface UserParams {
+  role?: string;
+  query?: string;
+  page?: number;
+  limit?: number;
+}
 
-// Создаем экземпляр axios для пользовательских запросов
-const usersAxios = axios.create({
-  baseURL: getSecureApiUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
+class UsersAPI {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = getSecureApiUrl();
   }
-});
 
-// Получение информации о пользователе из локального хранилища
-const getUserRole = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    // Сначала пробуем получить из localStorage/sessionStorage
-    const roleFromStorage = localStorage.getItem('user_role') || sessionStorage.getItem('user_role');
-    if (roleFromStorage) return roleFromStorage;
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const authHeaders = getAuthHeaders();
     
-    // Если не нашли, попробуем извлечь из токена
-    const userData = getUserDataFromToken();
-    if (userData && userData.role) return userData.role;
-    
-    // Дефолтное значение
-    return 'client';
-  } catch (e) {
-    console.error('Ошибка при получении роли пользователя:', e);
-    return 'client';
-  }
-};
+    // Преобразуем объект заголовков в Record<string, string>
+    const headersObject: Record<string, string> = {
+      ...Object.entries(authHeaders).reduce((acc, [key, value]) => ({
+        ...acc,
+        [key]: value || ''
+      }), {}),
+      ...Object.entries(options.headers || {}).reduce((acc, [key, value]) => ({
+        ...acc,
+        [key]: value || ''
+      }), {})
+    };
 
-// Получение ID пользователя из локального хранилища или из токена
-const getUserId = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    // Сначала пробуем получить из localStorage/sessionStorage
-    const userIdFromStorage = localStorage.getItem('user_id') || sessionStorage.getItem('user_id');
-    if (userIdFromStorage) return userIdFromStorage;
-    
-    // Если не нашли, попробуем извлечь из токена
-    const userData = getUserDataFromToken();
-    if (userData && userData.sub) return String(userData.sub);
-    
-    // Дефолтное значение
-    return '1';
-  } catch (e) {
-    console.error('Ошибка при получении ID пользователя:', e);
-    return '1';
-  }
-};
-
-// Получение данных пользователя из JWT токена
-const getUserDataFromToken = (): any => {
-  try {
-    const token = getAuthTokenFromAllSources();
-    if (!token) return null;
-    
-    // Декодируем JWT токен
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    // Парсим данные и возвращаем
-    const userData = JSON.parse(jsonPayload);
-    console.log('Данные извлечены из токена:', userData);
-    return userData;
-  } catch (e) {
-    console.error('Ошибка при декодировании токена:', e);
-    return null;
-  }
-};
-
-// Добавляем перехватчик для авторизации
-usersAxios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Получаем токен из всех возможных источников
-  const token = getAuthTokenFromAllSources();
-  
-  // Добавляем заголовок авторизации, если токен есть
-  if (token && config.headers) {
-    config.headers['Authorization'] = `Bearer ${token}`;
-    
-    // Добавляем информацию о пользователе в заголовки
-    const role = getUserRole();
-    const userId = getUserId();
-    
-    if (role) config.headers['X-User-Role'] = role;
-    if (userId) config.headers['X-User-ID'] = userId;
-    
-    console.log(`Добавлены заголовки авторизации: токен, роль=${role}, id=${userId}`);
-  } else {
-    console.warn('Токен авторизации не найден');
-  }
-  
-  return config;
-}, (error) => {
-  console.error('Ошибка при настройке запроса:', error);
-  return Promise.reject(error);
-});
-
-// Добавляем перехватчик ответов
-usersAxios.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Для успешных ответов
-    console.log(`Успешный ответ от ${response.config.url}:`, {
-      status: response.status,
-      headers: response.headers
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers: headersObject,
+      credentials: 'include'
     });
-    return response;
-  },
-  (error: AxiosError) => {
-    // Для ошибок
-    if (error.response) {
-      console.error(`Ошибка ${error.response.status} при запросе ${error.config?.url}:`, 
-        error.response.data || error.message);
-      
-      // Проверка на ошибку авторизации
-      if (error.response.status === 401) {
-        console.warn('Ошибка авторизации! Заголовки запроса:', error.config?.headers);
-        
-        // Удаляем кэш пользователей при ошибке авторизации
-        usersCache = [];
-        lastFetchTime = 0;
-      }
-    } else if (error.request) {
-      console.error('Ошибка сети - ответ не получен:', error.message);
-    } else {
-      console.error('Ошибка при настройке запроса:', error.message);
-    }
-    
-    return Promise.reject(error);
-  }
-);
 
-// API для работы с пользователями
-export const usersApi = {
-  // Получение списка пользователей с фильтрацией
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Неизвестная ошибка' }));
+      throw new Error(error.message || `HTTP ошибка! Статус: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
     try {
-      console.log('Запрос пользователей с параметрами:', params);
-      
-      // Проверяем наличие токена авторизации
-      const token = getAuthTokenFromAllSources();
-      if (!token) {
-        console.error('Отсутствует токен авторизации');
-        return [];
-      }
-      
-      // Получаем роль пользователя
-      const userRole = getUserRole();
-      const userId = getUserId();
-      
-      if (!userRole || !userId) {
-        console.error('Отсутствуют данные пользователя');
-        return [];
+      if (!isAdmin()) {
+        throw new Error('Недостаточно прав для просмотра списка пользователей');
       }
 
-      if (userRole !== 'admin') {
-        console.error('Недостаточно прав для просмотра списка пользователей');
-        return [];
-      }
+      // Формируем строку запроса
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value.toString());
+      });
 
-      // Сначала пробуем через прокси
-      try {
-        console.log('Получение пользователей через прокси...');
-        const proxyResponse = await fetch('/api/v1/users', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole,
-            'X-User-ID': userId,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          credentials: 'include'
-        });
+      const queryString = queryParams.toString();
+      const endpoint = `/users${queryString ? `?${queryString}` : ''}`;
 
-        if (!proxyResponse.ok) {
-          throw new Error(`HTTP ошибка! Статус: ${proxyResponse.status}`);
-        }
-
-        const proxyData = await proxyResponse.json();
-        console.log('Получены данные пользователей:', proxyData);
-        
-        const proxyUsers = Array.isArray(proxyData) ? proxyData : proxyData.items || [];
-        
-        return proxyUsers.map((user: any) => ({
-          id: user.id,
-          full_name: user.full_name || user.name || 'Без имени',
-          email: user.email,
-          phone: user.phone || null,
-          role: user.role || 'client',
-          is_active: user.is_active ?? true,
-          created_at: user.created_at || new Date().toISOString(),
-          updated_at: user.updated_at || new Date().toISOString(),
-          birthday: user.birthday || null,
-          age_group: user.age_group || null,
-          orders_count: user.orders_count || 0,
-          reservations_count: user.reservations_count || 0
-        }));
-      } catch (proxyError) {
-        console.error('Ошибка при получении пользователей через прокси:', proxyError);
-        throw proxyError; // Пробрасываем ошибку дальше
-      }
-    } catch (error: any) {
+      return await this.request<UserData[]>(endpoint);
+    } catch (error) {
       console.error('Ошибка при получении списка пользователей:', error);
-      throw error; // Пробрасываем ошибку для обработки на уровне компонента
+      throw error;
     }
-  },
-  
-  // Получаем мок-данные пользователей для тестирования интерфейса
-  getMockUsers(): UserData[] {
-    console.log('Генерация мок-данных пользователей');
-    
-    return [
-      {
-        id: 1,
-        full_name: 'Администратор Системы',
-        email: 'admin@example.com',
-        phone: '+7 (999) 123-45-67',
-        role: 'admin',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_active: true,
-        birthday: null,
-        age_group: null,
-        orders_count: 0,
-        reservations_count: 0
-      },
-      {
-        id: 2,
-        full_name: 'Иван Петров',
-        email: 'ivan@example.com',
-        phone: '+7 (999) 234-56-78',
-        role: 'client',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_active: true,
-        birthday: '1990-01-01',
-        age_group: 'MIDDLE',
-        orders_count: 5,
-        reservations_count: 3
-      },
-      {
-        id: 3,
-        full_name: 'Мария Сидорова',
-        email: 'maria@example.com',
-        phone: '+7 (999) 345-67-89',
-        role: 'waiter',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_active: true,
-        birthday: '1995-05-15',
-        age_group: 'YOUNG',
-        orders_count: 150,
-        reservations_count: 0
-      },
-      {
-        id: 4,
-        full_name: 'Алексей Николаев',
-        email: 'alex@example.com',
-        phone: '+7 (999) 456-78-90',
-        role: 'client',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_active: false,
-        birthday: '1975-12-31',
-        age_group: 'OLD',
-        orders_count: 2,
-        reservations_count: 1
-      }
-    ];
-  },
-
-  // Получение пользователя по ID
-  async getUserById(userId: number): Promise<UserData> {
-    try {
-      const url = `${getSecureApiUrl()}/users/${userId}`;
-      const response = await axios.get(url, {
-        headers: getAuthHeaders()
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error(`Ошибка при получении пользователя #${userId}:`, error);
-      throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
-    }
-  },
-
-  // Обновление данных пользователя
-  async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
-    try {
-      const url = `${getSecureApiUrl()}/users/${userId}`;
-      const response = await axios.put(url, userData, {
-        headers: getAuthHeaders()
-      });
-      
-      // Инвалидируем кэш после обновления
-      usersCache = [];
-      lastFetchTime = 0;
-      
-      return response.data;
-    } catch (error: any) {
-      console.error(`Ошибка при обновлении пользователя #${userId}:`, error);
-      throw new Error(`Не удалось обновить данные пользователя: ${error.message}`);
-    }
-  },
-
-  // Удаление пользователя
-  async deleteUser(userId: number): Promise<boolean> {
-    try {
-      const url = `${getSecureApiUrl()}/users/${userId}`;
-      await axios.delete(url, {
-        headers: getAuthHeaders()
-      });
-      
-      // Инвалидируем кэш после удаления
-      usersCache = [];
-      lastFetchTime = 0;
-      
-      return true;
-    } catch (error: any) {
-      console.error(`Ошибка при удалении пользователя #${userId}:`, error);
-      throw new Error(`Не удалось удалить пользователя: ${error.message}`);
-    }
-  },
-
-  // Создание нового пользователя
-  async createUser(userData: UserData): Promise<UserData> {
-    try {
-      const url = `${getSecureApiUrl()}/users`;
-      const response = await axios.post(url, userData, {
-        headers: getAuthHeaders()
-      });
-      
-      // Инвалидируем кэш после создания
-      usersCache = [];
-      lastFetchTime = 0;
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('Ошибка при создании пользователя:', error);
-      throw new Error(`Не удалось создать пользователя: ${error.message}`);
-    }
-  },
-
-  // Обновление статуса пользователя
-  async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
-    try {
-      console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
-      const response = await usersAxios.patch(`/users/${userId}/status`, {
-        is_active: isActive
-      });
-      
-      // Инвалидируем кэш после обновления
-      usersCache = [];
-      lastFetchTime = 0;
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('Ошибка при обновлении статуса пользователя:', error);
-      throw new Error(`Не удалось обновить статус пользователя: ${error.message}`);
-    }
-  },
-
-  // Очистка кэша
-  clearCache() {
-    usersCache = [];
-    lastFetchTime = 0;
-    console.log('Кэш пользователей очищен');
   }
-}; 
+
+  async getUserById(id: number): Promise<UserData> {
+    try {
+      return await this.request<UserData>(`/users/${id}`);
+    } catch (error) {
+      console.error(`Ошибка при получении пользователя #${id}:`, error);
+      throw error;
+    }
+  }
+
+  async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
+    try {
+      return await this.request<UserData>(`/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+    } catch (error) {
+      console.error(`Ошибка при обновлении пользователя #${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    try {
+      await this.request(`/users/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      console.error(`Ошибка при удалении пользователя #${id}:`, error);
+      throw error;
+    }
+  }
+
+  async createUser(data: Partial<UserData>): Promise<UserData> {
+    try {
+      return await this.request<UserData>('/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+    } catch (error) {
+      console.error('Ошибка при создании пользователя:', error);
+      throw error;
+    }
+  }
+}
+
+export const usersApi = new UsersAPI(); 
