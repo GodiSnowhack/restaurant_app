@@ -1,6 +1,7 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
-import { getSecureApiUrl, createApiUrl } from '../utils/api';
-import axios, { InternalAxiosRequestConfig, AxiosHeaders, AxiosResponse, AxiosError } from 'axios';
+import axios from 'axios';
+
+const BASE_URL = 'https://backend-production-1a78.up.railway.app/api/v1';
 
 export interface UserData {
   id: number;
@@ -24,209 +25,118 @@ export interface UserParams {
   limit?: number;
 }
 
-// Создаем экземпляр axios с предустановленными параметрами
-const api = axios.create({
-  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  },
-  withCredentials: true,
-  timeout: 30000,
-  maxRedirects: 5
-});
-
-// Добавляем перехватчик для установки заголовков авторизации
-api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  try {
-    // Принудительно устанавливаем HTTPS
-    config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
-    
-    // Получаем заголовки авторизации
+class UsersAPI {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers = await getAuthHeaders();
     
-    // Создаем новый объект AxiosHeaders
-    const axiosHeaders = new AxiosHeaders();
-    
-    // Добавляем все заголовки
-    Object.entries(headers).forEach(([key, value]) => {
-      if (value) {
-        axiosHeaders.set(key, value);
-      }
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
     });
-    
-    // Устанавливаем заголовки
-    config.headers = axiosHeaders;
 
-    // Проверяем и принудительно устанавливаем HTTPS для всех URL
-    if (config.url && config.url.startsWith('http://')) {
-      config.url = config.url.replace('http://', 'https://');
+    if (!response.ok) {
+      throw new Error(`Ошибка HTTP: ${response.status}`);
     }
 
-    // Проверяем полный URL запроса
-    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
-    if (fullUrl && fullUrl.startsWith('http://')) {
-      throw new Error('Небезопасный HTTP запрос не разрешен');
-    }
-
-    return config;
-  } catch (error) {
-    console.error('Ошибка при установке заголовков:', error);
-    return Promise.reject(error);
+    return response.json();
   }
-});
 
-// Добавляем перехватчик для обработки ответов
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    if (error.response?.status === 307) {
-      const newUrl = error.response.headers.location;
-      if (newUrl) {
-        // Убеждаемся, что новый URL использует HTTPS
-        const secureUrl = newUrl.replace('http://', 'https://');
-        // Повторяем запрос с новым URL
-        const config = error.config;
-        if (config) {
-          config.url = secureUrl;
-          return api(config);
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-class UsersAPI {
-  // Получение списка пользователей
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
     try {
-      // Проверяем права доступа
       if (!isAdmin()) {
         throw new Error('Недостаточно прав для просмотра списка пользователей');
       }
 
-      // Формируем параметры запроса
       const queryParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value) queryParams.append(key, value.toString());
       });
 
-      // Формируем URL
       const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('Отправка запроса на получение пользователей:', url);
 
-      // Выполняем запрос с повторными попытками
-      let retries = 3;
-      let lastError;
-
-      while (retries > 0) {
-        try {
-          const response = await api.get(url);
-          
-          // Проверяем ответ
-          if (!response.data) {
-            console.warn('Получен пустой ответ от сервера');
-            return [];
-          }
-
-          // Преобразуем данные
-          const users = Array.isArray(response.data) ? response.data : response.data.items || [];
-          
-          // Маппим данные в нужный формат
-          return users.map((user: any) => ({
-            id: user.id,
-            email: user.email,
-            full_name: user.full_name || user.name || 'Без имени',
-            phone: user.phone || null,
-            role: user.role || 'client',
-            is_active: user.is_active ?? true,
-            created_at: user.created_at || new Date().toISOString(),
-            updated_at: user.updated_at || new Date().toISOString(),
-            birthday: user.birthday || null,
-            age_group: user.age_group || null,
-            orders_count: user.orders_count || 0,
-            reservations_count: user.reservations_count || 0
-          }));
-        } catch (error: any) {
-          lastError = error;
-          if (error.response?.status === 307) {
-            // Для 307 редиректа не уменьшаем количество попыток
-            continue;
-          }
-          retries--;
-          if (retries > 0) {
-            // Ждем перед следующей попыткой
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
-          }
-        }
-      }
-
-      // Если все попытки исчерпаны, обрабатываем последнюю ошибку
-      console.error('Ошибка при получении списка пользователей:', lastError);
+      const data = await this.request<UserData[]>(url);
       
-      if (lastError.response) {
-        throw new Error(`Ошибка сервера: ${lastError.response.status} - ${lastError.response.data?.message || lastError.message}`);
-      } else if (lastError.request) {
-        throw new Error('Сервер недоступен. Проверьте подключение к интернету.');
-      } else {
-        throw new Error(`Ошибка запроса: ${lastError.message}`);
+      if (!Array.isArray(data)) {
+        console.warn('Получен неверный формат данных от сервера');
+        return [];
       }
+
+      return data.map(user => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        phone: user.phone,
+        role: user.role || 'client',
+        is_active: user.is_active ?? true,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        birthday: user.birthday,
+        age_group: user.age_group,
+        orders_count: user.orders_count,
+        reservations_count: user.reservations_count
+      }));
     } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
-      throw error;
+      throw new Error(error.message || 'Не удалось загрузить список пользователей');
     }
   }
 
-  // Получение пользователя по ID
   async getUserById(id: number): Promise<UserData> {
     try {
-      const response = await api.get(`/users/${id}`);
-      return response.data;
+      return await this.request<UserData>(`/users/${id}`);
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${id}:`, error);
       throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
     }
   }
 
-  // Создание пользователя
   async createUser(data: Partial<UserData>): Promise<UserData> {
     try {
-      const response = await api.post('/users', data);
-      return response.data;
+      return await this.request<UserData>('/users', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
     } catch (error: any) {
       console.error('Ошибка при создании пользователя:', error);
       throw new Error(`Не удалось создать пользователя: ${error.message}`);
     }
   }
 
-  // Обновление пользователя
   async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
     try {
-      const response = await api.put(`/users/${id}`, data);
-      return response.data;
+      return await this.request<UserData>(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
     } catch (error: any) {
       console.error(`Ошибка при обновлении пользователя #${id}:`, error);
       throw new Error(`Не удалось обновить пользователя: ${error.message}`);
     }
   }
 
-  // Удаление пользователя
   async deleteUser(id: number): Promise<void> {
     try {
-      await api.delete(`/users/${id}`);
+      await this.request(`/users/${id}`, {
+        method: 'DELETE'
+      });
     } catch (error: any) {
       console.error(`Ошибка при удалении пользователя #${id}:`, error);
       throw new Error(`Не удалось удалить пользователя: ${error.message}`);
     }
   }
 
-  // Изменение статуса пользователя
   async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
     try {
-      const response = await api.patch(`/users/${id}/status`, { is_active: isActive });
-      return response.data;
+      return await this.request<UserData>(`/users/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: isActive })
+      });
     } catch (error: any) {
       console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
       throw new Error(`Не удалось изменить статус пользователя: ${error.message}`);
