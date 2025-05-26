@@ -4,14 +4,16 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: 'admin' | 'waiter' | 'guest' | 'user';
+  role: UserRole;
   is_active: boolean;
   phone?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
   last_login?: string;
   orders_count?: number;
   reservations_count?: number;
+  birthday?: string;
+  age_group?: string;
 }
 
 export interface LoginResponse {

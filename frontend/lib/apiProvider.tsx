@@ -37,9 +37,15 @@ export const ApiProvider: React.FC<ApiProviderProps> = ({ children }) => {
   const refreshUserProfile = async (): Promise<UserProfile | null> => {
     try {
       const profile = await authApi.getProfile();
-      setUserProfile(profile);
+      // Проверяем и добавляем обязательные поля, если их нет
+      const enrichedProfile = {
+        ...profile,
+        created_at: profile.created_at || new Date().toISOString(),
+        updated_at: profile.updated_at || new Date().toISOString()
+      };
+      setUserProfile(enrichedProfile);
       setIsLoggedIn(true);
-      return profile;
+      return enrichedProfile;
     } catch (error) {
       console.error('ApiProvider: Ошибка при получении профиля пользователя:', error);
       setUserProfile(null);
