@@ -5,7 +5,7 @@ import { getSecureApiUrl } from '../utils/api';
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
   baseURL: getSecureApiUrl(),
-  timeout: 30000, // Увеличиваем таймаут до 30 секунд
+  timeout: 30000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
@@ -90,8 +90,8 @@ interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
 // Перехватчик для добавления токена авторизации
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // Получаем токен из localStorage
-    const token = localStorage.getItem('token');
+    // Получаем токен из всех возможных источников
+    const token = getAuthTokenFromAllSources();
     
     if (token) {
       console.log('API Interceptor: Добавляем токен в заголовки');
@@ -118,6 +118,11 @@ api.interceptors.request.use(
       }
     } else {
       console.warn('API Interceptor: Токен не найден');
+    }
+
+    // Принудительно используем HTTPS для production URL
+    if (config.url && config.url.includes('backend-production-1a78.up.railway.app')) {
+      config.url = config.url.replace('http://', 'https://');
     }
     
     return config;
