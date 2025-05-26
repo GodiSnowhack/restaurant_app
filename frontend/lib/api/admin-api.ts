@@ -1,4 +1,6 @@
-import { api } from './api';
+import { api } from './core';
+import { getSecureApiUrl } from '../utils/api';
+import axios from 'axios';
 import { handleApiResponse, getBaseApiOptions, ApiError } from '../api';
 
 /**
@@ -28,33 +30,12 @@ const adminApi = {
    */
   async getDashboardStats(): Promise<any> {
     try {
-      const response = await api.get('/admin/dashboard-stats');
+      const url = `${getSecureApiUrl()}/admin/dashboard/stats`;
+      const response = await axios.get(url);
       return response.data;
     } catch (error) {
-      console.error('Ошибка при получении статистики панели управления:', error);
-      
-      // Возвращаем демо-данные в случае ошибки
-      return {
-        ordersToday: 0,
-        ordersTotal: 0,
-        revenue: 0,
-        reservationsToday: 0,
-        users: 0,
-        dishes: 0,
-        totalRevenue: 0,
-        totalOrders: 0,
-        averageCheck: 0,
-        totalCustomers: 0,
-        pendingOrders: 0,
-        popularItems: [
-          { name: 'Стейк рибай', count: 0, revenue: 0 },
-          { name: 'Паста карбонара', count: 0, revenue: 0 },
-          { name: 'Тирамису', count: 0, revenue: 0 },
-        ],
-        recentOrders: [
-          { id: 0, customer: 'Загрузка...', status: 'pending', total: 0, date: new Date().toISOString() }
-        ]
-      };
+      console.error('Ошибка при получении статистики:', error);
+      throw error;
     }
   },
   
@@ -64,7 +45,8 @@ const adminApi = {
    */
   async getAdminUsers(): Promise<any[]> {
     try {
-      const response = await api.get('/admin/users');
+      const url = `${getSecureApiUrl()}/admin/users`;
+      const response = await axios.get(url);
       return response.data;
     } catch (error) {
       console.error('Ошибка при получении списка пользователей:', error);

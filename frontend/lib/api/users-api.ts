@@ -1,5 +1,6 @@
 import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import { getSecureApiUrl } from '../utils/api';
 
 interface UserParams {
   role?: string;
@@ -204,8 +205,7 @@ export const usersApi = {
         console.log('Отправка запроса на получение пользователей...');
         
         // Формируем URL с учетом параметров
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-        const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        const url = `${getSecureApiUrl()}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         console.log('URL запроса:', url);
         
         const response = await axios.get(url, {
@@ -257,8 +257,8 @@ export const usersApi = {
         throw error;
       }
     } catch (error: any) {
-      console.error('Критическая ошибка при получении пользователей:', error);
-      return this.getMockUsers();
+      console.error('Ошибка при обработке запроса пользователей:', error);
+      return [];
     }
   },
   
@@ -329,7 +329,10 @@ export const usersApi = {
   // Получение пользователя по ID
   async getUserById(userId: number): Promise<UserData> {
     try {
-      const response = await usersAxios.get(`/users/${userId}`);
+      const url = `${getSecureApiUrl()}/users/${userId}`;
+      const response = await axios.get(url, {
+        headers: getAuthHeaders()
+      });
       return response.data;
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${userId}:`, error);
@@ -340,8 +343,10 @@ export const usersApi = {
   // Обновление данных пользователя
   async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
     try {
-      console.log(`Обновление пользователя #${userId}:`, userData);
-      const response = await usersAxios.put(`/users/${userId}`, userData);
+      const url = `${getSecureApiUrl()}/users/${userId}`;
+      const response = await axios.put(url, userData, {
+        headers: getAuthHeaders()
+      });
       
       // Инвалидируем кэш после обновления
       usersCache = [];
@@ -357,7 +362,10 @@ export const usersApi = {
   // Удаление пользователя
   async deleteUser(userId: number): Promise<boolean> {
     try {
-      await usersAxios.delete(`/users/${userId}`);
+      const url = `${getSecureApiUrl()}/users/${userId}`;
+      await axios.delete(url, {
+        headers: getAuthHeaders()
+      });
       
       // Инвалидируем кэш после удаления
       usersCache = [];
@@ -373,7 +381,10 @@ export const usersApi = {
   // Создание нового пользователя
   async createUser(userData: UserData): Promise<UserData> {
     try {
-      const response = await usersAxios.post('/users', userData);
+      const url = `${getSecureApiUrl()}/users`;
+      const response = await axios.post(url, userData, {
+        headers: getAuthHeaders()
+      });
       
       // Инвалидируем кэш после создания
       usersCache = [];

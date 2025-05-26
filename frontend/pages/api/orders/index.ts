@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+import { getSecureApiUrl } from '../../../lib/utils/api';
 
 /**
  * API-прокси для работы с заказами
@@ -29,38 +28,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { start_date, end_date } = req.query;
   const { authorization } = req.headers;
 
-  try {
-    console.log('[Orders API] Получение заказов с параметрами:', { start_date, end_date });
+  if (!authorization) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
-    const response = await axios.get(`${API_BASE_URL}/orders`, {
-      params: {
-        start_date,
-        end_date
-      },
+  try {
+    const url = `${getSecureApiUrl()}/orders`;
+    const params = new URLSearchParams();
+    
+    if (start_date) params.append('start_date', start_date as string);
+    if (end_date) params.append('end_date', end_date as string);
+    
+    const finalUrl = `${url}${params.toString() ? `?${params.toString()}` : ''}`;
+    
+    const response = await axios.get(finalUrl, {
       headers: {
+        Authorization: authorization,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(authorization ? { 'Authorization': authorization } : {})
+        'Accept': 'application/json'
       }
     });
 
-    console.log('[Orders API] Получен ответ от сервера:', {
-      status: response.status,
-      data: response.data
-    });
-
     return res.status(200).json(response.data);
-        } catch (error: any) {
-    console.error('[Orders API] Ошибка при получении заказов:', error);
-          
-    // Если есть ответ от сервера, передаем его
-          if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
-
-    // Если нет ответа, возвращаем общую ошибку
-    return res.status(500).json({ 
-      message: error.message || 'Внутренняя ошибка сервера'
+  } catch (error: any) {
+    console.error('Ошибка при получении заказов:', error);
+    return res.status(error.response?.status || 500).json({
+      message: error.response?.data?.message || 'Internal server error'
     });
   }
 } 

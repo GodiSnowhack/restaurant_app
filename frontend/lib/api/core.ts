@@ -1,32 +1,10 @@
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 import jwt from 'jsonwebtoken';
-
-// Функция для определения правильного baseURL для API
-const getApiBaseUrl = (): string => {
-  const defaultUrl = 'https://backend-production-1a78.up.railway.app/api/v1';
-  
-  // Если есть переменная окружения, используем её
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!envUrl) return defaultUrl;
-  
-  // Проверяем и корректируем URL
-  try {
-    const url = new URL(envUrl);
-    // Если это не localhost, принудительно используем HTTPS
-    if (!url.hostname.includes('localhost') && url.protocol === 'http:') {
-      url.protocol = 'https:';
-      return url.toString();
-    }
-    return envUrl;
-  } catch (e) {
-    console.error('Неверный формат URL:', e);
-    return defaultUrl;
-  }
-};
+import { getSecureApiUrl } from '../utils/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: getApiBaseUrl(),
+  baseURL: getSecureApiUrl(),
   timeout: 30000, // Увеличиваем таймаут до 30 секунд
   headers: {
     'Accept': 'application/json',
@@ -59,18 +37,12 @@ export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3,
 // Проверка, не истёк ли токен
 export const isTokenExpired = (token: string): boolean => {
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    const { exp } = JSON.parse(jsonPayload);
-    const expired = Date.now() >= exp * 1000;
-    
-    return expired;
+    const decoded = jwt.decode(token) as { exp?: number };
+    if (!decoded || !decoded.exp) return true;
+    return Date.now() >= decoded.exp * 1000;
   } catch (e) {
-    return false; // Если ошибка при декодировании, считаем что токен не истёк
+    console.error('[API] Ошибка при проверке токена:', e);
+    return true;
   }
 };
 
@@ -103,17 +75,11 @@ export const getAuthToken = (): string | null => {
 
 // Обновление функции logout для очистки обоих хранилищ
 export const clearAuthTokens = () => {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('auth_timestamp');
-    localStorage.removeItem('auth_method');
-    localStorage.removeItem('user_profile');
-  } catch (e) {
-    console.error('Ошибка при очистке токенов:', e);
-  }
+  localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user_profile');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('user_role');
 };
 
 // Расширяем тип конфигурации axios
@@ -146,27 +112,6 @@ api.interceptors.request.use(
             userId,
             role: userRole
           });
-        } else {
-          // Пробуем получить данные из профиля
-          const userProfile = localStorage.getItem('user_profile');
-          if (userProfile) {
-            const user = JSON.parse(userProfile);
-            if (user && user.id && user.role) {
-              config.headers['X-User-ID'] = user.id.toString();
-              config.headers['X-User-Role'] = user.role;
-              
-              // Сохраняем данные отдельно для будущего использования
-              localStorage.setItem('user_id', user.id.toString());
-              localStorage.setItem('user_role', user.role);
-              
-              console.log('API Interceptor: Добавлены пользовательские заголовки из профиля:', {
-                userId: user.id,
-                role: user.role
-              });
-            } else {
-              console.warn('API Interceptor: Неполные данные пользователя в профиле');
-            }
-          }
         }
       } catch (e) {
         console.error('API Interceptor: Ошибка при добавлении пользовательских заголовков:', e);
@@ -230,8 +175,8 @@ api.interceptors.response.use(
           config._retry = true;
           return api(config);
         }
-      } catch (refreshError) {
-        console.error('[API] Ошибка при обработке 401:', refreshError);
+      } catch (e) {
+        console.error('[API] Ошибка при обработке 401:', e);
         clearAuthTokens();
         if (typeof window !== 'undefined') {
           window.location.href = '/auth/login';

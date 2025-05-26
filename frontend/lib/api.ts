@@ -403,7 +403,7 @@ export const authApi = {
         try {
           console.log('API login - Используем прямой запрос для мобильного устройства');
           
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
           const loginUrl = `${apiUrl}/auth/login`;
           
           console.log('API login - URL для мобильного:', loginUrl);
@@ -692,7 +692,7 @@ export const authApi = {
             // Последняя попытка - прямой вызов к бэкенду (может не сработать из-за CORS)
             console.log('API: Последняя попытка - прямой вызов к бэкенду');
             try {
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
               const directResponse = await fetch(`${apiUrl}/auth/register`, {
                 method: 'POST',
                 headers: {
@@ -836,7 +836,7 @@ export const authApi = {
         console.log('API - Пробуем прямой fetch запрос из-за ошибки сети');
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
           
           // Проверяем валидность URL
           let validApiUrl = apiUrl;
@@ -846,7 +846,7 @@ export const authApi = {
           } catch (urlError) {
             console.error('API - Неверный формат API URL, используем резервный URL:', urlError);
             // Если URL некорректен, используем резервный
-            validApiUrl = 'http://localhost:8000/api/v1';
+            validApiUrl = 'https://backend-production-1a78.up.railway.app/api/v1';
             
             // Записываем информацию об ошибке
             if (isClient) {
