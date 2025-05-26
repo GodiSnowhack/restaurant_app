@@ -4,8 +4,8 @@ import { getDefaultApiUrl, getDefaultFrontendUrl } from '../../src/config/defaul
  * Возвращает безопасный URL для API запросов
  */
 export const getSecureApiUrl = (): string => {
-  // Принудительно используем HTTPS URL
-  return 'https://backend-production-1a78.up.railway.app/api/v1';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || getDefaultApiUrl();
+  return ensureSecureUrl(apiUrl);
 };
 
 /**

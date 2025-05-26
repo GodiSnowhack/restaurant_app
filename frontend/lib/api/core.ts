@@ -120,9 +120,18 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Принудительно используем HTTPS для production URL
-    if (config.url && config.url.includes('backend-production-1a78.up.railway.app')) {
+    // Принудительно используем HTTPS для всех запросов
+    if (config.baseURL && config.baseURL.startsWith('http://')) {
+      config.baseURL = config.baseURL.replace('http://', 'https://');
+    }
+    if (config.url && config.url.startsWith('http://')) {
       config.url = config.url.replace('http://', 'https://');
+    }
+
+    // Проверяем полный URL запроса
+    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
+    if (fullUrl && fullUrl.startsWith('http://')) {
+      throw new Error('Небезопасный HTTP запрос не разрешен');
     }
     
     return config;

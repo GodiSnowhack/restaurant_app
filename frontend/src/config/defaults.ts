@@ -13,11 +13,13 @@ export const DEFAULT_URLS = {
 // Получение базового URL API
 export const getDefaultApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
+  const baseUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
+  return baseUrl.replace('http://', 'https://');
 };
 
 // Получение базового URL фронтенда
 export const getDefaultFrontendUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction ? DEFAULT_URLS.production.frontend : DEFAULT_URLS.development.frontend;
+  const baseUrl = isProduction ? DEFAULT_URLS.production.frontend : DEFAULT_URLS.development.frontend;
+  return baseUrl.replace('http://', 'https://');
 }; 
