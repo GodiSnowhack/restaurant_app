@@ -1,8 +1,9 @@
 import axios from 'axios';
 import type { NextApiRequest } from 'next';
+import { getSecureApiUrl } from './utils/api';
 
 // Базовый URL для бэкенда
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+const API_BASE_URL = getSecureApiUrl();
 
 // Создаем базовый клиент с настройками
 export const createClient = () => {

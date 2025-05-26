@@ -1,5 +1,7 @@
+import { getSecureApiUrl } from '../../lib/utils/api';
+
 // Базовый URL API
-export const API_URL = 'https://backend-production-1a78.up.railway.app/api/v1';
+export const API_URL = getSecureApiUrl();
 
 // Базовые настройки для fetch запросов
 export const defaultFetchOptions = {

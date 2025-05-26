@@ -4,23 +4,39 @@
  */
 export const getSecureApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isProduction) {
-    return process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+  let baseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (!baseUrl) {
+    baseUrl = isProduction 
+      ? 'https://backend-production-1a78.up.railway.app/api/v1'
+      : 'http://localhost:8000/api/v1';
   }
-  
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+  // Гарантируем HTTPS для production URL
+  if (isProduction && baseUrl.startsWith('http://')) {
+    baseUrl = baseUrl.replace('http://', 'https://');
+  }
+
+  return baseUrl;
 };
 
 // Получение базового URL для фронтенда
 export const getFrontendUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isProduction) {
-    return process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app';
+  let baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL;
+
+  if (!baseUrl) {
+    baseUrl = isProduction
+      ? 'https://frontend-production-8eb6.up.railway.app'
+      : 'http://localhost:3000';
   }
-  
-  return process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+
+  // Гарантируем HTTPS для production URL
+  if (isProduction && baseUrl.startsWith('http://')) {
+    baseUrl = baseUrl.replace('http://', 'https://');
+  }
+
+  return baseUrl;
 };
 
 // Проверка, является ли URL безопасным (HTTPS)
