@@ -143,16 +143,20 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: '*',
+            value: 'https://backend-production-1a78.up.railway.app'
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS',
+            value: 'GET, POST, PUT, DELETE, OPTIONS'
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'X-Requested-With, Content-Type, Accept, Authorization',
+            value: 'X-Requested-With, Content-Type, Accept, Authorization, X-User-ID, X-User-Role'
           },
+          {
+            key: 'Access-Control-Allow-Credentials',
+            value: 'true'
+          }
         ],
       },
     ];
