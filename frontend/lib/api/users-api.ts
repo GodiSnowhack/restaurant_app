@@ -1,5 +1,6 @@
 import { getAuthHeaders, isAdmin } from '../utils/auth';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 
 export interface UserData {
   id: number;
@@ -23,109 +24,145 @@ export interface UserParams {
   limit?: number;
 }
 
-class UsersAPI {
-  private baseUrl: string;
-
-  constructor() {
-    this.baseUrl = getSecureApiUrl();
+// Создаем экземпляр axios с предустановленными параметрами
+const api = axios.create({
+  baseURL: getSecureApiUrl(),
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   }
+});
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = createApiUrl(endpoint);
-    const authHeaders = await getAuthHeaders();
-    
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...authHeaders as Record<string, string>,
-      ...(options.headers as Record<string, string> || {})
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers
+// Добавляем перехватчик для установки заголовков авторизации
+api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  try {
+    const headers = await getAuthHeaders();
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value) {
+        config.headers.set(key, value);
+      }
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
+    return config;
+  } catch (error) {
+    console.error('Ошибка при установке заголовков:', error);
+    return Promise.reject(error);
   }
+});
 
+class UsersAPI {
+  // Получение списка пользователей
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
     try {
+      // Проверяем права доступа
       if (!isAdmin()) {
         throw new Error('Недостаточно прав для просмотра списка пользователей');
       }
 
+      // Формируем параметры запроса
       const queryParams = new URLSearchParams();
       Object.entries(params).forEach(([key, value]) => {
         if (value) queryParams.append(key, value.toString());
       });
 
-      const queryString = queryParams.toString();
-      const endpoint = `/users${queryString ? `?${queryString}` : ''}`;
+      // Формируем URL
+      const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      console.log('Отправка запроса на получение пользователей:', url);
 
-      return await this.request<UserData[]>(endpoint);
-    } catch (error) {
+      // Выполняем запрос
+      const response = await api.get(url);
+
+      // Проверяем ответ
+      if (!response.data) {
+        console.warn('Получен пустой ответ от сервера');
+        return [];
+      }
+
+      // Преобразуем данные
+      const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+      
+      // Маппим данные в нужный формат
+      return users.map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || user.name || 'Без имени',
+        phone: user.phone || null,
+        role: user.role || 'client',
+        is_active: user.is_active ?? true,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        birthday: user.birthday || null,
+        age_group: user.age_group || null,
+        orders_count: user.orders_count || 0,
+        reservations_count: user.reservations_count || 0
+      }));
+    } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
-      throw error;
+      
+      // Проверяем тип ошибки
+      if (error.response) {
+        // Если получили ответ от сервера с ошибкой
+        throw new Error(`Ошибка сервера: ${error.response.status} - ${error.response.data?.message || error.message}`);
+      } else if (error.request) {
+        // Если не получили ответ
+        throw new Error('Сервер недоступен. Проверьте подключение к интернету.');
+      } else {
+        // Если произошла ошибка при подготовке запроса
+        throw new Error(`Ошибка запроса: ${error.message}`);
+      }
     }
   }
 
+  // Получение пользователя по ID
   async getUserById(id: number): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}`);
-    } catch (error) {
+      const response = await api.get(`/users/${id}`);
+      return response.data;
+    } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${id}:`, error);
-      throw error;
+      throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
     }
   }
 
-  async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
-    try {
-      return await this.request<UserData>(`/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      });
-    } catch (error) {
-      console.error(`Ошибка при обновлении пользователя #${id}:`, error);
-      throw error;
-    }
-  }
-
-  async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
-    try {
-      return await this.request<UserData>(`/users/${id}/toggle-status`, {
-        method: 'PUT',
-        body: JSON.stringify({ is_active: isActive })
-      });
-    } catch (error) {
-      console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
-      throw error;
-    }
-  }
-
-  async deleteUser(id: number): Promise<void> {
-    try {
-      await this.request(`/users/${id}`, {
-        method: 'DELETE'
-      });
-    } catch (error) {
-      console.error(`Ошибка при удалении пользователя #${id}:`, error);
-      throw error;
-    }
-  }
-
+  // Создание пользователя
   async createUser(data: Partial<UserData>): Promise<UserData> {
     try {
-      return await this.request<UserData>('/users', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-    } catch (error) {
+      const response = await api.post('/users', data);
+      return response.data;
+    } catch (error: any) {
       console.error('Ошибка при создании пользователя:', error);
-      throw error;
+      throw new Error(`Не удалось создать пользователя: ${error.message}`);
+    }
+  }
+
+  // Обновление пользователя
+  async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
+    try {
+      const response = await api.put(`/users/${id}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Ошибка при обновлении пользователя #${id}:`, error);
+      throw new Error(`Не удалось обновить пользователя: ${error.message}`);
+    }
+  }
+
+  // Удаление пользователя
+  async deleteUser(id: number): Promise<void> {
+    try {
+      await api.delete(`/users/${id}`);
+    } catch (error: any) {
+      console.error(`Ошибка при удалении пользователя #${id}:`, error);
+      throw new Error(`Не удалось удалить пользователя: ${error.message}`);
+    }
+  }
+
+  // Изменение статуса пользователя
+  async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
+    try {
+      const response = await api.patch(`/users/${id}/status`, { is_active: isActive });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
+      throw new Error(`Не удалось изменить статус пользователя: ${error.message}`);
     }
   }
 }
