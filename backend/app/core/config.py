@@ -1,6 +1,6 @@
 import os
 import secrets
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, ClassVar
 from pathlib import Path
 
 from pydantic import validator
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = "admin123"
 
     # Настройки безопасности
-    SECURITY_HEADERS = {
+    SECURITY_HEADERS: ClassVar[Dict[str, str]] = {
         'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
