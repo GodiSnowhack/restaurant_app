@@ -34,4 +34,11 @@ export const ensureSecureUrl = (url: string): string => {
     return url.replace('http://', 'https://');
   }
   return url;
+};
+
+// Получение полного URL API с учетом окружения
+export const getApiUrl = (endpoint: string): string => {
+  const baseUrl = getSecureApiUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  return ensureSecureUrl(url);
 }; 

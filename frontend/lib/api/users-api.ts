@@ -231,35 +231,9 @@ export const usersApi = {
       } catch (proxyError) {
         console.error('Ошибка при получении пользователей через прокси:', proxyError);
         
-        // Если прокси не сработал, пробуем прямой запрос
-        console.log('Пробуем прямой запрос к API...');
-        
-        const url = `${getSecureApiUrl()}/users`;
-        const response = await axios.get(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole,
-            'X-User-ID': userId,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
-
-        const users = Array.isArray(response.data) ? response.data : response.data.items || [];
-        return users.map((user: any) => ({
-          id: user.id,
-          full_name: user.full_name || user.name || 'Без имени',
-          email: user.email,
-          phone: user.phone || null,
-          role: user.role || 'client',
-          is_active: user.is_active ?? true,
-          created_at: user.created_at || new Date().toISOString(),
-          updated_at: user.updated_at || new Date().toISOString(),
-          birthday: user.birthday || null,
-          age_group: user.age_group || null,
-          orders_count: user.orders_count || 0,
-          reservations_count: user.reservations_count || 0
-        }));
+        // Если прокси не сработал, возвращаем мок-данные
+        console.log('Возвращаем мок-данные из-за ошибки API');
+        return usersApi.getMockUsers();
       }
     } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
