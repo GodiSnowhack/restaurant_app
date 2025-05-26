@@ -204,10 +204,19 @@ export const usersApi = {
         console.log('Отправка запроса на получение пользователей...');
         
         // Формируем URL с учетом параметров
-        const url = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+        const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         console.log('URL запроса:', url);
         
-        const response = await usersAxios.get(url);
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-User-Role': userRole,
+            'X-User-ID': getUserId() || '1',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
 
         if (!response.data) {
           console.error('Получен пустой ответ от сервера');

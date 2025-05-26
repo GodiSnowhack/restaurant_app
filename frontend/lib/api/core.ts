@@ -3,16 +3,25 @@ import jwt from 'jsonwebtoken';
 
 // Функция для определения правильного baseURL для API
 const getApiBaseUrl = (): string => {
-  // В production используем Railway URL для бэкенда
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://backend-production-1a78.up.railway.app/api/v1';
-  }
+  const defaultUrl = 'https://backend-production-1a78.up.railway.app/api/v1';
   
-  // В development используем локальный сервер
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-  return apiUrl.startsWith('http://') && !apiUrl.includes('localhost') 
-    ? apiUrl.replace('http://', 'https://') 
-    : apiUrl;
+  // Если есть переменная окружения, используем её
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!envUrl) return defaultUrl;
+  
+  // Проверяем и корректируем URL
+  try {
+    const url = new URL(envUrl);
+    // Если это не localhost, принудительно используем HTTPS
+    if (!url.hostname.includes('localhost') && url.protocol === 'http:') {
+      url.protocol = 'https:';
+      return url.toString();
+    }
+    return envUrl;
+  } catch (e) {
+    console.error('Неверный формат URL:', e);
+    return defaultUrl;
+  }
 };
 
 // Создаем экземпляр axios с базовой конфигурацией
