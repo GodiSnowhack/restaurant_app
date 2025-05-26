@@ -45,8 +45,12 @@ export const api = axios.create({
     'Accept': 'application/json'
   },
   withCredentials: true,
-  timeout: 30000, // Уменьшаем таймаут до 30 секунд
-  maxRedirects: 0, // Отключаем автоматические редиректы
+  timeout: 30000,
+  maxRedirects: 0,
+  validateStatus: function (status) {
+    // Принимаем все статусы кроме редиректов
+    return status !== 301 && status !== 302 && status !== 307 && status !== 308;
+  }
 });
 
 // Добавляем интерфейс для расширенной конфигурации
@@ -123,6 +127,13 @@ api.interceptors.request.use(
     if (!config.headers) {
       config.headers = new AxiosHeaders();
     }
+    
+    // Добавляем дополнительные заголовки для Railway
+    const isRailway = typeof window !== 'undefined' && window.location.hostname.includes('railway.app');
+    if (isRailway) {
+      config.headers.set('X-Forwarded-Proto', 'https');
+    }
+
     config.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     config.headers.set('X-Content-Type-Options', 'nosniff');
     config.headers.set('X-Frame-Options', 'DENY');
@@ -137,6 +148,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Если получили редирект, обрабатываем его вручную
+    if (error.response?.status === 301 || error.response?.status === 302) {
+      const redirectUrl = error.response.headers.location;
+      if (redirectUrl) {
+        // Повторяем запрос с новым URL
+        const config = error.config;
+        if (config) {
+          config.url = redirectUrl;
+          return axios(config);
+        }
+      }
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
@@ -145,6 +169,7 @@ api.interceptors.response.use(
       }
       return Promise.reject(error);
     }
+
     return Promise.reject(error);
   }
 );

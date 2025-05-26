@@ -21,24 +21,28 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Проверяем заголовок X-Forwarded-Proto
         forwarded_proto = request.headers.get('X-Forwarded-Proto')
+        host = request.headers.get('host', '')
         
-        # Если запрос уже идет через HTTPS или мы на Railway (они автоматически обрабатывают HTTPS)
+        # Пропускаем запрос если:
+        # 1. Уже используется HTTPS
+        # 2. Запрос идет через Railway
+        # 3. Локальная разработка
+        # 4. HTTPS не принудительный
         if (forwarded_proto == 'https' or 
-            'railway.app' in request.headers.get('host', '') or
+            'railway.app' in host or
+            request.url.hostname in ['localhost', '127.0.0.1'] or
             not settings.FORCE_HTTPS):
             return await call_next(request)
             
-        # Для локальной разработки
-        if request.url.hostname in ['localhost', '127.0.0.1']:
-            return await call_next(request)
-            
-        # Для всех остальных случаев делаем редирект на HTTPS
-        if request.url.scheme == "http":
+        # Для всех остальных случаев делаем редирект на HTTPS только если запрос пришел по HTTP
+        if request.url.scheme == "http" and forwarded_proto == 'http':
+            https_url = str(request.url.replace(scheme="https"))
             return RedirectResponse(
-                request.url.replace(scheme="https"),
+                https_url,
                 status_code=301
             )
             
+        # Во всех остальных случаях пропускаем запрос
         return await call_next(request)
 
 # Инициализируем базу данных при запуске
@@ -67,6 +71,8 @@ app.add_middleware(
     allow_origins=[
         "https://frontend-production-8eb6.up.railway.app",
         "https://backend-production-1a78.up.railway.app",
+        "http://localhost:3000",
+        "http://localhost:8000",
         "https://localhost:3000",
         "https://localhost:8000"
     ],
@@ -74,13 +80,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=[
         "Content-Type",
-        "Authorization",
+        "Authorization", 
         "Accept",
         "Origin",
         "X-User-ID",
         "X-User-Role",
         "X-Forwarded-Proto",
-        "X-Forwarded-For"
+        "X-Forwarded-For",
+        "X-Real-IP",
+        "X-Request-ID"
     ],
     expose_headers=["*"],
     max_age=3600,
