@@ -6,7 +6,6 @@ import { ordersApi } from './api/orders';
 import adminApi from './api/admin-api';
 // Импортируем список публичных маршрутов
 import { PUBLIC_ROUTES } from '../pages/_app';
-import { usersApi } from './api/users-api';
 import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
 import { settingsApi } from '@/lib/api/settings-api';
 // Импортируем menuApi из правильного файла
@@ -39,18 +38,15 @@ const API_URL = baseURL;
 
 // Создаем axios инстанс с настройками
 export const api = axios.create({
-  baseURL,
+  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'X-Forwarded-Proto': 'https'
   },
   withCredentials: true,
   timeout: 30000,
-  maxRedirects: 0,
-  validateStatus: function (status) {
-    // Принимаем все статусы кроме редиректов
-    return status !== 301 && status !== 302 && status !== 307 && status !== 308;
-  }
+  maxRedirects: 0
 });
 
 // Добавляем интерфейс для расширенной конфигурации
@@ -107,14 +103,6 @@ const getAuthToken = (): string | null => {
 // Interceptor для запросов
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // Проверяем и обеспечиваем HTTPS
-    if (config.url) {
-      config.url = config.url.startsWith('https://') ? config.url : config.url.replace('http://', 'https://');
-    }
-    if (config.baseURL) {
-      config.baseURL = config.baseURL.startsWith('https://') ? config.baseURL : config.baseURL.replace('http://', 'https://');
-    }
-
     const token = getAuthToken();
     if (token) {
       if (!config.headers) {
@@ -122,23 +110,6 @@ api.interceptors.request.use(
       }
       config.headers.set('Authorization', `Bearer ${token}`);
     }
-
-    // Добавляем заголовки безопасности
-    if (!config.headers) {
-      config.headers = new AxiosHeaders();
-    }
-    
-    // Добавляем дополнительные заголовки для Railway
-    const isRailway = typeof window !== 'undefined' && window.location.hostname.includes('railway.app');
-    if (isRailway) {
-      config.headers.set('X-Forwarded-Proto', 'https');
-    }
-
-    config.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    config.headers.set('X-Content-Type-Options', 'nosniff');
-    config.headers.set('X-Frame-Options', 'DENY');
-    config.headers.set('X-XSS-Protection', '1; mode=block');
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -148,28 +119,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // Если получили редирект, обрабатываем его вручную
-    if (error.response?.status === 301 || error.response?.status === 302) {
-      const redirectUrl = error.response.headers.location;
-      if (redirectUrl) {
-        // Повторяем запрос с новым URL
-        const config = error.config;
-        if (config) {
-          config.url = redirectUrl;
-          return axios(config);
-        }
-      }
-    }
-
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login';
       }
-      return Promise.reject(error);
     }
-
     return Promise.reject(error);
   }
 );
@@ -211,7 +167,6 @@ export const authApi = {
       // Проверяем наличие кэшированного профиля
       const cachedProfile = localStorage.getItem('user_profile');
       if (cachedProfile) {
-        console.log('Используем кэшированный профиль');
         return JSON.parse(cachedProfile);
       }
 
@@ -230,7 +185,6 @@ export const authApi = {
       // В случае ошибки пробуем использовать кэшированный профиль
       const cachedProfile = localStorage.getItem('user_profile');
       if (cachedProfile) {
-        console.log('Используем кэшированный профиль после ошибки');
         return JSON.parse(cachedProfile);
       }
       
@@ -358,7 +312,7 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   return options;
 };
 
-export {  usersApi,  settingsApi};
+export {  settingsApi};
 
 export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
   try {
@@ -397,5 +351,48 @@ export const createCombinedReview = async (data: any): Promise<any> => {
   } catch (error: any) {
     console.error('Error creating combined review:', error);
     throw error;
+  }
+};
+
+// API для работы с пользователями
+export const usersApi = {
+  getUsers: async () => {
+    try {
+      const response = await api.get('/users');
+      return response.data;
+    } catch (error) {
+      console.error('Ошибка при получении списка пользователей:', error);
+      throw error;
+    }
+  },
+
+  getUser: async (id: number) => {
+    try {
+      const response = await api.get(`/users/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при получении пользователя ${id}:`, error);
+      throw error;
+    }
+  },
+
+  updateUser: async (id: number, data: any) => {
+    try {
+      const response = await api.put(`/users/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при обновлении пользователя ${id}:`, error);
+      throw error;
+    }
+  },
+
+  deleteUser: async (id: number) => {
+    try {
+      const response = await api.delete(`/users/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Ошибка при удалении пользователя ${id}:`, error);
+      throw error;
+    }
   }
 };
