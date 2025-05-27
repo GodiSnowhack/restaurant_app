@@ -120,11 +120,56 @@ export const menuApi = {
   // Получение блюда по ID
   getDishById: async (id: number): Promise<Dish | null> => {
     try {
+      console.log(`API: Получение блюда ${id}...`);
+      
+      // Используем относительный путь для доступа к нашему внутреннему прокси
       const response = await api.get(`/menu/dishes/${id}`);
+      
+      if (!response.data) {
+        throw new Error('Данные не получены');
+      }
+      
+      // Кэшируем результат
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          // Обновляем или добавляем блюдо в кэш
+          const existingIndex = dishes.findIndex((dish: Dish) => dish.id === id);
+          if (existingIndex >= 0) {
+            dishes[existingIndex] = response.data;
+          } else {
+            dishes.push(response.data);
+          }
+          localStorage.setItem('cached_dishes', JSON.stringify(dishes));
+        } else {
+          // Если кэша нет, создаем новый только с этим блюдом
+          localStorage.setItem('cached_dishes', JSON.stringify([response.data]));
+        }
+      } catch (cacheError) {
+        console.error('API: Ошибка при кешировании блюда:', cacheError);
+      }
+      
       return response.data;
     } catch (error) {
       console.error(`API: Ошибка при получении блюда ${id}:`, error);
-      return null;
+      
+      // Пробуем получить из кэша
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          const cachedDish = dishes.find((dish: Dish) => dish.id === id);
+          if (cachedDish) {
+            console.log(`API: Используем кешированное блюдо ${id}`);
+            return cachedDish;
+          }
+        }
+      } catch (cacheError) {
+        console.error('API: Ошибка при чтении кеша блюд:', cacheError);
+      }
+      
+      throw new Error('Блюдо не найдено');
     }
   },
   
