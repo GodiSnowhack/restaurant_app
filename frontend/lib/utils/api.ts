@@ -4,8 +4,17 @@ import { getDefaultApiUrl } from '../../src/config/defaults';
  * Возвращает безопасный URL для API запросов
  */
 export const getSecureApiUrl = (): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-  return ensureSecureUrl(baseUrl);
+  // Проверяем, запущено ли приложение в браузере или на сервере
+  const isBrowser = typeof window !== 'undefined';
+  
+  if (isBrowser) {
+    // В браузере используем относительные URL для внутренних прокси-эндпоинтов
+    return '/api';
+  } else {
+    // На сервере используем полный URL из переменных окружения
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+    return ensureSecureUrl(baseUrl);
+  }
 };
 
 /**
@@ -21,6 +30,11 @@ export const createApiUrl = (endpoint: string): string => {
  * Проверяет, является ли URL безопасным (HTTPS)
  */
 export const isSecureUrl = (url: string): boolean => {
+  // Для относительных URL (начинающихся с /) считаем их безопасными
+  if (url.startsWith('/')) {
+    return true;
+  }
+  
   try {
     const urlObj = new URL(url);
     return urlObj.protocol === 'https:';
@@ -33,6 +47,11 @@ export const isSecureUrl = (url: string): boolean => {
  * Преобразует URL в безопасный (HTTPS)
  */
 export const ensureSecureUrl = (url: string): string => {
+  // Для относительных URL (начинающихся с /) не меняем их
+  if (url.startsWith('/')) {
+    return url;
+  }
+  
   try {
     const urlObj = new URL(url);
     if (urlObj.protocol !== 'https:') {

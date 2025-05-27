@@ -1,8 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // Убедимся, что директория существует
 const ensureDirectoryExists = (filePath: string) => {
@@ -17,10 +19,10 @@ const ensureDirectoryExists = (filePath: string) => {
 // Начальные настройки по умолчанию
 const DEFAULT_SETTINGS = {
   restaurant_name: 'Ресторан',
-  restaurant_description: 'Описание ресторана',
-  restaurant_address: 'Адрес ресторана',
-  restaurant_phone: '+7 (777) 777-77-77',
-  restaurant_email: 'info@restaurant.com',
+  email: 'info@restaurant.com',
+  phone: '+7 (777) 777-77-77',
+  address: 'Адрес ресторана',
+  website: 'restaurant.com',
   working_hours: {
     monday: { is_open: true, open: '09:00', close: '22:00' },
     tuesday: { is_open: true, open: '09:00', close: '22:00' },
@@ -94,14 +96,72 @@ const saveSettingsToFile = (settings: any) => {
   }
 };
 
+// Получение настроек с бэкенда
+const getSettingsFromBackend = async (token?: string) => {
+  try {
+    console.log('Запрашиваем настройки с бэкенда');
+    
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = token;
+    }
+    
+    const response = await axios.get(`${API_BASE_URL}/settings`, {
+      headers,
+      maxRedirects: 0,
+      validateStatus: function (status) {
+        return status < 400; // Принимаем только успешные статусы
+      },
+      timeout: 5000 // 5 секунд таймаут
+    });
+    
+    if (response.data) {
+      console.log('Настройки успешно получены с бэкенда');
+      
+      // Сохраняем полученные настройки в файл для кэширования
+      saveSettingsToFile(response.data);
+      
+      return response.data;
+    }
+    
+    throw new Error('Пустой ответ от API');
+  } catch (error) {
+    console.error('Ошибка при получении настроек с бэкенда:', error);
+    
+    // В случае ошибки возвращаем локальные настройки
+    console.log('Используем локальные настройки');
+    return getSettingsFromFile();
+  }
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Добавляем искусственную задержку для демонстрации загрузки
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // Настройка CORS заголовков
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  // Обработка предварительных запросов CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   try {
     // GET запрос - получение настроек
     if (req.method === 'GET') {
-      const settings = getSettingsFromFile();
+      // Получаем токен из заголовков запроса
+      const token = req.headers.authorization;
+      
+      // Пытаемся получить настройки с бэкенда, если не получится, используем локальные
+      const settings = await getSettingsFromBackend(token);
+      
       return res.status(200).json(settings);
     }
     
@@ -113,6 +173,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Отсутствуют данные настроек' });
       }
       
+      // Получаем токен из заголовков запроса
+      const token = req.headers.authorization;
+      
+      try {
+        // Пытаемся обновить настройки на бэкенде
+        if (token) {
+          await axios.put(`${API_BASE_URL}/settings`, newSettings, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token
+            },
+            maxRedirects: 0
+          });
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении настроек на бэкенде:', error);
+      }
+      
+      // В любом случае обновляем локальные настройки
       const updatedSettings = saveSettingsToFile(newSettings);
       return res.status(200).json(updatedSettings);
     }
