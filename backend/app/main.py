@@ -66,16 +66,39 @@ app = FastAPI(
 app.add_middleware(HTTPSRedirectMiddleware)
 
 # Настройки CORS
+origins = [
+    "https://frontend-production-8eb6.up.railway.app",
+    "https://backend-production-1a78.up.railway.app",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://localhost:3000",
+    "https://localhost:8000"
+]
+
+# Middleware для обработки CORS
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", origins[0])
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-User-ID, X-User-Role"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Max-Age"] = "3600"
+        return response
+        
+    response = await call_next(request)
+    
+    origin = request.headers.get("origin")
+    if origin in origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://frontend-production-8eb6.up.railway.app",
-        "https://backend-production-1a78.up.railway.app",
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "https://localhost:3000",
-        "https://localhost:8000"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -88,17 +111,11 @@ app.add_middleware(
         "X-Forwarded-Proto",
         "X-Forwarded-For",
         "X-Real-IP",
-        "X-Request-ID",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials",
-        "Access-Control-Allow-Methods",
-        "Access-Control-Allow-Headers"
+        "X-Request-ID"
     ],
     expose_headers=[
         "Content-Type",
-        "Authorization",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials"
+        "Authorization"
     ],
     max_age=3600,
 )

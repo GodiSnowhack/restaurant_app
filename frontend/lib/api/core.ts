@@ -9,21 +9,47 @@ export const api = axios.create({
   withCredentials: true,
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': 'https://frontend-production-8eb6.up.railway.app',
-    'Access-Control-Allow-Credentials': 'true'
+    'Content-Type': 'application/json'
   }
 });
 
 // Функция получения токена
 export const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  
+  // Проверяем несколько источников
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  
+  if (!token) {
+    console.warn('Токен не найден');
+    return null;
+  }
+
+  // Проверяем валидность токена
+  try {
+    const decoded = jwt.decode(token) as { exp?: number };
+    if (!decoded || !decoded.exp) {
+      console.warn('Токен невалиден');
+      clearAuthTokens();
+      return null;
+    }
+    if (Date.now() >= decoded.exp * 1000) {
+      console.warn('Токен истек');
+      clearAuthTokens();
+      return null;
+    }
+    return token;
+  } catch (error) {
+    console.error('Ошибка при проверке токена:', error);
+    clearAuthTokens();
+    return null;
+  }
 };
 
 // Очистка токенов при выходе
 export const clearAuthTokens = () => {
   localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
   localStorage.removeItem('user_profile');
   localStorage.removeItem('user_id');
   localStorage.removeItem('user_role');
@@ -36,15 +62,18 @@ api.interceptors.request.use(
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Если токен отсутствует или невалиден, перенаправляем на страницу входа
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+        window.location.href = '/auth/login';
+        throw new Error('Необходима авторизация');
+      }
     }
-
-    // Добавляем CORS заголовки для каждого запроса
-    config.headers['Access-Control-Allow-Origin'] = 'https://frontend-production-8eb6.up.railway.app';
-    config.headers['Access-Control-Allow-Credentials'] = 'true';
     
     return config;
   },
   (error: AxiosError) => {
+    console.error('Ошибка в интерцепторе запроса:', error);
     return Promise.reject(error);
   }
 );
@@ -53,12 +82,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
+    console.error('Ошибка ответа:', error.response?.status, error.message);
+    
     if (error.response?.status === 401) {
       clearAuthTokens();
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
         window.location.href = '/auth/login';
       }
     }
+    
     return Promise.reject(error);
   }
 );

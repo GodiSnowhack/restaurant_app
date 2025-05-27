@@ -134,6 +134,14 @@ def update_settings(
     logger.info(f"Пользователь: {current_user.email} (role: {current_user.role})")
     logger.info(f"Данные для обновления: {settings_in.dict()}")
     
+    # Проверяем роль пользователя
+    if not current_user:
+        logger.error("Пользователь не авторизован")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Необходима авторизация"
+        )
+    
     if current_user.role != UserRole.admin:
         logger.warning(f"Попытка обновления настроек пользователем без прав админа: {current_user.email}")
         raise HTTPException(
@@ -142,6 +150,7 @@ def update_settings(
         )
     
     try:
+        # Получаем текущие настройки
         db_settings = db.query(Settings).first()
         
         if not db_settings:
@@ -155,23 +164,27 @@ def update_settings(
         settings_data = settings_in.dict(exclude_unset=True)
         logger.info(f"Обновляемые поля: {list(settings_data.keys())}")
         
+        # Проверяем каждое поле перед обновлением
         for field, value in settings_data.items():
             if hasattr(db_settings, field):
+                logger.debug(f"Обновление поля {field}: {value}")
                 setattr(db_settings, field, value)
             else:
                 logger.warning(f"Попытка обновить несуществующее поле: {field}")
         
         try:
+            # Сохраняем изменения
             db.commit()
             db.refresh(db_settings)
             logger.info("Настройки успешно обновлены")
             return db_settings
+            
         except Exception as db_error:
             logger.error(f"Ошибка при сохранении в базу данных: {str(db_error)}")
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка при сохранении настроек в базу данных"
+                detail=f"Ошибка при сохранении настроек в базу данных: {str(db_error)}"
             )
             
     except HTTPException:
