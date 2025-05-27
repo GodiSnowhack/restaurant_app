@@ -188,7 +188,7 @@ export const menuApi = {
       const requestData = { ...dish, id };
       
       // Используем новый эндпоинт update-dish вместо прямого обновления
-      const response = await api.post('/menu/update-dish', requestData);
+      const response = await api.post('/api/menu/update-dish', requestData);
       
       // Обновляем кэш блюд после успешного обновления
       try {
