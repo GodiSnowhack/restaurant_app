@@ -25,47 +25,35 @@ class RestaurantTable(BaseModel):
     position_y: int
     status: str
 
-class SettingsBase(BaseModel):
-    """Базовая схема настроек ресторана"""
-    restaurant_name: str = Field(default="Вкусно и Точка")
-    email: EmailStr = Field(default="info@restaurant.ru")
-    phone: str = Field(default="+7 (999) 123-45-67")
-    address: str = Field(default="ул. Пушкина, д. 10, Москва")
+class PublicSettings(BaseModel):
+    """Схема публичных настроек ресторана"""
+    restaurant_name: str
+    email: EmailStr
+    phone: str
+    address: str
     website: Optional[str] = None
-    
-    working_hours: Dict[str, Dict[str, Any]] = Field(default_factory=lambda: {
-        "monday": {"open": "09:00", "close": "22:00", "is_closed": False},
-        "tuesday": {"open": "09:00", "close": "22:00", "is_closed": False},
-        "wednesday": {"open": "09:00", "close": "22:00", "is_closed": False},
-        "thursday": {"open": "09:00", "close": "22:00", "is_closed": False},
-        "friday": {"open": "09:00", "close": "23:00", "is_closed": False},
-        "saturday": {"open": "10:00", "close": "23:00", "is_closed": False},
-        "sunday": {"open": "10:00", "close": "22:00", "is_closed": False}
-    })
-    
-    tables: List[RestaurantTable] = Field(default_factory=list)
-    
-    currency: str = Field(default="KZT")
-    currency_symbol: str = Field(default="₸")
-    tax_percentage: int = Field(default=20)
-    min_order_amount: int = Field(default=1000)
-    delivery_fee: int = Field(default=300)
-    free_delivery_threshold: int = Field(default=3000)
-    
-    table_reservation_enabled: bool = Field(default=True)
-    delivery_enabled: bool = Field(default=True)
-    pickup_enabled: bool = Field(default=True)
-    
-    smtp_host: Optional[str] = None
-    smtp_port: Optional[int] = None
-    smtp_user: Optional[str] = None
+    working_hours: Dict[str, WorkingHoursModel]
+
+class SettingsBase(PublicSettings):
+    """Базовая схема настроек ресторана"""
+    currency: str = "RUB"
+    currency_symbol: str = "₽"
+    tax_percentage: float = 20.0
+    min_order_amount: float = 1000.0
+    delivery_fee: float = 300.0
+    free_delivery_threshold: float = 3000.0
+    table_reservation_enabled: bool = True
+    delivery_enabled: bool = True
+    pickup_enabled: bool = True
+    tables: List[RestaurantTable] = []
+    smtp_host: str = "smtp.example.com"
+    smtp_port: int = 587
+    smtp_user: str = "noreply@restaurant.ru"
     smtp_password: Optional[str] = None
-    smtp_from_email: Optional[EmailStr] = None
-    smtp_from_name: Optional[str] = None
-    
+    smtp_from_email: str = "noreply@restaurant.ru"
+    smtp_from_name: str = "Restaurant"
     sms_api_key: Optional[str] = None
-    sms_sender: Optional[str] = None
-    
+    sms_sender: str = "RESTAURANT"
     privacy_policy: Optional[str] = None
     terms_of_service: Optional[str] = None
 
@@ -73,25 +61,38 @@ class SettingsCreate(SettingsBase):
     """Схема для создания настроек"""
     pass
 
-class SettingsUpdate(SettingsBase):
+class SettingsUpdate(BaseModel):
     """Схема для обновления настроек"""
     restaurant_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    website: Optional[str] = None
+    working_hours: Optional[Dict[str, WorkingHoursModel]] = None
     currency: Optional[str] = None
     currency_symbol: Optional[str] = None
-    tax_percentage: Optional[int] = None
-    min_order_amount: Optional[int] = None
-    delivery_fee: Optional[int] = None
-    free_delivery_threshold: Optional[int] = None
+    tax_percentage: Optional[float] = None
+    min_order_amount: Optional[float] = None
+    delivery_fee: Optional[float] = None
+    free_delivery_threshold: Optional[float] = None
     table_reservation_enabled: Optional[bool] = None
     delivery_enabled: Optional[bool] = None
     pickup_enabled: Optional[bool] = None
+    tables: Optional[List[RestaurantTable]] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    sms_api_key: Optional[str] = None
+    sms_sender: Optional[str] = None
+    privacy_policy: Optional[str] = None
+    terms_of_service: Optional[str] = None
 
 class SettingsResponse(SettingsBase):
     """Схема для ответа с настройками"""
     id: int
-    
+
     class Config:
-        from_attributes = True 
+        orm_mode = True 

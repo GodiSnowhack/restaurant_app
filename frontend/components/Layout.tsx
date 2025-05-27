@@ -4,6 +4,7 @@ import Header from './Header';
 import Footer from './Footer';
 import { useTheme } from '@/lib/theme-context';
 import useAuthStore from '../lib/auth-store';
+import { useSettings } from '../settings-context';
 
 // Вспомогательная функция для безопасного получения URL изображений с обработкой ошибок 404
 export const getSafeImageUrl = (imageUrl: string | null | undefined): string => {
@@ -41,7 +42,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
-  title = 'Restaurant App', 
+  title, 
   section, 
   showFooter = true, 
   description = 'Restaurant management application',
@@ -51,6 +52,10 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
   const { isDark } = useTheme();
   const { isAuthenticated, user, initialize } = useAuthStore();
+  const { publicSettings, settings } = useSettings();
+  
+  // Используем публичные настройки, если они доступны, иначе используем полные настройки
+  const displaySettings = publicSettings || settings;
   
   useEffect(() => {
     // Применяем dark mode в соответствии с настройками пользователя
@@ -84,7 +89,7 @@ const Layout: React.FC<LayoutProps> = ({
   return (
     <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       <Head>
-        <title>{title}</title>
+        <title>{title || displaySettings.restaurant_name}</title>
         <meta name="description" content={description} />
         <meta name="keywords" content={keywords} />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />

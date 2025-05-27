@@ -1,5 +1,21 @@
-import { RestaurantSettings } from './types';
+import { RestaurantSettings, WorkingHours } from './types';
 import { api } from '../api/api';
+
+// Интерфейс для публичных настроек
+export interface PublicSettings {
+  restaurant_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  website?: string;
+  working_hours: {
+    [key: string]: {
+      open: string;
+      close: string;
+      is_closed: boolean;
+    };
+  };
+}
 
 interface UpdateSettingsRequest extends Partial<RestaurantSettings> {
   isEditing?: boolean;
@@ -67,146 +83,50 @@ export const settingsApi = {
     return defaultSettings;
   },
   
-  // Получение настроек с сервера
+  // Получение публичных настроек
+  getPublicSettings: async (): Promise<PublicSettings> => {
+    try {
+      console.log('Запрос публичных настроек...');
+      const response = await api.get<PublicSettings>('/settings/public');
+      
+      if (response.data) {
+        return response.data;
+      }
+      throw new Error('Не удалось получить публичные настройки');
+    } catch (error) {
+      console.error('Ошибка при получении публичных настроек:', error);
+      throw error;
+    }
+  },
+
+  // Получение полных настроек
   getSettings: async (): Promise<RestaurantSettings> => {
     try {
       console.log('Запрос настроек с сервера...');
       const response = await api.get<RestaurantSettings>('/settings');
       
       if (response.data) {
-        const settings = response.data;
-        console.log('Получены настройки с сервера:', settings);
-        
-        // Проверяем наличие столов
-        if (!settings.tables || settings.tables.length === 0) {
-          console.warn('Сервер вернул настройки без столов');
-          // Добавляем дефолтные столы
-          settings.tables = settingsApi.getDefaultSettings().tables;
-        }
-        
-        // Обновляем кэш
-        settingsApi.saveSettingsLocally(settings);
-        return settings;
+        console.log('Получены настройки с сервера:', response.data);
+        return response.data;
       }
-      
-      throw new Error('Сервер вернул пустые настройки');
+      throw new Error('Не удалось получить настройки');
     } catch (error) {
       console.error('Ошибка при получении настроек:', error);
-      
-      // Пробуем получить из кэша
-      const cachedSettings = settingsApi.getLocalSettings();
-      if (cachedSettings) {
-        console.log('Используем кэшированные настройки после ошибки');
-        return cachedSettings;
-      }
-      
-      // Если нет в кэше, возвращаем дефолтные
-      console.log('Используем дефолтные настройки');
-      const defaultSettings = settingsApi.getDefaultSettings();
-      // Сохраняем дефолтные настройки в кэш
-      settingsApi.saveSettingsLocally(defaultSettings);
-      return defaultSettings;
+      throw error;
     }
   },
 
-  // Принудительное обновление настроек с сервера
-  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
-    try {
-      console.log('Принудительное обновление настроек с сервера...');
-      const response = await api.get<RestaurantSettings>('/settings');
-      
-      if (response.data) {
-        const settings = response.data;
-        // Обновляем кэш
-        settingsApi.saveSettingsLocally(settings);
-        return settings;
-      }
-      
-      throw new Error('Сервер вернул пустые настройки');
-    } catch (error) {
-      console.error('Ошибка при принудительном обновлении настроек:', error);
-      // При ошибке возвращаем локальные настройки
-      const localSettings = settingsApi.getLocalSettings();
-      if (localSettings) {
-        return localSettings;
-      }
-      return settingsApi.getDefaultSettings();
-    }
-  },
-
-  // Обновление настроек на сервере
+  // Обновление настроек
   updateSettings: async (settings: UpdateSettingsRequest): Promise<RestaurantSettings> => {
     try {
-      // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-
-      // Проверяем роль пользователя
-      const userProfile = localStorage.getItem('user_profile');
-      if (!userProfile) {
-        throw new Error('Информация о пользователе не найдена');
-      }
-
-      const { role } = JSON.parse(userProfile);
-      if (role !== 'admin') {
-        throw new Error('Недостаточно прав для изменения настроек');
-      }
-
-      // Удаляем служебное поле перед отправкой
-      const { isEditing, ...settingsData } = settings;
-
-      // Отправляем запрос на сервер с заголовками авторизации
-      const response = await api.put<RestaurantSettings>('/settings', settingsData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-User-Role': role
-        }
-      });
+      const response = await api.put<RestaurantSettings>('/settings', settings);
       
-      if (!response.data) {
-        throw new Error('Сервер вернул некорректный ответ');
+      if (response.data) {
+        return response.data;
       }
-
-      const updatedSettings = response.data;
-
-      // Проверяем наличие всех необходимых полей
-      const requiredFields = [
-        'restaurant_name',
-        'email',
-        'phone',
-        'address',
-        'currency',
-        'currency_symbol',
-        'tables'
-      ] as const;
-
-      const missingFields = requiredFields.filter(field => !updatedSettings[field]);
-      if (missingFields.length > 0) {
-        throw new Error(`Отсутствуют обязательные поля в ответе сервера: ${missingFields.join(', ')}`);
-      }
-
-      // Обновляем кэш только если это не временное сохранение при редактировании
-      if (!isEditing) {
-        settingsApi.saveSettingsLocally(updatedSettings);
-      }
-
-      return updatedSettings;
-    } catch (error: any) {
+      throw new Error('Не удалось обновить настройки');
+    } catch (error) {
       console.error('Ошибка при обновлении настроек:', error);
-      
-      // Проверяем тип ошибки и формируем соответствующее сообщение
-      if (error.response) {
-        // Ошибка от сервера
-        const message = error.response.data?.message || 'Ошибка сервера при обновлении настроек';
-        throw new Error(message);
-      } else if (error.request) {
-        // Ошибка сети
-        throw new Error('Не удалось связаться с сервером. Проверьте подключение к интернету.');
-      }
-      
-      // Прокидываем исходную ошибку дальше
       throw error;
     }
   },
@@ -235,6 +155,31 @@ export const settingsApi = {
       } catch (error) {
         console.error('Ошибка при сохранении настроек в localStorage:', error);
       }
+    }
+  },
+
+  // Принудительное обновление настроек с сервера
+  forceRefreshSettings: async (): Promise<RestaurantSettings> => {
+    try {
+      console.log('Принудительное обновление настроек с сервера...');
+      const response = await api.get<RestaurantSettings>('/settings');
+      
+      if (response.data) {
+        const settings = response.data;
+        // Обновляем кэш
+        settingsApi.saveSettingsLocally(settings);
+        return settings;
+      }
+      
+      throw new Error('Сервер вернул пустые настройки');
+    } catch (error) {
+      console.error('Ошибка при принудительном обновлении настроек:', error);
+      // При ошибке возвращаем локальные настройки
+      const localSettings = settingsApi.getLocalSettings();
+      if (localSettings) {
+        return localSettings;
+      }
+      return settingsApi.getDefaultSettings();
     }
   }
 }; 

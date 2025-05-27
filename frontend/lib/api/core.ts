@@ -272,4 +272,52 @@ export const checkConnectionAdvanced = async (
       error: error.message || 'Не удалось подключиться к серверу',
     };
   }
+};
+
+// Интерфейс для публичных настроек
+interface PublicSettings {
+  restaurant_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  website: string;
+  working_hours: {
+    [key: string]: {
+      open: string;
+      close: string;
+      is_closed: boolean;
+    };
+  };
+}
+
+// Интерфейс для полных настроек
+interface FullSettings extends PublicSettings {
+  tables_count: number;
+  currency: string;
+  currency_symbol: string;
+  tax_percentage: number;
+  min_order_amount: number;
+  delivery_fee: number;
+  free_delivery_threshold: number;
+  table_reservation_enabled: boolean;
+  delivery_enabled: boolean;
+  pickup_enabled: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_from_email: string;
+  smtp_from_name: string;
+  sms_sender: string;
+}
+
+// Получение только публичных настроек
+export const getPublicSettings = async (): Promise<PublicSettings> => {
+  const response = await api.get('/settings/public');
+  return response.data;
+};
+
+// Получение полных настроек (только для авторизованных пользователей)
+export const getFullSettings = async (): Promise<FullSettings> => {
+  const response = await api.get('/settings');
+  return response.data;
 }; 
