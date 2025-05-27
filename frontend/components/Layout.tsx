@@ -9,6 +9,11 @@ import useAuthStore from '../lib/auth-store';
 export const getSafeImageUrl = (imageUrl: string | null | undefined): string => {
   if (!imageUrl) return '/images/placeholder-user.jpg';
   
+  // Если это аватар пользователя, всегда возвращаем плейсхолдер
+  if (imageUrl.includes('avatars/') || imageUrl.includes('user') && imageUrl.endsWith('.jpg')) {
+    return '/images/placeholder-user.jpg';
+  }
+  
   // Если URL начинается с http или https, возвращаем как есть
   if (imageUrl.startsWith('http:') || imageUrl.startsWith('https:')) {
     return imageUrl;
@@ -16,11 +21,6 @@ export const getSafeImageUrl = (imageUrl: string | null | undefined): string => 
   
   // Для относительных путей добавляем базовый URL
   if (imageUrl.startsWith('/')) {
-    // Проверяем есть ли в URL имя пользователя (userX.jpg)
-    if (imageUrl.includes('user') && imageUrl.endsWith('.jpg')) {
-      // Заменяем на плейсхолдер, чтобы предотвратить ошибки 404
-      return '/images/placeholder-user.jpg';
-    }
     return imageUrl;
   }
   
@@ -31,7 +31,7 @@ export const getSafeImageUrl = (imageUrl: string | null | undefined): string => 
 interface LayoutProps {
   children: ReactNode;
   title?: string;
-  section?: string;
+  section?: 'admin' | 'waiter' | 'customer' | undefined;
   showFooter?: boolean;
   description?: string;
   keywords?: string;

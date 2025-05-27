@@ -1,14 +1,23 @@
 import { ensureSecureUrl } from '../../lib/utils/api';
 
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      NEXT_PUBLIC_API_URL?: string;
+      NEXT_PUBLIC_FRONTEND_URL?: string;
+    }
+  }
+}
+
 // Базовые URL для разных окружений
 export const DEFAULT_URLS = {
   development: {
-    api: 'https://localhost:8000/api/v1',
-    frontend: 'https://localhost:3000'
+    api: 'http://localhost:8000/api/v1',
+    frontend: 'http://localhost:3000'
   },
   production: {
-    api: 'https://backend-production-1a78.up.railway.app/api/v1',
-    frontend: 'https://frontend-production-8eb6.up.railway.app'
+    api: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
+    frontend: process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app'
   }
 };
 

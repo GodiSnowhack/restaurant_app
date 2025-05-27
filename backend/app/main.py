@@ -6,6 +6,7 @@ from pathlib import Path
 import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse
+import os
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -45,11 +46,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://frontend-production-8eb6.up.railway.app",
-        "https://backend-production-1a78.up.railway.app",
+        os.getenv("CORS_ORIGINS", "https://frontend-production-8eb6.up.railway.app"),
         "http://localhost:3000",
-        "http://localhost:8000",
-        "*"  # Разрешаем все источники для отладки
+        "http://localhost:8000"
     ],
     allow_credentials=True,
     allow_methods=["*"],

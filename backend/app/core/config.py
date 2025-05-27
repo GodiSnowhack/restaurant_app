@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     # Используем значение из .env или фиксированное значение по умолчанию
-    JWT_SECRET: str = "your-super-secret-key-keep-it-safe-and-secure-123"
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "your-super-secret-key-keep-it-safe-and-secure-123")
     JWT_ALGORITHM: str = "HS256"
     # 60 минут * 24 часа * 8 дней = 8 дней
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
@@ -19,11 +19,9 @@ class Settings(BaseSettings):
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        "https://frontend-production-8eb6.up.railway.app",
-        "https://backend-production-1a78.up.railway.app",
+        os.getenv("CORS_ORIGINS", "https://frontend-production-8eb6.up.railway.app"),
         "http://localhost:3000",
-        "http://localhost:8000",
-        "*"  # Разрешаем все источники для отладки
+        "http://localhost:8000"
     ]
 
     # Принудительное использование HTTPS
