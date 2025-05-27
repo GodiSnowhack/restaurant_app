@@ -35,6 +35,40 @@ const getCachedDishes = () => {
   }
 };
 
+// Сохранение блюд в кэш
+const saveDishesToCache = (dishes: any[]) => {
+  try {
+    ensureDirectoryExists(CACHE_FILE_PATH);
+    
+    const cacheData = {
+      dishes,
+      timestamp: Date.now()
+    };
+    
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2), 'utf8');
+    console.log('Блюда успешно сохранены в кэш');
+  } catch (error) {
+    console.error('Ошибка при сохранении кэша блюд:', error);
+  }
+};
+
+// Обновление блюда в кэше
+const updateDishInCache = (id: number, updatedDish: any) => {
+  try {
+    const dishes = getCachedDishes();
+    if (!dishes) return;
+    
+    const index = dishes.findIndex((dish: any) => dish.id === id);
+    if (index >= 0) {
+      dishes[index] = { ...dishes[index], ...updatedDish, id };
+      saveDishesToCache(dishes);
+      console.log(`Блюдо с ID ${id} обновлено в кэше`);
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении блюда в кэше:', error);
+  }
+};
+
 // Данные-заглушки для блюд
 const FALLBACK_DISHES = [
   { 
@@ -114,11 +148,32 @@ const FALLBACK_DISHES = [
   }
 ];
 
+// Список разрешенных полей для редактирования блюда
+const allowedDishFields = [
+  'name', 'description', 'price', 'category_id', 'image_url', 
+  'is_available', 'calories', 'weight', 'position', 'is_vegetarian', 
+  'is_vegan', 'is_spicy', 'cooking_time', 'cost_price', 'ingredients',
+  'allergens', 'tags'
+];
+
+// Функция для фильтрации полей объекта
+const filterObject = (obj: any, allowedFields: string[]) => {
+  const filteredObj: any = {};
+  
+  for (const field of allowedFields) {
+    if (field in obj) {
+      filteredObj[field] = obj[field];
+    }
+  }
+  
+  return filteredObj;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS заголовков
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
@@ -129,7 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).end();
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'PUT') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
@@ -145,47 +200,120 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ message: 'Invalid dish ID format' });
   }
 
-  // Сначала пробуем получить блюдо из кэша
-  const cachedDishes = getCachedDishes();
-  
-  if (cachedDishes) {
-    const cachedDish = cachedDishes.find((dish: any) => dish.id === dishId);
-    if (cachedDish) {
-      console.log(`Возвращаем блюдо с ID ${dishId} из кэша`);
-      return res.status(200).json(cachedDish);
+  // Обработка GET запроса
+  if (req.method === 'GET') {
+    // Сначала пробуем получить блюдо из кэша
+    const cachedDishes = getCachedDishes();
+    
+    if (cachedDishes) {
+      const cachedDish = cachedDishes.find((dish: any) => dish.id === dishId);
+      if (cachedDish) {
+        console.log(`Возвращаем блюдо с ID ${dishId} из кэша`);
+        return res.status(200).json(cachedDish);
+      }
+    }
+
+    try {
+      // Пробуем получить блюдо с бэкенда
+      const url = `${getSecureApiUrl()}/menu/dishes/${dishId}`;
+      console.log(`Запрос блюда с ID ${dishId} из API: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        maxRedirects: 0,
+        validateStatus: function (status) {
+          return status < 400;
+        },
+        timeout: 5000
+      });
+
+      return res.status(200).json(response.data);
+    } catch (error: any) {
+      console.error(`Ошибка при получении блюда с ID ${dishId}:`, error.message);
+      
+      // Ищем блюдо в данных-заглушках
+      const fallbackDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
+      
+      if (fallbackDish) {
+        console.log(`Возвращаем заглушку для блюда с ID ${dishId}`);
+        return res.status(200).json(fallbackDish);
+      }
+      
+      // Если блюда нет даже в заглушках, возвращаем 404
+      return res.status(404).json({ message: 'Блюдо не найдено' });
     }
   }
 
-  try {
-    // Пробуем получить блюдо с бэкенда
-    const url = `${getSecureApiUrl()}/menu/dishes/${dishId}`;
-    console.log(`Запрос блюда с ID ${dishId} из API: ${url}`);
+  // Обработка PUT запроса (обновление блюда)
+  if (req.method === 'PUT') {
+    console.log(`[API] Получен запрос на обновление блюда ID ${dishId}`);
     
-    const response = await axios.get(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      maxRedirects: 0,
-      validateStatus: function (status) {
-        return status < 400;
-      },
-      timeout: 5000
-    });
-
-    return res.status(200).json(response.data);
-  } catch (error: any) {
-    console.error(`Ошибка при получении блюда с ID ${dishId}:`, error.message);
-    
-    // Ищем блюдо в данных-заглушках
-    const fallbackDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
-    
-    if (fallbackDish) {
-      console.log(`Возвращаем заглушку для блюда с ID ${dishId}`);
-      return res.status(200).json(fallbackDish);
+    // Проверяем тело запроса
+    if (!req.body) {
+      return res.status(400).json({ message: 'Missing request body' });
     }
-    
-    // Если блюда нет даже в заглушках, возвращаем 404
-    return res.status(404).json({ message: 'Блюдо не найдено' });
+
+    // Фильтруем данные для безопасности
+    const dishData = filterObject(req.body, allowedDishFields);
+
+    try {
+      // Пытаемся отправить запрос на бэкенд
+      const url = `${getSecureApiUrl()}/menu/dishes/${dishId}`;
+      console.log(`Отправка запроса на обновление блюда в API: ${url}`);
+      
+      try {
+        const response = await axios.put(url, dishData, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(req.headers.authorization ? { 'Authorization': req.headers.authorization } : {})
+          },
+          maxRedirects: 0,
+          validateStatus: function (status) {
+            return status < 400;
+          },
+          timeout: 5000
+        });
+
+        // Обновляем кэш
+        updateDishInCache(dishId, response.data);
+        
+        return res.status(200).json(response.data);
+      } catch (error) {
+        console.error(`Ошибка при обновлении блюда в API:`, error);
+        
+        // Если не удалось обновить на бэкенде, обновляем только локальный кэш
+        // Сначала проверяем, есть ли блюдо в кэше или заглушках
+        let existingDish = null;
+        const cachedDishes = getCachedDishes();
+        
+        if (cachedDishes) {
+          existingDish = cachedDishes.find((dish: any) => dish.id === dishId);
+        }
+        
+        if (!existingDish) {
+          existingDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
+        }
+        
+        if (!existingDish) {
+          return res.status(404).json({ message: 'Блюдо не найдено' });
+        }
+        
+        // Обновляем данные блюда
+        const updatedDish = { ...existingDish, ...dishData, id: dishId };
+        
+        // Обновляем кэш
+        updateDishInCache(dishId, updatedDish);
+        
+        console.log(`Блюдо с ID ${dishId} обновлено локально`);
+        return res.status(200).json(updatedDish);
+      }
+    } catch (error: any) {
+      console.error(`Серверная ошибка при обновлении блюда с ID ${dishId}:`, error.message);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
   }
 } 
