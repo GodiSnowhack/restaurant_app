@@ -9,7 +9,7 @@ import { getSecureApiUrl } from '../../../../lib/utils/api';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', 'https://frontend-production-8eb6.up.railway.app');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE,PATCH');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -58,11 +58,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'X-User-ID': userId,
         'X-User-Role': userRole,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Origin': 'https://frontend-production-8eb6.up.railway.app'
       },
-      maxRedirects: 2, // Ограничиваем количество редиректов
+      maxRedirects: 1,
       validateStatus: (status) => {
-        return (status >= 200 && status < 300) || (status === 307 || status === 308);
+        return status >= 200 && status < 400;
       }
     });
 
@@ -84,24 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const response = await api.request({
       method: req.method as string,
       url,
-      data: req.body,
-      maxRedirects: 5
+      data: req.body
     });
-
-    // Проверяем на редирект
-    if (response.status === 307 || response.status === 308) {
-      const location = response.headers.location;
-      if (location) {
-        console.log('Получен редирект на:', location);
-        const redirectResponse = await api.request({
-          method: req.method as string,
-          url: location,
-          data: req.body,
-          maxRedirects: 5
-        });
-        return res.status(redirectResponse.status).json(redirectResponse.data);
-      }
-    }
 
     // Возвращаем данные
     return res.status(response.status).json(response.data);

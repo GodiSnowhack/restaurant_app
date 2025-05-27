@@ -8,12 +8,13 @@ export const api = axios.create({
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Origin': 'https://frontend-production-8eb6.up.railway.app'
   },
-  maxRedirects: 2,
-  withCredentials: false, // Отключаем, так как используем токен
+  maxRedirects: 1, // Минимизируем количество редиректов
+  withCredentials: true, // Включаем для CORS
   validateStatus: (status) => {
-    return (status >= 200 && status < 300) || (status === 307 || status === 308);
+    return status >= 200 && status < 400; // Принимаем все успешные статусы и редиректы
   }
 });
 
@@ -124,10 +125,11 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Проверяем и принудительно устанавливаем HTTPS для всех URL
-    if (config.url && config.url.startsWith('http://')) {
-      config.url = config.url.replace('http://', 'https://');
-    }
+    // Добавляем заголовки для CORS
+    config.headers['Access-Control-Allow-Origin'] = 'https://frontend-production-8eb6.up.railway.app';
+    config.headers['Access-Control-Allow-Credentials'] = 'true';
+    config.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS';
+    config.headers['Access-Control-Allow-Headers'] = 'Origin,X-Requested-With,Content-Type,Accept,Authorization,X-User-ID,X-User-Role';
 
     // Добавляем заголовки для предотвращения кэширования
     config.headers['Cache-Control'] = 'no-cache';
@@ -160,26 +162,23 @@ api.interceptors.response.use(
       headers: error.response?.headers
     });
 
-    // Обработка редиректов
+    // Обработка CORS ошибок
+    if (error.message === 'Network Error' && error.response?.status === undefined) {
+      console.error('[API] CORS ошибка:', error);
+      return Promise.reject(new Error('Ошибка доступа к API. Проверьте настройки CORS на сервере.'));
+    }
+
+    // Обработка редиректов - теперь только для HTTPS
     if (error.response?.status === 307 || error.response?.status === 308) {
       const newLocation = error.response.headers['location'];
-      if (newLocation && config && !config._retry) {
+      if (newLocation && config && !config._retry && newLocation.startsWith('https://')) {
         console.log('[API] Обработка редиректа:', {
           from: config.url,
           to: newLocation
         });
         
         config._retry = true;
-        
-        // Если редирект на HTTPS, обновляем baseURL
-        if (newLocation.startsWith('https://') && config.baseURL?.startsWith('http://')) {
-          config.baseURL = config.baseURL.replace('http://', 'https://');
-        }
-        
-        // Используем полный URL из заголовка Location
-        const redirectUrl = new URL(newLocation);
-        config.url = redirectUrl.pathname + redirectUrl.search;
-        
+        config.url = newLocation;
         return api(config);
       }
     }
@@ -208,13 +207,6 @@ api.interceptors.response.use(
             window.location.href = '/auth/login';
           }
           return Promise.reject(error);
-        }
-        
-        // Если токен валиден, но все равно получаем 401,
-        // возможно, проблема с сервером. Пробуем повторить запрос
-        if (config && !config._retry) {
-          config._retry = true;
-          return api(config);
         }
       } catch (e) {
         console.error('[API] Ошибка при обработке 401:', e);
