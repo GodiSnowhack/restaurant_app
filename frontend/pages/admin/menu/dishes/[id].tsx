@@ -163,70 +163,24 @@ const EditDishPage: NextPage = () => {
 
       console.log('[EditDish] Отправка данных на сервер:', dishData);
       
-      // Отправляем запрос на обновление через прокси
-      const response = await fetch(`/api/menu/dishes/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dishData)
-      });
+      // Используем menuApi.updateDish вместо прямого fetch-запроса
+      const result = await menuApi.updateDish(parseInt(id as string), dishData);
       
-      const result = await response.json();
-      console.log('[EditDish] Детальный лог ответа:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        result: result,
-        requestData: {
-          url: `/api/menu/dishes/${id}`,
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer [HIDDEN]'
-          },
-          body: dishData
+      console.log('[EditDish] Успешное обновление:', result);
+      setSuccess('Блюдо успешно обновлено');
+      
+      // Очищаем кэш
+      localStorage.removeItem('cached_dishes');
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('cached_dishes_')) {
+          localStorage.removeItem(key);
         }
       });
-
-      // Проверяем статус ответа
-      if (!response.ok) {
-        console.log('[EditDish] Ответ не ok:', {
-          status: response.status,
-          statusText: response.statusText,
-          result: result
-        });
-        throw new Error(result.message || result.error || 'Не удалось обновить блюдо');
-      }
-
-      // Если статус 200-299, считаем операцию успешной
-      if (response.ok) {
-        console.log('[EditDish] Успешное обновление:', {
-          status: response.status,
-          result: result
-        });
-        setSuccess('Блюдо успешно обновлено');
-        
-        // Очищаем кэш
-        localStorage.removeItem('cached_dishes');
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('cached_dishes_')) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        // Перенаправляем на список блюд
-        setTimeout(() => {
-          router.push('/admin/menu');
-        }, 1500);
-        return;
-      }
-
-      // До этой строки код не должен дойти, так как выше есть return
-      throw new Error('Не удалось обновить блюдо');
+      
+      // Перенаправляем на список блюд
+      setTimeout(() => {
+        router.push('/admin/menu');
+      }, 1500);
       
     } catch (error: any) {
       console.error('[EditDish] Ошибка при обновлении блюда:', error);
