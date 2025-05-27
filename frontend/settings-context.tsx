@@ -9,6 +9,8 @@ interface SettingsContextType {
   publicSettings: PublicSettings | null;
   isLoading: boolean;
   error: string | null;
+  loadSettings: () => Promise<void>;
+  loadPublicSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -22,16 +24,35 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { settings, publicSettings, isLoading, error, loadPublicSettings } = useSettingsStore();
+  const { settings, publicSettings, isLoading, error, loadSettings, loadPublicSettings } = useSettingsStore();
+  const [initialized, setInitialized] = useState(false);
   const [showError, setShowError] = useState(false);
 
   useEffect(() => {
-    // Загружаем только публичные настройки при монтировании компонента
-    loadPublicSettings();
-  }, []);
+    const initializeSettings = async () => {
+      if (!initialized) {
+        try {
+          // Загружаем публичные настройки только один раз при инициализации
+          await loadPublicSettings();
+          
+          // Загружаем полные настройки только если пользователь авторизован
+          const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+          if (hasToken && !settings.restaurant_name) {
+            await loadSettings();
+          }
+          
+          setInitialized(true);
+        } catch (err) {
+          console.error('Ошибка при инициализации настроек:', err);
+          setShowError(true);
+        }
+      }
+    };
+
+    initializeSettings();
+  }, [initialized]);
 
   useEffect(() => {
-    // Показываем ошибку, если она есть
     if (error) {
       setShowError(true);
     }
@@ -45,7 +66,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     settings,
     publicSettings,
     isLoading,
-    error
+    error,
+    loadSettings,
+    loadPublicSettings
   };
 
   return (

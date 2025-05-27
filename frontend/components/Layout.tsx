@@ -52,10 +52,7 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
   const { isDark } = useTheme();
   const { isAuthenticated, user, initialize } = useAuthStore();
-  const { publicSettings, settings } = useSettings();
-  
-  // Используем публичные настройки, если они доступны, иначе используем полные настройки
-  const displaySettings = publicSettings || settings;
+  const { publicSettings } = useSettings();
   
   useEffect(() => {
     // Применяем dark mode в соответствии с настройками пользователя
@@ -86,10 +83,13 @@ const Layout: React.FC<LayoutProps> = ({
     }
   };
 
+  // Используем значение по умолчанию, если publicSettings еще не загружены
+  const restaurantName = publicSettings?.restaurant_name || 'Restaurant';
+
   return (
     <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       <Head>
-        <title>{title || displaySettings.restaurant_name}</title>
+        <title>{title || restaurantName}</title>
         <meta name="description" content={description} />
         <meta name="keywords" content={keywords} />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />

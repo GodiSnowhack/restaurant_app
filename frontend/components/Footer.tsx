@@ -13,12 +13,9 @@ import { useRouter } from 'next/router';
 
 const Footer = () => {
   const year = new Date().getFullYear();
-  const { publicSettings, settings } = useSettings();
+  const { publicSettings } = useSettings();
   const router = useRouter();
   
-  // Используем публичные настройки, если они доступны, иначе используем полные настройки
-  const displaySettings = publicSettings || settings;
-
   // Обработчик клика на домашнюю страницу
   const handleHomeClick = (e: React.MouseEvent) => {
     // Если мы уже на главной странице, предотвращаем переход
@@ -30,7 +27,7 @@ const Footer = () => {
 
   // Форматирование рабочих часов
   const formatWorkingHours = () => {
-    if (!displaySettings?.working_hours) return null;
+    if (!publicSettings?.working_hours) return null;
 
     // Определяем дни недели и их порядок
     const daysOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -48,7 +45,7 @@ const Footer = () => {
     const scheduleGroups: Record<string, string[]> = {};
     
     daysOrder.forEach(day => {
-      const schedule = displaySettings.working_hours?.[day as keyof typeof displaySettings.working_hours];
+      const schedule = publicSettings.working_hours?.[day as keyof typeof publicSettings.working_hours];
       if (!schedule) return;
       
       const key = schedule.is_closed 
@@ -99,6 +96,12 @@ const Footer = () => {
     );
   };
 
+  // Используем значение по умолчанию, если publicSettings еще не загружены
+  const restaurantName = publicSettings?.restaurant_name || 'Restaurant';
+  const address = publicSettings?.address || 'Адрес ресторана';
+  const phone = publicSettings?.phone || '+7 (XXX) XXX-XX-XX';
+  const email = publicSettings?.email || 'info@restaurant.com';
+
   return (
     <footer className="bg-gray-800 text-white dark:bg-gray-900">
       {/* Основная информация */}
@@ -106,7 +109,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* О ресторане */}
           <div>
-            <h3 className="text-xl font-bold mb-4">{displaySettings.restaurant_name}</h3>
+            <h3 className="text-xl font-bold mb-4">{restaurantName}</h3>
             <p className="mb-4 text-gray-300 dark:text-gray-300">
               Система поддержки принятия решений для управления рестораном.
               Насладитесь изысканными блюдами в атмосфере уюта и комфорта.
@@ -133,18 +136,18 @@ const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-start">
                 <LocationMarkerIcon className="h-5 w-5 mr-2 mt-0.5 text-primary" />
-                <span className="text-gray-300 dark:text-gray-300">{displaySettings.address}</span>
+                <span className="text-gray-300 dark:text-gray-300">{address}</span>
               </li>
               <li className="flex items-center">
                 <PhoneIcon className="h-5 w-5 mr-2 text-primary" />
-                <a href={`tel:${displaySettings.phone}`} className="text-gray-300 hover:text-white dark:text-gray-300 dark:hover:text-white">
-                  {displaySettings.phone}
+                <a href={`tel:${phone}`} className="text-gray-300 hover:text-white dark:text-gray-300 dark:hover:text-white">
+                  {phone}
                 </a>
               </li>
               <li className="flex items-center">
                 <MailIcon className="h-5 w-5 mr-2 text-primary" />
-                <a href={`mailto:${displaySettings.email}`} className="text-gray-300 hover:text-white dark:text-gray-300 dark:hover:text-white">
-                  {displaySettings.email}
+                <a href={`mailto:${email}`} className="text-gray-300 hover:text-white dark:text-gray-300 dark:hover:text-white">
+                  {email}
                 </a>
               </li>
               <li className="flex items-start">
@@ -183,7 +186,7 @@ const Footer = () => {
       {/* Копирайт */}
       <div className="bg-gray-900 py-4 dark:bg-black">
         <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-[1400px] text-center text-gray-400 dark:text-gray-300 text-sm">
-          <p>&copy; {year} {displaySettings.restaurant_name}. Все права защищены.</p>
+          <p>&copy; {year} {restaurantName}. Все права защищены.</p>
         </div>
       </div>
     </footer>

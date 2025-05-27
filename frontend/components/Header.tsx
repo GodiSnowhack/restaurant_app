@@ -34,15 +34,12 @@ const Header = () => {
   const router = useRouter();
   const { isAuthenticated, user, logout } = useAuthStore();
   const { items } = useCartStore();
-  const { publicSettings, settings } = useSettings();
+  const { publicSettings } = useSettings();
   const { theme } = useTheme();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [authState, setAuthState] = useState<AuthStateType>({ isAuthenticated: false, user: null });
-
-  // Используем публичные настройки, если они доступны, иначе используем полные настройки
-  const displaySettings = publicSettings || settings;
 
   // Устанавливаем флаг клиентского рендеринга и инициализируем состояние авторизации
   useEffect(() => {
@@ -109,6 +106,9 @@ const Header = () => {
     }
   }
 
+  // Используем значение по умолчанию, если publicSettings еще не загружены
+  const restaurantName = publicSettings?.restaurant_name || 'Restaurant';
+
   return (
     <header className="bg-white shadow-md dark:bg-gray-800 dark:text-white transition-colors duration-300">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-[1400px]">
@@ -116,7 +116,7 @@ const Header = () => {
           <div className="flex items-center space-x-4 flex-shrink-0">
             <Link href="/" className="flex items-center" onClick={handleLogoClick}>
               <div className="text-primary font-bold text-xl uppercase dark:text-primary">
-                {displaySettings.restaurant_name || 'RESTAURANT'}
+                {restaurantName}
               </div>
             </Link>
           </div>
