@@ -42,14 +42,13 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
+# Отключаем принудительный HTTPS редирект для Railway
+settings.FORCE_HTTPS = False
+
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        os.getenv("CORS_ORIGINS", "https://frontend-production-8eb6.up.railway.app"),
-        "http://localhost:3000",
-        "http://localhost:8000"
-    ],
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=[
@@ -59,19 +58,12 @@ app.add_middleware(
         "Origin",
         "X-User-ID",
         "X-User-Role",
-        "Access-Control-Allow-Origin"
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials"
     ],
     expose_headers=["*"],
     max_age=3600,
 )
-
-# Монтируем статические файлы
-static_path = Path(__file__).parent.parent / "static"
-static_path.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
-
-# Регистрируем маршруты API
-app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Middleware для логирования запросов
 @app.middleware("http")
@@ -82,6 +74,14 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     logger.info(f"Response status: {response.status_code}")
     return response
+
+# Монтируем статические файлы
+static_path = Path(__file__).parent.parent / "static"
+static_path.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
+# Регистрируем маршруты API
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Корневой маршрут для проверки работоспособности API
 @app.get("/")
@@ -94,7 +94,5 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         reload=settings.DEBUG,
-        workers=settings.WORKERS_COUNT,
-        ssl_keyfile="key.pem",  # Добавляем SSL
-        ssl_certfile="cert.pem"  # Добавляем SSL
+        workers=settings.WORKERS_COUNT
     ) 

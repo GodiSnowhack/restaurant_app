@@ -9,6 +9,17 @@ declare global {
   }
 }
 
+// Функция для обработки базового URL API
+const formatApiUrl = (url: string): string => {
+  // Убираем слеш в конце, если он есть
+  const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  // Добавляем /api/v1, если его нет
+  if (!baseUrl.endsWith('/api/v1')) {
+    return `${baseUrl}/api/v1`;
+  }
+  return baseUrl;
+};
+
 // Базовые URL для разных окружений
 export const DEFAULT_URLS = {
   development: {
@@ -16,7 +27,7 @@ export const DEFAULT_URLS = {
     frontend: 'http://localhost:3000'
   },
   production: {
-    api: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
+    api: formatApiUrl(process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app'),
     frontend: process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app'
   }
 };
