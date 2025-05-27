@@ -1,4 +1,4 @@
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 import jwt from 'jsonwebtoken';
 import { getSecureApiUrl } from '../utils/api';
 
@@ -9,11 +9,6 @@ export const api = axios.create({
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
-  },
-  withCredentials: true,
-  maxRedirects: 0, // Отключаем автоматические редиректы
-  validateStatus: (status) => {
-    return status >= 200 && status < 400; // Принимаем только успешные статусы
   }
 });
 
@@ -49,48 +44,14 @@ api.interceptors.request.use(
 
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Проверяем, является ли это редиректом
-    if (response.status >= 300 && response.status < 400 && response.headers.location) {
-      // Получаем новый URL из заголовка Location
-      const newUrl = response.headers.location;
-      
-      // Проверяем, что URL безопасный
-      if (newUrl.startsWith('https://backend-production-1a78.up.railway.app/')) {
-        // Извлекаем путь из полного URL
-        const path = newUrl.replace('https://backend-production-1a78.up.railway.app/api/v1/', '');
-        
-        // Делаем новый запрос к извлеченному пути
-        return api.get(path);
-      }
-    }
-    return response;
-  },
+  (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    // Если ошибка связана с сетью или CORS
-    if (error.message === 'Network Error') {
-      console.error('Сетевая ошибка:', error);
-      return Promise.reject(new Error('Ошибка сети. Проверьте подключение к интернету.'));
-    }
-
-    // Если ошибка 401, выходим из системы
     if (error.response?.status === 401) {
       clearAuthTokens();
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login';
       }
-      return Promise.reject(error);
     }
-
-    // Если это ошибка редиректа
-    if (error.response?.status === 301 || error.response?.status === 302) {
-      const newUrl = error.response.headers?.location;
-      if (newUrl && newUrl.startsWith('https://backend-production-1a78.up.railway.app/')) {
-        const path = newUrl.replace('https://backend-production-1a78.up.railway.app/api/v1/', '');
-        return api.get(path);
-      }
-    }
-
     return Promise.reject(error);
   }
 );
