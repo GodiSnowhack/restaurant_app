@@ -41,16 +41,20 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Добавляем middleware для HTTPS
-app.add_middleware(HTTPSRedirectMiddleware)
+# Закомментируем middleware для HTTPS
+# app.add_middleware(HTTPSRedirectMiddleware)
 
 # Настройки CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://frontend-production-8eb6.up.railway.app",
         "https://frontend-production-8eb6.up.railway.app",
+        "http://backend-production-1a78.up.railway.app",
         "https://backend-production-1a78.up.railway.app",
+        "http://localhost:3000",
         "https://localhost:3000",
+        "http://localhost:8000",
         "https://localhost:8000"
     ],
     allow_credentials=True,

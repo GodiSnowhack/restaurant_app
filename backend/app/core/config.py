@@ -28,16 +28,16 @@ class Settings(BaseSettings):
     ]
 
     # Принудительное использование HTTPS
-    FORCE_HTTPS: bool = True
+    FORCE_HTTPS: bool = False
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
             origins = [i.strip() for i in v.split(",")]
-            # Преобразуем все HTTP в HTTPS
-            return [origin.replace("http://", "https://") for origin in origins]
+            # Разрешаем как HTTP, так и HTTPS
+            return origins
         elif isinstance(v, list):
-            return [origin.replace("http://", "https://") for origin in v]
+            return v
         return v
 
     PROJECT_NAME: str = "Restaurant SPPR"
