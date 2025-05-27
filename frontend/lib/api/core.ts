@@ -120,9 +120,6 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Принудительно используем HTTPS
-    config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
-    
     // Проверяем и принудительно устанавливаем HTTPS для всех URL
     if (config.url && config.url.startsWith('http://')) {
       config.url = config.url.replace('http://', 'https://');
@@ -156,6 +153,16 @@ api.interceptors.response.use(
       url: config?.url,
       message: error.message
     });
+
+    // Обработка редиректов
+    if (error.response?.status === 307 || error.response?.status === 308) {
+      const newLocation = error.response.headers['location'];
+      if (newLocation && config && !config._retry) {
+        config._retry = true;
+        config.url = newLocation;
+        return api(config);
+      }
+    }
     
     // Если ошибка 401, пробуем обновить токен
     if (error.response?.status === 401) {

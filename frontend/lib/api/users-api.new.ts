@@ -1,5 +1,5 @@
 import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
 
 interface UserParams {
@@ -30,15 +30,6 @@ export interface UserData {
 let usersCache: UserData[] | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 60000; // 1 минута
-
-// Создаем экземпляр axios для пользовательских запросов
-const usersAxios = axios.create({
-  baseURL: getSecureApiUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-});
 
 // Получение информации о пользователе из локального хранилища
 const getUserRole = (): string | null => {
@@ -106,7 +97,7 @@ const getUserDataFromToken = (): any => {
 };
 
 // Добавляем перехватчик для авторизации
-usersAxios.interceptors.request.use((config) => {
+api.interceptors.request.use((config) => {
   // Получаем токен из всех возможных источников
   const token = getAuthTokenFromAllSources();
   
@@ -133,7 +124,7 @@ usersAxios.interceptors.request.use((config) => {
 });
 
 // Добавляем перехватчик ответов
-usersAxios.interceptors.response.use(
+api.interceptors.response.use(
   (response: AxiosResponse) => {
     // Для успешных ответов
     console.log(`Успешный ответ от ${response.config.url}:`, {
@@ -203,8 +194,8 @@ export const usersApi = {
       try {
         console.log('Отправка запроса на получение пользователей...');
         
-        // Используем usersAxios для запроса
-        const response = await usersAxios.get(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+        // Используем основной api для запроса
+        const response = await api.get(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
         console.log('URL запроса:', response.config.url);
 
         if (!response.data) {
@@ -241,7 +232,7 @@ export const usersApi = {
         
         throw error;
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Критическая ошибка при получении пользователей:', error);
       return this.getMockUsers();
     }
@@ -314,7 +305,7 @@ export const usersApi = {
   // Получение пользователя по ID
   async getUserById(userId: number): Promise<UserData> {
     try {
-      const response = await usersAxios.get(`/users/${userId}`);
+      const response = await api.get(`/users/${userId}`);
       return response.data;
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${userId}:`, error);
@@ -326,7 +317,7 @@ export const usersApi = {
   async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
     try {
       console.log(`Обновление пользователя #${userId}:`, userData);
-      const response = await usersAxios.put(`/users/${userId}`, userData);
+      const response = await api.put(`/users/${userId}`, userData);
       
       // Инвалидируем кэш после обновления
       usersCache = null;
@@ -342,7 +333,7 @@ export const usersApi = {
   // Удаление пользователя
   async deleteUser(userId: number): Promise<boolean> {
     try {
-      await usersAxios.delete(`/users/${userId}`);
+      await api.delete(`/users/${userId}`);
       
       // Инвалидируем кэш после удаления
       usersCache = null;
@@ -358,7 +349,7 @@ export const usersApi = {
   // Создание нового пользователя
   async createUser(userData: UserData): Promise<UserData> {
     try {
-      const response = await usersAxios.post('/users', userData);
+      const response = await api.post('/users', userData);
       
       // Инвалидируем кэш после создания
       usersCache = null;
@@ -375,7 +366,7 @@ export const usersApi = {
   async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
     try {
       console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
-      const response = await usersAxios.patch(`/users/${userId}/status`, {
+      const response = await api.patch(`/users/${userId}/status`, {
         is_active: isActive
       });
       
