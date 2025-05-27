@@ -10,8 +10,11 @@ export const api = axios.create({
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
-  maxRedirects: 0, // Отключаем редиректы на клиенте
-  withCredentials: true // Включаем для CORS
+  maxRedirects: 5,
+  withCredentials: true,
+  validateStatus: (status) => {
+    return status >= 200 && status < 500; // Принимаем все ответы, кроме серверных ошибок
+  }
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -136,10 +139,17 @@ api.interceptors.request.use(
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`[API] Получен ответ от ${response.config.url}:`, {
-      status: response.status,
-      headers: response.headers
-    });
+    // Если получили редирект, обрабатываем его
+    if (response.status >= 300 && response.status < 400) {
+      const newUrl = response.headers['location'];
+      if (newUrl) {
+        // Проверяем, что URL безопасный и соответствует нашему домену
+        const isSafeUrl = newUrl.startsWith('https://backend-production-1a78.up.railway.app/');
+        if (isSafeUrl) {
+          return api.get(newUrl);
+        }
+      }
+    }
     return response;
   },
   async (error: AxiosError) => {
@@ -155,6 +165,16 @@ api.interceptors.response.use(
     // Обработка CORS ошибок
     if (error.message === 'Network Error' && error.response?.status === undefined) {
       console.error('[API] CORS ошибка:', error);
+      // Пробуем повторить запрос с другими заголовками
+      if (config && !config._retry) {
+        config._retry = true;
+        const headers = new AxiosHeaders({
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        });
+        config.headers = headers;
+        return api(config);
+      }
       return Promise.reject(new Error('Ошибка доступа к API. Проверьте настройки CORS на сервере.'));
     }
 

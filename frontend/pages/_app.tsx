@@ -95,11 +95,10 @@ export const renderMode = 'force-dynamic';
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const { isAuthenticated, user, fetchUserProfile, isMobileDevice, initialize } = useAuthStore();
-  const { loadSettings } = useSettingsStore();
   const [previousPath, setPreviousPath] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const { settings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
   
   // Определяем, что мы на клиенте
   useEffect(() => {
@@ -143,9 +142,6 @@ export default function App({ Component, pageProps }: AppProps) {
     if (!isClient) return;
     
     const loadUserData = async () => {
-      // Загружаем настройки без ожидания
-      loadSettings();
-      
       // Инициализируем хранилище бронирований только на соответствующих страницах
       if (typeof window !== 'undefined') {
         const currentPath = router.pathname;
@@ -163,8 +159,6 @@ export default function App({ Component, pageProps }: AppProps) {
             const reservationsStore = useReservationsStore.getState();
             if (typeof reservationsStore.init === 'function') {
               reservationsStore.init();
-            } else {
-              console.log('Метод init не найден в хранилище бронирований');
             }
           } catch (e: unknown) {
             console.error('Ошибка при инициализации хранилища бронирований:', e);
@@ -175,17 +169,17 @@ export default function App({ Component, pageProps }: AppProps) {
     
     loadUserData();
     
-    // Проверка профиля раз в 5 минут, а не каждые 30 секунд
+    // Проверка профиля раз в 5 минут
     const intervalCheck = setInterval(() => {
       if (getAppToken() && isAuthenticated) {
         fetchUserProfile().catch(e => {
           console.error('Ошибка фоновой проверки профиля:', e);
         });
       }
-    }, 300000); // 5 минут вместо 30 секунд
+    }, 300000);
     
     return () => clearInterval(intervalCheck);
-  }, [isClient, isAuthenticated, fetchUserProfile, loadSettings, router.pathname]);
+  }, [isClient, isAuthenticated, fetchUserProfile, router.pathname]);
   
   // Проверяем, имеет ли пользователь роль админа для отображения отладчика
   useEffect(() => {
