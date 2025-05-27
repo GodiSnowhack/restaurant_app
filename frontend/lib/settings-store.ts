@@ -8,18 +8,13 @@ interface SettingsState {
   isLoading: boolean;
   error: string | null;
   lastUpdated: number | null;
-  loadSettings: () => Promise<void>;
   loadPublicSettings: () => Promise<void>;
   updateSettings: (newSettings: Partial<RestaurantSettings>) => Promise<RestaurantSettings>;
   updateTables: (tables: RestaurantTable[]) => Promise<void>;
   addTable: (table: Omit<RestaurantTable, 'id'>) => Promise<void>;
   removeTable: (tableId: number) => Promise<void>;
   updateTableStatus: (tableId: number, status: 'available' | 'reserved' | 'occupied') => Promise<void>;
-  checkForUpdates: () => Promise<void>;
 }
-
-// Интервал автообновления настроек (5 минут)
-const AUTO_UPDATE_INTERVAL = 5 * 60 * 1000;
 
 const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {} as RestaurantSettings,
@@ -28,29 +23,33 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   error: null,
   lastUpdated: null,
 
-  loadSettings: async () => {
+  loadPublicSettings: async () => {
     try {
+      // Проверяем, нужно ли загружать настройки
+      const { lastUpdated } = get();
+      const now = Date.now();
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
+
+      // Если настройки уже загружены и не устарели, не делаем новый запрос
+      if (lastUpdated && now - lastUpdated < CACHE_DURATION) {
+        return;
+      }
+
       set({ isLoading: true, error: null });
-      console.log('Запрашиваем настройки с сервера...');
-      const settings = await settingsApi.getSettings();
-      console.log('Получены настройки с сервера:', settings);
-      set({ settings, isLoading: false, lastUpdated: Date.now() });
+      console.log('Запрос публичных настроек...');
+      const publicSettings = await settingsApi.getPublicSettings();
+      
+      // Если пользователь авторизован, загружаем полные настройки
+      if (typeof window !== 'undefined' && localStorage.getItem('token')) {
+        console.log('Запрос полных настроек...');
+        const settings = await settingsApi.getSettings();
+        set({ settings, publicSettings, isLoading: false, lastUpdated: now });
+      } else {
+        set({ publicSettings, isLoading: false, lastUpdated: now });
+      }
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
       set({ error: 'Ошибка при загрузке настроек', isLoading: false });
-    }
-  },
-
-  loadPublicSettings: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      console.log('Запрашиваем публичные настройки с сервера...');
-      const publicSettings = await settingsApi.getPublicSettings();
-      console.log('Получены публичные настройки с сервера:', publicSettings);
-      set({ publicSettings, isLoading: false, lastUpdated: Date.now() });
-    } catch (error) {
-      console.error('Ошибка при загрузке публичных настроек:', error);
-      set({ error: 'Ошибка при загрузке публичных настроек', isLoading: false });
     }
   },
 
@@ -120,16 +119,6 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
       console.error('Ошибка при обновлении статуса стола:', error);
       set({ error: 'Ошибка при обновлении статуса стола', isLoading: false });
       throw error;
-    }
-  },
-
-  checkForUpdates: async () => {
-    const { lastUpdated } = get();
-    const now = Date.now();
-    
-    // Проверяем, прошло ли достаточно времени с последнего обновления
-    if (!lastUpdated || now - lastUpdated >= AUTO_UPDATE_INTERVAL) {
-      await get().loadSettings();
     }
   }
 }));

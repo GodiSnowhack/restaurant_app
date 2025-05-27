@@ -9,8 +9,6 @@ interface SettingsContextType {
   publicSettings: PublicSettings | null;
   isLoading: boolean;
   error: string | null;
-  loadSettings: () => Promise<void>;
-  loadPublicSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -24,23 +22,13 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { settings, publicSettings, isLoading, error, loadSettings, loadPublicSettings } = useSettingsStore();
-  const [initialized, setInitialized] = useState(false);
+  const { settings, publicSettings, isLoading, error, loadPublicSettings } = useSettingsStore();
   const [showError, setShowError] = useState(false);
 
   useEffect(() => {
-    // Загружаем настройки только один раз при монтировании компонента
-    if (!initialized) {
-      // Сначала загружаем публичные настройки
-      loadPublicSettings().then(() => {
-        // Затем загружаем полные настройки, если пользователь авторизован
-        if (typeof window !== 'undefined' && localStorage.getItem('token')) {
-          loadSettings();
-        }
-      });
-      setInitialized(true);
-    }
-  }, [loadSettings, loadPublicSettings, initialized]);
+    // Загружаем только публичные настройки при монтировании компонента
+    loadPublicSettings();
+  }, []);
 
   useEffect(() => {
     // Показываем ошибку, если она есть
@@ -57,9 +45,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     settings,
     publicSettings,
     isLoading,
-    error,
-    loadSettings,
-    loadPublicSettings
+    error
   };
 
   return (
