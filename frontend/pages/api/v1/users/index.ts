@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      maxRedirects: 5, // Ограничиваем количество редиректов
+      maxRedirects: 2, // Ограничиваем количество редиректов
       validateStatus: (status) => {
         return (status >= 200 && status < 300) || (status === 307 || status === 308);
       }

@@ -10,7 +10,11 @@ export const api = axios.create({
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
-  withCredentials: true
+  maxRedirects: 2,
+  withCredentials: false, // Отключаем, так как используем токен
+  validateStatus: (status) => {
+    return (status >= 200 && status < 300) || (status === 307 || status === 308);
+  }
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -125,11 +129,9 @@ api.interceptors.request.use(
       config.url = config.url.replace('http://', 'https://');
     }
 
-    // Проверяем полный URL запроса
-    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
-    if (fullUrl && fullUrl.startsWith('http://')) {
-      throw new Error('Небезопасный HTTP запрос не разрешен');
-    }
+    // Добавляем заголовки для предотвращения кэширования
+    config.headers['Cache-Control'] = 'no-cache';
+    config.headers['Pragma'] = 'no-cache';
     
     return config;
   },
@@ -142,7 +144,10 @@ api.interceptors.request.use(
 // Перехватчик для обработки ответов
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`[API] Получен ответ от ${response.config.url}:`, response.status);
+    console.log(`[API] Получен ответ от ${response.config.url}:`, {
+      status: response.status,
+      headers: response.headers
+    });
     return response;
   },
   async (error: AxiosError) => {
@@ -151,15 +156,30 @@ api.interceptors.response.use(
     console.error('[API] Ошибка в ответе:', {
       status: error.response?.status,
       url: config?.url,
-      message: error.message
+      message: error.message,
+      headers: error.response?.headers
     });
 
     // Обработка редиректов
     if (error.response?.status === 307 || error.response?.status === 308) {
       const newLocation = error.response.headers['location'];
       if (newLocation && config && !config._retry) {
+        console.log('[API] Обработка редиректа:', {
+          from: config.url,
+          to: newLocation
+        });
+        
         config._retry = true;
-        config.url = newLocation;
+        
+        // Если редирект на HTTPS, обновляем baseURL
+        if (newLocation.startsWith('https://') && config.baseURL?.startsWith('http://')) {
+          config.baseURL = config.baseURL.replace('http://', 'https://');
+        }
+        
+        // Используем полный URL из заголовка Location
+        const redirectUrl = new URL(newLocation);
+        config.url = redirectUrl.pathname + redirectUrl.search;
+        
         return api(config);
       }
     }
