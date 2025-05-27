@@ -19,23 +19,28 @@ class Settings(BaseSettings):
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        "https://localhost:3000",
-        "https://localhost:8000",
-        "https://frontend:3000",
-        "https://backend:8000",
         "https://frontend-production-8eb6.up.railway.app",
-        "https://backend-production-1a78.up.railway.app"
+        "https://backend-production-1a78.up.railway.app",
+        "http://localhost:3000",
+        "http://localhost:8000"
     ]
 
     # Принудительное использование HTTPS
     FORCE_HTTPS: bool = False
 
+    # Railway specific settings
+    ROOT_PATH: str = ""
+    
+    @validator("ROOT_PATH", pre=True)
+    def assemble_root_path(cls, v: Optional[str], values: Dict[str, Any]) -> str:
+        if values.get("ENVIRONMENT") == "production":
+            return "/api"
+        return v
+
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
-            origins = [i.strip() for i in v.split(",")]
-            # Разрешаем как HTTP, так и HTTPS
-            return origins
+            return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):
             return v
         return v
