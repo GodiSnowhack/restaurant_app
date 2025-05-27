@@ -8,14 +8,10 @@ export const api = axios.create({
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Origin': 'https://frontend-production-8eb6.up.railway.app'
+    'Content-Type': 'application/json'
   },
-  maxRedirects: 1, // Минимизируем количество редиректов
-  withCredentials: true, // Включаем для CORS
-  validateStatus: (status) => {
-    return status >= 200 && status < 400; // Принимаем все успешные статусы и редиректы
-  }
+  maxRedirects: 0, // Отключаем редиректы на клиенте
+  withCredentials: true // Включаем для CORS
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -125,12 +121,6 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Добавляем заголовки для CORS
-    config.headers['Access-Control-Allow-Origin'] = 'https://frontend-production-8eb6.up.railway.app';
-    config.headers['Access-Control-Allow-Credentials'] = 'true';
-    config.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS';
-    config.headers['Access-Control-Allow-Headers'] = 'Origin,X-Requested-With,Content-Type,Accept,Authorization,X-User-ID,X-User-Role';
-
     // Добавляем заголовки для предотвращения кэширования
     config.headers['Cache-Control'] = 'no-cache';
     config.headers['Pragma'] = 'no-cache';
@@ -168,21 +158,6 @@ api.interceptors.response.use(
       return Promise.reject(new Error('Ошибка доступа к API. Проверьте настройки CORS на сервере.'));
     }
 
-    // Обработка редиректов - теперь только для HTTPS
-    if (error.response?.status === 307 || error.response?.status === 308) {
-      const newLocation = error.response.headers['location'];
-      if (newLocation && config && !config._retry && newLocation.startsWith('https://')) {
-        console.log('[API] Обработка редиректа:', {
-          from: config.url,
-          to: newLocation
-        });
-        
-        config._retry = true;
-        config.url = newLocation;
-        return api(config);
-      }
-    }
-    
     // Если ошибка 401, пробуем обновить токен
     if (error.response?.status === 401) {
       console.log('[API] Получена ошибка 401, проверяем авторизацию');

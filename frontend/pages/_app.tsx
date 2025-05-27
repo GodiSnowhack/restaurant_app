@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 import { ThemeProvider } from '../lib/theme-context';
 import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
+import { useSettings } from '../lib/hooks/useSettings';
 
 // Динамический импорт компонента AuthDebugger для отображения только на клиенте
 const AuthDebugger = dynamic(() => import('../components/AuthDebugger'), {
@@ -98,6 +99,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const [previousPath, setPreviousPath] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const { settings } = useSettings();
   
   // Определяем, что мы на клиенте
   useEffect(() => {
@@ -281,6 +283,12 @@ export default function App({ Component, pageProps }: AppProps) {
     }
     return null;
   };
+  
+  useEffect(() => {
+    if (settings) {
+      console.log('Получены настройки с сервера:', settings);
+    }
+  }, [settings]);
   
   // Базовый рендер для сервера
   if (!isClient) {
