@@ -123,7 +123,7 @@ export const menuApi = {
       console.log(`API: Получение блюда ${id}...`);
       
       // Используем относительный путь для доступа к нашему внутреннему прокси
-      const response = await api.get(`/menu/dishes/${id}`);
+      const response = await api.get(`/api/menu/dishes/${id}`);
       
       if (!response.data) {
         throw new Error('Данные не получены');
