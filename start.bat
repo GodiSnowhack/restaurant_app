@@ -4,15 +4,15 @@ echo Запуск проекта Restaurant SPPR...
 REM Переходим в корневую директорию проекта
 cd %~dp0
 
-REM Проверка наличия директорий
-if not exist data mkdir data
-echo Директория data проверена
+REM Проверка наличия директорий для бэкенда
+if not exist backend\data mkdir backend\data
+echo Директория backend\data проверена
 
-REM Проверка наличия базы данных
-if not exist data\restaurant.db (
-  echo База данных не найдена. Создаем новую...
-  copy NUL data\restaurant.db
-  echo Файл базы данных создан
+REM Проверка наличия базы данных для бэкенда
+if not exist backend\data\restaurant.db (
+  echo База данных backend\data\restaurant.db не найдена. Создаем новую...
+  type NUL > backend\data\restaurant.db
+  echo Файл базы данных backend\data\restaurant.db создан
 )
 
 REM Проверка установленных модулей frontend
@@ -28,7 +28,10 @@ if not exist frontend\node_modules (
 )
 
 echo Запуск бэкенда...
-start cmd /k "cd backend && python run.py"
+REM Запускаем Uvicorn напрямую, находясь в директории backend
+REM Используем app.main:app для указания на FastAPI приложение в backend/app/main.py
+REM Добавляем --reload для автоматической перезагрузки при изменениях кода
+start cmd /k "cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 echo Запуск фронтенда...
 start cmd /k "cd frontend && npm run dev"
