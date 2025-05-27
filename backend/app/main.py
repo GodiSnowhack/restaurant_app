@@ -88,7 +88,9 @@ app.add_middleware(
         "X-Forwarded-Proto",
         "X-Forwarded-For",
         "X-Real-IP",
-        "X-Request-ID"
+        "X-Request-ID",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials"
     ],
     expose_headers=["*"],
     max_age=3600,

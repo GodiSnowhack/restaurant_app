@@ -6,6 +6,7 @@ import { getSecureApiUrl } from '../utils/api';
 export const api = axios.create({
   baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'

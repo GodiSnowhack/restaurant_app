@@ -60,7 +60,9 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: 'https://backend-production-1a78.up.railway.app'
+            value: process.env.NODE_ENV === 'production' 
+              ? 'https://backend-production-1a78.up.railway.app' 
+              : 'http://localhost:8000'
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -108,7 +110,9 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://backend-production-1a78.up.railway.app/api/:path*'
+        destination: process.env.NODE_ENV === 'production'
+          ? 'https://backend-production-1a78.up.railway.app/api/:path*'
+          : 'http://localhost:8000/api/:path*'
       },
     ];
   },

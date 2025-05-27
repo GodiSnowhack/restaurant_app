@@ -131,8 +131,11 @@ def update_settings(
     """
     logger = logging.getLogger(__name__)
     logger.info("Вызов функции update_settings")
+    logger.info(f"Пользователь: {current_user.email} (role: {current_user.role})")
+    logger.info(f"Данные для обновления: {settings_in.dict()}")
     
     if current_user.role != UserRole.admin:
+        logger.warning(f"Попытка обновления настроек пользователем без прав админа: {current_user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав для изменения настроек"
@@ -142,6 +145,7 @@ def update_settings(
         db_settings = db.query(Settings).first()
         
         if not db_settings:
+            logger.error("Настройки не найдены в базе данных")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Настройки не найдены"
@@ -149,16 +153,32 @@ def update_settings(
         
         # Обновляем только переданные поля
         settings_data = settings_in.dict(exclude_unset=True)
+        logger.info(f"Обновляемые поля: {list(settings_data.keys())}")
+        
         for field, value in settings_data.items():
-            setattr(db_settings, field, value)
+            if hasattr(db_settings, field):
+                setattr(db_settings, field, value)
+            else:
+                logger.warning(f"Попытка обновить несуществующее поле: {field}")
         
-        db.commit()
-        db.refresh(db_settings)
-        
-        return db_settings
+        try:
+            db.commit()
+            db.refresh(db_settings)
+            logger.info("Настройки успешно обновлены")
+            return db_settings
+        except Exception as db_error:
+            logger.error(f"Ошибка при сохранении в базу данных: {str(db_error)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка при сохранении настроек в базу данных"
+            )
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Ошибка при обновлении настроек: {str(e)}")
+        logger.error(f"Неожиданная ошибка при обновлении настроек: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при обновлении настроек"
+            detail=f"Ошибка при обновлении настроек: {str(e)}"
         ) 
