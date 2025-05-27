@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getApiBaseUrl } from '../../lib/api';
+import { getDefaultApiUrl } from '../../src/config/defaults';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -7,9 +7,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.headers.authorization;
     const userId = req.headers['x-user-id'];
 
-    // Получаем базовый URL API и убеждаемся, что он использует HTTPS
-    const baseUrl = getApiBaseUrl().replace('http://', 'https://');
-    const apiUrl = `${baseUrl}/api/v1/reservations`;
+    // Получаем базовый URL API
+    const baseApiUrl = getDefaultApiUrl();
+    const apiUrl = `${baseApiUrl}/reservations`;
 
     // Формируем URL с учетом query параметров
     const url = query && Object.keys(query).length > 0

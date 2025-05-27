@@ -18,11 +18,12 @@ class Settings(BaseSettings):
     SERVER_HOST: str = "0.0.0.0"
     
     # CORS
+    # Этот список используется как значение ПО УМОЛЧАНИЮ, если переменная окружения BACKEND_CORS_ORIGINS не установлена.
+    # Pydantic-settings автоматически попытается загрузить BACKEND_CORS_ORIGINS из окружения.
+    # Валидатор assemble_cors_origins обработает строку из переменной окружения.
     BACKEND_CORS_ORIGINS: List[str] = [
-        "https://frontend-production-8eb6.up.railway.app",
-        "https://backend-production-1a78.up.railway.app",
-        "http://localhost:3000",
-        "http://localhost:8000"
+        "http://localhost:3000", # Для локальной разработки фронтенда
+        "https://frontend-production-8eb6.up.railway.app" # URL вашего развернутого фронтенда
     ]
 
     # Railway specific settings
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):
             return v
-        return v
+        return v # pragma: no cover
 
     PROJECT_NAME: str = "Restaurant SPPR"
     

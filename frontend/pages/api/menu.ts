@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import { getSecureApiUrl } from '../../lib/utils/api';
+// import { getSecureApiUrl } from '../../lib/utils/api'; // Удалено
+import { getDefaultApiUrl } from '../../src/config/defaults'; // Добавлено
 
 // Список разрешенных полей для блюда
 const allowedDishFields = [
@@ -22,7 +23,7 @@ const filterObject = (obj: any, allowedFields: string[]) => {
   return filteredObj;
 };
 
-const API_BASE_URL = getSecureApiUrl();
+const API_BASE_URL = getDefaultApiUrl(); // Изменено
 
 /**
  * API-прокси для получения меню и категорий
@@ -45,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Строим URL для запроса к бэкенду
-  let url = `${API_BASE_URL}/menu/${endpoint}`;
+  let url = `${API_BASE_URL}/menu/${endpoint}`; // API_BASE_URL уже содержит /api/v1
 
   // Копируем query параметры, исключая внутренние параметры
   const queryParams = new URLSearchParams();

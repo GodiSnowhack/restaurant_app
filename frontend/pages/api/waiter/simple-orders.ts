@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { demoWaiterOrders } from '../../../lib/demo-data/waiter-orders';
 import axios from 'axios';
+import { getDefaultApiUrl } from '../../../src/config/defaults';
 
 export default async function simpleWaiterOrdersApi(
   req: NextApiRequest,
@@ -75,7 +76,7 @@ export default async function simpleWaiterOrdersApi(
     console.log(`[API Proxy] Получение заказов для пользователя: роль=${userRole}, ID=${userId}, isAdmin=${isAdminRole}`);
 
     // Формируем URL для запроса к бэкенду
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const apiBaseUrl = getDefaultApiUrl();
     const endpoint = `${apiBaseUrl}/waiter/orders`;
 
     try {

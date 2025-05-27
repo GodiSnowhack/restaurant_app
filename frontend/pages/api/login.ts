@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+import { getDefaultApiUrl } from '../../src/config/defaults';
 
 /**
  * API-прокси для авторизации пользователей
@@ -30,6 +29,7 @@ export default async function handler(
 
   try {
     const { email, password } = req.body;
+    const baseApiUrl = getDefaultApiUrl();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -44,7 +44,7 @@ export default async function handler(
     formData.append('grant_type', 'password');
 
     // Отправляем запрос на бэкенд
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${baseApiUrl}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

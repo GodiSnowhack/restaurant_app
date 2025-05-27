@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+import { getDefaultApiUrl } from '../../src/config/defaults';
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,14 +11,16 @@ export default async function handler(
 
   try {
     const token = req.headers.authorization;
+    const baseApiUrl = getDefaultApiUrl();
 
     if (!token) {
       return res.status(401).json({ message: 'No authorization token' });
     }
 
-    console.log('Profile Proxy - Отправка запроса на', `${API_URL}/users/me`);
+    const profileUrl = `${baseApiUrl}/users/me`;
+    console.log('Profile Proxy - Отправка запроса на', profileUrl);
 
-    const response = await fetch(`${API_URL}/users/me`, {
+    const response = await fetch(profileUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
