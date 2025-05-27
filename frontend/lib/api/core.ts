@@ -1,4 +1,4 @@
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 import jwt from 'jsonwebtoken';
 import { getSecureApiUrl } from '../utils/api';
 
@@ -6,12 +6,94 @@ import { getSecureApiUrl } from '../utils/api';
 export const api = axios.create({
   baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
-  },
-  withCredentials: true
+  }
 });
+
+// Функция получения токена
+export const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  // Проверяем несколько источников
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  
+  if (!token) {
+    console.warn('Токен не найден');
+    return null;
+  }
+
+  // Проверяем валидность токена
+  try {
+    const decoded = jwt.decode(token) as { exp?: number };
+    if (!decoded || !decoded.exp) {
+      console.warn('Токен невалиден');
+      clearAuthTokens();
+      return null;
+    }
+    if (Date.now() >= decoded.exp * 1000) {
+      console.warn('Токен истек');
+      clearAuthTokens();
+      return null;
+    }
+    return token;
+  } catch (error) {
+    console.error('Ошибка при проверке токена:', error);
+    clearAuthTokens();
+    return null;
+  }
+};
+
+// Очистка токенов при выходе
+export const clearAuthTokens = () => {
+  localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
+  localStorage.removeItem('user_profile');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('user_role');
+};
+
+// Перехватчик для добавления токена авторизации
+api.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    const token = getAuthToken();
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Если токен отсутствует или невалиден, перенаправляем на страницу входа
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+        window.location.href = '/auth/login';
+        throw new Error('Необходима авторизация');
+      }
+    }
+    
+    return config;
+  },
+  (error: AxiosError) => {
+    console.error('Ошибка в интерцепторе запроса:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Перехватчик для обработки ответов
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    console.error('Ошибка ответа:', error.response?.status, error.message);
+    
+    if (error.response?.status === 401) {
+      clearAuthTokens();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+        window.location.href = '/auth/login';
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 // Функция повторных попыток для критически важных API-вызовов
 export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> => {
@@ -46,193 +128,10 @@ export const isTokenExpired = (token: string): boolean => {
   }
 };
 
-// Функция получения токена из любого доступного хранилища
-export const getAuthToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const localToken = localStorage.getItem('token');
-    const sessionToken = sessionStorage.getItem('token');
-    
-    // Если есть токен в localStorage, используем его, иначе из sessionStorage
-    if (localToken) {
-      return localToken;
-    } else if (sessionToken) {
-      // Если токен есть только в sessionStorage, копируем его в localStorage
-      try {
-        localStorage.setItem('token', sessionToken);
-      } catch (e) {
-        console.error('Не удалось скопировать токен из sessionStorage в localStorage:', e);
-      }
-      return sessionToken;
-    }
-  } catch (e) {
-    console.error('Ошибка при получении токена:', e);
-  }
-  
-  return null;
-};
+// Список публичных маршрутов
+export const PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
 
-// Обновление функции logout для очистки обоих хранилищ
-export const clearAuthTokens = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_profile');
-  localStorage.removeItem('user_id');
-  localStorage.removeItem('user_role');
-};
-
-// Расширяем тип конфигурации axios
-interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
-  _retry?: boolean;
-}
-
-// Перехватчик для добавления токена авторизации
-api.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    // Получаем токен из всех возможных источников
-    const token = getAuthTokenFromAllSources();
-    
-    if (token) {
-      console.log('API Interceptor: Добавляем токен в заголовки');
-      if (!config.headers) {
-        config.headers = new AxiosHeaders();
-      }
-      config.headers.Authorization = `Bearer ${token}`;
-      
-      // Добавляем дополнительные заголовки для авторизации
-      try {
-        const userId = localStorage.getItem('user_id');
-        const userRole = localStorage.getItem('user_role');
-        
-        if (userId && userRole) {
-          config.headers['X-User-ID'] = userId;
-          config.headers['X-User-Role'] = userRole;
-          console.log('API Interceptor: Добавлены пользовательские заголовки:', {
-            userId,
-            role: userRole
-          });
-        }
-      } catch (e) {
-        console.error('API Interceptor: Ошибка при добавлении пользовательских заголовков:', e);
-      }
-    } else {
-      console.warn('API Interceptor: Токен не найден');
-    }
-
-    // Принудительно используем HTTPS
-    config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
-    
-    // Проверяем и принудительно устанавливаем HTTPS для всех URL
-    if (config.url && config.url.startsWith('http://')) {
-      config.url = config.url.replace('http://', 'https://');
-    }
-
-    // Проверяем полный URL запроса
-    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
-    if (fullUrl && fullUrl.startsWith('http://')) {
-      throw new Error('Небезопасный HTTP запрос не разрешен');
-    }
-    
-    return config;
-  },
-  (error: AxiosError) => {
-    console.error('API Interceptor: Ошибка в перехватчике запроса:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Перехватчик для обработки ответов
-api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    console.log(`[API] Получен ответ от ${response.config.url}:`, response.status);
-    return response;
-  },
-  async (error: AxiosError) => {
-    const config = error.config as ExtendedAxiosRequestConfig;
-    
-    console.error('[API] Ошибка в ответе:', {
-      status: error.response?.status,
-      url: config?.url,
-      message: error.message
-    });
-    
-    // Если ошибка 401, пробуем обновить токен
-    if (error.response?.status === 401) {
-      console.log('[API] Получена ошибка 401, проверяем авторизацию');
-      
-      try {
-        // Проверяем наличие токена
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('[API] Токен отсутствует');
-          clearAuthTokens();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
-        
-        // Проверяем валидность токена
-        if (isTokenExpired(token)) {
-          console.log('[API] Токен истек, выполняем выход');
-          clearAuthTokens();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
-        
-        // Если токен валиден, но все равно получаем 401,
-        // возможно, проблема с сервером. Пробуем повторить запрос
-        if (config && !config._retry) {
-          config._retry = true;
-          return api(config);
-        }
-      } catch (e) {
-        console.error('[API] Ошибка при обработке 401:', e);
-        clearAuthTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/auth/login';
-        }
-      }
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-// Функция для создания нового токена
-function createAccessToken(data: { sub: string | number, role: string, email: string }): string {
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT'
-  };
-  
-  const payload = {
-    ...data,
-    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 часа
-  };
-  
-  // Используем строку в качестве секретного ключа
-  const secret = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-secret-key';
-  const token = jwt.sign(payload, secret, { algorithm: 'HS256' });
-  
-  return token;
-}
-
-// Функция для проверки, является ли текущий маршрут публичным
-// Импортируем позже для избежания циклических зависимостей
-let PUBLIC_ROUTES: string[] = [];
-try {
-  // Динамический импорт, если файл существует
-  if (typeof window !== 'undefined') {
-    PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
-  }
-} catch (e) {
-  PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
-}
-
+// Проверка публичного маршрута
 export const checkIfPublicRoute = (): boolean => {
   if (typeof window === 'undefined') return false;
   
@@ -249,6 +148,28 @@ export const checkIfPublicRoute = (): boolean => {
   }
   
   return false;
+};
+
+// Проверка мобильного устройства
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 768;
+};
+
+// Получение заголовков авторизации
+export const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Проверка соединения
+export const checkConnection = async (): Promise<boolean> => {
+  try {
+    await api.get('/ping');
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 // Универсальная функция для выполнения fetch с таймаутом
@@ -301,62 +222,8 @@ export const getAuthTokenFromAllSources = (): string | null => {
   return null;
 };
 
-/**
- * Получение заголовков авторизации
- */
-export const getAuthHeaders = () => {
-  const token = getAuthTokenFromAllSources();
-  
-  if (!token) {
-    return {};
-  }
-  
-  // Получаем данные пользователя из токена
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1]));
-      return {
-        'Authorization': `Bearer ${token}`,
-        'X-User-ID': payload.sub || '',
-        'X-User-Role': payload.role || ''
-      };
-    }
-  } catch (e) {
-    console.error('Ошибка при декодировании токена:', e);
-  }
-  
-  // Если не удалось получить данные из токена, используем только Authorization
-  return {
-    'Authorization': `Bearer ${token}`
-  };
-};
-
-// Улучшенная функция для определения мобильного устройства
-export const isMobileDevice = (): boolean => {
-  if (typeof navigator === 'undefined') return false;
-  
-  // Проверка на мобильное устройство по User-Agent
-  const mobileRegex = /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i;
-  const userAgent = navigator.userAgent || '';
-  
-  // Дополнительная проверка через mediaQuery для лучшего определения
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth < 768;
-  
-  console.log('Проверка устройства:', {
-    userAgent,
-    isMobileByUA: mobileRegex.test(userAgent),
-    isTouchDevice,
-    isSmallScreen,
-    innerWidth: window.innerWidth
-  });
-  
-  return mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen);
-};
-
 // Улучшенная функция для проверки соединения
-export const checkConnection = async (
+export const checkConnectionAdvanced = async (
   options?: { silent?: boolean; url?: string }
 ): Promise<{ isOnline: boolean; pingTime?: number; error?: string }> => {
   const url = options?.url || '/api/ping';  // Используем /api/ping вместо /api/v1
@@ -444,4 +311,52 @@ export const checkConnection = async (
       error: error.message || 'Не удалось подключиться к серверу',
     };
   }
+};
+
+// Интерфейс для публичных настроек
+interface PublicSettings {
+  restaurant_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  website: string;
+  working_hours: {
+    [key: string]: {
+      open: string;
+      close: string;
+      is_closed: boolean;
+    };
+  };
+}
+
+// Интерфейс для полных настроек
+interface FullSettings extends PublicSettings {
+  tables_count: number;
+  currency: string;
+  currency_symbol: string;
+  tax_percentage: number;
+  min_order_amount: number;
+  delivery_fee: number;
+  free_delivery_threshold: number;
+  table_reservation_enabled: boolean;
+  delivery_enabled: boolean;
+  pickup_enabled: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_from_email: string;
+  smtp_from_name: string;
+  sms_sender: string;
+}
+
+// Получение только публичных настроек
+export const getPublicSettings = async (): Promise<PublicSettings> => {
+  const response = await api.get('/settings/public');
+  return response.data;
+};
+
+// Получение полных настроек (только для авторизованных пользователей)
+export const getFullSettings = async (): Promise<FullSettings> => {
+  const response = await api.get('/settings');
+  return response.data;
 }; 

@@ -9,7 +9,7 @@ import { getSecureApiUrl } from '../../../../lib/utils/api';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', 'https://frontend-production-8eb6.up.railway.app');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE,PATCH');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -50,64 +50,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Используем безопасный URL для API
-    const baseUrl = getSecureApiUrl();
-    
-    // Формируем URL с параметрами
-    const queryParams = new URLSearchParams(req.query as Record<string, string>);
-    const url = `${baseUrl}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    
-    console.log('Прокси: отправка запроса к:', url);
-    console.log('Прокси: заголовки:', {
-      userId,
-      userRole,
-      hasToken: !!token
-    });
-    
-    const response = await axios({
-      method: req.method,
-      url: url,
+    // Создаем экземпляр axios с настройками
+    const api = axios.create({
+      baseURL: getSecureApiUrl(),
       headers: {
         'Authorization': token,
+        'X-User-ID': userId,
+        'X-User-Role': userRole,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-User-ID': userId as string,
-        'X-User-Role': userRole as string
+        'Origin': 'https://frontend-production-8eb6.up.railway.app'
       },
-      data: req.body,
-      validateStatus: function (status) {
-        return status < 500; // Разрешаем все статусы < 500
+      maxRedirects: 1,
+      validateStatus: (status) => {
+        return status >= 200 && status < 400;
       }
     });
 
-    // Проверяем статус ответа
-    if (response.status === 401) {
-      console.log('Прокси: ошибка авторизации');
-      return res.status(401).json({
-        success: false,
-        message: 'Ошибка авторизации'
-      });
-    }
+    // Формируем URL с учетом query параметров
+    const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
+    const url = `/users${queryString ? `?${queryString}` : ''}`;
 
-    if (response.status === 403) {
-      console.log('Прокси: недостаточно прав');
-      return res.status(403).json({
-        success: false,
-        message: 'Недостаточно прав для выполнения операции'
-      });
-    }
+    // Отправляем запрос на бэкенд
+    console.log('Отправка запроса на бэкенд:', {
+      method: req.method,
+      url,
+      headers: {
+        'Authorization': token,
+        'X-User-ID': userId,
+        'X-User-Role': userRole
+      }
+    });
 
-    if (response.status !== 200) {
-      console.log('Прокси: неожиданный статус ответа:', response.status);
-      return res.status(response.status).json({
-        success: false,
-        message: 'Ошибка при получении данных',
-        error: response.data
-      });
-    }
+    const response = await api.request({
+      method: req.method as string,
+      url,
+      data: req.body
+    });
 
     // Возвращаем данные
-    return res.status(200).json(response.data);
+    return res.status(response.status).json(response.data);
   } catch (error: any) {
     console.error('Прокси: ошибка при получении пользователей:', error);
     

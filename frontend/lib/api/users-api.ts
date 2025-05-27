@@ -1,7 +1,5 @@
-import { getAuthHeaders, isAdmin } from '../utils/auth';
-import { getSecureApiUrl, createApiUrl } from '../utils/api';
-
-const BASE_URL = 'https://backend-production-1a78.up.railway.app/api/v1';
+import { api } from '../api';
+import { isAdmin } from '../utils/auth';
 
 // Демо-данные для тестирования
 const DEMO_USERS: UserData[] = [
@@ -56,58 +54,6 @@ class UsersAPI {
   private retryCount = 3;
   private retryDelay = 1000;
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    let lastError: Error | null = null;
-    
-    for (let attempt = 0; attempt < this.retryCount; attempt++) {
-      try {
-        const headers = await getAuthHeaders();
-        const url = createApiUrl(endpoint);
-        
-        console.log('Отправка запроса на URL:', url);
-        
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ошибка: ${response.status}`);
-        }
-
-        return await response.json();
-      } catch (error: any) {
-        console.warn(`Попытка ${attempt + 1}/${this.retryCount} не удалась:`, error);
-        lastError = error;
-        
-        if (attempt === this.retryCount - 1) {
-          if (this.isDevMode) {
-            console.warn('Возвращаем демо-данные из-за ошибки API');
-            return this.getDemoData(endpoint) as T;
-          }
-          throw error;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
-      }
-    }
-
-    throw lastError;
-  }
-
-  private getDemoData(endpoint: string): UserData | UserData[] {
-    if (endpoint.includes('/users/')) {
-      const id = parseInt(endpoint.split('/').pop() || '1');
-      return DEMO_USERS.find(u => u.id === id) || DEMO_USERS[0];
-    }
-    return DEMO_USERS;
-  }
-
   async getUsers(params: UserParams = {}): Promise<UserData[]> {
     try {
       if (!isAdmin()) {
@@ -122,7 +68,7 @@ class UsersAPI {
       const endpoint = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('Отправка запроса на получение пользователей:', endpoint);
 
-      const data = await this.request<UserData[]>(endpoint);
+      const { data } = await api.get<UserData[]>(endpoint);
       
       if (!Array.isArray(data)) {
         console.warn('Получен неверный формат данных от сервера');
@@ -155,31 +101,28 @@ class UsersAPI {
 
   async getUserById(id: number): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}`);
+      const { data } = await api.get<UserData>(`/users/${id}`);
+      return data;
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${id}:`, error);
       throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
     }
   }
 
-  async createUser(data: Partial<UserData>): Promise<UserData> {
+  async createUser(userData: Partial<UserData>): Promise<UserData> {
     try {
-      return await this.request<UserData>('/users', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      const { data } = await api.post<UserData>('/users', userData);
+      return data;
     } catch (error: any) {
       console.error('Ошибка при создании пользователя:', error);
       throw new Error(`Не удалось создать пользователя: ${error.message}`);
     }
   }
 
-  async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
+  async updateUser(id: number, userData: Partial<UserData>): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      });
+      const { data } = await api.put<UserData>(`/users/${id}`, userData);
+      return data;
     } catch (error: any) {
       console.error(`Ошибка при обновлении пользователя #${id}:`, error);
       throw new Error(`Не удалось обновить пользователя: ${error.message}`);
@@ -188,9 +131,7 @@ class UsersAPI {
 
   async deleteUser(id: number): Promise<void> {
     try {
-      await this.request(`/users/${id}`, {
-        method: 'DELETE'
-      });
+      await api.delete(`/users/${id}`);
     } catch (error: any) {
       console.error(`Ошибка при удалении пользователя #${id}:`, error);
       throw new Error(`Не удалось удалить пользователя: ${error.message}`);
@@ -199,10 +140,8 @@ class UsersAPI {
 
   async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ is_active: isActive })
-      });
+      const { data } = await api.patch<UserData>(`/users/${id}/status`, { is_active: isActive });
+      return data;
     } catch (error: any) {
       console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
       throw new Error(`Не удалось изменить статус пользователя: ${error.message}`);

@@ -1,5 +1,6 @@
 import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
 import { saveToken, saveUser } from '../utils/auth';
+import { api } from './core';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 
@@ -24,28 +25,21 @@ export const authApi: IAuthApi = {
       formData.append('password', credentials.password);
       formData.append('grant_type', 'password');
 
-      // Отправляем запрос напрямую на бэкенд
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
+      // Отправляем запрос через axios
+      const response = await api.post('/auth/login', formData.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
-        },
-        body: formData
+        }
       });
 
-      const data = await response.json();
+      const data = response.data;
       
       console.log('Auth API: Получен ответ', {
         status: response.status,
-        ok: response.ok,
         hasToken: !!data?.access_token,
         hasUser: !!data?.user
       });
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка авторизации');
-      }
 
       if (!data.access_token || !data.user) {
         console.error('Auth API: Отсутствуют необходимые данные', {
@@ -77,20 +71,8 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Попытка регистрации', { email: credentials.email });
       
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(credentials)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка регистрации');
-      }
+      const response = await api.post('/auth/register', credentials);
+      const data = response.data;
 
       if (data.access_token && data.user) {
         saveToken(data.access_token);
@@ -106,42 +88,42 @@ export const authApi: IAuthApi = {
 
   getProfile: async (): Promise<User> => {
     try {
+      console.log('Auth API: Запрос профиля пользователя');
+      
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch(`${API_URL}/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка получения профиля');
-      }
+      const response = await api.get('/users/me');
+      const data = response.data;
 
       if (data) {
+        console.log('Auth API: Получен профиль пользователя', {
+          id: data.id,
+          email: data.email,
+          role: data.role
+        });
         saveUser(data);
       }
 
       return data;
     } catch (error: any) {
       console.error('Auth API: Ошибка получения профиля', error);
-      throw new Error(error.message || 'Ошибка получения профиля');
+      throw error;
     }
   },
 
   logout: async (): Promise<void> => {
     try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Auth API: Ошибка при выходе', error);
+    } finally {
       localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      sessionStorage.clear();
-    } catch (error: any) {
-      console.error('Auth API: Ошибка выхода', error);
+      localStorage.removeItem('user_profile');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user_profile');
     }
   }
 }; 

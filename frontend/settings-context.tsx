@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import useSettingsStore from './lib/settings-store';
 import { RestaurantSettings } from './lib/api/types';
+import { PublicSettings } from './lib/api/settings';
 import { Alert, Snackbar } from '@mui/material';
 
 interface SettingsContextType {
   settings: RestaurantSettings;
+  publicSettings: PublicSettings | null;
   isLoading: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
+  loadPublicSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -21,20 +24,55 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { settings, isLoading, error, loadSettings } = useSettingsStore();
+  const { settings, publicSettings, isLoading, error, loadSettings, loadPublicSettings } = useSettingsStore();
   const [initialized, setInitialized] = useState(false);
   const [showError, setShowError] = useState(false);
 
   useEffect(() => {
-    // Загружаем настройки только один раз при монтировании компонента
-    if (!initialized) {
-      loadSettings();
-      setInitialized(true);
-    }
-  }, [loadSettings, initialized]);
+    const initializeSettings = async () => {
+      if (!initialized) {
+        try {
+          const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+          
+          if (hasToken) {
+            // Если пользователь авторизован, загружаем только полные настройки
+            // Публичные настройки будут извлечены из полных в store
+            await loadSettings();
+          } else {
+            // Если пользователь не авторизован, загружаем только публичные настройки
+            await loadPublicSettings();
+          }
+          setInitialized(true);
+        } catch (error) {
+          console.error('Ошибка при инициализации настроек:', error);
+          setShowError(true);
+        }
+      }
+    };
+
+    initializeSettings();
+  }, [initialized, loadSettings, loadPublicSettings]);
+
+  // Обработка изменения токена авторизации
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        const hasToken = e.newValue !== null;
+        
+        // Перезагружаем настройки при изменении состояния авторизации
+        if (hasToken) {
+          loadSettings();
+        } else {
+          loadPublicSettings();
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [loadSettings, loadPublicSettings]);
 
   useEffect(() => {
-    // Показываем ошибку, если она есть
     if (error) {
       setShowError(true);
     }
@@ -46,9 +84,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const value = {
     settings,
+    publicSettings,
     isLoading,
     error,
-    loadSettings
+    loadSettings,
+    loadPublicSettings
   };
 
   return (

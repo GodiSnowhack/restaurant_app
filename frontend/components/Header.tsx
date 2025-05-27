@@ -34,12 +34,15 @@ const Header = () => {
   const router = useRouter();
   const { isAuthenticated, user, logout } = useAuthStore();
   const { items } = useCartStore();
-  const { settings } = useSettings();
+  const { publicSettings, settings } = useSettings();
   const { theme } = useTheme();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [authState, setAuthState] = useState<AuthStateType>({ isAuthenticated: false, user: null });
+
+  // Используем публичные настройки, если они доступны, иначе используем полные настройки
+  const displaySettings = publicSettings || settings;
 
   // Устанавливаем флаг клиентского рендеринга и инициализируем состояние авторизации
   useEffect(() => {
@@ -113,7 +116,7 @@ const Header = () => {
           <div className="flex items-center space-x-4 flex-shrink-0">
             <Link href="/" className="flex items-center" onClick={handleLogoClick}>
               <div className="text-primary font-bold text-xl uppercase dark:text-primary">
-                {settings.restaurant_name || 'RESTAURANT'}
+                {displaySettings.restaurant_name || 'RESTAURANT'}
               </div>
             </Link>
           </div>
