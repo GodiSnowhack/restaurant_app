@@ -81,5 +81,7 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         reload=settings.DEBUG,
-        workers=settings.WORKERS_COUNT
+        workers=settings.WORKERS_COUNT,
+        proxy_headers=True,
+        forwarded_allow_ips='*'
     ) 
