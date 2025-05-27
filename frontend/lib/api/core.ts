@@ -14,7 +14,7 @@ export const api = axios.create({
 });
 
 // Функция получения токена
-const getAuthToken = (): string | null => {
+export const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');
 };
@@ -91,37 +91,10 @@ export const isTokenExpired = (token: string): boolean => {
   }
 };
 
-// Функция для создания нового токена
-function createAccessToken(data: { sub: string | number, role: string, email: string }): string {
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT'
-  };
-  
-  const payload = {
-    ...data,
-    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 часа
-  };
-  
-  // Используем строку в качестве секретного ключа
-  const secret = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-secret-key';
-  const token = jwt.sign(payload, secret, { algorithm: 'HS256' });
-  
-  return token;
-}
+// Список публичных маршрутов
+export const PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
 
-// Функция для проверки, является ли текущий маршрут публичным
-// Импортируем позже для избежания циклических зависимостей
-let PUBLIC_ROUTES: string[] = [];
-try {
-  // Динамический импорт, если файл существует
-  if (typeof window !== 'undefined') {
-    PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
-  }
-} catch (e) {
-  PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/menu', '/menu/[id]', '/reservations', '/'];
-}
-
+// Проверка публичного маршрута
 export const checkIfPublicRoute = (): boolean => {
   if (typeof window === 'undefined') return false;
   
@@ -138,6 +111,28 @@ export const checkIfPublicRoute = (): boolean => {
   }
   
   return false;
+};
+
+// Проверка мобильного устройства
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 768;
+};
+
+// Получение заголовков авторизации
+export const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Проверка соединения
+export const checkConnection = async (): Promise<boolean> => {
+  try {
+    await api.get('/ping');
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 // Универсальная функция для выполнения fetch с таймаутом
@@ -190,62 +185,8 @@ export const getAuthTokenFromAllSources = (): string | null => {
   return null;
 };
 
-/**
- * Получение заголовков авторизации
- */
-export const getAuthHeaders = () => {
-  const token = getAuthTokenFromAllSources();
-  
-  if (!token) {
-    return {};
-  }
-  
-  // Получаем данные пользователя из токена
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1]));
-      return {
-        'Authorization': `Bearer ${token}`,
-        'X-User-ID': payload.sub || '',
-        'X-User-Role': payload.role || ''
-      };
-    }
-  } catch (e) {
-    console.error('Ошибка при декодировании токена:', e);
-  }
-  
-  // Если не удалось получить данные из токена, используем только Authorization
-  return {
-    'Authorization': `Bearer ${token}`
-  };
-};
-
-// Улучшенная функция для определения мобильного устройства
-export const isMobileDevice = (): boolean => {
-  if (typeof navigator === 'undefined') return false;
-  
-  // Проверка на мобильное устройство по User-Agent
-  const mobileRegex = /Mobile|Android|iPhone|iPad|iPod|Windows Phone/i;
-  const userAgent = navigator.userAgent || '';
-  
-  // Дополнительная проверка через mediaQuery для лучшего определения
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth < 768;
-  
-  console.log('Проверка устройства:', {
-    userAgent,
-    isMobileByUA: mobileRegex.test(userAgent),
-    isTouchDevice,
-    isSmallScreen,
-    innerWidth: window.innerWidth
-  });
-  
-  return mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen);
-};
-
 // Улучшенная функция для проверки соединения
-export const checkConnection = async (
+export const checkConnectionAdvanced = async (
   options?: { silent?: boolean; url?: string }
 ): Promise<{ isOnline: boolean; pingTime?: number; error?: string }> => {
   const url = options?.url || '/api/ping';  // Используем /api/ping вместо /api/v1
