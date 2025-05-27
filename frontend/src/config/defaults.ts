@@ -13,6 +13,7 @@ declare global {
 const formatApiUrl = (url: string): string => {
   // Убираем слеш в конце, если он есть
   const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  
   // Добавляем /api/v1, если его нет
   if (!baseUrl.endsWith('/api/v1')) {
     return `${baseUrl}/api/v1`;
@@ -35,13 +36,11 @@ export const DEFAULT_URLS = {
 // Получение базового URL API
 export const getDefaultApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const baseUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
-  return ensureSecureUrl(baseUrl);
+  return isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
 };
 
 // Получение базового URL фронтенда
 export const getDefaultFrontendUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const baseUrl = isProduction ? DEFAULT_URLS.production.frontend : DEFAULT_URLS.development.frontend;
-  return ensureSecureUrl(baseUrl);
+  return isProduction ? DEFAULT_URLS.production.frontend : DEFAULT_URLS.development.frontend;
 }; 

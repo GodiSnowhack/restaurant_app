@@ -19,13 +19,11 @@ class Settings(BaseSettings):
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
-        os.getenv("CORS_ORIGINS", "https://frontend-production-8eb6.up.railway.app"),
+        "https://frontend-production-8eb6.up.railway.app",
+        "https://backend-production-1a78.up.railway.app",
         "http://localhost:3000",
         "http://localhost:8000"
     ]
-
-    # Принудительное использование HTTPS
-    FORCE_HTTPS: bool = False
 
     # Railway specific settings
     ROOT_PATH: str = ""
@@ -68,7 +66,6 @@ class Settings(BaseSettings):
 
     # Настройки безопасности
     SECURITY_HEADERS: ClassVar[Dict[str, str]] = {
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'X-XSS-Protection': '1; mode=block',

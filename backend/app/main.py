@@ -4,8 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import logging
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import RedirectResponse
 import os
 
 from app.api.v1 import api_router
@@ -16,14 +14,6 @@ from app.core.init_db import init_db
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Middleware для принудительного HTTPS
-class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if settings.FORCE_HTTPS and request.url.scheme == "http":
-            https_url = str(request.url).replace("http://", "https://", 1)
-            return RedirectResponse(https_url, status_code=301)
-        return await call_next(request)
 
 # Инициализируем базу данных при запуске
 db = SessionLocal()
@@ -41,9 +31,6 @@ app = FastAPI(
     version="0.1.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
-
-# Отключаем принудительный HTTPS редирект для Railway
-settings.FORCE_HTTPS = False
 
 # Настройки CORS
 app.add_middleware(
