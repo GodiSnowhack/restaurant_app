@@ -10,12 +10,53 @@ export const api = axios.create({
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
-  maxRedirects: 5,
-  withCredentials: true,
-  validateStatus: (status) => {
-    return status >= 200 && status < 500; // Принимаем все ответы, кроме серверных ошибок
-  }
+  withCredentials: true
 });
+
+// Функция получения токена
+const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+};
+
+// Очистка токенов при выходе
+export const clearAuthTokens = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user_profile');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('user_role');
+};
+
+// Перехватчик для добавления токена авторизации
+api.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    const token = getAuthToken();
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error: AxiosError) => {
+    return Promise.reject(error);
+  }
+);
+
+// Перехватчик для обработки ответов
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    // Если 401, выходим из системы
+    if (error.response?.status === 401) {
+      clearAuthTokens();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Функция повторных попыток для критически важных API-вызовов
 export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> => {
@@ -49,172 +90,6 @@ export const isTokenExpired = (token: string): boolean => {
     return true;
   }
 };
-
-// Функция получения токена из любого доступного хранилища
-export const getAuthToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const localToken = localStorage.getItem('token');
-    const sessionToken = sessionStorage.getItem('token');
-    
-    // Если есть токен в localStorage, используем его, иначе из sessionStorage
-    if (localToken) {
-      return localToken;
-    } else if (sessionToken) {
-      // Если токен есть только в sessionStorage, копируем его в localStorage
-      try {
-        localStorage.setItem('token', sessionToken);
-      } catch (e) {
-        console.error('Не удалось скопировать токен из sessionStorage в localStorage:', e);
-      }
-      return sessionToken;
-    }
-  } catch (e) {
-    console.error('Ошибка при получении токена:', e);
-  }
-  
-  return null;
-};
-
-// Обновление функции logout для очистки обоих хранилищ
-export const clearAuthTokens = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_profile');
-  localStorage.removeItem('user_id');
-  localStorage.removeItem('user_role');
-};
-
-// Расширяем тип конфигурации axios
-interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
-  _retry?: boolean;
-}
-
-// Перехватчик для добавления токена авторизации
-api.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    // Получаем токен из всех возможных источников
-    const token = getAuthTokenFromAllSources();
-    
-    if (token) {
-      console.log('API Interceptor: Добавляем токен в заголовки');
-      if (!config.headers) {
-        config.headers = new AxiosHeaders();
-      }
-      config.headers.Authorization = `Bearer ${token}`;
-      
-      // Добавляем дополнительные заголовки для авторизации
-      try {
-        const userId = localStorage.getItem('user_id');
-        const userRole = localStorage.getItem('user_role');
-        
-        if (userId && userRole) {
-          config.headers['X-User-ID'] = userId;
-          config.headers['X-User-Role'] = userRole;
-          console.log('API Interceptor: Добавлены пользовательские заголовки:', {
-            userId,
-            role: userRole
-          });
-        }
-      } catch (e) {
-        console.error('API Interceptor: Ошибка при добавлении пользовательских заголовков:', e);
-      }
-    } else {
-      console.warn('API Interceptor: Токен не найден');
-    }
-
-    // Добавляем заголовки для предотвращения кэширования
-    config.headers['Cache-Control'] = 'no-cache';
-    config.headers['Pragma'] = 'no-cache';
-    
-    return config;
-  },
-  (error: AxiosError) => {
-    console.error('API Interceptor: Ошибка в перехватчике запроса:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Перехватчик для обработки ответов
-api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Если получили редирект, обрабатываем его
-    if (response.status >= 300 && response.status < 400) {
-      const newUrl = response.headers['location'];
-      if (newUrl) {
-        // Проверяем, что URL безопасный и соответствует нашему домену
-        const isSafeUrl = newUrl.startsWith('https://backend-production-1a78.up.railway.app/');
-        if (isSafeUrl) {
-          return api.get(newUrl);
-        }
-      }
-    }
-    return response;
-  },
-  async (error: AxiosError) => {
-    const config = error.config as ExtendedAxiosRequestConfig;
-    
-    console.error('[API] Ошибка в ответе:', {
-      status: error.response?.status,
-      url: config?.url,
-      message: error.message,
-      headers: error.response?.headers
-    });
-
-    // Обработка CORS ошибок
-    if (error.message === 'Network Error' && error.response?.status === undefined) {
-      console.error('[API] CORS ошибка:', error);
-      // Пробуем повторить запрос с другими заголовками
-      if (config && !config._retry) {
-        config._retry = true;
-        const headers = new AxiosHeaders({
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        });
-        config.headers = headers;
-        return api(config);
-      }
-      return Promise.reject(new Error('Ошибка доступа к API. Проверьте настройки CORS на сервере.'));
-    }
-
-    // Если ошибка 401, пробуем обновить токен
-    if (error.response?.status === 401) {
-      console.log('[API] Получена ошибка 401, проверяем авторизацию');
-      
-      try {
-        // Проверяем наличие токена
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.error('[API] Токен отсутствует');
-          clearAuthTokens();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
-        
-        // Проверяем валидность токена
-        if (isTokenExpired(token)) {
-          console.log('[API] Токен истек, выполняем выход');
-          clearAuthTokens();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/auth/login';
-          }
-          return Promise.reject(error);
-        }
-      } catch (e) {
-        console.error('[API] Ошибка при обработке 401:', e);
-        clearAuthTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/auth/login';
-        }
-      }
-    }
-    
-    return Promise.reject(error);
-  }
-);
 
 // Функция для создания нового токена
 function createAccessToken(data: { sub: string | number, role: string, email: string }): string {
