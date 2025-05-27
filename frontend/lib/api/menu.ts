@@ -181,8 +181,36 @@ export const menuApi = {
   
   // Обновление блюда
   updateDish: async (id: number, dish: Partial<Dish>): Promise<Dish> => {
-    const response = await api.put(`/menu/dishes/${id}`, dish);
-    return response.data;
+    try {
+      console.log(`API: Обновление блюда ${id}...`);
+      
+      // Добавляем id в данные для отправки
+      const requestData = { ...dish, id };
+      
+      // Используем новый эндпоинт update-dish вместо прямого обновления
+      const response = await api.post('/menu/update-dish', requestData);
+      
+      // Обновляем кэш блюд после успешного обновления
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          const index = dishes.findIndex((d: Dish) => d.id === id);
+          if (index >= 0) {
+            dishes[index] = response.data;
+            localStorage.setItem('cached_dishes', JSON.stringify(dishes));
+            console.log(`API: Блюдо ${id} обновлено в кэше`);
+          }
+        }
+      } catch (cacheError) {
+        console.error('API: Ошибка при обновлении кэша блюд:', cacheError);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error(`API: Ошибка при обновлении блюда ${id}:`, error);
+      throw new Error('Не удалось обновить блюдо');
+    }
   },
   
   // Удаление блюда

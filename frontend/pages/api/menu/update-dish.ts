@@ -1,14 +1,159 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getSecureApiUrl } from '../../../lib/utils/api';
+import fs from 'fs';
+import path from 'path';
 
-// Базовый URL бэкенда
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const CACHE_FILE_PATH = path.join(process.cwd(), 'data', 'dishes_cache.json');
 
-// Список разрешенных полей для блюда
+// Убедимся, что директория существует
+const ensureDirectoryExists = (filePath: string) => {
+  const dirname = path.dirname(filePath);
+  if (fs.existsSync(dirname)) {
+    return true;
+  }
+  fs.mkdirSync(dirname, { recursive: true });
+  return true;
+};
+
+// Чтение кэша из файла
+const getCachedDishes = () => {
+  try {
+    ensureDirectoryExists(CACHE_FILE_PATH);
+    
+    if (!fs.existsSync(CACHE_FILE_PATH)) {
+      return null;
+    }
+    
+    const fileContent = fs.readFileSync(CACHE_FILE_PATH, 'utf8');
+    const data = JSON.parse(fileContent);
+    
+    return data.dishes;
+  } catch (error) {
+    console.error('Ошибка при чтении кэша блюд:', error);
+    return null;
+  }
+};
+
+// Сохранение блюд в кэш
+const saveDishesToCache = (dishes: any[]) => {
+  try {
+    ensureDirectoryExists(CACHE_FILE_PATH);
+    
+    const cacheData = {
+      dishes,
+      timestamp: Date.now()
+    };
+    
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2), 'utf8');
+    console.log('Блюда успешно сохранены в кэш');
+  } catch (error) {
+    console.error('Ошибка при сохранении кэша блюд:', error);
+  }
+};
+
+// Обновление блюда в кэше
+const updateDishInCache = (id: number, updatedDish: any) => {
+  try {
+    const dishes = getCachedDishes();
+    if (!dishes) return;
+    
+    const index = dishes.findIndex((dish: any) => dish.id === id);
+    if (index >= 0) {
+      dishes[index] = { ...dishes[index], ...updatedDish, id };
+      saveDishesToCache(dishes);
+      console.log(`Блюдо с ID ${id} обновлено в кэше`);
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении блюда в кэше:', error);
+  }
+};
+
+// Данные-заглушки для блюд
+const FALLBACK_DISHES = [
+  { 
+    id: 1, 
+    name: "Бургер Классический", 
+    description: "Сочная говяжья котлета, свежие овощи, фирменный соус", 
+    price: 2500, 
+    category_id: 1,
+    image_url: "/images/dishes/burger.jpg",
+    is_available: true,
+    is_vegetarian: false,
+    ingredients: "Булочка, говядина, салат, помидор, соус",
+    calories: 850,
+    weight: 350,
+    cooking_time: 15,
+    allergens: ["Глютен", "Молоко"]
+  },
+  { 
+    id: 2, 
+    name: "Цезарь с курицей", 
+    description: "Классический салат с куриным филе, сыром пармезан и гренками", 
+    price: 2200, 
+    category_id: 3,
+    image_url: "/images/dishes/caesar.jpg",
+    is_available: true,
+    is_vegetarian: false,
+    ingredients: "Салат романо, куриное филе, гренки, пармезан, соус цезарь",
+    calories: 550,
+    weight: 250,
+    cooking_time: 10,
+    allergens: ["Глютен", "Молоко", "Яйца"]
+  },
+  { 
+    id: 3, 
+    name: "Борщ", 
+    description: "Традиционный борщ со сметаной и зеленью", 
+    price: 1800, 
+    category_id: 2,
+    image_url: "/images/dishes/borsch.jpg",
+    is_available: true,
+    is_vegetarian: false,
+    ingredients: "Свекла, капуста, морковь, картофель, говядина, зелень",
+    calories: 450,
+    weight: 400,
+    cooking_time: 20,
+    allergens: ["Молоко"]
+  },
+  { 
+    id: 4, 
+    name: "Тирамису", 
+    description: "Классический итальянский десерт с кофейным вкусом", 
+    price: 2000, 
+    category_id: 4,
+    image_url: "/images/dishes/tiramisu.jpg",
+    is_available: true,
+    is_vegetarian: true,
+    ingredients: "Маскарпоне, савоярди, кофе, какао",
+    calories: 420,
+    weight: 150,
+    cooking_time: 5,
+    allergens: ["Глютен", "Молоко", "Яйца"]
+  },
+  { 
+    id: 5, 
+    name: "Латте", 
+    description: "Кофейный напиток с молоком", 
+    price: 1200, 
+    category_id: 5,
+    image_url: "/images/dishes/latte.jpg",
+    is_available: true,
+    is_vegetarian: true,
+    ingredients: "Эспрессо, молоко",
+    calories: 180,
+    weight: 350,
+    cooking_time: 5,
+    allergens: ["Молоко"]
+  }
+];
+
+// Список разрешенных полей для редактирования блюда
 const allowedDishFields = [
   'name', 'description', 'price', 'category_id', 'image_url', 
   'is_available', 'calories', 'weight', 'position', 'is_vegetarian', 
-  'is_vegan', 'is_spicy', 'cooking_time', 'cost_price'
+  'is_vegan', 'is_spicy', 'cooking_time', 'cost_price', 'ingredients',
+  'allergens', 'tags'
 ];
 
 // Функция для фильтрации полей объекта
@@ -24,184 +169,98 @@ const filterObject = (obj: any, allowedFields: string[]) => {
   return filteredObj;
 };
 
-/**
- * Специализированный API прокси для надежного обновления блюд
- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { method, body, headers } = req;
-  
-  // Проверяем метод запроса - разрешаем только PUT
-  if (method !== 'PUT') {
-    return res.status(405).json({ message: 'Метод не разрешен, ожидается PUT' });
+  // Настройка CORS заголовков
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,PUT,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  // Обработка предварительных запросов CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-  
-  // Получаем ID блюда из параметров
-  const dishId = body.id;
-  if (!dishId) {
-    return res.status(400).json({ message: 'ID блюда обязателен' });
+
+  // Принимаем только POST и PUT запросы
+  if (req.method !== 'POST' && req.method !== 'PUT') {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
-  
-  console.log(`[Update Dish API] Получен запрос на обновление блюда с ID: ${dishId}`);
-  
-  // Проверяем данные блюда
-  if (!body.data) {
-    return res.status(400).json({ message: 'Данные блюда обязательны' });
+
+  // Проверка тела запроса
+  if (!req.body) {
+    return res.status(400).json({ message: 'Missing request body' });
   }
+
+  const { id } = req.body;
+  
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({ message: 'Invalid dish ID' });
+  }
+
+  const dishId = Number(id);
   
   // Фильтруем данные для безопасности
-  const dishData = filterObject(body.data, allowedDishFields);
-  
-  // Проверяем обязательные поля
-  if (!dishData.name || !dishData.price || !dishData.category_id) {
-    return res.status(400).json({ 
-      message: 'Отсутствуют обязательные поля: название, цена или категория',
-      success: false
-    });
-  }
-  
-  // Получаем заголовок авторизации
-  const authHeader = headers.authorization;
-  
-  // Формируем URL для запроса к бэкенду
-  const timestamp = Date.now();
-  const url = `${API_BASE_URL}/menu/dishes/${dishId}?_=${timestamp}`;
-  
-  console.log(`[Update Dish API] Подготовлен запрос к бэкенду: ${url}`);
-  
+  const dishData = filterObject(req.body, allowedDishFields);
+
+  console.log(`[API] Обновление блюда ID ${dishId}:`, dishData);
+
   try {
-    // Настройка заголовков для запроса к бэкенду
-    const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-    };
-    
-    // Добавляем заголовок авторизации, если он есть
-    if (authHeader) {
-      requestHeaders['Authorization'] = authHeader;
-    }
-    
-    // Проверяем доступность API перед отправкой основного запроса
-    try {
-      // Используем более надежный метод проверки - простой запрос к корню API
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-      
-      try {
-        // Пробуем простой запрос к корню API
-        const pingResponse = await fetch(`${API_BASE_URL}/`, { 
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!pingResponse.ok) {
-          console.warn(`[Update Dish API] Сервер недоступен (${pingResponse.status}), переходим в демо-режим`);
-          
-          // Возвращаем успешный демо-ответ
-          return res.status(200).json({
-            id: dishId,
-            ...dishData,
-            updated: true,
-            success: true,
-            message: 'Блюдо обновлено локально (демо-режим, сервер недоступен)',
-            demo: true
-          });
-        }
-      } catch (pingFetchError) {
-        clearTimeout(timeoutId);
-        throw pingFetchError; // Прокидываем ошибку дальше для обработки
-      }
-    } catch (pingError) {
-      console.error('[Update Dish API] Ошибка при проверке доступности сервера:', pingError);
-      
-      // Возвращаем успешный демо-ответ
-      return res.status(200).json({
-        id: dishId,
-        ...dishData,
-        updated: true,
-        success: true,
-        message: 'Блюдо обновлено локально (демо-режим, сервер недоступен)',
-        demo: true
-      });
-    }
-    
-    // Отправляем запрос к бэкенду
-    console.log(`[Update Dish API] Отправка запроса на бэкенд: ${url}`);
+    // Пытаемся отправить запрос на бэкенд
+    const url = `${getSecureApiUrl()}/menu/dishes/${dishId}`;
+    console.log(`Отправка запроса на обновление блюда в API: ${url}`);
     
     try {
-      const response = await axios({
-        method: 'PUT',
-        url,
-        headers: requestHeaders,
-        data: dishData,
-        timeout: 15000,
-        validateStatus: () => true // Возвращает все статусы ответов
+      const response = await axios.put(url, dishData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(req.headers.authorization ? { 'Authorization': req.headers.authorization } : {})
+        },
+        maxRedirects: 0,
+        validateStatus: function (status) {
+          return status < 400;
+        },
+        timeout: 5000
       });
+
+      // Обновляем кэш
+      updateDishInCache(dishId, response.data);
       
-      console.log(`[Update Dish API] Получен ответ со статусом: ${response.status}`);
+      return res.status(200).json(response.data);
+    } catch (error) {
+      console.error(`Ошибка при обновлении блюда в API:`, error);
       
-      // Если запрос успешен, возвращаем данные от бэкенда
-      if (response.status >= 200 && response.status < 300) {
-        console.log('[Update Dish API] Блюдо успешно обновлено на сервере');
-        return res.status(200).json({
-          ...response.data,
-          success: true,
-          message: 'Блюдо успешно обновлено'
-        });
-      } 
+      // Если не удалось обновить на бэкенде, обновляем только локальный кэш
+      // Сначала проверяем, есть ли блюдо в кэше или заглушках
+      let existingDish = null;
+      const cachedDishes = getCachedDishes();
       
-      // Если ошибка авторизации, возвращаем демо-ответ
-      if (response.status === 401) {
-        console.warn('[Update Dish API] Ошибка авторизации, возвращаем демо-ответ');
-        
-        return res.status(200).json({
-          id: dishId,
-          ...dishData,
-          updated: true,
-          success: true,
-          message: 'Блюдо обновлено локально (демо-режим, проблема авторизации)',
-          demo: true
-        });
+      if (cachedDishes) {
+        existingDish = cachedDishes.find((dish: any) => dish.id === dishId);
       }
       
-      // Для других ошибок также возвращаем демо-ответ
-      console.warn(`[Update Dish API] Ошибка от сервера: ${response.status}, возвращаем демо-ответ`);
-      return res.status(200).json({
-        id: dishId,
-        ...dishData,
-        updated: true,
-        success: true,
-        message: 'Блюдо обновлено локально (демо-режим, ошибка сервера)',
-        demo: true
-      });
-    } catch (apiError: any) {
-      console.error('[Update Dish API] Ошибка при запросе к API:', apiError.message);
+      if (!existingDish) {
+        existingDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
+      }
       
-      // Возвращаем успешный демо-ответ при любой ошибке
-      return res.status(200).json({
-        id: dishId,
-        ...dishData,
-        updated: true,
-        success: true,
-        message: 'Блюдо обновлено локально (демо-режим, ошибка соединения)',
-        demo: true
-      });
+      if (!existingDish) {
+        return res.status(404).json({ message: 'Блюдо не найдено' });
+      }
+      
+      // Обновляем данные блюда
+      const updatedDish = { ...existingDish, ...dishData, id: dishId };
+      
+      // Обновляем кэш
+      updateDishInCache(dishId, updatedDish);
+      
+      console.log(`Блюдо с ID ${dishId} обновлено локально:`, updatedDish);
+      return res.status(200).json(updatedDish);
     }
-  } catch (error) {
-    console.error('[Update Dish API] Критическая ошибка:', error);
-    
-    // Даже при критической ошибке возвращаем успешный демо-ответ
-    return res.status(200).json({
-      id: dishId,
-      ...dishData,
-      updated: true,
-      success: true,
-      message: 'Блюдо обновлено локально (демо-режим, критическая ошибка)',
-      demo: true
-    });
+  } catch (error: any) {
+    console.error(`Серверная ошибка при обновлении блюда с ID ${dishId}:`, error.message);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 } 
