@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { settingsApi, PublicSettings } from './api/settings';
-import { RestaurantTable, RestaurantSettings } from './api/types';
+import { RestaurantTable, RestaurantSettings, WorkingHours } from './api/types';
 
 interface SettingsState {
   settings: RestaurantSettings;
@@ -21,9 +21,6 @@ interface SettingsState {
 // Интервал автообновления настроек (5 минут)
 const AUTO_UPDATE_INTERVAL = 5 * 60 * 1000;
 
-// Время жизни кэша (1 час)
-const CACHE_TTL = 60 * 60 * 1000;
-
 const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {} as RestaurantSettings,
   publicSettings: null,
@@ -32,42 +29,53 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
   lastUpdated: null,
 
   loadSettings: async () => {
-    const state = get();
-    const now = Date.now();
-    
-    // Проверяем, есть ли актуальный кэш
-    if (state.settings && state.lastUpdated && (now - state.lastUpdated < CACHE_TTL)) {
-      return; // Используем кэшированные данные
-    }
-
     try {
       set({ isLoading: true, error: null });
       console.log('Запрос настроек с сервера...');
       const settings = await settingsApi.getSettings();
-      set({ settings, isLoading: false, lastUpdated: now });
+      // При получении полных настроек, обновляем и публичные
+      const publicSettings: PublicSettings = {
+        restaurant_name: settings.restaurant_name,
+        email: settings.email,
+        phone: settings.phone,
+        address: settings.address,
+        website: settings.website,
+        working_hours: Object.entries(settings.working_hours).reduce((acc, [day, hours]) => ({
+          ...acc,
+          [day]: {
+            open: hours.open,
+            close: hours.close,
+            is_closed: hours.is_closed
+          }
+        }), {})
+      };
+      set({ 
+        settings, 
+        publicSettings,
+        isLoading: false, 
+        lastUpdated: Date.now() 
+      });
     } catch (error) {
       console.error('Ошибка при загрузке настроек:', error);
       set({ error: 'Ошибка при загрузке настроек', isLoading: false });
+      throw error;
     }
   },
 
   loadPublicSettings: async () => {
-    const state = get();
-    const now = Date.now();
-    
-    // Проверяем, есть ли актуальный кэш публичных настроек
-    if (state.publicSettings && state.lastUpdated && (now - state.lastUpdated < CACHE_TTL)) {
-      return; // Используем кэшированные данные
-    }
-
     try {
       set({ isLoading: true, error: null });
       console.log('Запрос публичных настроек...');
       const publicSettings = await settingsApi.getPublicSettings();
-      set({ publicSettings, isLoading: false, lastUpdated: now });
+      set({ 
+        publicSettings, 
+        isLoading: false, 
+        lastUpdated: Date.now() 
+      });
     } catch (error) {
       console.error('Ошибка при загрузке публичных настроек:', error);
       set({ error: 'Ошибка при загрузке публичных настроек', isLoading: false });
+      throw error;
     }
   },
 
@@ -75,7 +83,28 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const updatedSettings = await settingsApi.updateSettings(newSettings);
-      set({ settings: updatedSettings, isLoading: false, lastUpdated: Date.now() });
+      // Обновляем и публичные настройки при обновлении полных
+      const publicSettings: PublicSettings = {
+        restaurant_name: updatedSettings.restaurant_name,
+        email: updatedSettings.email,
+        phone: updatedSettings.phone,
+        address: updatedSettings.address,
+        website: updatedSettings.website,
+        working_hours: Object.entries(updatedSettings.working_hours).reduce((acc, [day, hours]) => ({
+          ...acc,
+          [day]: {
+            open: hours.open,
+            close: hours.close,
+            is_closed: hours.is_closed
+          }
+        }), {})
+      };
+      set({ 
+        settings: updatedSettings, 
+        publicSettings,
+        isLoading: false, 
+        lastUpdated: Date.now() 
+      });
       return updatedSettings;
     } catch (error) {
       console.error('Ошибка при обновлении настроек:', error);
@@ -144,9 +173,13 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
     const { lastUpdated } = get();
     const now = Date.now();
     
-    // Проверяем, прошло ли достаточно времени с последнего обновления
     if (!lastUpdated || now - lastUpdated >= AUTO_UPDATE_INTERVAL) {
-      await get().loadSettings();
+      const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
+      if (hasToken) {
+        await get().loadSettings();
+      } else {
+        await get().loadPublicSettings();
+      }
     }
   }
 }));

@@ -32,25 +32,45 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const initializeSettings = async () => {
       if (!initialized) {
         try {
-          // Загружаем публичные настройки только один раз при инициализации
-          await loadPublicSettings();
-          
-          // Загружаем полные настройки только если пользователь авторизован
           const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
-          if (hasToken && !settings.restaurant_name) {
-            await loadSettings();
-          }
           
+          if (hasToken) {
+            // Если пользователь авторизован, загружаем только полные настройки
+            // Публичные настройки будут извлечены из полных в store
+            await loadSettings();
+          } else {
+            // Если пользователь не авторизован, загружаем только публичные настройки
+            await loadPublicSettings();
+          }
           setInitialized(true);
-        } catch (err) {
-          console.error('Ошибка при инициализации настроек:', err);
+        } catch (error) {
+          console.error('Ошибка при инициализации настроек:', error);
           setShowError(true);
         }
       }
     };
 
     initializeSettings();
-  }, [initialized]);
+  }, [initialized, loadSettings, loadPublicSettings]);
+
+  // Обработка изменения токена авторизации
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        const hasToken = e.newValue !== null;
+        
+        // Перезагружаем настройки при изменении состояния авторизации
+        if (hasToken) {
+          loadSettings();
+        } else {
+          loadPublicSettings();
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [loadSettings, loadPublicSettings]);
 
   useEffect(() => {
     if (error) {

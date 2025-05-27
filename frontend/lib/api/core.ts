@@ -6,14 +6,9 @@ import { getSecureApiUrl } from '../utils/api';
 export const api = axios.create({
   baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
   timeout: 30000,
-  maxRedirects: 2, // Ограничиваем количество редиректов
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
-  },
-  validateStatus: function (status) {
-    // Принимаем только успешные статусы и один редирект
-    return (status >= 200 && status < 300) || status === 307;
   }
 });
 
@@ -55,28 +50,6 @@ api.interceptors.response.use(
       clearAuthTokens();
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login';
-      }
-    }
-    if (error.response?.status === 307 && error.response.headers?.location) {
-      // Проверяем, что URL редиректа валидный
-      const redirectUrl = error.response.headers.location;
-      if (!redirectUrl.startsWith('http')) {
-        return Promise.reject(new Error('Invalid redirect URL'));
-      }
-      
-      // Повторяем запрос с новым URL
-      const config = error.config;
-      if (!config) {
-        return Promise.reject(error);
-      }
-      
-      try {
-        return await api.request({
-          ...config,
-          url: redirectUrl
-        });
-      } catch (redirectError) {
-        return Promise.reject(redirectError);
       }
     }
     return Promise.reject(error);

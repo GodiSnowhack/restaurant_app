@@ -61,40 +61,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Accept': 'application/json',
         'Origin': 'https://frontend-production-8eb6.up.railway.app'
       },
-      maxRedirects: 2,
+      maxRedirects: 1,
       validateStatus: (status) => {
-        return status >= 200 && status < 300 || status === 307;
-      },
-      timeout: 15000
-    });
-
-    // Добавляем перехватчик для обработки редиректов
-    api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 307 && error.response.headers?.location) {
-          const redirectUrl = error.response.headers.location;
-          if (!redirectUrl.startsWith('http')) {
-            return Promise.reject(new Error('Invalid redirect URL'));
-          }
-          
-          const config = error.config;
-          if (!config) {
-            return Promise.reject(error);
-          }
-          
-          try {
-            return await api.request({
-              ...config,
-              url: redirectUrl
-            });
-          } catch (redirectError) {
-            return Promise.reject(redirectError);
-          }
-        }
-        return Promise.reject(error);
+        return status >= 200 && status < 400;
       }
-    );
+    });
 
     // Формируем URL с учетом query параметров
     const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
