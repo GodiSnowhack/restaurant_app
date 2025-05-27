@@ -1,7 +1,9 @@
 import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
 import { saveToken, saveUser } from '../utils/auth';
+import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+// Используем внутренние прокси вместо прямого обращения к бэкенду
+const API_BASE_URL = '/api';
 
 interface IAuthApi {
   login: (credentials: LoginCredentials) => Promise<LoginResponse>;
@@ -9,6 +11,17 @@ interface IAuthApi {
   getProfile: () => Promise<User>;
   logout: () => Promise<void>;
 }
+
+// Создаем экземпляр axios для аутентификации
+const authAxios = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  },
+  maxRedirects: 0
+});
 
 export const authApi: IAuthApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -24,8 +37,8 @@ export const authApi: IAuthApi = {
       formData.append('password', credentials.password);
       formData.append('grant_type', 'password');
 
-      // Отправляем запрос напрямую на бэкенд
-      const response = await fetch(`${API_URL}/auth/login`, {
+      // Отправляем запрос через внутренний прокси
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -77,7 +90,7 @@ export const authApi: IAuthApi = {
     try {
       console.log('Auth API: Попытка регистрации', { email: credentials.email });
       
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,23 +119,35 @@ export const authApi: IAuthApi = {
 
   getProfile: async (): Promise<User> => {
     try {
+      console.log('Auth API: Запрос профиля пользователя');
+
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch(`${API_URL}/users/me`, {
+      // Используем внутренний прокси-эндпоинт для профиля
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         }
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка получения профиля');
+        // Если у нас есть кэшированный пользователь, используем его
+        const cachedUser = localStorage.getItem('user');
+        if (cachedUser) {
+          console.log('Auth API: Используем кэшированные данные пользователя');
+          return JSON.parse(cachedUser);
+        }
+        throw new Error('Ошибка получения профиля');
       }
+
+      const data = await response.json();
+      console.log('Auth API: Получен профиль', data);
 
       if (data) {
         saveUser(data);
@@ -131,6 +156,14 @@ export const authApi: IAuthApi = {
       return data;
     } catch (error: any) {
       console.error('Auth API: Ошибка получения профиля', error);
+      
+      // В случае ошибки проверяем, есть ли кэшированные данные
+      const cachedUser = localStorage.getItem('user');
+      if (cachedUser) {
+        console.log('Auth API: Используем кэшированные данные пользователя после ошибки');
+        return JSON.parse(cachedUser);
+      }
+      
       throw new Error(error.message || 'Ошибка получения профиля');
     }
   },

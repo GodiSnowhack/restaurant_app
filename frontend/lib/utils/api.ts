@@ -2,28 +2,48 @@ import { getDefaultApiUrl } from '../../src/config/defaults';
 
 /**
  * Возвращает безопасный URL для API запросов
+ * Всегда предпочитаем использовать внутренние прокси-эндпоинты
  */
 export const getSecureApiUrl = (): string => {
-  // Проверяем, запущено ли приложение в браузере или на сервере
-  const isBrowser = typeof window !== 'undefined';
-  
-  if (isBrowser) {
-    // В браузере используем относительные URL для внутренних прокси-эндпоинтов
+  // В браузере всегда используем внутренние прокси-эндпоинты
+  if (typeof window !== 'undefined') {
     return '/api';
-  } else {
-    // На сервере используем полный URL из переменных окружения
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-    return ensureSecureUrl(baseUrl);
-  }
+  } 
+  
+  // На сервере также используем внутренние прокси-эндпоинты
+  // или полный URL из переменных окружения если это необходимо для SSR
+  return '/api';
 };
 
 /**
- * Создает безопасный URL для API запросов
+ * Создает безопасный URL для API запросов через внутренние прокси
  */
 export const createApiUrl = (endpoint: string): string => {
   const baseUrl = getSecureApiUrl();
+  
+  // Для эндпоинтов аутентификации и профиля используем специальные прокси-маршруты
+  if (endpoint.includes('users/me') || endpoint.includes('profile')) {
+    return '/api/profile';
+  }
+  
+  // Для категорий меню
+  if (endpoint.includes('menu/categories')) {
+    return '/api/menu/categories';
+  }
+  
+  // Для блюд меню
+  if (endpoint.includes('menu/dishes')) {
+    return '/api/menu/dishes';
+  }
+  
+  // Для настроек
+  if (endpoint.includes('settings')) {
+    return '/api/settings';
+  }
+  
+  // Для общего случая
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  return ensureSecureUrl(url);
+  return url;
 };
 
 /**
@@ -74,6 +94,7 @@ export const getFrontendUrl = (): string => {
 
 /**
  * Получение полного URL API с учетом окружения
+ * Всегда предпочитаем использовать внутренние прокси-эндпоинты
  */
 export const getApiUrl = (endpoint: string): string => {
   return createApiUrl(endpoint);

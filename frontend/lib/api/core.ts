@@ -4,14 +4,17 @@ import { getSecureApiUrl } from '../utils/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: 'https://backend-production-1a78.up.railway.app/api/v1',
+  baseURL: '/api', // Используем внутренние прокси-эндпоинты вместо прямого обращения к бэкенду
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
   withCredentials: true,
-  maxRedirects: 0 // Отключаем автоматические редиректы, чтобы избежать циклических редиректов
+  maxRedirects: 0, // Отключаем автоматические редиректы, чтобы избежать циклических редиректов
+  validateStatus: function (status) {
+    return status < 400; // Принимаем только успешные статусы
+  }
 });
 
 // Функция повторных попыток для критически важных API-вызовов
@@ -121,18 +124,21 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Принудительно используем HTTPS
-    config.baseURL = 'https://backend-production-1a78.up.railway.app/api/v1';
+    // Устанавливаем базовый URL на внутренний прокси
+    config.baseURL = '/api';
     
-    // Проверяем и принудительно устанавливаем HTTPS для всех URL
-    if (config.url && config.url.startsWith('http://')) {
-      config.url = config.url.replace('http://', 'https://');
-    }
-
-    // Проверяем полный URL запроса
-    const fullUrl = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
-    if (fullUrl && fullUrl.startsWith('http://')) {
-      throw new Error('Небезопасный HTTP запрос не разрешен');
+    // Проверяем, не содержит ли URL прямых ссылок на бэкенд
+    if (config.url) {
+      // Если URL указывает на внешний API, заменяем его на внутренний прокси
+      if (config.url.includes('backend-production-1a78.up.railway.app')) {
+        const path = new URL(config.url).pathname;
+        config.url = path.replace('/api/v1', '');
+      }
+      
+      // Если URL начинается с '/api/v1', заменяем на простой '/api'
+      if (config.url.startsWith('/api/v1')) {
+        config.url = config.url.replace('/api/v1', '');
+      }
     }
     
     return config;
@@ -151,6 +157,32 @@ api.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const config = error.config as ExtendedAxiosRequestConfig;
+    
+    // Проверяем, является ли ошибка связанной с сетью
+    const isNetworkError = error.message?.includes('Network Error') || 
+                           error.code === 'ERR_NETWORK' ||
+                           error.code === 'ECONNABORTED' ||
+                           error.code === 'ERR_TOO_MANY_REDIRECTS';
+    
+    if (isNetworkError) {
+      console.warn('[API] Обнаружена сетевая ошибка:', error.message);
+      
+      // Для проблем с сетью пытаемся использовать кэшированные данные или заглушки
+      if (config?.url) {
+        // Возвращаем сообщение об ошибке в формате, совместимом с ожидаемым ответом
+        return Promise.reject({
+          ...error,
+          response: {
+            status: 503,
+            data: { 
+              message: 'Сервис временно недоступен, используйте кэшированные данные',
+              error: error.message,
+              useCached: true
+            }
+          }
+        });
+      }
+    }
     
     console.error('[API] Ошибка в ответе:', {
       status: error.response?.status,
