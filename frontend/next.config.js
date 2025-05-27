@@ -66,15 +66,19 @@ const nextConfig = {
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS'
+            value: 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'X-Requested-With, Content-Type, Accept, Authorization, X-User-ID, X-User-Role'
+            value: 'X-Requested-With, Content-Type, Accept, Authorization, X-User-ID, X-User-Role, Access-Control-Allow-Origin, Access-Control-Allow-Credentials, Access-Control-Allow-Methods, Access-Control-Allow-Headers'
           },
           {
             key: 'Access-Control-Allow-Credentials',
             value: 'true'
+          },
+          {
+            key: 'Access-Control-Max-Age',
+            value: '3600'
           }
         ],
       },

@@ -9,7 +9,9 @@ export const api = axios.create({
   withCredentials: true,
   headers: {
     'Accept': 'application/json',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': 'https://frontend-production-8eb6.up.railway.app',
+    'Access-Control-Allow-Credentials': 'true'
   }
 });
 
@@ -35,6 +37,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Добавляем CORS заголовки для каждого запроса
+    config.headers['Access-Control-Allow-Origin'] = 'https://frontend-production-8eb6.up.railway.app';
+    config.headers['Access-Control-Allow-Credentials'] = 'true';
     
     return config;
   },

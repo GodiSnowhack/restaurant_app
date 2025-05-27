@@ -77,7 +77,7 @@ app.add_middleware(
         "https://localhost:8000"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "Content-Type",
         "Authorization", 
@@ -90,9 +90,16 @@ app.add_middleware(
         "X-Real-IP",
         "X-Request-ID",
         "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
+    ],
+    expose_headers=[
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Origin",
         "Access-Control-Allow-Credentials"
     ],
-    expose_headers=["*"],
     max_age=3600,
 )
 
