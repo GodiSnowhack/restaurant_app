@@ -38,12 +38,8 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description="СППР для управления рестораном",
     version="0.1.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    root_path=settings.ROOT_PATH if settings.ENVIRONMENT == "production" else ""
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
-
-# Закомментируем middleware для HTTPS
-# app.add_middleware(HTTPSRedirectMiddleware)
 
 # Настройки CORS
 app.add_middleware(
@@ -52,7 +48,8 @@ app.add_middleware(
         "https://frontend-production-8eb6.up.railway.app",
         "https://backend-production-1a78.up.railway.app",
         "http://localhost:3000",
-        "http://localhost:8000"
+        "http://localhost:8000",
+        "*"  # Разрешаем все источники для отладки
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -62,7 +59,8 @@ app.add_middleware(
         "Accept",
         "Origin",
         "X-User-ID",
-        "X-User-Role"
+        "X-User-Role",
+        "Access-Control-Allow-Origin"
     ],
     expose_headers=["*"],
     max_age=3600,

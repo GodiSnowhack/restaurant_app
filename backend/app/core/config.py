@@ -22,7 +22,8 @@ class Settings(BaseSettings):
         "https://frontend-production-8eb6.up.railway.app",
         "https://backend-production-1a78.up.railway.app",
         "http://localhost:3000",
-        "http://localhost:8000"
+        "http://localhost:8000",
+        "*"  # Разрешаем все источники для отладки
     ]
 
     # Принудительное использование HTTPS
@@ -33,9 +34,7 @@ class Settings(BaseSettings):
     
     @validator("ROOT_PATH", pre=True)
     def assemble_root_path(cls, v: Optional[str], values: Dict[str, Any]) -> str:
-        if values.get("ENVIRONMENT") == "production":
-            return "/api"
-        return v
+        return ""  # Отключаем root_path для избежания конфликтов маршрутизации
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:

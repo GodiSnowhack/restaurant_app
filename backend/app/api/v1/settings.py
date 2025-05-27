@@ -13,10 +13,12 @@ router = APIRouter()
 
 @router.get("", response_model=SettingsResponse)
 def get_settings(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) if settings.ENVIRONMENT == "production" else None
 ) -> Any:
     """
     Получение настроек ресторана.
+    В production требует аутентификацию, в development - нет.
     """
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
