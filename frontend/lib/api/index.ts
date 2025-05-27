@@ -201,7 +201,8 @@ const axiosApi = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
-  }
+  },
+  maxRedirects: 0
 });
 
 // Добавляем перехватчик для обработки редиректов

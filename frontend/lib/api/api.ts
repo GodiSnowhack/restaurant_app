@@ -13,7 +13,8 @@ export const api = axios.create({
   validateStatus: function (status) {
     // Считаем успешными статусы 2xx и 304 (не изменилось)
     return (status >= 200 && status < 300) || status === 304;
-  }
+  },
+  maxRedirects: 0 // Отключаем автоматические редиректы для предотвращения циклических редиректов
 });
 
 // Добавляем перехватчик для обработки ошибок

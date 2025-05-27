@@ -10,7 +10,8 @@ export const api = axios.create({
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
-  withCredentials: true
+  withCredentials: true,
+  maxRedirects: 0 // Отключаем автоматические редиректы, чтобы избежать циклических редиректов
 });
 
 // Функция повторных попыток для критически важных API-вызовов
