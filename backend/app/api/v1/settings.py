@@ -8,13 +8,14 @@ from app.models.settings import Settings
 from app.models.user import User, UserRole
 from app.schemas.settings import SettingsCreate, SettingsUpdate, SettingsResponse
 from app.services.auth import get_current_user
+from app.core.config import settings as app_settings
 
 router = APIRouter()
 
 @router.get("", response_model=SettingsResponse)
 def get_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) if settings.ENVIRONMENT == "production" else None
+    current_user: User = Depends(get_current_user) if app_settings.ENVIRONMENT == "production" else None
 ) -> Any:
     """
     Получение настроек ресторана.
