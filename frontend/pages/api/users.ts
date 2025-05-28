@@ -109,7 +109,7 @@ export default async function handler(
     }
 
     const baseApiUrl = getDefaultApiUrl();
-    const usersApiUrl = `${baseApiUrl}/users`;
+    const usersApiUrl = `${baseApiUrl}/users/`;
 
     console.log('Users API - Отправка запроса на', usersApiUrl);
     console.log('Users API - Заголовок авторизации:', { 
@@ -130,7 +130,7 @@ export default async function handler(
           'Accept': 'application/json',
           'Authorization': authHeader
         },
-        maxRedirects: 0, // Запрещаем перенаправления
+        maxRedirects: 5, // Разрешаем ограниченное количество перенаправлений
         validateStatus: function (status) {
           return status < 500; // Принимаем все статусы, кроме 5xx
         },
