@@ -89,7 +89,7 @@ export default async function handler(
         return res.status(200).json(getMockData('menu'));
       }
 
-      const data = response.data;
+      let data = response.data;
 
       console.log('Analytics API (menu) - Ответ от сервера:', {
         status: response.status,
@@ -97,7 +97,69 @@ export default async function handler(
         dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
       });
 
-      // Возвращаем данные клиенту
+      // Проверяем структуру данных и преобразуем их, если необходимо
+      if (data && typeof data === 'object') {
+        const menuData = {
+          topSellingDishes: Array.isArray(data.topSellingDishes) 
+            ? data.topSellingDishes.map((dish: any) => ({
+                dishId: dish.dishId || dish.dish_id || 0,
+                dishName: dish.dishName || dish.dish_name || '',
+                categoryId: dish.categoryId || dish.category_id,
+                categoryName: dish.categoryName || dish.category_name,
+                salesCount: typeof dish.salesCount === 'number' ? dish.salesCount : 
+                           typeof dish.sales_count === 'number' ? dish.sales_count : 0,
+                revenue: typeof dish.revenue === 'number' ? dish.revenue : 0,
+                percentage: typeof dish.percentage === 'number' ? dish.percentage : 0
+              }))
+            : [],
+          
+          mostProfitableDishes: Array.isArray(data.mostProfitableDishes)
+            ? data.mostProfitableDishes.map((dish: any) => ({
+                dishId: dish.dishId || dish.dish_id || 0,
+                dishName: dish.dishName || dish.dish_name || '',
+                salesCount: typeof dish.salesCount === 'number' ? dish.salesCount : 
+                           typeof dish.sales_count === 'number' ? dish.sales_count : 0,
+                revenue: typeof dish.revenue === 'number' ? dish.revenue : 0,
+                percentage: typeof dish.percentage === 'number' ? dish.percentage : 0,
+                costPrice: typeof dish.costPrice === 'number' ? dish.costPrice : 
+                          typeof dish.cost_price === 'number' ? dish.cost_price : 0,
+                profit: typeof dish.profit === 'number' ? dish.profit : 0,
+                profitMargin: typeof dish.profitMargin === 'number' ? dish.profitMargin : 
+                             typeof dish.profit_margin === 'number' ? dish.profit_margin : 0
+              }))
+            : [],
+          
+          leastSellingDishes: Array.isArray(data.leastSellingDishes)
+            ? data.leastSellingDishes.map((dish: any) => ({
+                dishId: dish.dishId || dish.dish_id || 0,
+                dishName: dish.dishName || dish.dish_name || '',
+                salesCount: typeof dish.salesCount === 'number' ? dish.salesCount : 
+                           typeof dish.sales_count === 'number' ? dish.sales_count : 0,
+                revenue: typeof dish.revenue === 'number' ? dish.revenue : 0,
+                percentage: typeof dish.percentage === 'number' ? dish.percentage : 0
+              }))
+            : [],
+          
+          averageCookingTime: typeof data.averageCookingTime === 'number' ? data.averageCookingTime : 
+                              typeof data.average_cooking_time === 'number' ? data.average_cooking_time : 18,
+          
+          categoryPopularity: data.categoryPopularity || data.category_popularity || {},
+          
+          menuItemSalesTrend: data.menuItemSalesTrend || data.menu_item_sales_trend || {},
+          
+          categoryPerformance: data.categoryPerformance || data.category_performance || {},
+          
+          period: data.period || { 
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          }
+        };
+        
+        // Возвращаем преобразованные данные
+        return res.status(200).json(menuData);
+      }
+
+      // Возвращаем данные клиенту без изменений, если не соответствуют ожидаемой структуре
       return res.status(200).json(data);
     } catch (apiError: any) {
       // Если произошла ошибка при запросе к API, возвращаем заглушку
