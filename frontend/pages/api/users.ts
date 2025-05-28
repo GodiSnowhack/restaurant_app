@@ -18,32 +18,6 @@ interface UserData {
   reservations_count?: number;
 }
 
-// Демо-данные на случай отказа API
-const DEMO_USERS: UserData[] = [
-  {
-    id: 1,
-    email: 'admin@example.com',
-    full_name: 'Администратор',
-    role: 'admin',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    orders_count: 0,
-    reservations_count: 0
-  },
-  {
-    id: 2,
-    email: 'user@example.com',
-    full_name: 'Тестовый Пользователь',
-    role: 'client',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    orders_count: 5,
-    reservations_count: 2
-  }
-];
-
 /**
  * API-прокси для получения списка пользователей
  * Перенаправляет запросы к внутреннему API и возвращает результат
@@ -104,12 +78,6 @@ export default async function handler(
         data: response.data
       });
       
-      // В случае ошибки в development режиме возвращаем демо-данные
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Users API - Возвращаем демо-данные из-за ошибки API');
-        return res.status(200).json(DEMO_USERS);
-      }
-      
       return res.status(response.status).json({
         detail: response.data.detail || 'Ошибка при получении списка пользователей'
       });
@@ -119,7 +87,9 @@ export default async function handler(
 
     console.log('Users API - Ответ от сервера:', {
       status: response.status,
-      usersCount: Array.isArray(data) ? data.length : 'не массив'
+      usersCount: Array.isArray(data) ? data.length : 'не массив',
+      dataType: typeof data,
+      dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
     });
 
     // Обрабатываем различные форматы данных и преобразуем в нужный формат
@@ -145,7 +115,7 @@ export default async function handler(
       // Если объект с полем items или users, извлекаем массив
       const usersArray = data.items || data.users || data.data || [];
       
-      if (Array.isArray(usersArray)) {
+      if (Array.isArray(usersArray) && usersArray.length > 0) {
         formattedUsers = usersArray.map(user => ({
           id: user.id,
           email: user.email,
@@ -161,26 +131,24 @@ export default async function handler(
           reservations_count: user.reservations_count || 0
         }));
       } else {
-        // Если не смогли найти массив пользователей, возвращаем демо-данные
-        console.warn('Users API - Не найден массив пользователей в ответе, возвращаем демо-данные');
-        formattedUsers = DEMO_USERS;
+        // Если не смогли найти массив пользователей
+        console.warn('Users API - Не найден массив пользователей в ответе');
+        return res.status(500).json({
+          detail: 'Неверный формат данных от сервера'
+        });
       }
     } else {
-      // Если неизвестный формат, возвращаем демо-данные
-      console.warn('Users API - Неизвестный формат данных, возвращаем демо-данные');
-      formattedUsers = DEMO_USERS;
+      // Если неизвестный формат
+      console.warn('Users API - Неизвестный формат данных');
+      return res.status(500).json({
+        detail: 'Неверный формат данных от сервера'
+      });
     }
 
     // Возвращаем данные клиенту
     return res.status(200).json(formattedUsers);
   } catch (error: any) {
     console.error('Users API - Ошибка:', error);
-    
-    // В случае ошибки в development режиме возвращаем демо-данные
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Users API - Возвращаем демо-данные из-за ошибки');
-      return res.status(200).json(DEMO_USERS);
-    }
     
     // Формируем сообщение об ошибке
     const errorMessage = error.response?.data?.detail || error.message || 'Внутренняя ошибка сервера';
