@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 import { ThemeProvider } from '../lib/theme-context';
 import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
+import React from 'react';
 
 // Динамический импорт компонента AuthDebugger для отображения только на клиенте
 const AuthDebugger = dynamic(() => import('../components/AuthDebugger'), {
@@ -98,6 +99,16 @@ export default function App({ Component, pageProps }: AppProps) {
   const [previousPath, setPreviousPath] = useState<string | null>(null);
   const [showDebugger, setShowDebugger] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  
+  // Принудительно отключаем демо-режим при каждой загрузке приложения
+  React.useEffect(() => {
+    try {
+      localStorage.removeItem('force_demo_data');
+      console.log('App: Демо-режим отключен при инициализации');
+    } catch (e) {
+      console.error('App: Ошибка при отключении демо-режима:', e);
+    }
+  }, []);
   
   // Определяем, что мы на клиенте
   useEffect(() => {

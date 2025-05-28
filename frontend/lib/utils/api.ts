@@ -119,4 +119,19 @@ export const getFrontendUrl = (): string => {
  */
 export const getApiUrl = (endpoint: string): string => {
   return createApiUrl(endpoint);
-}; 
+};
+
+// Функция для инициализации API
+export function initializeApi() {
+  // Отключаем демо-данные при инициализации
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('force_demo_data');
+    }
+  } catch (e) {
+    console.error('Ошибка при очистке настроек демо-данных:', e);
+  }
+  
+  // Основная инициализация API
+  // ... существующий код ...
+} 

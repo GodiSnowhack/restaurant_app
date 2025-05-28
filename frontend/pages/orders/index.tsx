@@ -41,6 +41,14 @@ const OrdersPage: NextPage = () => {
       setIsLoading(true);
       setError('');
       
+      // Принудительно отключаем демо-режим перед запросом
+      try {
+        localStorage.removeItem('force_demo_data');
+        console.log('Демо-режим отключен');
+      } catch (e) {
+        console.error('Ошибка при отключении демо-режима:', e);
+      }
+      
       // Используем API клиент с обработкой ошибок
       const data = await ordersApi.getOrders(
         dateRange.startDate.toISOString(),

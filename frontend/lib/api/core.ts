@@ -1,6 +1,19 @@
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 import jwt from 'jsonwebtoken';
 import { getSecureApiUrl } from '../utils/api';
+import { getBaseUrl } from '../utils/url';
+import { initializeApi } from '../utils/api';
+
+// Отключаем демо-данные при инициализации
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('force_demo_data');
+    localStorage.removeItem('admin_use_demo_data');
+    console.log('API Core: Демо-режим отключен при инициализации');
+  } catch (e) {
+    console.error('API Core: Ошибка при отключении демо-режима:', e);
+  }
+}
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({

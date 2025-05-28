@@ -34,6 +34,14 @@ const useAuthStore = create<AuthStore>()(
         try {
           console.log('AuthStore: Начало инициализации');
           
+          // Отключаем демо-режим при каждой инициализации
+          try {
+            localStorage.removeItem('force_demo_data');
+            console.log('AuthStore: Демо-режим отключен при инициализации');
+          } catch (e) {
+            console.error('AuthStore: Ошибка при отключении демо-режима:', e);
+          }
+          
           // Проверяем все возможные источники токена
           let token = localStorage.getItem('token');
           if (!token) {

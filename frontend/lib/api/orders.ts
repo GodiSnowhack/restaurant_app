@@ -15,13 +15,6 @@ export const ordersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
       
-      // Для целей отладки: параметр для принудительного использования демо-данных
-      const forceDemoData = localStorage.getItem('force_demo_data') === 'true';
-      if (forceDemoData) {
-        console.log('API: Принудительное использование демо-данных для заказов');
-        return generateAdminOrdersDemoData();
-      }
-      
       // Используем локальный API-прокси для избежания проблем с CORS и Mixed Content
       try {
         const response = await fetch(`/api/orders?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`, {
@@ -53,7 +46,7 @@ export const ordersApi = {
         
         // Пробуем запрос через axios api instance как запасной вариант
         try {
-          console.log('API: Пробуем запрос через axios api');
+          console.log('API: Пробуем прямой запрос к бэкенду');
           const response = await api.get(`/orders/`, {
             params: {
               start_date: startDate,
@@ -78,7 +71,7 @@ export const ordersApi = {
         } catch (apiError) {
           console.error('API: Критическая ошибка при запросе заказов:', apiError);
           
-          // Только в крайнем случае возвращаем пустой массив
+          // В случае ошибки возвращаем пустой массив
           return [];
         }
       }
@@ -110,13 +103,6 @@ export const ordersApi = {
       
       const token = getToken();
       
-      // Проверяем локальные настройки
-      const useLocalData = localStorage?.getItem('force_demo_data') === 'true';
-      if (useLocalData) {
-        console.log('API: Используем локальные демо-данные согласно настройкам');
-        return generateWaiterDemoOrders();
-      }
-      
       // Пробуем через основной API
       try {
         console.log('API: Пробуем получить заказы через api.get');
@@ -128,11 +114,11 @@ export const ordersApi = {
         return response.data;
       } catch (apiError: any) {
         console.error('API: Ошибка при вызове основного API для заказов официанта:', apiError);
-        return generateWaiterDemoOrders();
+        return [];
       }
     } catch (error: any) {
       console.error('API: Общая ошибка при получении заказов официанта:', error);
-      return generateWaiterDemoOrders();
+      return [];
     }
   },
   
@@ -370,9 +356,22 @@ export const ordersApi = {
     }
   },
 
+  // Принудительное отключение демо-данных
+  disableDemoData: () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('force_demo_data');
+        console.log('API: Демо-режим отключен');
+      }
+    } catch (e) {
+      console.error('API: Ошибка при отключении демо-режима:', e);
+    }
+  },
+
   // Получение демо-данных заказов
   getDemoOrders: () => {
-    return generateAdminOrdersDemoData();
+    console.warn('API: Функция getDemoOrders устарела и будет удалена в следующей версии');
+    return [];
   }
 };
 
