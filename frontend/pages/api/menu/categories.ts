@@ -112,7 +112,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxRedirects: 0,
       validateStatus: function (status) {
         return status < 400; // Принимаем только успешные статусы
-      }
+      },
+      timeout: 10000 // 10 секунд таймаут
     });
 
     // Сохраняем результат в кэш
@@ -122,6 +123,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(response.data);
   } catch (error: any) {
     console.error('Error fetching categories:', error);
+    
+    // Специальная обработка для ошибки циклических редиректов
+    if (error.code === 'ERR_TOO_MANY_REDIRECTS' || error.message?.includes('Redirect')) {
+      console.log('Обнаружена ошибка циклических редиректов, пытаемся выполнить прямой запрос');
+      
+      try {
+        // Настраиваем базовые заголовки для прямого запроса
+        const directHeaders: Record<string, string> = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        };
+
+        // Добавляем токен авторизации, если он был в исходном запросе
+        if (req.headers.authorization) {
+          directHeaders['Authorization'] = req.headers.authorization as string;
+        }
+        
+        // Пробуем выполнить запрос с другими настройками
+        const directResponse = await axios.get(`${API_BASE_URL}/menu/categories`, {
+          headers: directHeaders,
+          maxRedirects: 0,
+          validateStatus: null, // Принимаем любые статусы
+          timeout: 5000
+        });
+        
+        if (directResponse.data) {
+          console.log('Прямой запрос успешен, возвращаем данные');
+          saveToCache(directResponse.data);
+          return res.status(200).json(directResponse.data);
+        }
+      } catch (directError) {
+        console.error('Прямой запрос также завершился с ошибкой:', directError);
+      }
+    }
     
     // В случае ошибки возвращаем данные-заглушки
     console.log('Возвращаем заглушки категорий из-за ошибки API');

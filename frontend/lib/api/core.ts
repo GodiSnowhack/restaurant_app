@@ -11,7 +11,7 @@ export const api = axios.create({
     'Content-Type': 'application/json'
   },
   withCredentials: true,
-  maxRedirects: 5, // Разрешаем редиректы
+  maxRedirects: 0, // Отключаем автоматические редиректы, чтобы избежать ERR_TOO_MANY_REDIRECTS
   validateStatus: function (status) {
     return status < 400; // Принимаем только успешные статусы
   }

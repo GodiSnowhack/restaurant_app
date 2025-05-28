@@ -1,19 +1,54 @@
 import { api } from './core';
 import type { Dish, Category } from '@/types';
 
+// Демо-данные для тестирования
+const FALLBACK_CATEGORIES: Category[] = [
+  { id: 1, name: "Горячие блюда", image_url: "/images/categories/hot_dishes.jpg", position: 1 },
+  { id: 2, name: "Супы", image_url: "/images/categories/soups.jpg", position: 2 },
+  { id: 3, name: "Салаты", image_url: "/images/categories/salads.jpg", position: 3 },
+  { id: 4, name: "Десерты", image_url: "/images/categories/desserts.jpg", position: 4 },
+  { id: 5, name: "Напитки", image_url: "/images/categories/drinks.jpg", position: 5 }
+];
+
 // API функции для работы с меню и блюдами
 export const menuApi = {
   // Получение всех категорий
   getCategories: async (): Promise<Category[]> => {
     try {
       console.log('API: Получение категорий...');
-      const response = await api.get('/menu/categories');
+      
+      // Проверяем наличие кэша перед запросом к API
+      try {
+        const cachedCategories = localStorage.getItem('cached_categories');
+        const cacheTimestamp = localStorage.getItem('categories_cache_timestamp');
+        
+        // Если есть кэш и он не старше 30 минут, используем его
+        if (cachedCategories && cacheTimestamp) {
+          const cacheAge = Date.now() - parseInt(cacheTimestamp);
+          if (cacheAge < 30 * 60 * 1000) { // 30 минут
+            console.log('API: Используем актуальный кэш категорий');
+            return JSON.parse(cachedCategories);
+          }
+        }
+      } catch (cacheError) {
+        console.error('API: Ошибка при проверке кэша категорий:', cacheError);
+      }
+      
+      // Настраиваем запрос с отключенными редиректами
+      const response = await api.get('/menu/categories', {
+        timeout: 10000,
+        maxRedirects: 0,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (!response.data) {
         throw new Error('Данные не получены');
       }
       
-      // Сохраняем в кеш
+      // Сохраняем в кэш
       try {
         localStorage.setItem('cached_categories', JSON.stringify(response.data));
         localStorage.setItem('categories_cache_timestamp', Date.now().toString());
@@ -22,10 +57,10 @@ export const menuApi = {
       }
       
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('API: Ошибка при получении категорий:', error);
       
-      // Пробуем получить из кеша
+      // Пробуем получить из кэша
       try {
         const cachedCategories = localStorage.getItem('cached_categories');
         if (cachedCategories) {
@@ -36,7 +71,24 @@ export const menuApi = {
         console.error('API: Ошибка при чтении кеша категорий:', cacheError);
       }
       
-      return [];
+      // Проверяем специальные ошибки
+      if (error.code === 'ERR_TOO_MANY_REDIRECTS' || error.message?.includes('Redirect')) {
+        console.warn('API: Обнаружена ошибка циклических редиректов, используем заглушки');
+        
+        // Сохраняем заглушки в кэш
+        try {
+          localStorage.setItem('cached_categories', JSON.stringify(FALLBACK_CATEGORIES));
+          localStorage.setItem('categories_cache_timestamp', Date.now().toString());
+        } catch (e) {
+          console.error('API: Не удалось сохранить заглушки в кэш:', e);
+        }
+        
+        return FALLBACK_CATEGORIES;
+      }
+      
+      // Если нет кэша и произошла ошибка, возвращаем заглушки
+      console.log('API: Возвращаем заглушки категорий');
+      return FALLBACK_CATEGORIES;
     }
   },
   
