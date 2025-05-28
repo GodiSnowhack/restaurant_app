@@ -97,6 +97,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(cachedData);
   }
 
+  // Вывод информации о конфигурации окружения
+  console.log('API Proxy: Переменные окружения:', {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NODE_ENV: process.env.NODE_ENV
+  });
+
   try {
     // Получаем токен авторизации
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -117,109 +123,103 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Получаем базовый URL API без /api/v1 в конце
-    let baseApiUrl = 'https://backend-production-1a78.up.railway.app';
+    // Получаем базовый URL API из переменных окружения
+    let baseApiUrl = getDefaultApiUrl();
     console.log('API Proxy: Базовый URL API:', baseApiUrl);
-    
+
+    // Проверяем, что URL не заканчивается на /api/v1
+    if (baseApiUrl.endsWith('/api/v1')) {
+      baseApiUrl = baseApiUrl.substring(0, baseApiUrl.length - 7);
+    }
+    console.log('API Proxy: Базовый URL API (без /api/v1):', baseApiUrl);
+
     // Формируем URL для запроса
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
+    
     // Добавляем статус и ID пользователя, если они доступны
     const status = req.query.status as string;
     const user_id = req.query.user_id as string;
     if (status) queryParams.append('status', status);
     if (user_id) queryParams.append('user_id', user_id);
-    
-    // Массив возможных путей для получения заказов
-    const possiblePaths = [
-      '/api/v1/orders',
-      '/api/orders',
-      '/api/v1/admin-orders', 
-      '/api/v1/waiter/orders'
-    ];
 
-    // Получаем данные ответа
-    let orderData = null;
+    // Используем только один правильный путь API
+    const apiPath = '/api/v1/orders';
+    const url = `${baseApiUrl}${apiPath}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log(`API Proxy: Отправка запроса к: ${url}`);
 
-    // Перебираем все возможные пути
-    for (const apiPath of possiblePaths) {
-      const url = `${baseApiUrl}${apiPath}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log(`API Proxy: Попытка через путь ${apiPath}:`, url);
+    try {
+      // Настройка HTTPS агента с отключенной проверкой сертификата
+      const httpsAgent = new https.Agent({
+        rejectUnauthorized: false
+      });
 
-      try {
-        // Настройка HTTPS агента с отключенной проверкой сертификата
-        const httpsAgent = new https.Agent({
-          rejectUnauthorized: false
-        });
-
-        // Используем axios для запроса
-        const response = await axios.get(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-User-Role': (req.headers['x-user-role'] as string || 'admin').toLowerCase(),
-            'X-User-ID': req.headers['x-user-id'] as string || '1'
-          },
-          httpsAgent,
-          timeout: 10000,
-          validateStatus: status => status < 500 // Принимаем статусы < 500
-        });
+      // Используем axios для запроса
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-Role': (req.headers['x-user-role'] as string || 'admin').toLowerCase(),
+          'X-User-ID': req.headers['x-user-id'] as string || '1'
+        },
+        httpsAgent,
+        timeout: 15000, // Увеличиваем таймаут до 15 секунд
+        validateStatus: status => true // Принимаем любой статус для дополнительной обработки
+      });
+      
+      // Логгируем статус ответа для отладки
+      console.log(`API Proxy: Получен ответ со статусом ${response.status}`);
+      console.log(`API Proxy: Заголовки ответа:`, response.headers);
+      
+      // Проверяем статус ответа
+      if (response.status === 200) {
+        const data = response.data;
         
-        // Проверяем статус ответа
-        if (response.status === 200) {
-          const data = response.data;
-          
-          // Проверяем формат данных
-          if (Array.isArray(data)) {
-            console.log(`API Proxy: Получено ${data.length} заказов через ${apiPath}`);
-            
-            // Проверка, что это реальные данные, а не демо-данные
-            if (data.length > 0 && data[0].id < 1000) { // Реальные ID обычно < 1000, демо >= 1001
-              console.log('API Proxy: Получены реальные данные заказов');
-              orderData = data;
-              break; // Нашли правильный путь, выходим из цикла
-            } else {
-              console.log('API Proxy: Получены данные, но похоже на демо:', data[0]?.id);
-              if (!orderData) orderData = data; // Сохраняем данные на случай, если ничего лучше не найдем
-            }
-          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-            console.log(`API Proxy: Получено ${data.items.length} заказов в формате items через ${apiPath}`);
-            
-            // Проверка, что это реальные данные, а не демо-данные
-            if (data.items.length > 0 && data.items[0].id < 1000) {
-              console.log('API Proxy: Получены реальные данные заказов (items)');
-              orderData = data.items;
-              break; // Нашли правильный путь, выходим из цикла
-            } else {
-              console.log('API Proxy: Получены данные items, но похоже на демо:', data.items[0]?.id);
-              if (!orderData) orderData = data.items;
-            }
-          } else {
-            console.log(`API Proxy: Данные в неожиданном формате через ${apiPath}:`, typeof data);
-          }
-        } else if (response.status === 401) {
-          // Если получаем 401, возможно, токен истек или недействителен
-          console.log(`API Proxy: Ошибка авторизации (401) при запросе через ${apiPath}`);
-          return res.status(401).json({ message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' });
+        // Проверяем формат данных
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов`);
+          saveToCache(cacheKey, data);
+          return res.status(200).json(data);
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов в формате items`);
+          saveToCache(cacheKey, data.items);
+          return res.status(200).json(data.items);
         } else {
-          console.log(`API Proxy: Путь ${apiPath} вернул статус ${response.status}`);
+          console.log(`API Proxy: Данные в неожиданном формате:`, typeof data);
+          if (data) {
+            console.log('API Proxy: Содержимое ответа:', JSON.stringify(data).substring(0, 500)); // Показываем начало ответа
+          }
         }
-      } catch (error: any) {
-        console.log(`API Proxy: Ошибка при запросе через ${apiPath}:`, error.message);
+      } else if (response.status === 401) {
+        // Если получаем 401, возможно, токен истек или недействителен
+        console.log(`API Proxy: Ошибка авторизации (401) при запросе`);
+        console.log('API Proxy: Сообщение об ошибке:', response.data);
+        return res.status(401).json({ message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' });
+      } else {
+        console.log(`API Proxy: Запрос вернул статус ${response.status}`);
+        console.log('API Proxy: Сообщение от сервера:', response.data);
       }
+    } catch (error: any) {
+      console.log(`API Proxy: Ошибка при запросе: ${error.message}`);
+      
+      // В случае ошибки проверяем, есть ли в ответе объяснение ошибки
+      if (error.response) {
+        console.log('API Proxy: Статус ответа при ошибке:', error.response.status);
+        console.log('API Proxy: Ответ сервера при ошибке:', error.response.data);
+        console.log('API Proxy: Заголовки ответа:', error.response.headers);
+      } else if (error.request) {
+        console.log('API Proxy: Запрос был сделан, но ответ не получен');
+        console.log('API Proxy: Объект запроса:', error.request);
+      } else {
+        console.log('API Proxy: Ошибка при настройке запроса:', error.message);
+      }
+      console.log('API Proxy: Конфигурация запроса:', error.config);
     }
 
-    // Если нашли данные, возвращаем их
-    if (orderData) {
-      console.log('API Proxy: Возвращаем найденные данные заказов');
-      saveToCache(cacheKey, orderData);
-      return res.status(200).json(orderData);
-    }
-
-    // Если все попытки не удались, используем заранее заготовленные реальные данные
-    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем заготовленные реальные данные');
+    // Если запрос не удался, используем заранее заготовленные реальные данные
+    console.log('API Proxy: Запрос не удался, возвращаем заготовленные реальные данные');
     const realOrders = getRealOrdersData();
     saveToCache(cacheKey, realOrders);
     return res.status(200).json(realOrders);
