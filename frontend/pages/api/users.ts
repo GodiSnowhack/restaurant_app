@@ -90,17 +90,29 @@ export default async function handler(
       return res.status(200).json(FALLBACK_USERS);
     }
 
+    // Проверяем формат токена и при необходимости корректируем
+    let authHeader = token;
+    if (!token.startsWith('Bearer ')) {
+      authHeader = `Bearer ${token}`;
+    }
+
     const baseApiUrl = getDefaultApiUrl();
     const usersApiUrl = `${baseApiUrl}/users`;
 
     console.log('Users API - Отправка запроса на', usersApiUrl);
+    console.log('Users API - Заголовок авторизации:', { 
+      original: token,
+      formatted: authHeader,
+      length: authHeader.length
+    });
 
     try {
       // Отправляем запрос на бэкенд
       const response = await axios.get(usersApiUrl, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': token
+          'Accept': 'application/json',
+          'Authorization': authHeader
         },
         maxRedirects: 0,
         validateStatus: function (status) {
@@ -115,6 +127,71 @@ export default async function handler(
           status: response.status,
           data: response.data
         });
+        
+        // Пробуем альтернативный формат авторизации
+        if (response.status === 401) {
+          try {
+            console.log('Users API - Пробуем альтернативный формат токена');
+            const altResponse = await axios.get(usersApiUrl, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': token // Используем оригинальный токен
+              },
+              maxRedirects: 0,
+              validateStatus: null,
+              timeout: 10000
+            });
+            
+            if (altResponse.status < 400) {
+              console.log('Users API - Альтернативный запрос успешен');
+              const data = altResponse.data;
+              
+              // Обрабатываем полученные данные
+              if (Array.isArray(data)) {
+                return res.status(200).json(data.map(user => ({
+                  id: user.id,
+                  email: user.email,
+                  full_name: user.full_name || user.name || '',
+                  phone: user.phone || '',
+                  role: user.role || 'client',
+                  is_active: user.is_active ?? true,
+                  created_at: user.created_at || new Date().toISOString(),
+                  updated_at: user.updated_at || new Date().toISOString(),
+                  birthday: user.birthday || '',
+                  age_group: user.age_group || '',
+                  orders_count: user.orders_count || 0,
+                  reservations_count: user.reservations_count || 0
+                })));
+              } else if (data && typeof data === 'object') {
+                const usersArray = data.items || data.users || data.data || [];
+                if (Array.isArray(usersArray) && usersArray.length > 0) {
+                  return res.status(200).json(usersArray.map(user => ({
+                    id: user.id,
+                    email: user.email,
+                    full_name: user.full_name || user.name || '',
+                    phone: user.phone || '',
+                    role: user.role || 'client',
+                    is_active: user.is_active ?? true,
+                    created_at: user.created_at || new Date().toISOString(),
+                    updated_at: user.updated_at || new Date().toISOString(),
+                    birthday: user.birthday || '',
+                    age_group: user.age_group || '',
+                    orders_count: user.orders_count || 0,
+                    reservations_count: user.reservations_count || 0
+                  })));
+                }
+              }
+            } else {
+              console.warn('Users API - Альтернативный запрос тоже не удался:', {
+                status: altResponse.status,
+                data: altResponse.data
+              });
+            }
+          } catch (altError) {
+            console.error('Users API - Ошибка при альтернативном запросе:', altError);
+          }
+        }
         
         console.log('Users API - Возвращаем тестовые данные из-за ошибки API');
         return res.status(200).json(FALLBACK_USERS);
