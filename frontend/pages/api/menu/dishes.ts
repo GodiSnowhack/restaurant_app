@@ -79,16 +79,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     console.log('Получаем блюда из бэкенда...');
     const url = `${getSecureApiUrl()}/menu/dishes`;
+    console.log('URL запроса:', url);
+    
+    // Более детальная диагностика запроса
     const response = await axios.get(url, {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      maxRedirects: 0,
+      maxRedirects: 5, // Увеличиваем количество редиректов
       validateStatus: function (status) {
-        return status < 400; // Принимаем только успешные статусы
+        // Принимаем все статусы для диагностики
+        return true;
       }
     });
+
+    console.log('Статус ответа API:', response.status);
+    console.log('Заголовки ответа:', JSON.stringify(response.headers));
+
+    if (response.status >= 400) {
+      throw new Error(`API вернул ошибку: ${response.status} ${response.statusText}`);
+    }
 
     if (response.data && Array.isArray(response.data)) {
       console.log(`Получено ${response.data.length} блюд из бэкенда`);
@@ -96,10 +107,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       saveToCache(response.data);
       return res.status(200).json(response.data);
     } else {
+      console.error('Некорректные данные от API:', response.data);
       throw new Error('Получены некорректные данные от API');
     }
   } catch (error: any) {
     console.error('Ошибка при получении блюд из бэкенда:', error);
+    
+    // Детали ошибки для диагностики
+    if (error.response) {
+      // Ответ от сервера получен, но с ошибкой
+      console.error('Детали ошибки API:');
+      console.error('Статус:', error.response.status);
+      console.error('Данные:', error.response.data);
+      console.error('Заголовки:', error.response.headers);
+    } else if (error.request) {
+      // Запрос был сделан, но ответ не получен
+      console.error('Запрос был отправлен, но ответ не получен:');
+      console.error(error.request);
+    } else {
+      // Что-то пошло не так при настройке запроса
+      console.error('Ошибка настройки запроса:', error.message);
+    }
     
     // Проверяем наличие данных в кэше
     console.log('Проверяем кэш...');
@@ -109,7 +137,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(cachedDishes);
     }
     
+    // Если и кэш недоступен, возвращаем ошибку с деталями
     console.error('Не удалось получить блюда ни из API, ни из кэша');
-    return res.status(500).json({ message: 'Не удалось получить данные о блюдах' });
+    return res.status(500).json({ 
+      message: 'Не удалось получить данные о блюдах',
+      error: error.message,
+      details: error.response ? {
+        status: error.response.status,
+        data: error.response.data
+      } : 'Нет данных о деталях ошибки'
+    });
   }
 } 

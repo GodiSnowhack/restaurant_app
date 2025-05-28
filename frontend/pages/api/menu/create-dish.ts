@@ -64,6 +64,13 @@ const addDishToCache = (newDish: any) => {
   }
 };
 
+// Функция для генерации уникального ID для нового блюда
+const generateUniqueId = (existingDishes: any[] = []): number => {
+  if (!existingDishes.length) return 1;
+  const maxId = Math.max(...existingDishes.map(dish => dish.id));
+  return maxId + 1;
+};
+
 // Список разрешенных полей для создания блюда
 const allowedDishFields = [
   'name', 'description', 'price', 'category_id', 'image_url', 
@@ -126,11 +133,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Accept': 'application/json',
         ...(req.headers.authorization ? { 'Authorization': req.headers.authorization } : {})
       },
-      maxRedirects: 0,
+      maxRedirects: 5,
       validateStatus: function (status) {
         return status < 400;
       },
-      timeout: 5000
+      timeout: 10000
     });
 
     // Получили ответ от бэкенда с созданным блюдом
@@ -143,10 +150,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     console.error('Ошибка при создании блюда:', error.message);
     
-    // Возвращаем ошибку клиенту
-    return res.status(500).json({ 
+    // Детали ошибки для диагностики
+    if (error.response) {
+      console.error('Детали ошибки API:');
+      console.error('Статус:', error.response.status);
+      console.error('Данные:', error.response.data);
+      console.error('Заголовки:', error.response.headers);
+    } else if (error.request) {
+      console.error('Запрос был отправлен, но ответ не получен:');
+      console.error(error.request);
+    } else {
+      console.error('Ошибка настройки запроса:', error.message);
+    }
+    
+    // Вместо создания локального блюда, возвращаем ошибку для диагностики
+    return res.status(error.response?.status || 500).json({ 
       message: 'Не удалось создать блюдо',
-      error: error.message
+      error: error.message,
+      details: error.response?.data || 'Нет деталей ошибки'
     });
   }
 } 

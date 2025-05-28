@@ -133,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        maxRedirects: 0,
+        maxRedirects: 5,
         validateStatus: function (status) {
           return status < 400;
         },
@@ -190,7 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'Accept': 'application/json',
             ...(req.headers.authorization ? { 'Authorization': req.headers.authorization } : {})
           },
-          maxRedirects: 0,
+          maxRedirects: 5,
           validateStatus: function (status) {
             return status < 400;
           },
@@ -205,7 +205,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error(`Ошибка при обновлении блюда в API:`, error);
         
         // Если не удалось обновить на бэкенде, обновляем только локальный кэш
-        // Сначала проверяем, есть ли блюдо в кэше или заглушках
+        // Сначала проверяем, есть ли блюдо в кэше
         let existingDish = null;
         const cachedDishes = getCachedDishes();
         

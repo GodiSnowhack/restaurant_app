@@ -122,8 +122,8 @@ export const menuApi = {
     try {
       console.log(`API: Получение блюда ${id}...`);
       
-      // Используем относительный путь для доступа к нашему внутреннему прокси
-      const response = await api.get(`/api/menu/dishes/${id}`);
+      // Используем прямой путь к API бэкенда
+      const response = await api.get(`/menu/dishes/${id}`);
       
       if (!response.data) {
         throw new Error('Данные не получены');
@@ -177,7 +177,7 @@ export const menuApi = {
   createDish: async (dish: Omit<Dish, 'id' | 'created_at' | 'updated_at'>): Promise<Dish> => {
     try {
       console.log('API: Создание нового блюда...');
-      const response = await api.post('/api/menu/create-dish', dish);
+      const response = await api.post('/menu/dishes', dish);
       
       // Обновляем кэш блюд после успешного создания
       try {
@@ -210,8 +210,8 @@ export const menuApi = {
       // Добавляем id в данные для отправки
       const requestData = { ...dish, id };
       
-      // Используем новый эндпоинт update-dish вместо прямого обновления
-      const response = await api.post('/api/menu/update-dish', requestData);
+      // Используем прямой API бэкенда для обновления
+      const response = await api.put(`/menu/dishes/${id}`, requestData);
       
       // Обновляем кэш блюд после успешного обновления
       try {

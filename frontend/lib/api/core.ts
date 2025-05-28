@@ -4,14 +4,14 @@ import { getSecureApiUrl } from '../utils/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: '/api', // Используем внутренние прокси-эндпоинты вместо прямого обращения к бэкенду
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1', // Используем переменную окружения
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
   withCredentials: true,
-  maxRedirects: 0, // Отключаем автоматические редиректы, чтобы избежать циклических редиректов
+  maxRedirects: 5, // Разрешаем редиректы
   validateStatus: function (status) {
     return status < 400; // Принимаем только успешные статусы
   }
@@ -124,23 +124,6 @@ api.interceptors.request.use(
       console.warn('API Interceptor: Токен не найден');
     }
 
-    // Устанавливаем базовый URL на внутренний прокси
-    config.baseURL = '/api';
-    
-    // Проверяем, не содержит ли URL прямых ссылок на бэкенд
-    if (config.url) {
-      // Если URL указывает на внешний API, заменяем его на внутренний прокси
-      if (config.url.includes('backend-production-1a78.up.railway.app')) {
-        const path = new URL(config.url).pathname;
-        config.url = path.replace('/api/v1', '');
-      }
-      
-      // Если URL начинается с '/api/v1', заменяем на простой '/api'
-      if (config.url.startsWith('/api/v1')) {
-        config.url = config.url.replace('/api/v1', '');
-      }
-    }
-    
     return config;
   },
   (error: AxiosError) => {

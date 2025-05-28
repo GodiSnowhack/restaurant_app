@@ -140,21 +140,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Accept': 'application/json',
           ...(req.headers.authorization ? { 'Authorization': req.headers.authorization } : {})
         },
-        maxRedirects: 0,
+        maxRedirects: 5,
         validateStatus: function (status) {
           return status < 400;
         },
-        timeout: 5000
+        timeout: 10000
       });
 
       // Обновляем кэш
       updateDishInCache(dishId, response.data);
       
       return res.status(200).json(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Ошибка при обновлении блюда в API:`, error);
       
-      // Если не удалось обновить на бэкенде, обновляем только локальный кэш
+      // Детали ошибки для диагностики
+      if (error.response) {
+        console.error('Детали ошибки API:');
+        console.error('Статус:', error.response.status);
+        console.error('Данные:', error.response.data);
+        console.error('Заголовки:', error.response.headers);
+      } else if (error.request) {
+        console.error('Запрос был отправлен, но ответ не получен:');
+        console.error(error.request);
+      } else {
+        console.error('Ошибка настройки запроса:', error.message);
+      }
+      
+      // Если не удалось обновить на бэкенде, пробуем обновить только локальный кэш
       // Сначала проверяем, есть ли блюдо в кэше
       let existingDish = null;
       const cachedDishes = getCachedDishes();
@@ -164,7 +177,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       if (!existingDish) {
-        return res.status(404).json({ message: 'Блюдо не найдено' });
+        return res.status(404).json({ 
+          message: 'Блюдо не найдено',
+          error: error.message,
+          details: error.response?.data || 'Нет данных о деталях ошибки'
+        });
       }
       
       // Обновляем блюдо в кэше
@@ -173,8 +190,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       return res.status(200).json(updatedDish);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Ошибка при обработке запроса на обновление блюда:', error);
-    return res.status(500).json({ message: 'Внутренняя ошибка сервера' });
+    return res.status(500).json({ 
+      message: 'Внутренняя ошибка сервера',
+      error: error.message
+    });
   }
 } 
