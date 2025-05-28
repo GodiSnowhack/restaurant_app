@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getDefaultApiUrl } from '../../../src/config/defaults';
+import { getDefaultApiUrl } from '../../../../src/config/defaults';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
 
 // Путь к кешу
 const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
-const ORDERS_CACHE_FILE = path.join(CACHE_DIR, 'orders_cache.json');
+const WAITER_ORDERS_CACHE_FILE = path.join(CACHE_DIR, 'waiter_orders_cache.json');
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут в миллисекундах
 
 // Убедимся, что директория кеша существует
@@ -20,11 +20,11 @@ const ensureCacheDir = () => {
 const getFromCache = (key: string) => {
   try {
     ensureCacheDir();
-    if (!fs.existsSync(ORDERS_CACHE_FILE)) {
+    if (!fs.existsSync(WAITER_ORDERS_CACHE_FILE)) {
       return null;
     }
     
-    const cacheData = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
+    const cacheData = JSON.parse(fs.readFileSync(WAITER_ORDERS_CACHE_FILE, 'utf8'));
     if (!cacheData[key] || (Date.now() - cacheData[key].timestamp > CACHE_TTL)) {
       return null;
     }
@@ -42,8 +42,8 @@ const saveToCache = (key: string, data: any) => {
     ensureCacheDir();
     
     let cacheData = {};
-    if (fs.existsSync(ORDERS_CACHE_FILE)) {
-      cacheData = JSON.parse(fs.readFileSync(ORDERS_CACHE_FILE, 'utf8'));
+    if (fs.existsSync(WAITER_ORDERS_CACHE_FILE)) {
+      cacheData = JSON.parse(fs.readFileSync(WAITER_ORDERS_CACHE_FILE, 'utf8'));
     }
     
     cacheData = {
@@ -54,7 +54,7 @@ const saveToCache = (key: string, data: any) => {
       }
     };
     
-    fs.writeFileSync(ORDERS_CACHE_FILE, JSON.stringify(cacheData, null, 2), 'utf8');
+    fs.writeFileSync(WAITER_ORDERS_CACHE_FILE, JSON.stringify(cacheData, null, 2), 'utf8');
   } catch (error) {
     console.error('Ошибка при сохранении в кеш:', error);
   }
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE,PATCH');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-User-ID, X-User-Role'
@@ -83,16 +83,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // Получаем параметры запроса
-  const { start_date, end_date } = req.query;
-  
   // Ключ для кеширования
-  const cacheKey = `orders_${start_date}_${end_date}`;
+  const waiterId = req.headers['x-user-id'] as string || '1';
+  const cacheKey = `waiter_orders_${waiterId}`;
   
   // Проверяем наличие данных в кеше
   const cachedData = getFromCache(cacheKey);
   if (cachedData) {
-    console.log('API Proxy: Данные заказов получены из кеша');
+    console.log('API Proxy: Данные заказов официанта получены из кеша');
     return res.status(200).json(cachedData);
   }
 
@@ -101,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
       console.log('API Proxy: Отсутствует токен авторизации, возвращаем демо-данные');
-      const demoOrders = generateDemoOrders();
+      const demoOrders = generateWaiterDemoOrders();
       saveToCache(cacheKey, demoOrders);
       return res.status(200).json(demoOrders);
     }
@@ -110,13 +108,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseApiUrl = getDefaultApiUrl();
     
     // Формируем URL для запроса
-    const queryParams = new URLSearchParams();
-    if (start_date) queryParams.append('start_date', start_date as string);
-    if (end_date) queryParams.append('end_date', end_date as string);
-    
-    const url = `${baseApiUrl}/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `${baseApiUrl}/waiter/orders`;
 
-    console.log('API Proxy: Отправка запроса на', url);
+    console.log('API Proxy: Отправка запроса к заказам официанта на', url);
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
@@ -134,8 +128,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'X-User-Role': req.headers['x-user-role'] as string || 'admin',
-          'X-User-ID': req.headers['x-user-id'] as string || '1'
+          'X-User-Role': 'waiter',
+          'X-User-ID': waiterId
         },
         signal: controller.signal,
         // @ts-ignore - добавляем агент напрямую
@@ -146,8 +140,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Если ответ не успешный, генерируем демо-данные
       if (!response.ok) {
-        console.log(`API Proxy: Сервер вернул ошибку ${response.status}, возвращаем демо-данные`);
-        const demoOrders = generateDemoOrders();
+        console.log(`API Proxy: Сервер вернул ошибку ${response.status}, возвращаем демо-данные заказов официанта`);
+        const demoOrders = generateWaiterDemoOrders();
         saveToCache(cacheKey, demoOrders);
         return res.status(200).json(demoOrders);
       }
@@ -157,25 +151,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Проверяем, что данные в правильном формате
       if (Array.isArray(data)) {
-        console.log(`API Proxy: Получено ${data.length} заказов с сервера`);
+        console.log(`API Proxy: Получено ${data.length} заказов официанта с сервера`);
         saveToCache(cacheKey, data);
         return res.status(200).json(data);
       } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-        console.log(`API Proxy: Получено ${data.items.length} заказов в формате items`);
+        console.log(`API Proxy: Получено ${data.items.length} заказов официанта в формате items`);
         saveToCache(cacheKey, data.items);
         return res.status(200).json(data.items);
       } else {
         console.log('API Proxy: Сервер вернул данные в неожиданном формате, возвращаем демо-данные');
-        const demoOrders = generateDemoOrders();
+        const demoOrders = generateWaiterDemoOrders();
         saveToCache(cacheKey, demoOrders);
         return res.status(200).json(demoOrders);
       }
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      console.error('API Proxy: Ошибка при отправке запроса:', fetchError.message);
+      console.error('API Proxy: Ошибка при отправке запроса заказов официанта:', fetchError.message);
       
       // В случае ошибки сети возвращаем демо-данные
-      const demoOrders = generateDemoOrders();
+      const demoOrders = generateWaiterDemoOrders();
       
       // Сохраняем демо-данные в кеш
       saveToCache(cacheKey, demoOrders);
@@ -184,27 +178,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(demoOrders);
     }
   } catch (error: any) {
-    console.error('API Proxy: Ошибка при обработке запроса заказов:', error);
+    console.error('API Proxy: Ошибка при обработке запроса заказов официанта:', error);
     
     // В случае любой ошибки возвращаем демо-данные
-    const demoOrders = generateDemoOrders();
+    const demoOrders = generateWaiterDemoOrders();
     
-    // Сохраняем демо-данные в кеш в случае ошибки
+    // Сохраняем демо-данные в кеш
     saveToCache(cacheKey, demoOrders);
     
     return res.status(200).json(demoOrders);
   }
 }
 
-// Функция для генерации демо-данных заказов с улучшенной логикой
-function generateDemoOrders() {
+// Функция для генерации демо-данных заказов официанта
+function generateWaiterDemoOrders() {
   const now = new Date();
   
-  // Генерируем дату в прошлом со случайным смещением (до 10 дней назад)
+  // Генерируем дату в прошлом со случайным смещением (до 2 дней назад)
   const getRandomPastDate = () => {
     const date = new Date(now);
-    const randomDaysBack = Math.floor(Math.random() * 10) + 1;
-    date.setDate(date.getDate() - randomDaysBack);
+    const randomHoursBack = Math.floor(Math.random() * 48) + 1;
+    date.setHours(date.getHours() - randomHoursBack);
     return date.toISOString();
   };
   
@@ -213,34 +207,34 @@ function generateDemoOrders() {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   };
   
-  // Список демо-блюд
-  const dishes = [
-    { id: 1, name: 'Стейк из говядины', price: 1200 },
-    { id: 2, name: 'Паста Карбонара', price: 1100 },
-    { id: 3, name: 'Сёмга на гриле', price: 1500 },
-    { id: 4, name: 'Салат Цезарь', price: 650 },
-    { id: 5, name: 'Стейк Рибай', price: 2500 },
-    { id: 6, name: 'Тирамису', price: 900 },
-    { id: 7, name: 'Вино красное (бокал)', price: 800 },
-    { id: 8, name: 'Пицца Маргарита', price: 1800 },
-    { id: 9, name: 'Суши-сет Филадельфия', price: 1300 },
-    { id: 10, name: 'Бургер с говядиной', price: 1200 }
-  ];
+  // Список статусов заказов
+  const orderStatuses = ['confirmed', 'preparing', 'ready', 'completed'];
+  const paymentStatuses = ['unpaid', 'paid'];
   
-  // Список возможных статусов заказа
-  const orderStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
-  const paymentStatuses = ['pending', 'paid', 'refunded', 'failed'];
-  const paymentMethods = ['card', 'cash', 'online'];
-  const orderTypes = ['dine-in', 'delivery', 'pickup'];
+  // Создаем массив демо-заказов
+  const orders = [];
+  const orderCount = getRandomInt(2, 5);
   
-  // Генерируем случайные товары для заказа
-  const generateOrderItems = () => {
-    const itemCount = getRandomInt(1, 5);
-    const items = [];
+  for (let i = 0; i < orderCount; i++) {
+    const created_at = getRandomPastDate();
+    const updated_at = new Date(new Date(created_at).getTime() + getRandomInt(1, 5) * 60 * 60 * 1000).toISOString();
+    const completed_at = null;
     
-    for (let i = 0; i < itemCount; i++) {
+    const items = [];
+    const itemCount = getRandomInt(1, 3);
+    
+    for (let j = 0; j < itemCount; j++) {
+      // Случайно выбираем блюдо
+      const dishes = [
+        { id: 1, name: 'Стейк из говядины', price: 1200 },
+        { id: 2, name: 'Паста Карбонара', price: 1100 },
+        { id: 3, name: 'Сёмга на гриле', price: 1500 },
+        { id: 4, name: 'Салат Цезарь', price: 650 },
+        { id: 5, name: 'Стейк Рибай', price: 2500 }
+      ];
+      
       const dish = dishes[getRandomInt(0, dishes.length - 1)];
-      const quantity = getRandomInt(1, 3);
+      const quantity = getRandomInt(1, 2);
       
       items.push({
         dish_id: dish.id,
@@ -251,53 +245,29 @@ function generateDemoOrders() {
       });
     }
     
-    return items;
-  };
-  
-  // Генерируем демо-заказы
-  const orderCount = getRandomInt(5, 10);
-  const orders = [];
-  
-  for (let i = 0; i < orderCount; i++) {
-    const items = generateOrderItems();
-    const total_amount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const order_type = orderTypes[getRandomInt(0, orderTypes.length - 1)];
-    const status = orderStatuses[getRandomInt(0, orderStatuses.length - 1)];
-    const payment_status = paymentStatuses[getRandomInt(0, paymentStatuses.length - 1)];
-    const payment_method = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
+    const total_amount = items.reduce((sum, item) => sum + item.total_price, 0);
     
-    const created_at = getRandomPastDate();
-    const updated_at = new Date(new Date(created_at).getTime() + getRandomInt(1, 24) * 60 * 60 * 1000).toISOString();
-    const completed_at = status === 'completed' ? 
-      new Date(new Date(updated_at).getTime() + getRandomInt(1, 5) * 60 * 60 * 1000).toISOString() : null;
-    
-    const order = {
-      id: 1000 + i + 1,
+    orders.push({
+      id: 1001 + i,
       user_id: getRandomInt(1, 5),
-      waiter_id: getRandomInt(1, 3),
-      status: status,
-      payment_status: payment_status,
-      payment_method: payment_method,
-      order_type: order_type,
-      total_amount: total_amount,
+      waiter_id: 1,
+      status: orderStatuses[getRandomInt(0, orderStatuses.length - 1)],
+      payment_status: paymentStatuses[getRandomInt(0, paymentStatuses.length - 1)],
+      payment_method: 'cash',
+      order_type: 'dine-in',
+      total_amount,
       total_price: total_amount,
-      created_at: created_at,
-      updated_at: updated_at,
-      completed_at: completed_at,
-      items: items,
-      table_number: order_type === 'dine-in' ? getRandomInt(1, 10) : null,
+      created_at,
+      updated_at,
+      completed_at,
+      items,
+      table_number: getRandomInt(1, 10),
       customer_name: ['Александр Иванов', 'Елена Петрова', 'Дмитрий Сидоров', 'Андрей Кузнецов', 'Наталья Смирнова'][getRandomInt(0, 4)],
       customer_phone: `+7 (${getRandomInt(900, 999)}) ${getRandomInt(100, 999)}-${getRandomInt(10, 99)}-${getRandomInt(10, 99)}`,
-      delivery_address: order_type === 'delivery' ? 'ул. Абая 44, кв. 12' : null,
-      is_urgent: Math.random() < 0.2, // 20% шанс, что заказ срочный
-      is_group_order: Math.random() < 0.1, // 10% шанс, что заказ групповой
-      order_code: `ORD-${getRandomInt(1000, 9999)}`,
-      comment: Math.random() < 0.3 ? 'Комментарий к заказу' : null
-    };
-    
-    orders.push(order);
+      order_code: `ORD-${getRandomInt(1000, 9999)}`
+    });
   }
   
-  console.log(`API Proxy: Сгенерировано ${orders.length} демо-заказов`);
+  console.log(`API Proxy: Сгенерировано ${orders.length} демо-заказов для официанта`);
   return orders;
 } 

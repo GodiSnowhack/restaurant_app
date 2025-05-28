@@ -1,6 +1,5 @@
 import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus } from './types';
-import axios from 'axios';
 
 // API функции для работы с заказами
 export const ordersApi = {
@@ -8,37 +7,23 @@ export const ordersApi = {
   getOrders: async (startDate: string, endDate: string): Promise<Order[]> => {
     console.log('API: Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
     
-    // Принудительно отключаем демо-режим
     try {
-      localStorage.removeItem('force_demo_data');
-      localStorage.removeItem('admin_use_demo_data');
-      console.log('API: Демо-режим отключен');
-    } catch (e) {
-      console.error('API: Ошибка при отключении демо-режима:', e);
-    }
-    
-    // Получаем токен для запроса
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.error('API: Отсутствует токен авторизации');
-      return [];
-    }
-    
-    // Создаем объект AbortController для возможности отмены запроса
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 секунд таймаут
-    
-    try {
+      // Получаем токен для запроса
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('API: Отсутствует токен авторизации');
+        return [];
+      }
+      
       // Формируем URL для запроса с корректным кодированием параметров
       const queryParams = new URLSearchParams();
       queryParams.append('start_date', startDate);
       queryParams.append('end_date', endDate);
       
-      // Сначала пробуем запрос через локальный API-прокси
+      // Отправляем запрос через локальный API-прокси
       const url = `/api/orders?${queryParams.toString()}`;
       console.log('API: Отправка запроса к:', url);
       
-      // Делаем запрос через fetch с возможностью отмены
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -46,123 +31,21 @@ export const ordersApi = {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        signal: controller.signal
+        cache: 'no-cache'
       });
-      
-      // Очищаем таймер после получения ответа
-      clearTimeout(timeoutId);
       
       // Проверяем статус ответа
       if (!response.ok) {
         console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
-        throw new Error(`Ошибка HTTP: ${response.status}`);
+        return [];
       }
       
       // Получаем данные ответа
       const data = await response.json();
       console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
       
-      // Проверяем валидность данных и конвертируем объект в массив, если это необходимо
-      let ordersArray = data;
-      
-      // Если сервер вернул объект с сообщением, но не массив, пробуем альтернативный запрос
-      if (!Array.isArray(data)) {
-        console.warn('API: Получены некорректные данные (не массив). Пробуем прямой запрос к API');
-        
-        try {
-          // Прямой запрос к API
-          const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-          const directResponse = await fetch(`${baseApiUrl}/orders?${queryParams.toString()}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            signal: controller.signal
-          });
-          
-          if (!directResponse.ok) {
-            throw new Error(`Ошибка HTTP при прямом запросе: ${directResponse.status}`);
-          }
-          
-          const directData = await directResponse.json();
-          
-          if (Array.isArray(directData)) {
-            console.log('API: Получены данные через прямой запрос:', { count: directData.length });
-            ordersArray = directData;
-          } else if (directData && typeof directData === 'object' && directData.items && Array.isArray(directData.items)) {
-            console.log('API: Получены данные в формате { items: [] }:', { count: directData.items.length });
-            ordersArray = directData.items;
-          } else {
-            throw new Error('Некорректный формат данных при прямом запросе');
-          }
-        } catch (directError) {
-          console.error('API: Ошибка при прямом запросе к API:', directError);
-          
-          // Если прямой запрос тоже не удался, используем запрос через API с указанием нужных заголовков
-          try {
-            const apiResponse = await api.get('/orders/', {
-              params: { start_date: startDate, end_date: endDate },
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-User-Role': 'admin',
-                'X-User-ID': localStorage.getItem('user_id') || '1'
-              },
-              timeout: 10000
-            });
-            
-            if (Array.isArray(apiResponse.data)) {
-              console.log('API: Получены данные через axios:', { count: apiResponse.data.length });
-              ordersArray = apiResponse.data;
-            } else if (apiResponse.data && typeof apiResponse.data === 'object' && 
-                      apiResponse.data.items && Array.isArray(apiResponse.data.items)) {
-              console.log('API: Получены данные через axios в формате { items: [] }:', { count: apiResponse.data.items.length });
-              ordersArray = apiResponse.data.items;
-            } else {
-              console.warn('API: Некорректный формат данных при запросе через axios');
-              return [];
-            }
-          } catch (apiError) {
-            console.error('API: Все попытки получить заказы не удались');
-            return [];
-          }
-        }
-      }
-      
-      // Нормализуем полученные данные
-      const normalizedOrders = ordersArray.map((order: any) => ({
-        ...order,
-        // Убеждаемся, что обязательные поля имеют значения
-        id: order.id || 0,
-        status: order.status || 'pending',
-        payment_status: order.payment_status || 'pending',
-        payment_method: order.payment_method || 'cash',
-        total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
-                     (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
-        created_at: order.created_at || new Date().toISOString(),
-        // Обрабатываем массив товаров
-        items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-          dish_id: item.dish_id || 0,
-          quantity: item.quantity || 1,
-          price: typeof item.price === 'number' ? item.price : 
-                (typeof item.price === 'string' ? parseFloat(item.price) : 0),
-          name: item.name || item.dish_name || 'Неизвестное блюдо'
-        })) : []
-      }));
-      
-      console.log('API: Нормализованные заказы:', { count: normalizedOrders.length });
-      return normalizedOrders;
+      return Array.isArray(data) ? data : [];
     } catch (error: any) {
-      // Очищаем таймер в случае ошибки
-      clearTimeout(timeoutId);
-      
-      // Если ошибка связана с отменой запроса, логируем специальное сообщение
-      if (error.name === 'AbortError') {
-        console.warn('API: Запрос заказов был отменен из-за таймаута');
-        return [];
-      }
-      
       console.error('API: Ошибка при запросе заказов:', error.message);
       return [];
     }
@@ -174,49 +57,48 @@ export const ordersApi = {
       console.log('API: Запрос заказов для текущего официанта');
       
       // Получаем токен для авторизации
-      const getToken = () => {
-        try {
-          if (typeof localStorage !== 'undefined') {
-            return localStorage.getItem('token');
-          }
-          return null;
-        } catch (e) {
-          console.error('API: Ошибка при получении токена:', e);
-          return null;
-        }
-      };
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('API: Отсутствует токен авторизации');
+        return [];
+      }
       
-      const token = getToken();
-      
-      // Пробуем через основной API
+      // Пробуем через API-прокси
       try {
-        console.log('API: Пробуем получить заказы через api.get');
-        const response = await api.get('/waiter/orders', {
+        const response = await fetch('/api/waiter/orders', {
+          method: 'GET',
           headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
             'X-User-Role': 'waiter'
           }
         });
-        return response.data;
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
       } catch (apiError: any) {
-        console.error('API: Ошибка при вызове основного API для заказов официанта:', apiError);
-        return [];
+        console.error('API: Ошибка при запросе заказов официанта:', apiError.message);
+        
+        // Если прокси недоступен, используем основной API
+        try {
+          const apiResponse = await api.get('/waiter/orders', {
+            headers: {
+              'X-User-Role': 'waiter'
+            }
+          });
+          return apiResponse.data || [];
+        } catch (error) {
+          console.error('API: Все попытки получить заказы официанта не удались');
+          return [];
+        }
       }
     } catch (error: any) {
       console.error('API: Общая ошибка при получении заказов официанта:', error);
-      return [];
-    }
-  },
-  
-  // Получение заказов пользователя
-  getUserOrders: async (userId?: number): Promise<Order[]> => {
-    try {
-      // Если ID пользователя не указан, используем /me для текущего пользователя
-      const endpoint = userId ? `/users/${userId}/orders` : '/users/me/orders';
-      
-      const response = await api.get(endpoint);
-      return response.data;
-    } catch (error) {
-      console.error('API: Ошибка при получении заказов пользователя:', error);
       return [];
     }
   },
@@ -232,7 +114,7 @@ export const ordersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      // Используем локальный API-прокси вместо прямого обращения к бэкенду
+      // Отправляем запрос через локальный API-прокси
       const response = await fetch(`/api/orders/${id}`, {
         method: 'GET',
         headers: {
@@ -240,13 +122,13 @@ export const ordersApi = {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache'
-        },
-        credentials: 'include'
+        }
       });
 
+      // Если ответ не успешный, возвращаем null
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Ошибка при получении заказа ${id}`);
+        console.error(`API: Ошибка при получении заказа ${id}: ${response.status}`);
+        return null;
       }
 
       const data = await response.json();
@@ -261,40 +143,15 @@ export const ordersApi = {
   // Создание нового заказа
   createOrder: async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> => {
     try {
-      console.log('API: Создание заказа с данными:', {
-        ...order,
-        items: order.items.map(item => ({
-          ...item,
-          name: item.name,
-          price: item.price
-        }))
-      });
+      console.log('API: Создание заказа с данными:', order);
       
-      // Сначала пробуем через прямой API
-      try {
-        const response = await api.post('/orders', order);
-        console.log('API: Заказ успешно создан через API, ID:', response.data.id);
-        return response.data;
-      } catch (apiError) {
-        console.error('API: Ошибка при создании заказа через API:', apiError);
-        
-        // Пробуем через fetch
-        const response = await fetch('/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(order)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Ошибка HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('API: Заказ успешно создан через fetch, ID:', data.id);
-        return data;
-      }
+      // Получаем токен для запроса
+      const token = localStorage.getItem('token');
+      
+      // Отправляем запрос через основной API
+      const response = await api.post('/orders', order);
+      console.log('API: Заказ успешно создан через API, ID:', response.data.id);
+      return response.data;
     } catch (error) {
       console.error('API: Ошибка при создании заказа:', error);
       throw error;
@@ -380,20 +237,20 @@ export const ordersApi = {
         body: JSON.stringify({ code })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
+      const data = await response.json();
+      
+      if (!data.success) {
         return {
           success: false,
-          message: error.message || 'Не удалось привязать заказ'
+          message: data.message || 'Не удалось привязать заказ'
         };
       }
 
-      const data = await response.json();
       return {
         success: true,
         orderId: data.orderId,
         orderNumber: data.orderNumber,
-        message: 'Заказ успешно привязан'
+        message: data.message || 'Заказ успешно привязан'
       };
     } catch (error: any) {
       console.error('API: Ошибка при привязке заказа:', error);
@@ -425,38 +282,17 @@ export const ordersApi = {
         body: JSON.stringify({ status })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Ошибка при обновлении статуса оплаты заказа ${id}`);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || `Ошибка при обновлении статуса оплаты заказа ${id}`);
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        order: data
-      };
+      return data;
     } catch (error: any) {
       console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
       throw error;
     }
-  },
-
-  // Принудительное отключение демо-данных
-  disableDemoData: () => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('force_demo_data');
-        console.log('API: Демо-режим отключен');
-      }
-    } catch (e) {
-      console.error('API: Ошибка при отключении демо-режима:', e);
-    }
-  },
-
-  // Получение демо-данных заказов
-  getDemoOrders: () => {
-    console.warn('API: Функция getDemoOrders устарела и будет удалена в следующей версии');
-    return [];
   }
 };
 
