@@ -1,8 +1,6 @@
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse, AxiosHeaders } from 'axios';
 import jwt from 'jsonwebtoken';
-import { getSecureApiUrl } from '../utils/api';
-import { getBaseUrl } from '../utils/url';
-import { initializeApi } from '../utils/api';
+import { getSecureApiUrl, initializeApi } from '../utils/api';
 
 // Отключаем демо-данные при инициализации
 if (typeof window !== 'undefined') {
