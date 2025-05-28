@@ -125,7 +125,7 @@ class Order(OrderBase):
     user_id: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # Класс для обратной совместимости

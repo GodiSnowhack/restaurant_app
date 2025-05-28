@@ -48,7 +48,7 @@ class OrderItemResponse(OrderItemBase):
     total_price: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Схема для заказа
 class OrderBase(BaseModel):
@@ -97,7 +97,7 @@ class OrderResponse(OrderBase):
     order_type: OrderType
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Детальная информация о заказе
 class OrderDetails(OrderResponse):
@@ -110,4 +110,4 @@ class OrderOut(BaseModel):
     message: str = "Заказ успешно создан"
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 
