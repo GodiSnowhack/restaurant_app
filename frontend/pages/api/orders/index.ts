@@ -105,6 +105,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Отсутствует токен авторизации' });
     }
 
+    // Логгируем параметры запроса
+    console.log('API Proxy: Параметры запроса:', {
+      start_date,
+      end_date,
+      status: req.query.status,
+      user_id: req.query.user_id,
+      headers: {
+        'x-user-role': req.headers['x-user-role'],
+        'x-user-id': req.headers['x-user-id']
+      }
+    });
+
     // Получаем базовый URL API без /api/v1 в конце
     let baseApiUrl = 'https://backend-production-1a78.up.railway.app';
     console.log('API Proxy: Базовый URL API:', baseApiUrl);
@@ -113,17 +125,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
+    // Добавляем статус и ID пользователя, если они доступны
+    const status = req.query.status as string;
+    const user_id = req.query.user_id as string;
+    if (status) queryParams.append('status', status);
+    if (user_id) queryParams.append('user_id', user_id);
     
     // Массив возможных путей для получения заказов
     const possiblePaths = [
       '/api/v1/orders',
       '/api/orders',
-      '/orders',
-      '/api/v1/admin/orders',
-      '/api/admin/orders',
-      '/api/v1/admin-orders',
-      '/api/v1/restaurant/orders',
-      '/api/v2/orders'
+      '/api/v1/admin-orders', 
+      '/api/v1/waiter/orders'
     ];
 
     // Получаем данные ответа
@@ -146,7 +159,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-User-Role': req.headers['x-user-role'] as string || 'admin',
+            'X-User-Role': (req.headers['x-user-role'] as string || 'admin').toLowerCase(),
             'X-User-ID': req.headers['x-user-id'] as string || '1'
           },
           httpsAgent,
@@ -186,6 +199,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else {
             console.log(`API Proxy: Данные в неожиданном формате через ${apiPath}:`, typeof data);
           }
+        } else if (response.status === 401) {
+          // Если получаем 401, возможно, токен истек или недействителен
+          console.log(`API Proxy: Ошибка авторизации (401) при запросе через ${apiPath}`);
+          return res.status(401).json({ message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' });
         } else {
           console.log(`API Proxy: Путь ${apiPath} вернул статус ${response.status}`);
         }
@@ -199,40 +216,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('API Proxy: Возвращаем найденные данные заказов');
       saveToCache(cacheKey, orderData);
       return res.status(200).json(orderData);
-    }
-
-    // Пробуем специальный метод для получения заказов
-    try {
-      const specialUrl = `${baseApiUrl}/api/v1/restaurant/1/orders`;
-      console.log('API Proxy: Пробуем специальный URL для ресторана:', specialUrl);
-      
-      const specialResponse = await axios.get(specialUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-User-Role': 'admin',
-          'X-User-ID': req.headers['x-user-id'] as string || '1'
-        },
-        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-        timeout: 8000,
-        validateStatus: status => status < 500
-      });
-      
-      if (specialResponse.status === 200) {
-        const data = specialResponse.data;
-        if (Array.isArray(data)) {
-          console.log(`API Proxy: Получено ${data.length} заказов через специальный URL`);
-          saveToCache(cacheKey, data);
-          return res.status(200).json(data);
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          console.log(`API Proxy: Получено ${data.items.length} заказов через специальный URL`);
-          saveToCache(cacheKey, data.items);
-          return res.status(200).json(data.items);
-        }
-      }
-    } catch (specialError: any) {
-      console.log('API Proxy: Ошибка специального запроса:', specialError.message);
     }
 
     // Если все попытки не удались, используем заранее заготовленные реальные данные
