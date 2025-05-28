@@ -4,7 +4,6 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enu
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from typing import List, Optional
 
 from app.database.session import Base
 
@@ -55,47 +54,46 @@ class OrderDish(Base):
     order = relationship("Order", back_populates="order_dishes")
     dish = relationship("app.models.menu.Dish", back_populates="order_dishes")
 
-    def __repr__(self):
-        return f"<OrderDish {self.id}: order={self.order_id}, dish={self.dish_id}, qty={self.quantity}>"
-
 
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
     waiter_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    table_number = Column(Integer, nullable=True)
-    payment_method = Column(String(6), nullable=True)
+    table_number = Column(Integer)
+    
+    # Дополнительные поля для интеграции с фронтендом
+    payment_method = Column(Enum(PaymentMethod), nullable=True)
     customer_name = Column(String, nullable=True)
     customer_phone = Column(String, nullable=True)
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
-    status = Column(String(9), default="pending")
-    payment_status = Column(String(8), default="pending")
-    total_amount = Column(Float, nullable=True)
+    
+    status = Column(String, default="pending")
+    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    total_price = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
     is_urgent = Column(Boolean, default=False)
     is_group_order = Column(Boolean, default=False)
-    customer_age_group = Column(String, nullable=True)
     
-    # Временные метки
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
+    # Информация о клиенте
+    customer_age_group = Column(String, nullable=True)  # teen, young, adult, elderly
     
-    # Связь с пользователями
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Отношения
     user = relationship("User", foreign_keys=[user_id], back_populates="orders")
-    waiter = relationship("User", foreign_keys=[waiter_id], back_populates="waiter_orders")
-    
-    # Связь с элементами заказа
-    items = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan")
-    
-    # Связь с платежами
+    waiter = relationship("User", foreign_keys=[waiter_id], back_populates="served_orders")
+    order_dishes = relationship("OrderDish", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
+    review = relationship("Review", back_populates="order", uselist=False)
     
-    def __repr__(self):
-        return f"<Order {self.id}: {self.status}>"
+    @property
+    def items(self):
+        return [od.dish for od in self.order_dishes]
 
     def to_dict(self):
         from datetime import datetime
@@ -109,7 +107,7 @@ class Order(Base):
             "waiter_id": self.waiter_id,
             "table_number": self.table_number,
             "status": self.status,
-            "total_amount": self.total_amount,
+            "total_price": self.total_price,
             "comment": self.comment,
             "created_at": self.created_at.isoformat() if self.created_at else datetime.utcnow().isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -124,11 +122,11 @@ class Order(Base):
             "is_group_order": self.is_group_order,
             "items": [
                 {
-                    "dish_id": item.dish_id,
-                    "name": item.dish.name,
+                    "dish_id": item.id,
+                    "name": item.name,
                     "price": item.price,
-                    "quantity": item.quantity,
-                    "special_instructions": item.special_instructions
+                    "quantity": next((od.quantity for od in self.order_dishes if od.dish_id == item.id), 0),
+                    "special_instructions": next((od.special_instructions for od in self.order_dishes if od.dish_id == item.id), None)
                 }
                 for item in self.items
             ]

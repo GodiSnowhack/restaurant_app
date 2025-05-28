@@ -76,470 +76,258 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).end();
   }
 
-  try {
-    // Получаем параметры запроса
-    const { start_date, end_date, status, user_id } = req.query;
-    
-    // Ключ для кеширования
-    const cacheKey = `orders_${start_date}_${end_date}_${status || 'all'}_${user_id || 'all'}`;
-    
-    // Проверяем наличие данных в кеше
-    const cachedData = getFromCache(cacheKey);
-    if (cachedData) {
-      console.log('API Proxy: Данные заказов получены из кеша');
-      return res.status(200).json(cachedData);
-    }
+  // Проверка метода запроса
+  if (req.method !== 'GET') {
+    return res.status(405).json({
+      success: false,
+      message: 'Метод не поддерживается'
+    });
+  }
 
-    // Получаем токен авторизации
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      console.log('API Proxy: Отсутствует токен авторизации');
-      return res.status(401).json({ message: 'Отсутствует токен авторизации' });
-    }
-    
-    // Получаем ID и роль пользователя из заголовков
-    const userId = req.headers['x-user-id'] as string || '1';
-    const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+  // Получаем параметры запроса
+  const { start_date, end_date } = req.query;
+  
+  // Ключ для кеширования
+  const cacheKey = `orders_${start_date}_${end_date}`;
+  
+  // Проверяем наличие данных в кеше
+  const cachedData = getFromCache(cacheKey);
+  if (cachedData) {
+    console.log('API Proxy: Данные заказов получены из кеша');
+    return res.status(200).json(cachedData);
+  }
 
-    // Формируем параметры запроса
+  // Вывод информации о конфигурации окружения
+  console.log('API Proxy: Переменные окружения:', {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NODE_ENV: process.env.NODE_ENV
+  });
+
+  // Получаем токен авторизации
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    console.log('API Proxy: Отсутствует токен авторизации');
+    return res.status(401).json({ message: 'Отсутствует токен авторизации' });
+  }
+  
+  // Получаем ID и роль пользователя из заголовков
+  const userId = req.headers['x-user-id'] as string || '1';
+  const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+
+  // Логгируем параметры запроса
+  console.log('API Proxy: Параметры запроса:', {
+    start_date,
+    end_date,
+    status: req.query.status,
+    user_id: req.query.user_id,
+    headers: {
+      'x-user-role': userRole,
+      'x-user-id': userId,
+      'authorization': token ? `Bearer ${token.substring(0, 10)}...` : undefined
+    }
+  });
+
+  // Получаем базовый URL API
+  const baseApiUrl = getDefaultApiUrl();
+  console.log('API Proxy: Базовый URL API:', baseApiUrl);
+
+  // Получаем прямой URL API для заказов
+  const ordersApiUrl = getOrdersApiUrl();
+  console.log('API Proxy: URL API заказов:', ordersApiUrl);
+
+  // Убираем /api/v1 из базового URL, чтобы избежать дублирования
+  let cleanBaseUrl = baseApiUrl;
+  if (cleanBaseUrl.endsWith('/api/v1')) {
+    cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - 7);
+  }
+  console.log('API Proxy: Очищенный базовый URL API:', cleanBaseUrl);
+
+  // Формируем URL для запроса
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
-    if (status) queryParams.append('status', status as string);
-    if (user_id) queryParams.append('user_id', user_id as string);
     
-    // Заголовки запроса
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-User-Role': userRole,
-      'X-User-ID': userId
-    };
+  // Создаем HTTPS агент для безопасных запросов
+  const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+  });
 
-    // HTTPS агент для безопасных запросов
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false
+  // Заголовки запроса
+  const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+    'X-User-Role': userRole,
+    'X-User-ID': userId
+  };
+
+  console.log('API Proxy: Заголовки запроса:', {
+    ...headers,
+    'Authorization': 'Bearer [скрыто]'
+  });
+
+  // Сначала пробуем прямой запрос к API заказов
+  let orderData = null;
+
+  try {
+    const directOrdersUrl = `${ordersApiUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log('API Proxy: Прямой запрос к API заказов:', directOrdersUrl);
+    
+    const directOrdersResponse = await axios.get(directOrdersUrl, {
+      headers,
+      httpsAgent,
+      timeout: 15000,
+      validateStatus: status => true
     });
-
-    // Определяем базовый URL API
-    const baseApiUrl = getDefaultApiUrl();
-    console.log('API Proxy: Базовый URL API:', baseApiUrl);
-
-    // Получаем прямой URL API для заказов
-    const ordersApiUrl = getOrdersApiUrl();
-    console.log('API Proxy: URL API заказов:', ordersApiUrl);
-
-    // Очищаем baseApiUrl от возможного двойного /api/v1
-    let cleanBaseUrl = baseApiUrl;
-    if (cleanBaseUrl.endsWith('/api/v1')) {
-      cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - 7);
+    
+    console.log('API Proxy: Ответ прямого запроса к API заказов, статус:', directOrdersResponse.status);
+    
+    if (directOrdersResponse.status === 200) {
+      const directOrdersData = directOrdersResponse.data;
+      
+      if (Array.isArray(directOrdersData)) {
+        console.log(`API Proxy: Получено ${directOrdersData.length} заказов через прямой запрос к API заказов`);
+        orderData = directOrdersData;
+      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.items && Array.isArray(directOrdersData.items)) {
+        console.log(`API Proxy: Получено ${directOrdersData.items.length} заказов в формате items через прямой запрос к API заказов`);
+        orderData = directOrdersData.items;
+      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.status === 'success' && directOrdersData.data && Array.isArray(directOrdersData.data)) {
+        console.log(`API Proxy: Получено ${directOrdersData.data.length} заказов в формате data.data через прямой запрос к API заказов`);
+        orderData = directOrdersData.data;
+      }
     }
-    console.log('API Proxy: Очищенный базовый URL API:', cleanBaseUrl);
+  } catch (directOrdersError: any) {
+    console.log('API Proxy: Ошибка при прямом запросе к API заказов:', directOrdersError.message);
+  }
 
+  // Если прямой запрос не сработал, пробуем другие пути
+  if (!orderData) {
+    console.log('API Proxy: Прямой запрос не удался, пробуем альтернативные пути');
+    
     // Список возможных путей API для заказов
-    const apiEndpoints = [
-      { url: `${ordersApiUrl}`, description: 'прямой URL заказов' },
-      { url: `${cleanBaseUrl}/api/v1/orders`, description: 'основной API путь' },
-      { url: `${cleanBaseUrl}/orders`, description: 'короткий путь' },
-      { url: `${cleanBaseUrl}/api/orders`, description: 'альтернативный API путь' }
+    const apiPaths = [
+      '/api/v1/orders',
+      '/orders',
+      '/api/orders',
+      '/api/v1/admin/orders',
+      '/api/admin/orders'
     ];
 
-    // Пробуем все API эндпоинты последовательно
-    let orderData = null;
-    let error = null;
-
-    for (const endpoint of apiEndpoints) {
+    // Перебираем возможные пути API
+    for (const path of apiPaths) {
       try {
-        const fullUrl = `${endpoint.url}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        console.log(`API Proxy: Пробуем ${endpoint.description}:`, fullUrl);
+        const fullUrl = `${cleanBaseUrl}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log(`API Proxy: Попытка получения данных по пути ${path}:`, fullUrl);
         
         const response = await axios.get(fullUrl, {
           headers,
           httpsAgent,
-          timeout: 15000 // 15 секунд таймаут
+          timeout: 15000,
+          validateStatus: status => true
         });
         
-        console.log(`API Proxy: Ответ от ${endpoint.description}, статус:`, response.status);
+        console.log(`API Proxy: Ответ по пути ${path}, статус:`, response.status);
         
         if (response.status === 200) {
-          if (Array.isArray(response.data)) {
-            console.log(`API Proxy: Получено ${response.data.length} заказов от ${endpoint.description}`);
-            orderData = response.data;
+          const data = response.data;
+          
+          if (Array.isArray(data)) {
+            console.log(`API Proxy: Получено ${data.length} заказов по пути ${path}`);
+            orderData = data;
             break;
-          } else if (response.data && typeof response.data === 'object') {
-            if (response.data.items && Array.isArray(response.data.items)) {
-              console.log(`API Proxy: Получено ${response.data.items.length} заказов в формате items от ${endpoint.description}`);
-              orderData = response.data.items;
-              break;
-            } else if (response.data.data && Array.isArray(response.data.data)) {
-              console.log(`API Proxy: Получено ${response.data.data.length} заказов в формате data от ${endpoint.description}`);
-              orderData = response.data.data;
-              break;
-            } else {
-              console.log(`API Proxy: Неожиданный формат данных от ${endpoint.description}:`, 
-                JSON.stringify(response.data).substring(0, 200) + '...');
-            }
-          }
-        } else if (response.status === 401) {
-          console.log(`API Proxy: Ошибка авторизации (401) от ${endpoint.description}`);
-          error = { status: 401, message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' };
-        } else {
-          console.log(`API Proxy: Ошибка от ${endpoint.description}, статус ${response.status}`);
-          if (!error) {
-            error = { status: response.status, message: `Ошибка при получении данных: ${response.status}` };
+          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+            console.log(`API Proxy: Получено ${data.items.length} заказов в формате items по пути ${path}`);
+            orderData = data.items;
+            break;
+          } else if (data && typeof data === 'object' && data.status === 'success' && data.data && Array.isArray(data.data)) {
+            console.log(`API Proxy: Получено ${data.data.length} заказов в формате data.data по пути ${path}`);
+            orderData = data.data;
+            break;
           }
         }
-      } catch (endpointError: any) {
-        console.log(`API Proxy: Ошибка при запросе к ${endpoint.description}:`, endpointError.message);
-        if (!error) {
-          error = { status: 500, message: `Ошибка при запросе: ${endpointError.message}` };
-        }
+      } catch (pathError: any) {
+        console.log(`API Proxy: Ошибка при запросе к пути ${path}:`, pathError.message);
       }
     }
-
-    // Если получили данные, возвращаем их
-    if (orderData) {
-      console.log('API Proxy: Возвращаем полученные реальные данные');
-      saveToCache(cacheKey, orderData);
-      return res.status(200).json(orderData);
-    }
-
-    // Если есть ошибка авторизации, возвращаем соответствующий статус
-    if (error && error.status === 401) {
-      return res.status(401).json({ message: error.message });
-    }
-
-    // Если все попытки не удались, возвращаем тестовые данные
-    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем тестовые данные');
-    const testOrders = getTestOrdersData();
-    saveToCache(cacheKey, testOrders);
-    return res.status(200).json(testOrders);
-  } catch (error) {
-    console.error('API Proxy: Непредвиденная ошибка:', error);
-    return res.status(500).json({ 
-      message: 'Внутренняя ошибка сервера', 
-      error: error instanceof Error ? error.message : String(error) 
-    });
   }
-}
 
-// Функция для получения тестовых данных о заказах
-function getTestOrdersData() {
-  return [
-    {
-      id: 1, 
-      user_id: 1,
-      waiter_id: 2,
-      status: "completed",
-      payment_status: "paid",
-      payment_method: "card",
-      order_type: "dine-in",
-      total_amount: 2950,
-      total_price: 2950,
-      created_at: "2025-05-22T10:30:00.000Z",
-      updated_at: "2025-05-22T12:15:00.000Z",
-      completed_at: "2025-05-22T12:15:00.000Z",
-      items: [
-        {
-          dish_id: 3,
-          quantity: 1,
-          price: 1500,
-          name: "Сёмга на гриле",
-          total_price: 1500
-        },
-        {
-          dish_id: 4,
-          quantity: 2,
-          price: 650,
-          name: "Салат Цезарь",
-          total_price: 1300
-        },
-        {
-          dish_id: 10,
-          quantity: 1,
-          price: 150,
-          name: "Кока-кола",
-          total_price: 150
+  // Если получили данные, возвращаем их
+  if (orderData) {
+    console.log('API Proxy: Возвращаем полученные реальные данные');
+    saveToCache(cacheKey, orderData);
+    return res.status(200).json(orderData);
+  } else {
+    // Если не удалось получить данные, пробуем прямой запрос к базе данных
+    console.log('API Proxy: Все попытки получить данные через API не удались, пробуем прямой запрос к базе данных');
+    
+    try {
+      // Прямой SQL-запрос к базе данных через API
+      const dbQuery = `
+        SELECT o.*, json_group_array(json_object(
+          'dish_id', od.dish_id,
+          'quantity', od.quantity,
+          'price', od.price,
+          'name', d.name,
+          'total_price', od.price * od.quantity
+        )) as items
+        FROM orders o
+        LEFT JOIN order_dish od ON o.id = od.order_id
+        LEFT JOIN dishes d ON od.dish_id = d.id
+        WHERE o.created_at >= '${start_date}' AND o.created_at <= '${end_date}'
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+      `;
+
+      // Формируем URL для прямого запроса к базе данных
+      const dbEndpoint = `${cleanBaseUrl}/api/db/query`;
+      console.log('API Proxy: Запрос к базе данных:', dbEndpoint);
+      
+      const dbResponse = await axios.post(dbEndpoint, 
+        { query: dbQuery },
+        { 
+          headers,
+          httpsAgent,
+          timeout: 15000,
+          validateStatus: status => true
         }
-      ],
-      table_number: 5,
-      customer_name: "Иван Петров",
-      customer_phone: "+7 (925) 123-45-67"
-    },
-    {
-      id: 2,
-      user_id: 3,
-      waiter_id: 1,
-      status: "preparing",
-      payment_status: "pending",
-      payment_method: "cash",
-      order_type: "dine-in",
-      total_amount: 3800,
-      total_price: 3800,
-      created_at: "2025-05-25T19:45:00.000Z",
-      updated_at: "2025-05-25T20:00:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 1,
-          quantity: 2,
-          price: 1200,
-          name: "Стейк из говядины",
-          total_price: 2400
-        },
-        {
-          dish_id: 6,
-          quantity: 1,
-          price: 900,
-          name: "Тирамису",
-          total_price: 900
-        },
-        {
-          dish_id: 7,
-          quantity: 1,
-          price: 500,
-          name: "Вино красное (бокал)",
-          total_price: 500
-        }
-      ],
-      table_number: 3,
-      customer_name: "Елена Сидорова",
-      customer_phone: "+7 (916) 765-43-21"
-    },
-    {
-      id: 3,
-      user_id: 2,
-      waiter_id: 3,
-      status: "confirmed",
-      payment_status: "pending",
-      payment_method: "card",
-      order_type: "delivery",
-      total_amount: 2900,
-      total_price: 2900,
-      created_at: "2025-05-27T12:15:00.000Z",
-      updated_at: "2025-05-27T12:20:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 8,
-          quantity: 1,
-          price: 1800,
-          name: "Пицца Маргарита",
-          total_price: 1800
-        },
-        {
-          dish_id: 9,
-          quantity: 1,
-          price: 1100,
-          name: "Паста Карбонара",
-          total_price: 1100
-        }
-      ],
-      delivery_address: "ул. Ленина, д. 10, кв. 25",
-      customer_name: "Дмитрий Кузнецов",
-      customer_phone: "+7 (903) 555-77-88"
-    },
-    {
-      id: 4,
-      user_id: 5,
-      waiter_id: 2,
-      status: "pending",
-      payment_status: "pending",
-      payment_method: "online",
-      order_type: "pickup",
-      total_amount: 1200,
-      total_price: 1200,
-      created_at: "2025-05-28T09:30:00.000Z",
-      updated_at: "2025-05-28T09:30:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 10,
-          quantity: 1,
-          price: 1200,
-          name: "Бургер с говядиной",
-          total_price: 1200
-        }
-      ],
-      customer_name: "Анна Морозова",
-      customer_phone: "+7 (901) 222-33-44"
-    },
-    {
-      id: 5,
-      user_id: 4,
-      waiter_id: 1,
-      status: "cancelled",
-      payment_status: "refunded",
-      payment_method: "card",
-      order_type: "dine-in",
-      total_amount: 4200,
-      total_price: 4200,
-      created_at: "2025-05-21T18:00:00.000Z",
-      updated_at: "2025-05-21T18:15:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 5,
-          quantity: 1,
-          price: 2500,
-          name: "Стейк Рибай",
-          total_price: 2500
-        },
-        {
-          dish_id: 4,
-          quantity: 1,
-          price: 650,
-          name: "Салат Цезарь",
-          total_price: 650
-        },
-        {
-          dish_id: 7,
-          quantity: 1,
-          price: 500,
-          name: "Вино красное (бокал)",
-          total_price: 500
-        },
-        {
-          dish_id: 6,
-          quantity: 1,
-          price: 550,
-          name: "Чизкейк",
-          total_price: 550
-        }
-      ],
-      table_number: 8,
-      customer_name: "Сергей Иванов",
-      customer_phone: "+7 (999) 888-77-66",
-      comment: "Отменено из-за длительного ожидания"
-    },
-    {
-      id: 6,
-      user_id: 1,
-      waiter_id: 3,
-      status: "ready",
-      payment_status: "paid",
-      payment_method: "cash",
-      order_type: "dine-in",
-      total_amount: 1750,
-      total_price: 1750,
-      created_at: "2025-05-27T20:30:00.000Z",
-      updated_at: "2025-05-27T21:00:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 9,
-          quantity: 1,
-          price: 1100,
-          name: "Паста Карбонара",
-          total_price: 1100
-        },
-        {
-          dish_id: 6,
-          quantity: 1,
-          price: 550,
-          name: "Чизкейк",
-          total_price: 550
-        },
-        {
-          dish_id: 10,
-          quantity: 1,
-          price: 100,
-          name: "Чай",
-          total_price: 100
-        }
-      ],
-      table_number: 2,
-      customer_name: "Ольга Смирнова",
-      customer_phone: "+7 (910) 456-78-90"
-    },
-    {
-      id: 7,
-      user_id: 3,
-      waiter_id: 2,
-      status: "completed",
-      payment_status: "paid",
-      payment_method: "card",
-      order_type: "dine-in",
-      total_amount: 3250,
-      total_price: 3250,
-      created_at: "2025-05-26T13:45:00.000Z",
-      updated_at: "2025-05-26T15:20:00.000Z",
-      completed_at: "2025-05-26T15:20:00.000Z",
-      items: [
-        {
-          dish_id: 3,
-          quantity: 1,
-          price: 1500,
-          name: "Сёмга на гриле",
-          total_price: 1500
-        },
-        {
-          dish_id: 2,
-          quantity: 1,
-          price: 1100,
-          name: "Паста Карбонара",
-          total_price: 1100
-        },
-        {
-          dish_id: 6,
-          quantity: 1,
-          price: 550,
-          name: "Чизкейк",
-          total_price: 550
-        },
-        {
-          dish_id: 11,
-          quantity: 1,
-          price: 100,
-          name: "Кофе",
-          total_price: 100
-        }
-      ],
-      table_number: 6,
-      customer_name: "Алексей Козлов",
-      customer_phone: "+7 (926) 111-22-33"
-    },
-    {
-      id: 8,
-      user_id: 2,
-      waiter_id: 1,
-      status: "preparing",
-      payment_status: "pending",
-      payment_method: "cash",
-      order_type: "dine-in",
-      total_amount: 2300,
-      total_price: 2300,
-      created_at: "2025-05-28T13:15:00.000Z",
-      updated_at: "2025-05-28T13:25:00.000Z",
-      completed_at: null,
-      items: [
-        {
-          dish_id: 10,
-          quantity: 1,
-          price: 1200,
-          name: "Бургер с говядиной",
-          total_price: 1200
-        },
-        {
-          dish_id: 12,
-          quantity: 1,
-          price: 350,
-          name: "Картофель фри",
-          total_price: 350
-        },
-        {
-          dish_id: 13,
-          quantity: 1,
-          price: 750,
-          name: "Салат Греческий",
-          total_price: 750
-        }
-      ],
-      table_number: 4,
-      customer_name: "Максим Попов",
-      customer_phone: "+7 (905) 333-44-55",
-      is_urgent: true
+      );
+      
+      if (dbResponse.status === 200 && dbResponse.data) {
+        console.log('API Proxy: Получены данные из базы данных');
+        
+        // Преобразуем данные в нужный формат
+        const ordersData = dbResponse.data.map((order: any) => {
+          // Преобразуем items из строки в объект, если это необходимо
+          let items = order.items;
+          if (typeof items === 'string') {
+            try {
+              items = JSON.parse(items);
+            } catch (e) {
+              items = [];
+            }
+          }
+          
+          return {
+            ...order,
+            items: items || []
+          };
+        });
+        
+        saveToCache(cacheKey, ordersData);
+        return res.status(200).json(ordersData);
+      } else {
+        console.log('API Proxy: Не удалось получить данные из базы данных, возвращаем ошибку');
+        return res.status(503).json({ 
+          error: 'Не удалось получить данные заказов',
+          message: 'Сервер временно недоступен. Пожалуйста, попробуйте позже.'
+        });
+      }
+    } catch (dbError: any) {
+      console.log('API Proxy: Ошибка при запросе к базе данных:', dbError.message);
+      return res.status(503).json({ 
+        error: 'Не удалось получить данные заказов',
+        message: 'Сервер временно недоступен. Пожалуйста, попробуйте позже.'
+      });
     }
-  ];
+  }
 } 
