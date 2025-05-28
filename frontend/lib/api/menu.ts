@@ -175,8 +175,31 @@ export const menuApi = {
   
   // Создание нового блюда
   createDish: async (dish: Omit<Dish, 'id' | 'created_at' | 'updated_at'>): Promise<Dish> => {
-    const response = await api.post('/menu/dishes', dish);
-    return response.data;
+    try {
+      console.log('API: Создание нового блюда...');
+      const response = await api.post('/api/menu/create-dish', dish);
+      
+      // Обновляем кэш блюд после успешного создания
+      try {
+        const cachedDishes = localStorage.getItem('cached_dishes');
+        if (cachedDishes) {
+          const dishes = JSON.parse(cachedDishes);
+          dishes.push(response.data);
+          localStorage.setItem('cached_dishes', JSON.stringify(dishes));
+          console.log('API: Новое блюдо добавлено в кэш');
+        } else {
+          // Если кэша нет, создаем новый только с этим блюдом
+          localStorage.setItem('cached_dishes', JSON.stringify([response.data]));
+        }
+      } catch (cacheError) {
+        console.error('API: Ошибка при обновлении кэша блюд:', cacheError);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('API: Ошибка при создании блюда:', error);
+      throw new Error('Не удалось создать блюдо');
+    }
   },
   
   // Обновление блюда

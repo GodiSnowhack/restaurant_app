@@ -69,85 +69,6 @@ const updateDishInCache = (id: number, updatedDish: any) => {
   }
 };
 
-// Данные-заглушки для блюд
-const FALLBACK_DISHES = [
-  { 
-    id: 1, 
-    name: "Бургер Классический", 
-    description: "Сочная говяжья котлета, свежие овощи, фирменный соус", 
-    price: 2500, 
-    category_id: 1,
-    image_url: "/images/dishes/burger.jpg",
-    is_available: true,
-    is_vegetarian: false,
-    ingredients: "Булочка, говядина, салат, помидор, соус",
-    calories: 850,
-    weight: 350,
-    cooking_time: 15,
-    allergens: ["Глютен", "Молоко"]
-  },
-  { 
-    id: 2, 
-    name: "Цезарь с курицей", 
-    description: "Классический салат с куриным филе, сыром пармезан и гренками", 
-    price: 2200, 
-    category_id: 3,
-    image_url: "/images/dishes/caesar.jpg",
-    is_available: true,
-    is_vegetarian: false,
-    ingredients: "Салат романо, куриное филе, гренки, пармезан, соус цезарь",
-    calories: 550,
-    weight: 250,
-    cooking_time: 10,
-    allergens: ["Глютен", "Молоко", "Яйца"]
-  },
-  { 
-    id: 3, 
-    name: "Борщ", 
-    description: "Традиционный борщ со сметаной и зеленью", 
-    price: 1800, 
-    category_id: 2,
-    image_url: "/images/dishes/borsch.jpg",
-    is_available: true,
-    is_vegetarian: false,
-    ingredients: "Свекла, капуста, морковь, картофель, говядина, зелень",
-    calories: 450,
-    weight: 400,
-    cooking_time: 20,
-    allergens: ["Молоко"]
-  },
-  { 
-    id: 4, 
-    name: "Тирамису", 
-    description: "Классический итальянский десерт с кофейным вкусом", 
-    price: 2000, 
-    category_id: 4,
-    image_url: "/images/dishes/tiramisu.jpg",
-    is_available: true,
-    is_vegetarian: true,
-    ingredients: "Маскарпоне, савоярди, кофе, какао",
-    calories: 420,
-    weight: 150,
-    cooking_time: 5,
-    allergens: ["Глютен", "Молоко", "Яйца"]
-  },
-  { 
-    id: 5, 
-    name: "Латте", 
-    description: "Кофейный напиток с молоком", 
-    price: 1200, 
-    category_id: 5,
-    image_url: "/images/dishes/latte.jpg",
-    is_available: true,
-    is_vegetarian: true,
-    ingredients: "Эспрессо, молоко",
-    calories: 180,
-    weight: 350,
-    cooking_time: 5,
-    allergens: ["Молоко"]
-  }
-];
-
 // Список разрешенных полей для редактирования блюда
 const allowedDishFields = [
   'name', 'description', 'price', 'category_id', 'image_url', 
@@ -202,17 +123,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Обработка GET запроса
   if (req.method === 'GET') {
-    // Сначала пробуем получить блюдо из кэша
-    const cachedDishes = getCachedDishes();
-    
-    if (cachedDishes) {
-      const cachedDish = cachedDishes.find((dish: any) => dish.id === dishId);
-      if (cachedDish) {
-        console.log(`Возвращаем блюдо с ID ${dishId} из кэша`);
-        return res.status(200).json(cachedDish);
-      }
-    }
-
     try {
       // Пробуем получить блюдо с бэкенда
       const url = `${getSecureApiUrl()}/menu/dishes/${dishId}`;
@@ -230,19 +140,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timeout: 5000
       });
 
-      return res.status(200).json(response.data);
+      if (response.data) {
+        // Если успешно получили данные, обновляем кэш
+        updateDishInCache(dishId, response.data);
+        return res.status(200).json(response.data);
+      } else {
+        throw new Error('Получены некорректные данные от API');
+      }
     } catch (error: any) {
-      console.error(`Ошибка при получении блюда с ID ${dishId}:`, error.message);
+      console.error(`Ошибка при получении блюда с ID ${dishId} из API:`, error.message);
       
-      // Ищем блюдо в данных-заглушках
-      const fallbackDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
+      // В случае ошибки пробуем получить блюдо из кэша
+      const cachedDishes = getCachedDishes();
       
-      if (fallbackDish) {
-        console.log(`Возвращаем заглушку для блюда с ID ${dishId}`);
-        return res.status(200).json(fallbackDish);
+      if (cachedDishes) {
+        const cachedDish = cachedDishes.find((dish: any) => dish.id === dishId);
+        if (cachedDish) {
+          console.log(`Возвращаем блюдо с ID ${dishId} из кэша`);
+          return res.status(200).json(cachedDish);
+        }
       }
       
-      // Если блюда нет даже в заглушках, возвращаем 404
+      // Если блюда нет в кэше, возвращаем 404
       return res.status(404).json({ message: 'Блюдо не найдено' });
     }
   }
@@ -292,10 +211,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         if (cachedDishes) {
           existingDish = cachedDishes.find((dish: any) => dish.id === dishId);
-        }
-        
-        if (!existingDish) {
-          existingDish = FALLBACK_DISHES.find(dish => dish.id === dishId);
         }
         
         if (!existingDish) {
