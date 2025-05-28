@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getDefaultApiUrl } from '../../../src/config/defaults';
+import { getDefaultApiUrl, getOrdersApiUrl } from '../../../src/config/defaults';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -131,6 +131,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const baseApiUrl = getDefaultApiUrl();
   console.log('API Proxy: Базовый URL API:', baseApiUrl);
 
+  // Получаем прямой URL API для заказов
+  const ordersApiUrl = getOrdersApiUrl();
+  console.log('API Proxy: URL API заказов:', ordersApiUrl);
+
+  // Убираем /api/v1 из базового URL, чтобы избежать дублирования
+  let cleanBaseUrl = baseApiUrl;
+  if (cleanBaseUrl.endsWith('/api/v1')) {
+    cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - 7);
+  }
+  console.log('API Proxy: Очищенный базовый URL API:', cleanBaseUrl);
+
   // Формируем URL для запроса
   const queryParams = new URLSearchParams();
   if (start_date) queryParams.append('start_date', start_date as string);
@@ -155,57 +166,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     'Authorization': 'Bearer [скрыто]'
   });
 
-  // Список возможных путей API для заказов
-  const apiPaths = [
-    '/orders',
-    '/api/v1/orders',
-    '/api/orders'
-  ];
-
+  // Сначала пробуем прямой запрос к API заказов
   let orderData = null;
 
-  // Перебираем возможные пути API
-  for (const path of apiPaths) {
-    try {
-      const fullUrl = `${baseApiUrl}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log(`API Proxy: Попытка получения данных по пути ${path}:`, fullUrl);
+  try {
+    const directOrdersUrl = `${ordersApiUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log('API Proxy: Прямой запрос к API заказов:', directOrdersUrl);
+    
+    const directOrdersResponse = await axios.get(directOrdersUrl, {
+      headers,
+      httpsAgent,
+      timeout: 15000,
+      validateStatus: status => true
+    });
+    
+    console.log('API Proxy: Ответ прямого запроса к API заказов, статус:', directOrdersResponse.status);
+    
+    if (directOrdersResponse.status === 200) {
+      const directOrdersData = directOrdersResponse.data;
       
-      // Выполняем запрос к API
-      const response = await axios.get(fullUrl, {
-        headers,
-        httpsAgent,
-        timeout: 10000,
-        validateStatus: status => true // Принимаем любой статус для анализа
-      });
-      
-      console.log(`API Proxy: Ответ по пути ${path}, статус:`, response.status);
-      
-      // Проверяем статус ответа
-      if (response.status === 200) {
-        // Получили успешный ответ
-        const data = response.data;
-        console.log(`API Proxy: Получены реальные данные с сервера по пути ${path}`);
-        
-        if (Array.isArray(data)) {
-          console.log(`API Proxy: Получено ${data.length} заказов`);
-          orderData = data;
-          break;
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          console.log(`API Proxy: Получено ${data.items.length} заказов в формате items`);
-          orderData = data.items;
-          break;
-        } else {
-          console.log(`API Proxy: Данные в неожиданном формате:`, typeof data);
-        }
-      } else if (response.status === 401) {
-        console.log(`API Proxy: Ошибка авторизации (401) по пути ${path}`);
-        // Возможно, токен устарел - возвращаем ошибку авторизации
-        return res.status(401).json({ message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' });
-      } else {
-        console.log(`API Proxy: Ошибка при получении данных по пути ${path}, статус ${response.status}`);
+      if (Array.isArray(directOrdersData)) {
+        console.log(`API Proxy: Получено ${directOrdersData.length} заказов через прямой запрос к API заказов`);
+        orderData = directOrdersData;
+      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.items && Array.isArray(directOrdersData.items)) {
+        console.log(`API Proxy: Получено ${directOrdersData.items.length} заказов в формате items через прямой запрос к API заказов`);
+        orderData = directOrdersData.items;
+      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.status === 'success' && directOrdersData.data && Array.isArray(directOrdersData.data)) {
+        console.log(`API Proxy: Получено ${directOrdersData.data.length} заказов в формате data.data через прямой запрос к API заказов`);
+        orderData = directOrdersData.data;
       }
-    } catch (pathError: any) {
-      console.log(`API Proxy: Ошибка при запросе к пути ${path}:`, pathError.message);
+    }
+  } catch (directOrdersError: any) {
+    console.log('API Proxy: Ошибка при прямом запросе к API заказов:', directOrdersError.message);
+  }
+
+  // Если прямой запрос не сработал, пробуем другие пути
+  if (!orderData) {
+    console.log('API Proxy: Прямой запрос не удался, пробуем альтернативные пути');
+    
+    // Список возможных путей API для заказов
+    const apiPaths = [
+      '/api/v1/orders',
+      '/orders',
+      '/api/orders',
+      '/api/v1/admin/orders',
+      '/api/admin/orders'
+    ];
+
+    // Перебираем возможные пути API
+    for (const path of apiPaths) {
+      try {
+        const fullUrl = `${cleanBaseUrl}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log(`API Proxy: Попытка получения данных по пути ${path}:`, fullUrl);
+        
+        const response = await axios.get(fullUrl, {
+          headers,
+          httpsAgent,
+          timeout: 15000,
+          validateStatus: status => true
+        });
+        
+        console.log(`API Proxy: Ответ по пути ${path}, статус:`, response.status);
+        
+        if (response.status === 200) {
+          const data = response.data;
+          
+          if (Array.isArray(data)) {
+            console.log(`API Proxy: Получено ${data.length} заказов по пути ${path}`);
+            orderData = data;
+            break;
+          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+            console.log(`API Proxy: Получено ${data.items.length} заказов в формате items по пути ${path}`);
+            orderData = data.items;
+            break;
+          } else if (data && typeof data === 'object' && data.status === 'success' && data.data && Array.isArray(data.data)) {
+            console.log(`API Proxy: Получено ${data.data.length} заказов в формате data.data по пути ${path}`);
+            orderData = data.data;
+            break;
+          }
+        }
+      } catch (pathError: any) {
+        console.log(`API Proxy: Ошибка при запросе к пути ${path}:`, pathError.message);
+      }
     }
   }
 

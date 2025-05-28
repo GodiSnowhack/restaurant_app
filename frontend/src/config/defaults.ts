@@ -27,12 +27,14 @@ export const DEFAULT_URLS = {
   development: {
     // Для локальной разработки 
     api: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
-    frontend: 'http://localhost:3000'
+    frontend: 'http://localhost:3000',
+    orders: 'http://localhost:8000/api/v1/orders'
   },
   production: {
     // Используем точный URL из переменной среды Railway
     api: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
-    frontend: process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app'
+    frontend: process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app',
+    orders: 'https://backend-production-1a78.up.railway.app/api/v1/orders'
   }
 };
 
@@ -58,4 +60,10 @@ export const getDefaultFrontendUrl = (): string => {
     return frontendUrl.replace('http://', 'https://');
   }
   return frontendUrl;
+};
+
+// Получение URL API для заказов
+export const getOrdersApiUrl = (): string => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return isProduction ? DEFAULT_URLS.production.orders : DEFAULT_URLS.development.orders;
 }; 

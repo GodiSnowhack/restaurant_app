@@ -109,15 +109,23 @@ const nextConfig = {
     const apiBaseUrl = 'https://backend-production-1a78.up.railway.app';
     
     return [
-      // Общий путь API
+      // Прямое проксирование путей API
+      {
+        source: '/api/v1/orders',
+        destination: `${apiBaseUrl}/api/v1/orders`
+      },
+      {
+        source: '/orders',
+        destination: `${apiBaseUrl}/api/v1/orders`
+      },
+      {
+        source: '/api/orders',
+        destination: `${apiBaseUrl}/api/v1/orders`
+      },
+      // Общие пути
       {
         source: '/api/:path*',
-        destination: `${apiBaseUrl}/api/:path*`,
-      },
-      // API v1
-      {
-        source: '/api/v1/:path*',
-        destination: `${apiBaseUrl}/api/v1/:path*`
+        destination: `${apiBaseUrl}/api/:path*`
       }
     ];
   },
