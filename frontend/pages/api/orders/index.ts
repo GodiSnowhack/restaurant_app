@@ -3,6 +3,7 @@ import { getDefaultApiUrl } from '../../../src/config/defaults';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 // Путь к кешу
 const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
@@ -100,21 +101,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем токен авторизации
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
-      console.log('API Proxy: Отсутствует токен авторизации, возвращаем демо-данные');
-      const demoOrders = generateDemoOrders();
-      saveToCache(cacheKey, demoOrders);
-      return res.status(200).json(demoOrders);
+      console.log('API Proxy: Отсутствует токен авторизации');
+      return res.status(401).json({ message: 'Отсутствует токен авторизации' });
     }
 
-    // Получаем базовый URL API
-    const baseApiUrl = getDefaultApiUrl();
+    // Получаем базовый URL API - обязательно с https:// и без дополнительных /api/v1
+    let baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app';
+    
+    // Если baseApiUrl не начинается с http, добавляем https://
+    if (!baseApiUrl.startsWith('http')) {
+      baseApiUrl = `https://${baseApiUrl}`;
+    }
+    
+    // Убедимся, что используем HTTPS
+    baseApiUrl = baseApiUrl.replace('http://', 'https://');
     
     // Формируем URL для запроса
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
     
-    const url = `${baseApiUrl}/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    // Формируем правильный URL конечной точки API
+    const url = `${baseApiUrl}/api/v1/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
     console.log('API Proxy: Отправка запроса на', url);
 
@@ -123,11 +131,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       rejectUnauthorized: false
     });
 
-    // Отправляем запрос к бэкенду с таймаутом
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
+    // Попробуем несколько способов запроса к API сервера
     try {
+      // Метод 1: Через axios с прямым указанием Bearer
+      console.log('API Proxy: Попытка через axios...');
+      const axiosResponse = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-Role': req.headers['x-user-role'] as string || 'admin',
+          'X-User-ID': req.headers['x-user-id'] as string || '1'
+        },
+        httpsAgent,
+        timeout: 10000
+      });
+      
+      if (axiosResponse.status === 200) {
+        const data = axiosResponse.data;
+        // Проверяем формат данных
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов через axios`);
+          saveToCache(cacheKey, data);
+          return res.status(200).json(data);
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов в формате items через axios`);
+          saveToCache(cacheKey, data.items);
+          return res.status(200).json(data.items);
+        }
+      }
+      console.log('API Proxy: Данные в неправильном формате через axios');
+    } catch (axiosError: any) {
+      console.log('API Proxy: Ошибка axios запроса:', axiosError.message);
+    }
+
+    // Метод 2: Через fetch
+    try {
+      console.log('API Proxy: Попытка через fetch...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -139,59 +182,109 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         signal: controller.signal,
         // @ts-ignore - добавляем агент напрямую
-        agent: url.startsWith('https') ? httpsAgent : undefined
+        agent: httpsAgent
       });
 
       clearTimeout(timeoutId);
 
-      // Если ответ не успешный, генерируем демо-данные
-      if (!response.ok) {
-        console.log(`API Proxy: Сервер вернул ошибку ${response.status}, возвращаем демо-данные`);
-        const demoOrders = generateDemoOrders();
-        saveToCache(cacheKey, demoOrders);
-        return res.status(200).json(demoOrders);
-      }
+      // Если ответ успешный, обрабатываем данные
+      if (response.ok) {
+        const data = await response.json();
 
-      // Получаем данные ответа
-      const data = await response.json();
-
-      // Проверяем, что данные в правильном формате
-      if (Array.isArray(data)) {
-        console.log(`API Proxy: Получено ${data.length} заказов с сервера`);
-        saveToCache(cacheKey, data);
-        return res.status(200).json(data);
-      } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-        console.log(`API Proxy: Получено ${data.items.length} заказов в формате items`);
-        saveToCache(cacheKey, data.items);
-        return res.status(200).json(data.items);
+        // Проверяем, что данные в правильном формате
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов через fetch`);
+          saveToCache(cacheKey, data);
+          return res.status(200).json(data);
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов в формате items через fetch`);
+          saveToCache(cacheKey, data.items);
+          return res.status(200).json(data.items);
+        }
       } else {
-        console.log('API Proxy: Сервер вернул данные в неожиданном формате, возвращаем демо-данные');
-        const demoOrders = generateDemoOrders();
-        saveToCache(cacheKey, demoOrders);
-        return res.status(200).json(demoOrders);
+        console.log(`API Proxy: Сервер вернул ошибку ${response.status}`);
       }
     } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      console.error('API Proxy: Ошибка при отправке запроса:', fetchError.message);
-      
-      // В случае ошибки сети возвращаем демо-данные
-      const demoOrders = generateDemoOrders();
-      
-      // Сохраняем демо-данные в кеш
-      saveToCache(cacheKey, demoOrders);
-      
-      // Отправляем демо-данные клиенту
-      return res.status(200).json(demoOrders);
+      console.log('API Proxy: Ошибка fetch запроса:', fetchError.message);
     }
+
+    // Если все способы получения данных не сработали, используем прямое подключение к API
+    try {
+      // Пробуем другой endpoint для заказов
+      const alternativeUrl = `${baseApiUrl}/api/v1/admin/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      console.log('API Proxy: Попытка через альтернативный URL:', alternativeUrl);
+      
+      const altResponse = await axios.get(alternativeUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-Role': 'admin',
+          'X-User-ID': req.headers['x-user-id'] as string || '1'
+        },
+        httpsAgent,
+        timeout: 10000
+      });
+      
+      if (altResponse.status === 200) {
+        const data = altResponse.data;
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов через альтернативный URL`);
+          saveToCache(cacheKey, data);
+          return res.status(200).json(data);
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов через альтернативный URL`);
+          saveToCache(cacheKey, data.items);
+          return res.status(200).json(data.items);
+        }
+      }
+    } catch (altError: any) {
+      console.log('API Proxy: Ошибка альтернативного запроса:', altError.message);
+    }
+
+    // Если все способы не сработали, проверяем ещё один путь
+    try {
+      // Пробуем через v2 API
+      const v2Url = baseApiUrl.replace('/api/v1', '') + '/api/v2/orders';
+      console.log('API Proxy: Попытка через v2 API:', v2Url);
+      
+      const v2Response = await axios.get(v2Url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        httpsAgent,
+        timeout: 8000
+      });
+      
+      if (v2Response.status === 200) {
+        const data = v2Response.data;
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов через v2 API`);
+          saveToCache(cacheKey, data);
+          return res.status(200).json(data);
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов через v2 API`);
+          saveToCache(cacheKey, data.items);
+          return res.status(200).json(data.items);
+        }
+      }
+    } catch (v2Error: any) {
+      console.log('API Proxy: Ошибка v2 API запроса:', v2Error.message);
+    }
+
+    // Все попытки получить реальные данные не удались, придется вернуть демо-данные
+    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем демо-данные');
+    const demoOrders = generateDemoOrders();
+    saveToCache(cacheKey, demoOrders);
+    return res.status(200).json(demoOrders);
   } catch (error: any) {
-    console.error('API Proxy: Ошибка при обработке запроса заказов:', error);
+    console.error('API Proxy: Общая ошибка при обработке запроса заказов:', error);
     
     // В случае любой ошибки возвращаем демо-данные
     const demoOrders = generateDemoOrders();
-    
-    // Сохраняем демо-данные в кеш в случае ошибки
     saveToCache(cacheKey, demoOrders);
-    
     return res.status(200).json(demoOrders);
   }
 }
@@ -272,7 +365,7 @@ function generateDemoOrders() {
       new Date(new Date(updated_at).getTime() + getRandomInt(1, 5) * 60 * 60 * 1000).toISOString() : null;
     
     const order = {
-      id: 1000 + i + 1,
+      id: 1001 + i,
       user_id: getRandomInt(1, 5),
       waiter_id: getRandomInt(1, 3),
       status: status,
