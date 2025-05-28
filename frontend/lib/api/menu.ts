@@ -1,15 +1,6 @@
 import { api } from './core';
 import type { Dish, Category } from '@/types';
 
-// Демо-данные для тестирования
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: 1, name: "Горячие блюда", image_url: "/images/categories/hot_dishes.jpg", position: 1 },
-  { id: 2, name: "Супы", image_url: "/images/categories/soups.jpg", position: 2 },
-  { id: 3, name: "Салаты", image_url: "/images/categories/salads.jpg", position: 3 },
-  { id: 4, name: "Десерты", image_url: "/images/categories/desserts.jpg", position: 4 },
-  { id: 5, name: "Напитки", image_url: "/images/categories/drinks.jpg", position: 5 }
-];
-
 // API функции для работы с меню и блюдами
 export const menuApi = {
   // Получение всех категорий
@@ -71,24 +62,8 @@ export const menuApi = {
         console.error('API: Ошибка при чтении кеша категорий:', cacheError);
       }
       
-      // Проверяем специальные ошибки
-      if (error.code === 'ERR_TOO_MANY_REDIRECTS' || error.message?.includes('Redirect')) {
-        console.warn('API: Обнаружена ошибка циклических редиректов, используем заглушки');
-        
-        // Сохраняем заглушки в кэш
-        try {
-          localStorage.setItem('cached_categories', JSON.stringify(FALLBACK_CATEGORIES));
-          localStorage.setItem('categories_cache_timestamp', Date.now().toString());
-        } catch (e) {
-          console.error('API: Не удалось сохранить заглушки в кэш:', e);
-        }
-        
-        return FALLBACK_CATEGORIES;
-      }
-      
-      // Если нет кэша и произошла ошибка, возвращаем заглушки
-      console.log('API: Возвращаем заглушки категорий');
-      return FALLBACK_CATEGORIES;
+      // Если не удалось получить данные ни откуда, бросаем ошибку
+      throw new Error('Не удалось получить категории. Пожалуйста, обновите страницу или обратитесь к администратору.');
     }
   },
   

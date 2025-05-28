@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { query, initDB } from '../../../lib/db';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const CACHE_FILE_PATH = path.join(process.cwd(), 'data', 'categories_cache.json');
@@ -57,14 +58,52 @@ const saveToCache = (categories: any) => {
   }
 };
 
-// Данные-заглушки для категорий
-const FALLBACK_CATEGORIES = [
-  { id: 1, name: "Горячие блюда", image_url: "/images/categories/hot_dishes.jpg" },
-  { id: 2, name: "Супы", image_url: "/images/categories/soups.jpg" },
-  { id: 3, name: "Салаты", image_url: "/images/categories/salads.jpg" },
-  { id: 4, name: "Десерты", image_url: "/images/categories/desserts.jpg" },
-  { id: 5, name: "Напитки", image_url: "/images/categories/drinks.jpg" }
-];
+// Получение категорий непосредственно из БД
+const getCategoriesFromDB = async () => {
+  try {
+    console.log('Попытка получить категории напрямую из БД...');
+    
+    // Убедимся, что соединение с БД инициализировано
+    await initDB();
+    
+    // Запрос категорий из БД
+    const sql = `
+      SELECT 
+        id, 
+        name, 
+        description, 
+        created_at, 
+        updated_at,
+        '' as image_url,  -- Добавляем пустое поле image_url
+        0 as position    -- Добавляем поле position со значением 0
+      FROM categories
+      ORDER BY id
+    `;
+    
+    const categories = await query(sql);
+    
+    if (!categories || !Array.isArray(categories)) {
+      console.error('Ошибка: результат запроса к БД не является массивом:', categories);
+      return [];
+    }
+    
+    console.log(`Получено ${categories.length} категорий из БД`);
+    
+    // Преобразуем данные в нужный формат
+    return categories.map((category, index) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description || '',
+      image_url: category.image_url || `/images/categories/default${(index % 5) + 1}.jpg`,
+      position: index + 1,
+      created_at: category.created_at,
+      updated_at: category.updated_at
+    }));
+  } catch (error) {
+    console.error('Ошибка при получении категорий из БД:', error);
+    return [];
+  }
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS заголовков
@@ -160,13 +199,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
     
-    // В случае ошибки возвращаем данные-заглушки
-    console.log('Возвращаем заглушки категорий из-за ошибки API');
+    // В случае ошибки пытаемся получить категории из БД
+    console.log('Пытаемся получить категории напрямую из БД');
+    const dbCategories = await getCategoriesFromDB();
     
-    // Сохраняем заглушки в кэш
-    saveToCache(FALLBACK_CATEGORIES);
+    if (dbCategories && dbCategories.length > 0) {
+      console.log(`Получено ${dbCategories.length} категорий из БД, возвращаем их`);
+      saveToCache(dbCategories);
+      return res.status(200).json(dbCategories);
+    }
     
-    // Возвращаем заглушки клиенту
-    return res.status(200).json(FALLBACK_CATEGORIES);
+    // Если не удалось получить данные ни откуда, возвращаем ошибку
+    console.error('Не удалось получить категории ни из API, ни из БД');
+    return res.status(500).json({ error: 'Не удалось получить категории' });
   }
 } 
