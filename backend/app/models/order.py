@@ -151,23 +151,3 @@ class Feedback(Base):
     user = relationship("User", back_populates="feedback")
     # Используем строковое имя с полным модулем
     dish = relationship("app.models.menu.Dish", back_populates="feedbacks")
-
-
-class Payment(Base):
-    __tablename__ = "payments"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    amount = Column(Float, nullable=False)
-    payment_method = Column(String(6), nullable=False)
-    status = Column(String(8), nullable=False, default="pending")
-    transaction_id = Column(String, nullable=True)
-    description = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, nullable=True)
-    
-    # Связи
-    order = relationship("Order", back_populates="payments")
-    
-    def __repr__(self):
-        return f"<Payment {self.id}: order={self.order_id}, amount={self.amount}, status={self.status}>"

@@ -22,4 +22,4 @@ class Payment(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Отношения
-    order = relationship("app.models.order.Order", back_populates="payments") 
+    order = relationship("Order", back_populates="payments") 
