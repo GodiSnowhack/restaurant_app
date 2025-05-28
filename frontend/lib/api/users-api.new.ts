@@ -1,6 +1,7 @@
 import { api, getAuthHeaders, getAuthTokenFromAllSources } from './core';
 import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
+import { getDefaultApiUrl } from '../../src/config/defaults';
 
 interface UserParams {
   role?: string;
@@ -33,11 +34,12 @@ const CACHE_TTL = 60000; // 1 минута
 
 // Создаем экземпляр axios для пользовательских запросов
 const usersAxios = axios.create({
-  baseURL: getSecureApiUrl(),
+  baseURL: getDefaultApiUrl(), // Используем полный URL до бэкенда вместо относительного пути
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
-  }
+  },
+  timeout: 10000 // 10 секунд таймаут
 });
 
 // Получение информации о пользователе из локального хранилища
@@ -203,19 +205,50 @@ export const usersApi = {
       try {
         console.log('Отправка запроса на получение пользователей...');
         
-        // Используем usersAxios для запроса
-        const response = await usersAxios.get(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
-        console.log('URL запроса:', response.config.url);
+        // Получаем полный URL до API пользователей
+        const apiUrl = `${getDefaultApiUrl()}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log('URL запроса:', apiUrl);
+        
+        // Используем axios напрямую с полным URL и явными заголовками авторизации
+        const response = await axios.get(apiUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          timeout: 10000,
+          maxRedirects: 0
+        });
+
+        console.log('Ответ от сервера:', {
+          status: response.status,
+          dataType: typeof response.data,
+          isArray: Array.isArray(response.data),
+          dataKeys: response.data && typeof response.data === 'object' ? Object.keys(response.data) : []
+        });
 
         if (!response.data) {
           console.error('Получен пустой ответ от сервера');
           return [];
         }
 
-        // Преобразуем данные в нужный формат
-        const users = Array.isArray(response.data) ? response.data : response.data.items || [];
+        // Преобразуем данные в нужный формат в зависимости от структуры ответа
+        let users: any[] = [];
+        
+        if (Array.isArray(response.data)) {
+          users = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          // Проверяем различные форматы вложенности данных в ответе
+          users = response.data.items || response.data.users || response.data.data || [];
+          if (!Array.isArray(users)) {
+            console.warn('Не удалось найти массив пользователей в ответе', response.data);
+            return [];
+          }
+        }
+        
         console.log(`Получено ${users.length} пользователей`);
         
+        // Форматируем данные пользователей в единый формат
         return users.map((user: any) => ({
           id: user.id,
           full_name: user.full_name || user.name || 'Без имени',
@@ -314,40 +347,99 @@ export const usersApi = {
   // Получение пользователя по ID
   async getUserById(userId: number): Promise<UserData> {
     try {
-      const response = await usersAxios.get(`/users/${userId}`);
-      return response.data;
+      const token = getAuthTokenFromAllSources();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const apiUrl = `${getDefaultApiUrl()}/users/${userId}`;
+      console.log(`Запрос пользователя по ID ${userId}, URL: ${apiUrl}`);
+      
+      const response = await axios.get(apiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 10000
+      });
+      
+      const userData = response.data;
+      console.log(`Получены данные пользователя #${userId}:`, userData);
+      
+      return {
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.full_name || userData.name || '',
+        phone: userData.phone || null,
+        role: userData.role || 'client',
+        is_active: userData.is_active ?? true,
+        created_at: userData.created_at || new Date().toISOString(),
+        updated_at: userData.updated_at || new Date().toISOString(),
+        birthday: userData.birthday || null,
+        age_group: userData.age_group || null,
+        orders_count: userData.orders_count || 0,
+        reservations_count: userData.reservations_count || 0
+      };
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${userId}:`, error);
       throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
     }
   },
 
-  // Обновление данных пользователя
+  // Обновление пользователя
   async updateUser(userId: number, userData: Partial<UserData>): Promise<UserData> {
     try {
-      console.log(`Обновление пользователя #${userId}:`, userData);
-      const response = await usersAxios.put(`/users/${userId}`, userData);
+      const token = getAuthTokenFromAllSources();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const apiUrl = `${getDefaultApiUrl()}/users/${userId}`;
+      console.log(`Обновление пользователя #${userId}, URL: ${apiUrl}`);
       
-      // Инвалидируем кэш после обновления
-      usersCache = null;
-      lastFetchTime = 0;
+      const response = await axios.put(apiUrl, userData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 10000
+      });
       
+      console.log(`Пользователь #${userId} успешно обновлен:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error(`Ошибка при обновлении пользователя #${userId}:`, error);
-      throw new Error(`Не удалось обновить данные пользователя: ${error.message}`);
+      throw new Error(`Не удалось обновить пользователя: ${error.message}`);
     }
   },
 
   // Удаление пользователя
   async deleteUser(userId: number): Promise<boolean> {
     try {
-      await usersAxios.delete(`/users/${userId}`);
+      const token = getAuthTokenFromAllSources();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const apiUrl = `${getDefaultApiUrl()}/users/${userId}`;
+      console.log(`Удаление пользователя #${userId}, URL: ${apiUrl}`);
+      
+      await axios.delete(apiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 10000
+      });
       
       // Инвалидируем кэш после удаления
       usersCache = null;
       lastFetchTime = 0;
       
+      console.log(`Пользователь #${userId} успешно удален`);
       return true;
     } catch (error: any) {
       console.error(`Ошибка при удалении пользователя #${userId}:`, error);
@@ -358,12 +450,28 @@ export const usersApi = {
   // Создание нового пользователя
   async createUser(userData: UserData): Promise<UserData> {
     try {
-      const response = await usersAxios.post('/users', userData);
+      const token = getAuthTokenFromAllSources();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const apiUrl = `${getDefaultApiUrl()}/users`;
+      console.log(`Создание нового пользователя, URL: ${apiUrl}`);
+      
+      const response = await axios.post(apiUrl, userData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 10000
+      });
       
       // Инвалидируем кэш после создания
       usersCache = null;
       lastFetchTime = 0;
       
+      console.log(`Новый пользователь успешно создан:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('Ошибка при создании пользователя:', error);
@@ -374,15 +482,28 @@ export const usersApi = {
   // Обновление статуса пользователя
   async toggleUserStatus(userId: number, isActive: boolean): Promise<UserData> {
     try {
-      console.log(`Обновление статуса пользователя ${userId} на ${isActive}`);
-      const response = await usersAxios.patch(`/users/${userId}/status`, {
-        is_active: isActive
+      const token = getAuthTokenFromAllSources();
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const apiUrl = `${getDefaultApiUrl()}/users/${userId}/status`;
+      console.log(`Обновление статуса пользователя ${userId} на ${isActive}, URL: ${apiUrl}`);
+      
+      const response = await axios.patch(apiUrl, { is_active: isActive }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 10000
       });
       
       // Инвалидируем кэш после обновления
       usersCache = null;
       lastFetchTime = 0;
       
+      console.log(`Статус пользователя #${userId} успешно обновлен:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('Ошибка при обновлении статуса пользователя:', error);

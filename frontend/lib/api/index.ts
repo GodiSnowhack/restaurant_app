@@ -7,7 +7,7 @@ import waiterApi from './waiter';
 import { settingsApi } from './settings';
 import { reservationsApi } from './reservations-api';
 import adminApi from './admin-api';
-import { usersApi, UserData } from './users-api';
+import { usersApi, UserData } from './users-api.new';
 import {
   LoginCredentials,
   RegisterCredentials,

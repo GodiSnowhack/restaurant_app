@@ -20,7 +20,7 @@ import {
 import {useTheme} from '../../lib/theme-context';
 
 // Импортируем API напрямую из файла API
-import { usersApi, UserData } from '../../lib/api/users-api';
+import { usersApi, UserData } from '../../lib/api/users-api.new';
 
 // Функция для отложенного запуска поиска
 const useDebounce = (value: any, delay: number) => {

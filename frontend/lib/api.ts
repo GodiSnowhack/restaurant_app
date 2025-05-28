@@ -6,7 +6,7 @@ import { ordersApi } from './api/orders';
 import adminApi from './api/admin-api';
 // Импортируем список публичных маршрутов
 import { PUBLIC_ROUTES } from '../pages/_app';
-import { usersApi } from './api/users-api';
+import { usersApi } from './api/users-api.new';
 import { getWaiterRating, getWaiterReviews } from './api/waiter-api';
 import { settingsApi } from '@/lib/api/settings-api';
 // Импортируем menuApi из правильного файла
@@ -1201,7 +1201,7 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   return options;
 };
 
-export {  usersApi,  settingsApi};
+export {  settingsApi};
 
 export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
   try {
