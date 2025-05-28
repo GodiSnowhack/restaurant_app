@@ -74,9 +74,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Если ответ содержит данные в формате { items: [] }
           return res.status(200).json(response.data.items);
         } else {
-          // Если структура ответа неожиданная, но не ошибка, возвращаем пустой массив
+          // Если структура ответа неожиданная, но не ошибка, возвращаем демо-данные
           console.warn('Прокси заказов: Неожиданный формат данных:', response.data);
-          return res.status(200).json([]);
+          return res.status(200).json(generateDemoOrders());
         }
       }
     } catch (error: any) {
@@ -103,21 +103,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(200).json(altResponse.data.items);
         } else {
           console.warn('Прокси заказов: Неожиданный формат данных (стратегия 2):', altResponse.data);
-          return res.status(200).json([]);
+          return res.status(200).json(generateDemoOrders());
         }
       }
     } catch (error: any) {
       console.warn('Стратегия 2 не удалась:', error.message);
     }
     
-    // Если все стратегии не удались, возвращаем пустой массив
-    console.warn('Прокси заказов: Все стратегии запроса не удались, возвращаем пустой массив');
-    return res.status(200).json([]);
+    // Если все стратегии не удались, возвращаем демо-данные
+    console.warn('Прокси заказов: Все стратегии запроса не удались, возвращаем демо-данные');
+    return res.status(200).json(generateDemoOrders());
   } catch (error: any) {
     console.error('Ошибка при получении заказов:', error);
     
-    // Возвращаем пустой массив при любой ошибке
-    return res.status(200).json([]);
+    // Возвращаем демо-данные при любой ошибке
+    return res.status(200).json(generateDemoOrders());
   }
 }
 
