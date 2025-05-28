@@ -2,13 +2,17 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ordersApi } from '../lib/api/orders';
 import { Order } from '../lib/api/types';
 
-// Интерфейс для контекста заказов
+// Расширенный интерфейс для контекста заказов
 interface OrdersContextType {
   orders: Order[];
   loading: boolean;
   error: string | null;
   fetchOrders: (startDate?: string, endDate?: string) => Promise<void>;
   fetchOrdersByStatus: (status: string, startDate?: string, endDate?: string) => Promise<void>;
+  getOrderById: (id: number) => Order | undefined;
+  refreshOrders: () => Promise<void>;
+  clearOrders: () => void;
+  lastUpdated: Date | null;
 }
 
 // Создаем контекст с дефолтными значениями
@@ -17,7 +21,11 @@ const OrdersContext = React.createContext<OrdersContextType>({
   loading: true,
   error: null,
   fetchOrders: async () => {},
-  fetchOrdersByStatus: async () => {}
+  fetchOrdersByStatus: async () => {},
+  getOrderById: () => undefined,
+  refreshOrders: async () => {},
+  clearOrders: () => {},
+  lastUpdated: null
 });
 
 // Функция для получения текущей даты в формате ISO
@@ -37,11 +45,25 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [currentDateRange, setCurrentDateRange] = useState({
+    startDate: getDefaultStartDate(),
+    endDate: getCurrentDate()
+  });
 
   // Функция для загрузки заказов
   const fetchOrders = useCallback(async (startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
+    
+    // Сохраняем текущий диапазон дат
+    const newStartDate = startDate || getDefaultStartDate();
+    const newEndDate = endDate || getCurrentDate();
+    
+    setCurrentDateRange({
+      startDate: newStartDate,
+      endDate: newEndDate
+    });
     
     // Принудительно отключаем демо-режим перед запросом
     try {
@@ -52,11 +74,40 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     
     try {
-      const orderData = await ordersApi.getOrders(
-        startDate || getDefaultStartDate(), 
-        endDate || getCurrentDate()
-      );
-      setOrders(orderData);
+      console.log(`OrdersContext: Загрузка заказов с ${newStartDate} по ${newEndDate}`);
+      const orderData = await ordersApi.getOrders(newStartDate, newEndDate);
+      
+      if (Array.isArray(orderData)) {
+        // Проверяем и нормализуем данные заказов
+        const normalizedOrders = orderData.map(order => ({
+          ...order,
+          // Убеждаемся, что важные поля имеют значения по умолчанию
+          id: order.id || 0,
+          status: order.status || 'pending',
+          payment_status: order.payment_status || 'pending',
+          payment_method: order.payment_method || 'card',
+          total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
+                       (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
+          created_at: order.created_at || new Date().toISOString(),
+          // Нормализуем массив товаров
+          items: Array.isArray(order.items) ? order.items.map(item => ({
+            dish_id: item.dish_id || 0,
+            quantity: item.quantity || 1,
+            price: typeof item.price === 'number' ? item.price : 
+                  (typeof item.price === 'string' ? parseFloat(item.price) : 0),
+            name: item.name || item.dish_name || 'Неизвестное блюдо',
+            special_instructions: item.special_instructions || ''
+          })) : []
+        }));
+        
+        console.log(`OrdersContext: Получено ${normalizedOrders.length} заказов`);
+        setOrders(normalizedOrders);
+        setLastUpdated(new Date());
+      } else {
+        console.warn('OrdersContext: Получены некорректные данные (не массив)');
+        setOrders([]);
+      }
+      
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке заказов');
@@ -72,14 +123,21 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setError(null);
     
     try {
+      console.log(`OrdersContext: Загрузка заказов со статусом "${status}"`);
       const orderData = await ordersApi.getOrders(
-        startDate || getDefaultStartDate(), 
-        endDate || getCurrentDate()
+        startDate || currentDateRange.startDate, 
+        endDate || currentDateRange.endDate
       );
       
-      // Фильтруем заказы по статусу
-      const filteredOrders = orderData.filter(order => order.status === status);
+      // Фильтруем заказы по статусу (учитываем верхний и нижний регистр)
+      const lowerStatus = status.toLowerCase();
+      const filteredOrders = orderData.filter(order => 
+        order.status?.toLowerCase() === lowerStatus
+      );
+      
+      console.log(`OrdersContext: Получено ${filteredOrders.length} заказов со статусом "${status}"`);
       setOrders(filteredOrders);
+      setLastUpdated(new Date());
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке заказов');
@@ -87,12 +145,39 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setLoading(false);
     }
+  }, [currentDateRange]);
+
+  // Функция для обновления текущих заказов
+  const refreshOrders = useCallback(async () => {
+    console.log('OrdersContext: Обновление списка заказов');
+    return fetchOrders(currentDateRange.startDate, currentDateRange.endDate);
+  }, [fetchOrders, currentDateRange]);
+
+  // Функция для очистки списка заказов
+  const clearOrders = useCallback(() => {
+    console.log('OrdersContext: Очистка списка заказов');
+    setOrders([]);
+    setLastUpdated(null);
   }, []);
+
+  // Функция для получения заказа по ID
+  const getOrderById = useCallback((id: number): Order | undefined => {
+    return orders.find(order => order.id === id);
+  }, [orders]);
 
   // Загружаем заказы при первом рендере
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+    
+    // Настраиваем автоматическое обновление каждые 2 минуты
+    const interval = setInterval(() => {
+      console.log('OrdersContext: Автоматическое обновление заказов');
+      refreshOrders();
+    }, 2 * 60 * 1000); // 2 минуты
+    
+    // Очищаем интервал при размонтировании компонента
+    return () => clearInterval(interval);
+  }, [fetchOrders, refreshOrders]);
 
   // Значение контекста
   const contextValue: OrdersContextType = {
@@ -100,7 +185,11 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     loading,
     error,
     fetchOrders,
-    fetchOrdersByStatus
+    fetchOrdersByStatus,
+    getOrderById,
+    refreshOrders,
+    clearOrders,
+    lastUpdated
   };
 
   return (

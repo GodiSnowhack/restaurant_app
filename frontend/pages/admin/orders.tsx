@@ -65,6 +65,23 @@ const AdminOrdersPage: NextPage = () => {
       setIsLoading(true);
       setError(null);
       
+      // Обрабатываем режим демо-данных
+      if (useDemoData) {
+        try {
+          localStorage.setItem('force_demo_data', 'true');
+          console.log('Включен режим демо-данных');
+        } catch (e) {
+          console.error('Ошибка при включении режима демо-данных:', e);
+        }
+      } else {
+        try {
+          localStorage.removeItem('force_demo_data');
+          console.log('Режим демо-данных отключен');
+        } catch (e) {
+          console.error('Ошибка при отключении режима демо-данных:', e);
+        }
+      }
+      
       // Подготавливаем параметры для API запроса с корректными названиями полей
       const params: any = {};
       
@@ -120,23 +137,100 @@ const AdminOrdersPage: NextPage = () => {
       
       console.log('Запрос заказов с параметрами:', params);
       
-      // Получаем заказы через API
-      const ordersData = await ordersApi.getOrders(
-        params.start_date,
-        params.end_date
-      );
+      // Получаем заказы через API с учетом потенциальных проблем с сетью
+      let ordersData;
+      
+      try {
+        // Первая попытка: основной метод получения заказов
+        ordersData = await ordersApi.getOrders(
+          params.start_date,
+          params.end_date
+        );
+      } catch (apiError) {
+        console.error('Первая попытка получения заказов не удалась:', apiError);
+        
+        // Вторая попытка: пробуем получить данные с другими настройками
+        try {
+          // Делаем явный запрос через fetch с большим таймаутом
+          const token = localStorage.getItem('token');
+          
+          if (!token) {
+            throw new Error('Отсутствует токен авторизации');
+          }
+          
+          const response = await fetch(`/api/orders?start_date=${encodeURIComponent(params.start_date)}&end_date=${encodeURIComponent(params.end_date)}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Ошибка HTTP: ${response.status}`);
+          }
+          
+          ordersData = await response.json();
+          console.log('Данные получены через альтернативный метод');
+        } catch (fetchError) {
+          console.error('Вторая попытка тоже не удалась:', fetchError);
+          
+          // Если обе попытки не удались, используем демо-данные
+          if (useDemoData) {
+            console.log('Использование демо-данных согласно настройкам');
+            
+            // Здесь мы не генерируем данные, а рассчитываем на то, что API-прокси вернет демо-данные
+            throw new Error('Не удалось получить данные. Используются демо-данные.');
+          } else {
+            throw new Error('Не удалось получить данные заказов. Пожалуйста, проверьте подключение к интернету и повторите попытку.');
+          }
+        }
+      }
+      
       console.log('Полученные заказы:', ordersData);
       
       if (Array.isArray(ordersData)) {
+        // Фильтруем заказы по статусу, если выбран конкретный статус
+        let filteredOrders = ordersData;
+        if (activeTab !== 'all') {
+          // Учитываем возможное разное написание статусов (верхний/нижний регистр)
+          const statusLower = activeTab.toLowerCase();
+          filteredOrders = ordersData.filter(order => 
+            order.status?.toLowerCase() === statusLower
+          );
+          
+          console.log(`Отфильтровано ${filteredOrders.length} заказов со статусом ${activeTab}`);
+        }
+        
         // Нормализуем данные заказов
-        const normalizedOrders = ordersData.map(order => ({
+        const normalizedOrders = filteredOrders.map(order => ({
           ...order,
+          // Убеждаемся, что важные поля имеют значения по умолчанию
+          id: order.id || 0,
+          status: order.status || 'pending',
+          payment_status: order.payment_status || 'pending',
+          payment_method: order.payment_method || 'card',
+          total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
+                       (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
           // Преобразуем строку в объект Date только если она существует
           created_at: order.created_at || new Date().toISOString(),
-          items: order.items.map(item => ({
+          updated_at: order.updated_at,
+          completed_at: order.completed_at,
+          customer_name: order.customer_name || '',
+          customer_phone: order.customer_phone || '',
+          // Нормализуем массив товаров
+          items: Array.isArray(order.items) ? order.items.map((item: any) => ({
             ...item,
-            total: item.quantity * item.price
-          }))
+            dish_id: item.dish_id || 0,
+            quantity: item.quantity || 1,
+            price: typeof item.price === 'number' ? item.price : 
+                  (typeof item.price === 'string' ? parseFloat(item.price) : 0),
+            name: item.name || item.dish_name || 'Неизвестное блюдо',
+            // Вычисляем полную стоимость позиции
+            total: (item.quantity || 1) * (typeof item.price === 'number' ? item.price : 
+                  (typeof item.price === 'string' ? parseFloat(item.price) : 0))
+          })) : []
         }));
         
         console.log('Нормализованные заказы:', normalizedOrders);

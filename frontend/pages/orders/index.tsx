@@ -49,43 +49,75 @@ const OrdersPage: NextPage = () => {
         console.error('Ошибка при отключении демо-режима:', e);
       }
       
+      // Определяем даты для запроса
+      const now = new Date();
+      // По умолчанию запрашиваем данные за последний месяц
+      const defaultStartDate = new Date(now);
+      defaultStartDate.setMonth(now.getMonth() - 1);
+      
+      // Используем установленные даты или значения по умолчанию
+      const startDateStr = dateRange.startDate ? dateRange.startDate.toISOString() : defaultStartDate.toISOString();
+      const endDateStr = dateRange.endDate ? dateRange.endDate.toISOString() : now.toISOString();
+      
+      console.log('Даты для запроса:', { startDate: startDateStr, endDate: endDateStr, now: now.toISOString() });
+      
       // Используем API клиент с обработкой ошибок
-      const data = await ordersApi.getOrders(
-        dateRange.startDate.toISOString(),
-        dateRange.endDate.toISOString()
-      );
+      const data = await ordersApi.getOrders(startDateStr, endDateStr);
       console.log('Полученные заказы:', data);
       
       // Проверяем полученные данные
       if (Array.isArray(data) && data.length > 0) {
-        // Проверяем и нормализуем данные заказов
-        const validOrders = data.map(order => ({
-          ...order,
-          // Убеждаемся, что важные поля имеют значения по умолчанию
+        // Нормализуем данные заказов для уверенности, что все поля имеют правильные значения
+        const normalizedOrders = data.map(order => ({
+          id: order.id || 0,
+          user_id: order.user_id,
+          waiter_id: order.waiter_id,
+          table_number: order.table_number,
           status: order.status || 'pending',
-          total_amount: order.total_amount ?? 0,
+          payment_status: order.payment_status || 'pending',
+          payment_method: order.payment_method || 'card',
+          order_type: order.order_type || 'dine-in',
+          total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
+                       (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
+          total_price: typeof order.total_price === 'number' ? order.total_price : 
+                      (typeof order.total_price === 'string' ? parseFloat(order.total_price) : 
+                      (typeof order.total_amount === 'number' ? order.total_amount : 0)),
+          created_at: order.created_at || new Date().toISOString(),
+          updated_at: order.updated_at,
+          completed_at: order.completed_at,
           customer_name: order.customer_name || '',
           customer_phone: order.customer_phone || '',
-          payment_status: order.payment_status || 'pending',
-          // Преобразуем items, чтобы они соответствовали типу OrderItem из types/index.ts
+          customer_email: order.customer_email || '',
+          delivery_address: order.delivery_address,
+          order_code: order.order_code,
+          reservation_code: order.reservation_code,
+          is_urgent: order.is_urgent || false,
+          is_group_order: order.is_group_order || false,
+          comment: order.comment || '',
+          // Преобразуем items, чтобы они соответствовали типу OrderItem
           items: Array.isArray(order.items) ? order.items.map(item => ({
-            dish_id: item.dish_id,
-            quantity: item.quantity,
-            price: item.price,
+            dish_id: item.dish_id || 0,
+            quantity: item.quantity || 1,
+            price: typeof item.price === 'number' ? item.price : 
+                  (typeof item.price === 'string' ? parseFloat(item.price) : 0),
             name: item.name || item.dish_name || 'Неизвестное блюдо',
-            dish_name: item.dish_name,
-            special_instructions: item.special_instructions
+            special_instructions: item.special_instructions || '',
+            total_price: typeof item.price === 'number' && typeof item.quantity === 'number' ? 
+                        item.price * item.quantity : 0
           })) : []
         }));
-        setOrders(validOrders);
+        
+        console.log('Нормализованные заказы:', normalizedOrders);
+        setOrders(normalizedOrders);
       } else {
-        console.log('Нет заказов или получен пустой массив');
+        // Если нет данных или ответ не является массивом
+        console.warn('Получен пустой массив заказов или некорректные данные');
         setOrders([]);
+        setError('Заказы не найдены. Попробуйте изменить параметры фильтрации.');
       }
-    } catch (error) {
-      console.error('Ошибка при загрузке заказов:', error);
-      setError('Не удалось загрузить список заказов. Пожалуйста, попробуйте позже.');
-      // Устанавливаем пустой массив, чтобы интерфейс корректно отображался
+    } catch (error: any) {
+      console.error('Ошибка при получении заказов:', error);
+      setError(error?.message || 'Произошла ошибка при загрузке заказов');
       setOrders([]);
     } finally {
       setIsLoading(false);
