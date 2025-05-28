@@ -122,7 +122,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (end_date) queryParams.append('end_date', end_date as string);
     
     // Формируем правильный URL конечной точки API
-    const url = `${baseApiUrl}/api/v1/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    // Проверяем, не содержит ли базовый URL уже путь /api/v1
+    const apiPath = baseApiUrl.includes('/api/v1') ? '/orders' : '/api/v1/orders';
+    const url = `${baseApiUrl}${apiPath}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
     console.log('API Proxy: Отправка запроса на', url);
 
@@ -211,7 +213,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Если все способы получения данных не сработали, используем прямое подключение к API
     try {
       // Пробуем другой endpoint для заказов
-      const alternativeUrl = `${baseApiUrl}/api/v1/admin/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const adminApiPath = baseApiUrl.includes('/api/v1') ? '/admin/orders' : '/api/v1/admin/orders';
+      const alternativeUrl = `${baseApiUrl}${adminApiPath}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('API Proxy: Попытка через альтернативный URL:', alternativeUrl);
       
       const altResponse = await axios.get(alternativeUrl, {
@@ -245,7 +248,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Если все способы не сработали, проверяем ещё один путь
     try {
       // Пробуем через v2 API
-      const v2Url = baseApiUrl.replace('/api/v1', '') + '/api/v2/orders';
+      // Заменяем /api/v1 на /api/v2 если есть, иначе добавляем /api/v2
+      const v2Url = baseApiUrl.includes('/api/v1') 
+        ? baseApiUrl.replace('/api/v1', '/api/v2') + '/orders' 
+        : baseApiUrl + '/api/v2/orders';
       console.log('API Proxy: Попытка через v2 API:', v2Url);
       
       const v2Response = await axios.get(v2Url, {
