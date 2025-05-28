@@ -106,9 +106,20 @@ const nextConfig = {
   },
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
-    // Пока не используем проксирование, так как бэкенд API отвечает с ошибкой 500
-    // Вместо этого мы используем наши локальные API обработчики для возврата данных
-    return [];
+    const apiBaseUrl = 'https://backend-production-1a78.up.railway.app';
+    
+    return [
+      // Общий путь API
+      {
+        source: '/api/:path*',
+        destination: `${apiBaseUrl}/api/:path*`,
+      },
+      // API v1
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiBaseUrl}/api/v1/:path*`
+      }
+    ];
   },
   // Переменные окружения, доступные на клиенте
   env: {

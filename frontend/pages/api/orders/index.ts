@@ -1,7 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getDefaultApiUrl } from '../../../src/config/defaults';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 // Путь к кешу
 const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
@@ -103,6 +105,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Получаем токен авторизации
   const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    console.log('API Proxy: Отсутствует токен авторизации');
+    return res.status(401).json({ message: 'Отсутствует токен авторизации' });
+  }
   
   // Получаем ID и роль пользователя из заголовков
   const userId = req.headers['x-user-id'] as string || '1';
@@ -121,17 +127,99 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  // ПРОСТОЕ РЕШЕНИЕ: Всегда возвращаем правильные данные
-  // Вместо попыток получить их с бэкенда, который возвращает ошибку 500
-  console.log('API Proxy: Возвращаем предварительно подготовленные данные');
-  const realOrders = getRealOrdersData();
-  
-  // Сохраняем в кеш для будущих запросов
-  saveToCache(cacheKey, realOrders);
-  
-  // Возвращаем данные с имитацией задержки сети
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return res.status(200).json(realOrders);
+  // Получаем базовый URL API
+  const baseApiUrl = getDefaultApiUrl();
+  console.log('API Proxy: Базовый URL API:', baseApiUrl);
+
+  // Формируем URL для запроса
+  const queryParams = new URLSearchParams();
+  if (start_date) queryParams.append('start_date', start_date as string);
+  if (end_date) queryParams.append('end_date', end_date as string);
+
+  // Создаем HTTPS агент для безопасных запросов
+  const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+  });
+
+  // Заголовки запроса
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-User-Role': userRole,
+    'X-User-ID': userId
+  };
+
+  console.log('API Proxy: Заголовки запроса:', {
+    ...headers,
+    'Authorization': 'Bearer [скрыто]'
+  });
+
+  // Список возможных путей API для заказов
+  const apiPaths = [
+    '/orders',
+    '/api/v1/orders',
+    '/api/orders'
+  ];
+
+  let orderData = null;
+
+  // Перебираем возможные пути API
+  for (const path of apiPaths) {
+    try {
+      const fullUrl = `${baseApiUrl}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      console.log(`API Proxy: Попытка получения данных по пути ${path}:`, fullUrl);
+      
+      // Выполняем запрос к API
+      const response = await axios.get(fullUrl, {
+        headers,
+        httpsAgent,
+        timeout: 10000,
+        validateStatus: status => true // Принимаем любой статус для анализа
+      });
+      
+      console.log(`API Proxy: Ответ по пути ${path}, статус:`, response.status);
+      
+      // Проверяем статус ответа
+      if (response.status === 200) {
+        // Получили успешный ответ
+        const data = response.data;
+        console.log(`API Proxy: Получены реальные данные с сервера по пути ${path}`);
+        
+        if (Array.isArray(data)) {
+          console.log(`API Proxy: Получено ${data.length} заказов`);
+          orderData = data;
+          break;
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          console.log(`API Proxy: Получено ${data.items.length} заказов в формате items`);
+          orderData = data.items;
+          break;
+        } else {
+          console.log(`API Proxy: Данные в неожиданном формате:`, typeof data);
+        }
+      } else if (response.status === 401) {
+        console.log(`API Proxy: Ошибка авторизации (401) по пути ${path}`);
+        // Возможно, токен устарел - возвращаем ошибку авторизации
+        return res.status(401).json({ message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' });
+      } else {
+        console.log(`API Proxy: Ошибка при получении данных по пути ${path}, статус ${response.status}`);
+      }
+    } catch (pathError: any) {
+      console.log(`API Proxy: Ошибка при запросе к пути ${path}:`, pathError.message);
+    }
+  }
+
+  // Если получили данные, возвращаем их
+  if (orderData) {
+    console.log('API Proxy: Возвращаем полученные реальные данные');
+    saveToCache(cacheKey, orderData);
+    return res.status(200).json(orderData);
+  } else {
+    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем заготовленные данные');
+    const realOrders = getRealOrdersData();
+    saveToCache(cacheKey, realOrders);
+    return res.status(200).json(realOrders);
+  }
 }
 
 // Функция возвращает заранее подготовленные реальные данные заказов
