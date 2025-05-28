@@ -105,10 +105,30 @@ const nextConfig = {
   },
   // Настройка перезаписи маршрутов для API прокси
   async rewrites() {
+    const apiBaseUrl = 'https://backend-production-1a78.up.railway.app';
+    
     return [
+      // Общий путь API
       {
         source: '/api/:path*',
-        destination: 'https://backend-production-1a78.up.railway.app/api/:path*'
+        destination: `${apiBaseUrl}/api/:path*`,
+      },
+      // API v1
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiBaseUrl}/api/v1/:path*`,
+        basePath: false,
+        locale: false
+      },
+      // Прямой путь к заказам
+      {
+        source: '/orders',
+        destination: `${apiBaseUrl}/api/v1/orders`,
+      },
+      // Прямой путь к заказам с параметрами
+      {
+        source: '/orders/:orderId',
+        destination: `${apiBaseUrl}/api/v1/orders/:orderId`,
       },
     ];
   },

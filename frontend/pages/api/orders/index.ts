@@ -111,6 +111,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Отсутствует токен авторизации' });
     }
 
+    // Получаем ID и роль пользователя из заголовков
+    const userId = req.headers['x-user-id'] as string || '1';
+    const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+
     // Логгируем параметры запроса
     console.log('API Proxy: Параметры запроса:', {
       start_date,
@@ -118,8 +122,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: req.query.status,
       user_id: req.query.user_id,
       headers: {
-        'x-user-role': req.headers['x-user-role'],
-        'x-user-id': req.headers['x-user-id']
+        'x-user-role': userRole,
+        'x-user-id': userId,
+        'authorization': token ? `Bearer ${token.substring(0, 10)}...` : undefined
       }
     });
 
@@ -149,21 +154,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const url = `${baseApiUrl}${apiPath}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     console.log(`API Proxy: Отправка запроса к: ${url}`);
 
+    // Попробуем альтернативный метод запроса - прямой запрос к серверу без префикса /api/v1
+    let directApiUrl = baseApiUrl.replace('/api/v1', '');
+    const directUrl = `${directApiUrl}/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    console.log(`API Proxy: Подготовлен альтернативный прямой запрос: ${directUrl}`);
+
     try {
       // Настройка HTTPS агента с отключенной проверкой сертификата
       const httpsAgent = new https.Agent({
         rejectUnauthorized: false
       });
 
-      // Используем axios для запроса
+      // Заголовки запроса
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-User-Role': userRole,
+        'X-User-ID': userId
+      };
+      
+      console.log('API Proxy: Заголовки запроса:', {
+        ...headers,
+        'Authorization': headers.Authorization ? 'Bearer [скрыто]' : undefined
+      });
+
+      // Попробуем сначала сделать запрос через fetch API
+      try {
+        console.log(`API Proxy: Пробуем запрос через fetch API к ${url}`);
+        const fetchResponse = await fetch(url, {
+          method: 'GET',
+          headers: headers,
+          cache: 'no-store'
+        });
+        
+        console.log(`API Proxy: Ответ fetch API: статус ${fetchResponse.status}`);
+        
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          if (Array.isArray(data)) {
+            console.log(`API Proxy: Получено ${data.length} заказов через fetch API`);
+            saveToCache(cacheKey, data);
+            return res.status(200).json(data);
+          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+            console.log(`API Proxy: Получено ${data.items.length} заказов через fetch API`);
+            saveToCache(cacheKey, data.items);
+            return res.status(200).json(data.items);
+          }
+        }
+      } catch (fetchError: any) {
+        console.log(`API Proxy: Ошибка при запросе через fetch API: ${fetchError.message}`);
+      }
+
+      // Если fetch не сработал, используем axios
+      console.log(`API Proxy: Пробуем запрос через axios к ${url}`);
       const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-User-Role': (req.headers['x-user-role'] as string || 'admin').toLowerCase(),
-          'X-User-ID': req.headers['x-user-id'] as string || '1'
-        },
+        headers,
         httpsAgent,
         timeout: 15000, // Увеличиваем таймаут до 15 секунд
         validateStatus: status => true // Принимаем любой статус для дополнительной обработки
@@ -215,7 +261,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         console.log('API Proxy: Ошибка при настройке запроса:', error.message);
       }
-      console.log('API Proxy: Конфигурация запроса:', error.config);
+      
+      // Если прямой запрос также не сработал, попробуем запрос через Next.js API с прямым перенаправлением
+      console.log('API Proxy: Пробуем запрос через Next.js API...');
+      try {
+        // Формируем URL для запроса через Next.js API (будет перенаправлен через rewrites)
+        const localApiUrl = '/orders';
+        const localApiParams = new URLSearchParams();
+        if (start_date) localApiParams.append('start_date', start_date as string);
+        if (end_date) localApiParams.append('end_date', end_date as string);
+        
+        const localUrl = `${localApiUrl}${localApiParams.toString() ? `?${localApiParams.toString()}` : ''}`;
+        console.log(`API Proxy: Запрос через Next.js API: ${localUrl}`);
+        
+        const localHeaders = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-Role': userRole,
+          'X-User-ID': userId
+        };
+        
+        // Используем fetch вместо axios для разнообразия методов
+        const localResponse = await fetch(localUrl, {
+          headers: localHeaders,
+          method: 'GET'
+        });
+        
+        console.log(`API Proxy: Ответ через Next.js API, статус ${localResponse.status}`);
+        
+        if (localResponse.ok) {
+          const data = await localResponse.json();
+          if (Array.isArray(data)) {
+            console.log(`API Proxy: Получено ${data.length} заказов через Next.js API`);
+            saveToCache(cacheKey, data);
+            return res.status(200).json(data);
+          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+            console.log(`API Proxy: Получено ${data.items.length} заказов через Next.js API`);
+            saveToCache(cacheKey, data.items);
+            return res.status(200).json(data.items);
+          }
+        }
+      } catch (localError: any) {
+        console.log(`API Proxy: Ошибка запроса через Next.js API: ${localError.message}`);
+      }
     }
 
     // Если запрос не удался, используем заранее заготовленные реальные данные
