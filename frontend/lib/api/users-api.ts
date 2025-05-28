@@ -119,10 +119,26 @@ class UsersAPI {
         if (value) queryParams.append(key, value.toString());
       });
 
-      const endpoint = `/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      // Используем прокси API для получения пользователей
+      const endpoint = `/api/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('Отправка запроса на получение пользователей:', endpoint);
 
-      const data = await this.request<UserData[]>(endpoint);
+      // Здесь используем fetch напрямую, так как endpoint уже содержит полный путь к прокси
+      const headers = await getAuthHeaders();
+      const response = await fetch(endpoint, {
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
+
+      const data = await response.json();
       
       if (!Array.isArray(data)) {
         console.warn('Получен неверный формат данных от сервера');
