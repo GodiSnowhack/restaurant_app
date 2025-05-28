@@ -9,7 +9,7 @@ from app.schemas.orders import OrderCreate, OrderOut, OrderResponse, OrderDetail
 from app.services.orders import create_order
 from app.models.user import User
 from app.database.session import get_db
-from app.core.auth import get_current_user, get_current_active_user
+from app.core.auth import get_current_user
 from app.crud import orders as orders_crud
 from app.models import Order, OrderDish, Dish
 
@@ -22,7 +22,7 @@ async def get_orders(
     status: Optional[str] = Query(None),
     user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Получить список заказов с фильтрацией по датам и другим параметрам.
@@ -131,7 +131,7 @@ async def get_orders(
 async def get_order(
     order_id: int = Path(..., title="ID заказа", ge=1),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Получить детальную информацию о конкретном заказе по его ID.
