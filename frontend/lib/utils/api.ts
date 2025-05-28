@@ -46,6 +46,22 @@ export const createApiUrl = (endpoint: string): string => {
     return '/api/settings';
   }
   
+  // Для аналитики
+  if (endpoint.startsWith('analytics/') || endpoint.startsWith('/analytics/')) {
+    const analyticsEndpoint = endpoint.replace(/^\/?(analytics\/)?/, '');
+    return `/api/analytics/${analyticsEndpoint}`;
+  }
+  
+  // Для прямых запросов к аналитике
+  if (endpoint === 'menu' || endpoint === '/menu' || 
+      endpoint === 'financial' || endpoint === '/financial' ||
+      endpoint === 'customers' || endpoint === '/customers' ||
+      endpoint === 'operational' || endpoint === '/operational' ||
+      endpoint === 'predictive' || endpoint === '/predictive' ||
+      endpoint === 'dashboard' || endpoint === '/dashboard') {
+    return `/api/analytics/${endpoint.replace(/^\//, '')}`;
+  }
+  
   // Для общего случая
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   return url;
