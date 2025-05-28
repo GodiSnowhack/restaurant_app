@@ -119,13 +119,14 @@ class UsersAPI {
         if (value) queryParams.append(key, value.toString());
       });
 
-      // Используем прокси API для получения пользователей
+      console.log('Запрос пользователей с параметрами:', params);
+      
+      // Формируем URL запроса
       const endpoint = `/api/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log('Отправка запроса на получение пользователей:', endpoint);
-
-      // Здесь используем fetch напрямую, так как endpoint уже содержит полный путь к прокси
+      
       const headers = await getAuthHeaders();
       const response = await fetch(endpoint, {
+        method: 'GET',
         headers: {
           ...headers,
           'Content-Type': 'application/json',
@@ -139,25 +140,26 @@ class UsersAPI {
       }
 
       const data = await response.json();
+      console.log('Получены данные пользователей:', data);
       
       if (!Array.isArray(data)) {
         console.warn('Получен неверный формат данных от сервера');
         return this.isDevMode ? DEMO_USERS : [];
       }
 
-      return data.map(user => ({
+      return data.map((user: any) => ({
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
-        phone: user.phone,
+        full_name: user.full_name || user.name || '',
+        phone: user.phone || null,
         role: user.role || 'client',
         is_active: user.is_active ?? true,
         created_at: user.created_at || new Date().toISOString(),
         updated_at: user.updated_at || new Date().toISOString(),
-        birthday: user.birthday,
-        age_group: user.age_group,
-        orders_count: user.orders_count,
-        reservations_count: user.reservations_count
+        birthday: user.birthday || null,
+        age_group: user.age_group || null,
+        orders_count: user.orders_count || 0,
+        reservations_count: user.reservations_count || 0
       }));
     } catch (error: any) {
       console.error('Ошибка при получении списка пользователей:', error);
@@ -171,19 +173,70 @@ class UsersAPI {
 
   async getUserById(id: number): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}`);
+      const endpoint = `/api/users/${id}`;
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
+
+      const user = await response.json();
+      
+      return {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || user.name || '',
+        phone: user.phone || null,
+        role: user.role || 'client',
+        is_active: user.is_active ?? true,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        birthday: user.birthday || null,
+        age_group: user.age_group || null,
+        orders_count: user.orders_count || 0,
+        reservations_count: user.reservations_count || 0
+      };
     } catch (error: any) {
       console.error(`Ошибка при получении пользователя #${id}:`, error);
+      if (this.isDevMode) {
+        const demoUser = DEMO_USERS.find(u => u.id === id) || DEMO_USERS[0];
+        return demoUser;
+      }
       throw new Error(`Не удалось получить данные пользователя: ${error.message}`);
     }
   }
 
   async createUser(data: Partial<UserData>): Promise<UserData> {
     try {
-      return await this.request<UserData>('/users', {
+      const endpoint = `/api/users`;
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify(data)
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data),
+        credentials: 'include'
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error: any) {
       console.error('Ошибка при создании пользователя:', error);
       throw new Error(`Не удалось создать пользователя: ${error.message}`);
@@ -192,10 +245,25 @@ class UsersAPI {
 
   async updateUser(id: number, data: Partial<UserData>): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}`, {
+      const endpoint = `/api/users/${id}`;
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(endpoint, {
         method: 'PUT',
-        body: JSON.stringify(data)
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data),
+        credentials: 'include'
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error: any) {
       console.error(`Ошибка при обновлении пользователя #${id}:`, error);
       throw new Error(`Не удалось обновить пользователя: ${error.message}`);
@@ -204,9 +272,22 @@ class UsersAPI {
 
   async deleteUser(id: number): Promise<void> {
     try {
-      await this.request(`/users/${id}`, {
-        method: 'DELETE'
+      const endpoint = `/api/users/${id}`;
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
     } catch (error: any) {
       console.error(`Ошибка при удалении пользователя #${id}:`, error);
       throw new Error(`Не удалось удалить пользователя: ${error.message}`);
@@ -215,10 +296,25 @@ class UsersAPI {
 
   async toggleUserStatus(id: number, isActive: boolean): Promise<UserData> {
     try {
-      return await this.request<UserData>(`/users/${id}/status`, {
+      const endpoint = `/api/users/${id}/status`;
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(endpoint, {
         method: 'PATCH',
-        body: JSON.stringify({ is_active: isActive })
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ is_active: isActive }),
+        credentials: 'include'
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ошибка: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error: any) {
       console.error(`Ошибка при изменении статуса пользователя #${id}:`, error);
       throw new Error(`Не удалось изменить статус пользователя: ${error.message}`);
