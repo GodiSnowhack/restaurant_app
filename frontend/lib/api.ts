@@ -1201,7 +1201,7 @@ export const getBaseApiOptions = (method: string, body?: any) => {
   return options;
 };
 
-export {  settingsApi};
+export { settingsApi, usersApi };
 
 export const getOrderReviewStatus = async (orderId: number): Promise<any> => {
   try {

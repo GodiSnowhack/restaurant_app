@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import useAuthStore from '../../../lib/auth-store';
 import {ArrowLeftIcon, UserIcon, EnvelopeIcon, PhoneIcon, LockClosedIcon, UserGroupIcon, CheckIcon as SaveIcon, XMarkIcon, TrashIcon, ArrowPathIcon as RefreshIcon} from '@heroicons/react/24/solid';
-import {usersApi} from '../../../lib/api';
+import {usersApi} from '../../../lib/api/users-api.new';
 
 // Типы ролей
 type Role = 'client' | 'admin' | 'waiter';
