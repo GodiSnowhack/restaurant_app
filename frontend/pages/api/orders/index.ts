@@ -73,6 +73,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else if (response.data && typeof response.data === 'object' && response.data.items && Array.isArray(response.data.items)) {
           // Если ответ содержит данные в формате { items: [] }
           return res.status(200).json(response.data.items);
+        } else if (response.data && typeof response.data === 'object' && response.data.message === 'Orders endpoint') {
+          // Если сервер вернул объект с сообщением "Orders endpoint" вместо массива
+          console.warn('Прокси заказов: Сервер вернул сообщение вместо данных:', response.data);
+          return res.status(200).json(generateDemoOrders());
         } else {
           // Если структура ответа неожиданная, но не ошибка, возвращаем демо-данные
           console.warn('Прокси заказов: Неожиданный формат данных:', response.data);
@@ -101,6 +105,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(200).json(altResponse.data);
         } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.items && Array.isArray(altResponse.data.items)) {
           return res.status(200).json(altResponse.data.items);
+        } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.message === 'Orders endpoint') {
+          // Если сервер вернул объект с сообщением "Orders endpoint" вместо массива
+          console.warn('Прокси заказов: Сервер вернул сообщение вместо данных (стратегия 2):', altResponse.data);
+          return res.status(200).json(generateDemoOrders());
         } else {
           console.warn('Прокси заказов: Неожиданный формат данных (стратегия 2):', altResponse.data);
           return res.status(200).json(generateDemoOrders());

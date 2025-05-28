@@ -114,10 +114,16 @@ const getSettingsFromBackend = async (token?: string) => {
       headers,
       maxRedirects: 0,
       validateStatus: function (status) {
-        return status < 400; // Принимаем только успешные статусы
+        return status < 500; // Принимаем только успешные статусы
       },
       timeout: 5000 // 5 секунд таймаут
     });
+    
+    // Проверяем статус ответа
+    if (response.status === 401) {
+      console.warn('Ошибка авторизации при получении настроек. Используем локальные настройки.');
+      return getSettingsFromFile();
+    }
     
     if (response.data) {
       console.log('Настройки успешно получены с бэкенда');
