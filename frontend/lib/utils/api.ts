@@ -26,6 +26,11 @@ export const createApiUrl = (endpoint: string): string => {
     return '/api/profile';
   }
   
+  // Для списка пользователей
+  if (endpoint === '/users' || endpoint.startsWith('/users?')) {
+    return '/api/users';
+  }
+  
   // Для категорий меню
   if (endpoint.includes('menu/categories')) {
     return '/api/menu/categories';
