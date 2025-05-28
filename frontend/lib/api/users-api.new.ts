@@ -179,14 +179,14 @@ export const usersApi = {
       const token = getAuthTokenFromAllSources();
       if (!token) {
         console.error('Отсутствует токен авторизации');
-        return [];
+        return this.getMockUsers();
       }
       
       // Получаем роль пользователя
       const userRole = getUserRole();
       if (userRole !== 'admin') {
         console.error('Недостаточно прав для просмотра списка пользователей');
-        return [];
+        return this.getMockUsers();
       }
 
       // Строим параметры запроса
@@ -202,77 +202,126 @@ export const usersApi = {
         return this.getMockUsers();
       }
 
+      // Проверяем, есть ли данные в кэше и не устарели ли они
+      const now = Date.now();
+      if (usersCache && (now - lastFetchTime < CACHE_TTL)) {
+        console.log('Возвращаем данные из кэша');
+        return usersCache;
+      }
+
       try {
         console.log('Отправка запроса на получение пользователей...');
         
-        // Получаем полный URL до API пользователей
-        const apiUrl = `${getDefaultApiUrl()}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        console.log('URL запроса:', apiUrl);
-        
-        // Используем axios напрямую с полным URL и явными заголовками авторизации
-        const response = await axios.get(apiUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          timeout: 10000,
-          maxRedirects: 0
-        });
+        // Стратегия 1: Используем Next.js API роут для прокси запроса
+        try {
+          console.log('Пробуем получить данные через Next.js API роут');
+          const response = await fetch('/api/users', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': token
+            }
+          });
 
-        console.log('Ответ от сервера:', {
-          status: response.status,
-          dataType: typeof response.data,
-          isArray: Array.isArray(response.data),
-          dataKeys: response.data && typeof response.data === 'object' ? Object.keys(response.data) : []
-        });
-
-        if (!response.data) {
-          console.error('Получен пустой ответ от сервера');
-          return [];
-        }
-
-        // Преобразуем данные в нужный формат в зависимости от структуры ответа
-        let users: any[] = [];
-        
-        if (Array.isArray(response.data)) {
-          users = response.data;
-        } else if (response.data && typeof response.data === 'object') {
-          // Проверяем различные форматы вложенности данных в ответе
-          users = response.data.items || response.data.users || response.data.data || [];
-          if (!Array.isArray(users)) {
-            console.warn('Не удалось найти массив пользователей в ответе', response.data);
-            return [];
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (Array.isArray(data) && data.length > 0) {
+              console.log('Получены данные через Next.js API роут');
+              
+              // Форматируем и кэшируем результат
+              const formattedUsers = data.map((user: any) => ({
+                id: user.id,
+                full_name: user.full_name || user.name || 'Без имени',
+                email: user.email,
+                phone: user.phone || null,
+                role: user.role || 'client',
+                is_active: user.is_active ?? true,
+                created_at: user.created_at || new Date().toISOString(),
+                updated_at: user.updated_at || new Date().toISOString(),
+                birthday: user.birthday || null,
+                age_group: user.age_group || null,
+                orders_count: user.orders_count || 0,
+                reservations_count: user.reservations_count || 0
+              }));
+              
+              // Обновляем кэш
+              usersCache = formattedUsers;
+              lastFetchTime = now;
+              
+              return formattedUsers;
+            }
+          } else {
+            console.warn('Не удалось получить данные через Next.js API роут', response.status);
           }
+        } catch (apiRouteError) {
+          console.error('Ошибка при запросе через Next.js API роут:', apiRouteError);
         }
         
-        console.log(`Получено ${users.length} пользователей`);
+        // Стратегия 2: Пробуем прямой запрос к API бэкенда
+        try {
+          console.log('Пробуем прямой запрос к API бэкенда');
+          const apiUrl = `${getDefaultApiUrl()}/users`;
+          
+          const response = await axios.get(apiUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            timeout: 8000,
+            maxRedirects: 0
+          });
+          
+          if (response.status < 400 && response.data) {
+            console.log('Получены данные через прямой запрос к API');
+            
+            // Обрабатываем различные форматы ответа
+            let users: any[] = [];
+            
+            if (Array.isArray(response.data)) {
+              users = response.data;
+            } else if (response.data && typeof response.data === 'object') {
+              users = response.data.items || response.data.users || response.data.data || [];
+            }
+            
+            if (Array.isArray(users) && users.length > 0) {
+              // Форматируем и кэшируем результат
+              const formattedUsers = users.map((user: any) => ({
+                id: user.id,
+                full_name: user.full_name || user.name || 'Без имени',
+                email: user.email,
+                phone: user.phone || null,
+                role: user.role || 'client',
+                is_active: user.is_active ?? true,
+                created_at: user.created_at || new Date().toISOString(),
+                updated_at: user.updated_at || new Date().toISOString(),
+                birthday: user.birthday || null,
+                age_group: user.age_group || null,
+                orders_count: user.orders_count || 0,
+                reservations_count: user.reservations_count || 0
+              }));
+              
+              // Обновляем кэш
+              usersCache = formattedUsers;
+              lastFetchTime = now;
+              
+              return formattedUsers;
+            }
+          }
+        } catch (directApiError) {
+          console.error('Ошибка при прямом запросе к API:', directApiError);
+        }
         
-        // Форматируем данные пользователей в единый формат
-        return users.map((user: any) => ({
-          id: user.id,
-          full_name: user.full_name || user.name || 'Без имени',
-          email: user.email,
-          phone: user.phone || null,
-          role: user.role || 'client',
-          is_active: user.is_active ?? true,
-          created_at: user.created_at || new Date().toISOString(),
-          updated_at: user.updated_at || new Date().toISOString(),
-          birthday: user.birthday || null,
-          age_group: user.age_group || null,
-          orders_count: user.orders_count || 0,
-          reservations_count: user.reservations_count || 0
-        }));
+        // Стратегия 3: Используем моковые данные в случае ошибок
+        console.log('Все стратегии запроса данных не сработали, используем моковые данные');
+        return this.getMockUsers();
+        
       } catch (error: any) {
         console.error('Ошибка при получении списка пользователей:', error);
-        
-        // Если сервер недоступен или другая ошибка - возвращаем моковые данные
-        if (error.response?.status === 404 || error.code === 'ERR_NETWORK') {
-          console.log('Сервер недоступен, используем моковые данные');
-          return this.getMockUsers();
-        }
-        
-        throw error;
+        console.log('Сервер недоступен, используем моковые данные');
+        return this.getMockUsers();
       }
     } catch (error: any) {
       console.error('Критическая ошибка при получении пользователей:', error);

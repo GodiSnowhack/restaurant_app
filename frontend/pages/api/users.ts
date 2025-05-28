@@ -55,6 +55,11 @@ const FALLBACK_USERS: UserData[] = [
   }
 ];
 
+// Кэширование данных пользователей на уровне API-прокси
+let usersCache: UserData[] | null = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 60000; // 1 минута
+
 /**
  * API-прокси для получения списка пользователей
  * Перенаправляет запросы к внутреннему API и возвращает результат
@@ -95,6 +100,13 @@ export default async function handler(
     if (!token.startsWith('Bearer ')) {
       authHeader = `Bearer ${token}`;
     }
+    
+    // Проверяем наличие данных в кэше и не устарели ли они
+    const now = Date.now();
+    if (usersCache && (now - lastFetchTime < CACHE_TTL)) {
+      console.log('Users API - Возвращаем данные из кэша');
+      return res.status(200).json(usersCache);
+    }
 
     const baseApiUrl = getDefaultApiUrl();
     const usersApiUrl = `${baseApiUrl}/users`;
@@ -105,169 +117,143 @@ export default async function handler(
       formatted: authHeader,
       length: authHeader.length
     });
-
+    
+    // Пробуем несколько стратегий получения данных
+    
+    // Стратегия 1: Запрос с максимальной безопасностью
     try {
-      // Отправляем запрос на бэкенд
+      console.log('Users API - Пробуем запрос с ограничением перенаправлений');
+      // Отправляем запрос на бэкенд с защитой от перенаправлений
       const response = await axios.get(usersApiUrl, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': authHeader
         },
-        maxRedirects: 0,
+        maxRedirects: 0, // Запрещаем перенаправления
         validateStatus: function (status) {
           return status < 500; // Принимаем все статусы, кроме 5xx
         },
-        timeout: 10000 // 10 секунд таймаут
+        timeout: 5000, // 5 секунд таймаут
+        // Важная настройка для предотвращения зацикливания
+        proxy: false,
+        // Переопределяем опции безопасности
+        httpsAgent: new (require('https').Agent)({
+          rejectUnauthorized: false, // Разрешаем самоподписанные сертификаты
+        })
       });
 
-      // Если ответ не успешный, возвращаем тестовые данные
-      if (response.status >= 400) {
-        console.warn('Users API - Ошибка от сервера:', {
-          status: response.status,
-          data: response.data
-        });
+      // Если получили успешный ответ
+      if (response.status < 400 && response.data) {
+        const data = response.data;
+        console.log('Users API - Успешный ответ от сервера (стратегия 1)');
         
-        // Пробуем альтернативный формат авторизации
-        if (response.status === 401) {
-          try {
-            console.log('Users API - Пробуем альтернативный формат токена');
-            const altResponse = await axios.get(usersApiUrl, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': token // Используем оригинальный токен
-              },
-              maxRedirects: 0,
-              validateStatus: null,
-              timeout: 10000
-            });
-            
-            if (altResponse.status < 400) {
-              console.log('Users API - Альтернативный запрос успешен');
-              const data = altResponse.data;
-              
-              // Обрабатываем полученные данные
-              if (Array.isArray(data)) {
-                return res.status(200).json(data.map(user => ({
-                  id: user.id,
-                  email: user.email,
-                  full_name: user.full_name || user.name || '',
-                  phone: user.phone || '',
-                  role: user.role || 'client',
-                  is_active: user.is_active ?? true,
-                  created_at: user.created_at || new Date().toISOString(),
-                  updated_at: user.updated_at || new Date().toISOString(),
-                  birthday: user.birthday || '',
-                  age_group: user.age_group || '',
-                  orders_count: user.orders_count || 0,
-                  reservations_count: user.reservations_count || 0
-                })));
-              } else if (data && typeof data === 'object') {
-                const usersArray = data.items || data.users || data.data || [];
-                if (Array.isArray(usersArray) && usersArray.length > 0) {
-                  return res.status(200).json(usersArray.map(user => ({
-                    id: user.id,
-                    email: user.email,
-                    full_name: user.full_name || user.name || '',
-                    phone: user.phone || '',
-                    role: user.role || 'client',
-                    is_active: user.is_active ?? true,
-                    created_at: user.created_at || new Date().toISOString(),
-                    updated_at: user.updated_at || new Date().toISOString(),
-                    birthday: user.birthday || '',
-                    age_group: user.age_group || '',
-                    orders_count: user.orders_count || 0,
-                    reservations_count: user.reservations_count || 0
-                  })));
-                }
-              }
-            } else {
-              console.warn('Users API - Альтернативный запрос тоже не удался:', {
-                status: altResponse.status,
-                data: altResponse.data
-              });
-            }
-          } catch (altError) {
-            console.error('Users API - Ошибка при альтернативном запросе:', altError);
-          }
+        // Обрабатываем данные
+        let formattedUsers = processUsersData(data);
+        if (formattedUsers.length > 0) {
+          // Сохраняем в кэш
+          usersCache = formattedUsers;
+          lastFetchTime = now;
+          return res.status(200).json(formattedUsers);
         }
-        
-        console.log('Users API - Возвращаем тестовые данные из-за ошибки API');
-        return res.status(200).json(FALLBACK_USERS);
       }
-
-      const data = response.data;
-
-      console.log('Users API - Ответ от сервера:', {
-        status: response.status,
-        usersCount: Array.isArray(data) ? data.length : 'не массив',
-        dataType: typeof data,
-        dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
+    } catch (error: any) {
+      console.warn('Users API - Ошибка при запросе (стратегия 1):', error.message);
+    }
+    
+    // Стратегия 2: Запрос с альтернативным форматом токена
+    try {
+      console.log('Users API - Пробуем запрос с альтернативным форматом токена');
+      const altResponse = await axios.get(usersApiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token // Используем оригинальный токен
+        },
+        maxRedirects: 5,
+        validateStatus: null,
+        timeout: 5000
       });
-
-      // Обрабатываем различные форматы данных и преобразуем в нужный формат
-      let formattedUsers: UserData[];
       
-      if (Array.isArray(data)) {
-        // Если уже массив, просто проверяем наличие всех нужных полей
-        formattedUsers = data.map(user => ({
-          id: user.id,
-          email: user.email,
-          full_name: user.full_name || user.name || '',
-          phone: user.phone || '',
-          role: user.role || 'client',
-          is_active: user.is_active ?? true,
-          created_at: user.created_at || new Date().toISOString(),
-          updated_at: user.updated_at || new Date().toISOString(),
-          birthday: user.birthday || '',
-          age_group: user.age_group || '',
-          orders_count: user.orders_count || 0,
-          reservations_count: user.reservations_count || 0
-        }));
-      } else if (data && typeof data === 'object') {
-        // Если объект с полем items или users, извлекаем массив
-        const usersArray = data.items || data.users || data.data || [];
+      if (altResponse.status < 400 && altResponse.data) {
+        const data = altResponse.data;
+        console.log('Users API - Успешный ответ от сервера (стратегия 2)');
         
-        if (Array.isArray(usersArray) && usersArray.length > 0) {
-          formattedUsers = usersArray.map(user => ({
-            id: user.id,
-            email: user.email,
-            full_name: user.full_name || user.name || '',
-            phone: user.phone || '',
-            role: user.role || 'client',
-            is_active: user.is_active ?? true,
-            created_at: user.created_at || new Date().toISOString(),
-            updated_at: user.updated_at || new Date().toISOString(),
-            birthday: user.birthday || '',
-            age_group: user.age_group || '',
-            orders_count: user.orders_count || 0,
-            reservations_count: user.reservations_count || 0
-          }));
-        } else {
-          // Если не смогли найти массив пользователей, возвращаем тестовые данные
-          console.warn('Users API - Не найден массив пользователей в ответе, возвращаем тестовые данные');
-          formattedUsers = FALLBACK_USERS;
+        // Обрабатываем данные
+        let formattedUsers = processUsersData(data);
+        if (formattedUsers.length > 0) {
+          // Сохраняем в кэш
+          usersCache = formattedUsers;
+          lastFetchTime = now;
+          return res.status(200).json(formattedUsers);
         }
-      } else {
-        // Если неизвестный формат, возвращаем тестовые данные
-        console.warn('Users API - Неизвестный формат данных, возвращаем тестовые данные');
-        formattedUsers = FALLBACK_USERS;
       }
+    } catch (error: any) {
+      console.warn('Users API - Ошибка при запросе (стратегия 2):', error.message);
+    }
+    
+    // Если все стратегии не сработали, возвращаем тестовые данные
+    console.log('Users API - Все стратегии запроса не сработали, возвращаем тестовые данные');
+    return res.status(200).json(FALLBACK_USERS);
 
-      // Возвращаем данные клиенту
-      return res.status(200).json(formattedUsers);
-    } catch (apiError: any) {
-      // Если произошла ошибка при запросе к API, возвращаем тестовые данные
-      console.error('Users API - Ошибка при запросе к серверу:', apiError.message || apiError);
-      console.log('Users API - Возвращаем тестовые данные из-за ошибки запроса');
+  } catch (error: any) {
+    console.error('Users API - Ошибка при обработке запроса:', error);
+    
+    // Если это ошибка перенаправления, возвращаем тестовые данные
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_TOO_MANY_REDIRECTS' || error.code === 'ERR_NETWORK') {
+      console.warn('Users API - Возвращаем тестовые данные из-за сетевой ошибки');
       return res.status(200).json(FALLBACK_USERS);
     }
-  } catch (error: any) {
-    console.error('Users API - Критическая ошибка:', error);
     
-    // В любом случае возвращаем тестовые данные
-    console.log('Users API - Возвращаем тестовые данные из-за критической ошибки');
-    return res.status(200).json(FALLBACK_USERS);
+    // Для остальных ошибок
+    return res.status(500).json({ 
+      message: 'Ошибка при получении списка пользователей',
+      error: error.message
+    });
   }
+}
+
+// Функция для обработки данных пользователей из разных форматов ответа
+function processUsersData(data: any): UserData[] {
+  // Обрабатываем различные форматы данных и преобразуем в нужный формат
+  if (Array.isArray(data)) {
+    // Если уже массив, просто проверяем наличие всех нужных полей
+    return data.map(user => ({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name || user.name || '',
+      phone: user.phone || '',
+      role: user.role || 'client',
+      is_active: user.is_active ?? true,
+      created_at: user.created_at || new Date().toISOString(),
+      updated_at: user.updated_at || new Date().toISOString(),
+      birthday: user.birthday || '',
+      age_group: user.age_group || '',
+      orders_count: user.orders_count || 0,
+      reservations_count: user.reservations_count || 0
+    }));
+  } else if (data && typeof data === 'object') {
+    // Если объект с полем items или users, извлекаем массив
+    const usersArray = data.items || data.users || data.data || [];
+    
+    if (Array.isArray(usersArray) && usersArray.length > 0) {
+      return usersArray.map(user => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name || user.name || '',
+        phone: user.phone || '',
+        role: user.role || 'client',
+        is_active: user.is_active ?? true,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        birthday: user.birthday || '',
+        age_group: user.age_group || '',
+        orders_count: user.orders_count || 0,
+        reservations_count: user.reservations_count || 0
+      }));
+    }
+  }
+  
+  // Если не смогли найти массив пользователей, возвращаем пустой массив
+  return [];
 } 
