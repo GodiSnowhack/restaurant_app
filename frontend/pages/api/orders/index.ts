@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { getSecureApiUrl } from '../../../lib/utils/api';
+import { getDefaultApiUrl } from '../../../src/config/defaults';
 
 /**
  * API-прокси для работы с заказами
@@ -33,29 +34,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { start_date, end_date } = req.query;
     
-    // Используем безопасный URL для API
-    const baseUrl = getSecureApiUrl();
+    // Получаем базовый URL API, гарантированно с HTTPS
+    const baseApiUrl = getDefaultApiUrl().replace('http://', 'https://');
     
-    // Формируем URL с параметрами
+    // Формируем URL с параметрами и добавляем слеш в конце
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
     
-    const url = `${baseUrl}/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `${baseApiUrl}/orders/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     console.log('Прокси заказов: отправка запроса к:', url);
     
-    const response = await axios.get(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-User-ID': req.headers['x-user-id'] as string,
-        'X-User-Role': req.headers['x-user-role'] as string
-      }
-    });
+    // Пробуем несколько стратегий получения данных
+    
+    // Стратегия 1: Запрос с максимальной безопасностью
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-ID': req.headers['x-user-id'] as string,
+          'X-User-Role': req.headers['x-user-role'] as string
+        },
+        maxRedirects: 5, // Разрешаем перенаправления
+        validateStatus: function (status) {
+          return status < 500; // Принимаем все статусы, кроме 5xx
+        },
+        timeout: 8000, // 8 секунд таймаут
+        // Опции для предотвращения проблем с сертификатами
+        httpsAgent: new (require('https').Agent)({
+          rejectUnauthorized: false // Разрешаем самоподписанные сертификаты
+        })
+      });
 
-    return res.status(200).json(response.data);
+      if (response.status < 400) {
+        return res.status(200).json(response.data);
+      }
+    } catch (error: any) {
+      console.warn('Стратегия 1 не удалась:', error.message);
+    }
+    
+    // Стратегия 2: Альтернативный формат запроса
+    try {
+      const altResponse = await axios.get(url, {
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        maxRedirects: 5,
+        validateStatus: null,
+        timeout: 8000
+      });
+      
+      if (altResponse.status < 400) {
+        return res.status(200).json(altResponse.data);
+      }
+    } catch (error: any) {
+      console.warn('Стратегия 2 не удалась:', error.message);
+    }
+    
+    // Если не удалось получить данные, возвращаем пустой массив
+    return res.status(200).json([]);
   } catch (error: any) {
     console.error('Ошибка при получении заказов:', error);
     

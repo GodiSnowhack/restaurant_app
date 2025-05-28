@@ -14,16 +14,39 @@ export const ordersApi = {
       if (!token) {
         throw new Error('Отсутствует токен авторизации');
       }
-
-      // Используем axios instance с базовым URL
-      const response = await api.get(`/orders`, {
-        params: {
-          start_date: startDate,
-          end_date: endDate
+      
+      // Используем локальный API-прокси для избежания проблем с CORS и Mixed Content
+      try {
+        const response = await fetch(`/api/orders?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка HTTP: ${response.status}`);
         }
-      });
-
-      return response.data;
+        
+        const data = await response.json();
+        console.log('API: Получены данные заказов через прокси:', { count: data.length });
+        return data;
+      } catch (proxyError) {
+        console.error('API: Ошибка при запросе через API-прокси:', proxyError);
+        
+        // Пробуем запрос через axios api instance как запасной вариант
+        const response = await api.get(`/orders/`, {
+          params: {
+            start_date: startDate,
+            end_date: endDate
+          }
+        });
+        
+        console.log('API: Получены данные заказов через api:', { count: response.data.length });
+        return response.data;
+      }
     } catch (error: any) {
       console.error('API: Ошибка при получении заказов:', error);
 

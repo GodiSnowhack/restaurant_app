@@ -4,14 +4,14 @@ import { getSecureApiUrl } from '../utils/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1', // Используем переменную окружения
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1', // Всегда используем HTTPS
   timeout: 30000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
   },
   withCredentials: true,
-  maxRedirects: 0, // Отключаем автоматические редиректы, чтобы избежать ERR_TOO_MANY_REDIRECTS
+  maxRedirects: 5, // Разрешаем ограниченное количество перенаправлений
   validateStatus: function (status) {
     return status < 400; // Принимаем только успешные статусы
   }
