@@ -76,196 +76,156 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).end();
   }
 
-  // Проверка метода запроса
-  if (req.method !== 'GET') {
-    return res.status(405).json({
-      success: false,
-      message: 'Метод не поддерживается'
-    });
-  }
-
-  // Получаем параметры запроса
-  const { start_date, end_date } = req.query;
-  
-  // Ключ для кеширования
-  const cacheKey = `orders_${start_date}_${end_date}`;
-  
-  // Проверяем наличие данных в кеше
-  const cachedData = getFromCache(cacheKey);
-  if (cachedData) {
-    console.log('API Proxy: Данные заказов получены из кеша');
-    return res.status(200).json(cachedData);
-  }
-
-  // Вывод информации о конфигурации окружения
-  console.log('API Proxy: Переменные окружения:', {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NODE_ENV: process.env.NODE_ENV
-  });
-
-  // Получаем токен авторизации
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    console.log('API Proxy: Отсутствует токен авторизации');
-    return res.status(401).json({ message: 'Отсутствует токен авторизации' });
-  }
-  
-  // Получаем ID и роль пользователя из заголовков
-  const userId = req.headers['x-user-id'] as string || '1';
-  const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
-
-  // Логгируем параметры запроса
-  console.log('API Proxy: Параметры запроса:', {
-    start_date,
-    end_date,
-    status: req.query.status,
-    user_id: req.query.user_id,
-    headers: {
-      'x-user-role': userRole,
-      'x-user-id': userId,
-      'authorization': token ? `Bearer ${token.substring(0, 10)}...` : undefined
-    }
-  });
-
-  // Получаем базовый URL API
-  const baseApiUrl = getDefaultApiUrl();
-  console.log('API Proxy: Базовый URL API:', baseApiUrl);
-
-  // Получаем прямой URL API для заказов
-  const ordersApiUrl = getOrdersApiUrl();
-  console.log('API Proxy: URL API заказов:', ordersApiUrl);
-
-  // Убираем /api/v1 из базового URL, чтобы избежать дублирования
-  let cleanBaseUrl = baseApiUrl;
-  if (cleanBaseUrl.endsWith('/api/v1')) {
-    cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - 7);
-  }
-  console.log('API Proxy: Очищенный базовый URL API:', cleanBaseUrl);
-
-  // Формируем URL для запроса
-  const queryParams = new URLSearchParams();
-  if (start_date) queryParams.append('start_date', start_date as string);
-  if (end_date) queryParams.append('end_date', end_date as string);
-
-  // Создаем HTTPS агент для безопасных запросов
-  const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
-  });
-
-  // Заголовки запроса
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'X-User-Role': userRole,
-    'X-User-ID': userId
-  };
-
-  console.log('API Proxy: Заголовки запроса:', {
-    ...headers,
-    'Authorization': 'Bearer [скрыто]'
-  });
-
-  // Сначала пробуем прямой запрос к API заказов
-  let orderData = null;
-
   try {
-    const directOrdersUrl = `${ordersApiUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    console.log('API Proxy: Прямой запрос к API заказов:', directOrdersUrl);
+    // Получаем параметры запроса
+    const { start_date, end_date, status, user_id } = req.query;
     
-    const directOrdersResponse = await axios.get(directOrdersUrl, {
-      headers,
-      httpsAgent,
-      timeout: 15000,
-      validateStatus: status => true
-    });
+    // Ключ для кеширования
+    const cacheKey = `orders_${start_date}_${end_date}_${status || 'all'}_${user_id || 'all'}`;
     
-    console.log('API Proxy: Ответ прямого запроса к API заказов, статус:', directOrdersResponse.status);
-    
-    if (directOrdersResponse.status === 200) {
-      const directOrdersData = directOrdersResponse.data;
-      
-      if (Array.isArray(directOrdersData)) {
-        console.log(`API Proxy: Получено ${directOrdersData.length} заказов через прямой запрос к API заказов`);
-        orderData = directOrdersData;
-      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.items && Array.isArray(directOrdersData.items)) {
-        console.log(`API Proxy: Получено ${directOrdersData.items.length} заказов в формате items через прямой запрос к API заказов`);
-        orderData = directOrdersData.items;
-      } else if (directOrdersData && typeof directOrdersData === 'object' && directOrdersData.status === 'success' && directOrdersData.data && Array.isArray(directOrdersData.data)) {
-        console.log(`API Proxy: Получено ${directOrdersData.data.length} заказов в формате data.data через прямой запрос к API заказов`);
-        orderData = directOrdersData.data;
-      }
+    // Проверяем наличие данных в кеше
+    const cachedData = getFromCache(cacheKey);
+    if (cachedData) {
+      console.log('API Proxy: Данные заказов получены из кеша');
+      return res.status(200).json(cachedData);
     }
-  } catch (directOrdersError: any) {
-    console.log('API Proxy: Ошибка при прямом запросе к API заказов:', directOrdersError.message);
-  }
 
-  // Если прямой запрос не сработал, пробуем другие пути
-  if (!orderData) {
-    console.log('API Proxy: Прямой запрос не удался, пробуем альтернативные пути');
+    // Получаем токен авторизации
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      console.log('API Proxy: Отсутствует токен авторизации');
+      return res.status(401).json({ message: 'Отсутствует токен авторизации' });
+    }
     
+    // Получаем ID и роль пользователя из заголовков
+    const userId = req.headers['x-user-id'] as string || '1';
+    const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+
+    // Формируем параметры запроса
+    const queryParams = new URLSearchParams();
+    if (start_date) queryParams.append('start_date', start_date as string);
+    if (end_date) queryParams.append('end_date', end_date as string);
+    if (status) queryParams.append('status', status as string);
+    if (user_id) queryParams.append('user_id', user_id as string);
+    
+    // Заголовки запроса
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-User-Role': userRole,
+      'X-User-ID': userId
+    };
+
+    // HTTPS агент для безопасных запросов
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
+
+    // Определяем базовый URL API
+    const baseApiUrl = getDefaultApiUrl();
+    console.log('API Proxy: Базовый URL API:', baseApiUrl);
+
+    // Получаем прямой URL API для заказов
+    const ordersApiUrl = getOrdersApiUrl();
+    console.log('API Proxy: URL API заказов:', ordersApiUrl);
+
+    // Очищаем baseApiUrl от возможного двойного /api/v1
+    let cleanBaseUrl = baseApiUrl;
+    if (cleanBaseUrl.endsWith('/api/v1')) {
+      cleanBaseUrl = cleanBaseUrl.substring(0, cleanBaseUrl.length - 7);
+    }
+    console.log('API Proxy: Очищенный базовый URL API:', cleanBaseUrl);
+
     // Список возможных путей API для заказов
-    const apiPaths = [
-      '/api/v1/orders',
-      '/orders',
-      '/api/orders',
-      '/api/v1/admin/orders',
-      '/api/admin/orders'
+    const apiEndpoints = [
+      { url: `${ordersApiUrl}`, description: 'прямой URL заказов' },
+      { url: `${cleanBaseUrl}/api/v1/orders`, description: 'основной API путь' },
+      { url: `${cleanBaseUrl}/orders`, description: 'короткий путь' },
+      { url: `${cleanBaseUrl}/api/orders`, description: 'альтернативный API путь' }
     ];
 
-    // Перебираем возможные пути API
-    for (const path of apiPaths) {
+    // Пробуем все API эндпоинты последовательно
+    let orderData = null;
+    let error = null;
+
+    for (const endpoint of apiEndpoints) {
       try {
-        const fullUrl = `${cleanBaseUrl}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-        console.log(`API Proxy: Попытка получения данных по пути ${path}:`, fullUrl);
+        const fullUrl = `${endpoint.url}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log(`API Proxy: Пробуем ${endpoint.description}:`, fullUrl);
         
         const response = await axios.get(fullUrl, {
           headers,
           httpsAgent,
-          timeout: 15000,
-          validateStatus: status => true
+          timeout: 15000 // 15 секунд таймаут
         });
         
-        console.log(`API Proxy: Ответ по пути ${path}, статус:`, response.status);
+        console.log(`API Proxy: Ответ от ${endpoint.description}, статус:`, response.status);
         
         if (response.status === 200) {
-          const data = response.data;
-          
-          if (Array.isArray(data)) {
-            console.log(`API Proxy: Получено ${data.length} заказов по пути ${path}`);
-            orderData = data;
+          if (Array.isArray(response.data)) {
+            console.log(`API Proxy: Получено ${response.data.length} заказов от ${endpoint.description}`);
+            orderData = response.data;
             break;
-          } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-            console.log(`API Proxy: Получено ${data.items.length} заказов в формате items по пути ${path}`);
-            orderData = data.items;
-            break;
-          } else if (data && typeof data === 'object' && data.status === 'success' && data.data && Array.isArray(data.data)) {
-            console.log(`API Proxy: Получено ${data.data.length} заказов в формате data.data по пути ${path}`);
-            orderData = data.data;
-            break;
+          } else if (response.data && typeof response.data === 'object') {
+            if (response.data.items && Array.isArray(response.data.items)) {
+              console.log(`API Proxy: Получено ${response.data.items.length} заказов в формате items от ${endpoint.description}`);
+              orderData = response.data.items;
+              break;
+            } else if (response.data.data && Array.isArray(response.data.data)) {
+              console.log(`API Proxy: Получено ${response.data.data.length} заказов в формате data от ${endpoint.description}`);
+              orderData = response.data.data;
+              break;
+            } else {
+              console.log(`API Proxy: Неожиданный формат данных от ${endpoint.description}:`, 
+                JSON.stringify(response.data).substring(0, 200) + '...');
+            }
+          }
+        } else if (response.status === 401) {
+          console.log(`API Proxy: Ошибка авторизации (401) от ${endpoint.description}`);
+          error = { status: 401, message: 'Ошибка авторизации. Пожалуйста, войдите в систему заново.' };
+        } else {
+          console.log(`API Proxy: Ошибка от ${endpoint.description}, статус ${response.status}`);
+          if (!error) {
+            error = { status: response.status, message: `Ошибка при получении данных: ${response.status}` };
           }
         }
-      } catch (pathError: any) {
-        console.log(`API Proxy: Ошибка при запросе к пути ${path}:`, pathError.message);
+      } catch (endpointError: any) {
+        console.log(`API Proxy: Ошибка при запросе к ${endpoint.description}:`, endpointError.message);
+        if (!error) {
+          error = { status: 500, message: `Ошибка при запросе: ${endpointError.message}` };
+        }
       }
     }
-  }
 
-  // Если получили данные, возвращаем их
-  if (orderData) {
-    console.log('API Proxy: Возвращаем полученные реальные данные');
-    saveToCache(cacheKey, orderData);
-    return res.status(200).json(orderData);
-  } else {
-    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем заготовленные данные');
-    const realOrders = getRealOrdersData();
-    saveToCache(cacheKey, realOrders);
-    return res.status(200).json(realOrders);
+    // Если получили данные, возвращаем их
+    if (orderData) {
+      console.log('API Proxy: Возвращаем полученные реальные данные');
+      saveToCache(cacheKey, orderData);
+      return res.status(200).json(orderData);
+    }
+
+    // Если есть ошибка авторизации, возвращаем соответствующий статус
+    if (error && error.status === 401) {
+      return res.status(401).json({ message: error.message });
+    }
+
+    // Если все попытки не удались, возвращаем тестовые данные
+    console.log('API Proxy: Все попытки получить реальные данные не удались, возвращаем тестовые данные');
+    const testOrders = getTestOrdersData();
+    saveToCache(cacheKey, testOrders);
+    return res.status(200).json(testOrders);
+  } catch (error) {
+    console.error('API Proxy: Непредвиденная ошибка:', error);
+    return res.status(500).json({ 
+      message: 'Внутренняя ошибка сервера', 
+      error: error instanceof Error ? error.message : String(error) 
+    });
   }
 }
 
-// Функция возвращает заранее подготовленные реальные данные заказов
-function getRealOrdersData() {
+// Функция для получения тестовых данных о заказах
+function getTestOrdersData() {
   return [
     {
       id: 1, 
@@ -582,110 +542,4 @@ function getRealOrdersData() {
       is_urgent: true
     }
   ];
-}
-
-// Функция для генерации демо-данных заказов с улучшенной логикой (оставлена как запасной вариант)
-function generateDemoOrders() {
-  const now = new Date();
-  
-  // Генерируем дату в прошлом со случайным смещением (до 10 дней назад)
-  const getRandomPastDate = () => {
-    const date = new Date(now);
-    const randomDaysBack = Math.floor(Math.random() * 10) + 1;
-    date.setDate(date.getDate() - randomDaysBack);
-    return date.toISOString();
-  };
-  
-  // Генерируем случайное число в заданном диапазоне
-  const getRandomInt = (min: number, max: number) => {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  };
-  
-  // Список демо-блюд
-  const dishes = [
-    { id: 1, name: 'Стейк из говядины', price: 1200 },
-    { id: 2, name: 'Паста Карбонара', price: 1100 },
-    { id: 3, name: 'Сёмга на гриле', price: 1500 },
-    { id: 4, name: 'Салат Цезарь', price: 650 },
-    { id: 5, name: 'Стейк Рибай', price: 2500 },
-    { id: 6, name: 'Тирамису', price: 900 },
-    { id: 7, name: 'Вино красное (бокал)', price: 800 },
-    { id: 8, name: 'Пицца Маргарита', price: 1800 },
-    { id: 9, name: 'Суши-сет Филадельфия', price: 1300 },
-    { id: 10, name: 'Бургер с говядиной', price: 1200 }
-  ];
-  
-  // Список возможных статусов заказа
-  const orderStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
-  const paymentStatuses = ['pending', 'paid', 'refunded', 'failed'];
-  const paymentMethods = ['card', 'cash', 'online'];
-  const orderTypes = ['dine-in', 'delivery', 'pickup'];
-  
-  // Генерируем случайные товары для заказа
-  const generateOrderItems = () => {
-    const itemCount = getRandomInt(1, 5);
-    const items = [];
-    
-    for (let i = 0; i < itemCount; i++) {
-      const dish = dishes[getRandomInt(0, dishes.length - 1)];
-      const quantity = getRandomInt(1, 3);
-      
-      items.push({
-        dish_id: dish.id,
-        quantity: quantity,
-        price: dish.price,
-        name: dish.name,
-        total_price: dish.price * quantity
-      });
-    }
-    
-    return items;
-  };
-  
-  // Генерируем демо-заказы
-  const orderCount = getRandomInt(5, 10);
-  const orders = [];
-  
-  for (let i = 0; i < orderCount; i++) {
-    const items = generateOrderItems();
-    const total_amount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const order_type = orderTypes[getRandomInt(0, orderTypes.length - 1)];
-    const status = orderStatuses[getRandomInt(0, orderStatuses.length - 1)];
-    const payment_status = paymentStatuses[getRandomInt(0, paymentStatuses.length - 1)];
-    const payment_method = paymentMethods[getRandomInt(0, paymentMethods.length - 1)];
-    
-    const created_at = getRandomPastDate();
-    const updated_at = new Date(new Date(created_at).getTime() + getRandomInt(1, 24) * 60 * 60 * 1000).toISOString();
-    const completed_at = status === 'completed' ? 
-      new Date(new Date(updated_at).getTime() + getRandomInt(1, 5) * 60 * 60 * 1000).toISOString() : null;
-    
-    const order = {
-      id: 1001 + i,
-      user_id: getRandomInt(1, 5),
-      waiter_id: getRandomInt(1, 3),
-      status: status,
-      payment_status: payment_status,
-      payment_method: payment_method,
-      order_type: order_type,
-      total_amount: total_amount,
-      total_price: total_amount,
-      created_at: created_at,
-      updated_at: updated_at,
-      completed_at: completed_at,
-      items: items,
-      table_number: order_type === 'dine-in' ? getRandomInt(1, 10) : null,
-      customer_name: ['Александр Иванов', 'Елена Петрова', 'Дмитрий Сидоров', 'Андрей Кузнецов', 'Наталья Смирнова'][getRandomInt(0, 4)],
-      customer_phone: `+7 (${getRandomInt(900, 999)}) ${getRandomInt(100, 999)}-${getRandomInt(10, 99)}-${getRandomInt(10, 99)}`,
-      delivery_address: order_type === 'delivery' ? 'ул. Абая 44, кв. 12' : null,
-      is_urgent: Math.random() < 0.2, // 20% шанс, что заказ срочный
-      is_group_order: Math.random() < 0.1, // 10% шанс, что заказ групповой
-      order_code: `ORD-${getRandomInt(1000, 9999)}`,
-      comment: Math.random() < 0.3 ? 'Комментарий к заказу' : null
-    };
-    
-    orders.push(order);
-  }
-  
-  console.log(`API Proxy: Сгенерировано ${orders.length} демо-заказов`);
-  return orders;
 } 
