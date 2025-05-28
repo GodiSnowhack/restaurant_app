@@ -141,6 +141,36 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as ExtendedAxiosRequestConfig;
     
+    // Проверяем, является ли ошибка связанной с CORS
+    const isCorsError = error.message?.includes('CORS') || 
+                        error.message?.includes('cross-origin') ||
+                        error.code === 'ERR_NETWORK' && error.message?.includes('blocked');
+    
+    if (isCorsError) {
+      console.warn('[API] Обнаружена CORS ошибка:', error.message);
+      console.log('[API] Перенаправляем запрос через локальный API-прокси');
+      
+      // Если URL начинается с внешнего API, попробуем заменить его на локальный прокси
+      if (config?.url && config.url.includes('/api/v1/')) {
+        const localProxyUrl = config.url.replace('/api/v1/', '/api/');
+        console.log(`[API] Перенаправление запроса с ${config.url} на локальный прокси ${localProxyUrl}`);
+        
+        try {
+          // Попытка сделать запрос через локальный прокси
+          return axios({
+            ...config,
+            url: localProxyUrl,
+            headers: {
+              ...config.headers,
+              'X-Original-URL': config.url
+            }
+          });
+        } catch (proxyError) {
+          console.error('[API] Ошибка при использовании локального прокси:', proxyError);
+        }
+      }
+    }
+    
     // Проверяем, является ли ошибка связанной с сетью
     const isNetworkError = error.message?.includes('Network Error') || 
                            error.code === 'ERR_NETWORK' ||

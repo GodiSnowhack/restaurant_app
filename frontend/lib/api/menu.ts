@@ -1,5 +1,6 @@
 import { api } from './core';
 import type { Dish, Category } from '@/types';
+import axios from 'axios';
 
 // API функции для работы с меню и блюдами
 export const menuApi = {
@@ -25,10 +26,10 @@ export const menuApi = {
         console.error('API: Ошибка при проверке кэша категорий:', cacheError);
       }
       
-      // Настраиваем запрос с отключенными редиректами
-      const response = await api.get('/menu/categories', {
+      // Используем локальный API-маршрут вместо прямого обращения к бэкенду
+      // Это решает проблему CORS, т.к. запрос идет к тому же домену
+      const response = await axios.get('/api/menu/categories', {
         timeout: 10000,
-        maxRedirects: 0,
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'

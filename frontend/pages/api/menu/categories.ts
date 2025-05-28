@@ -4,9 +4,56 @@ import fs from 'fs';
 import path from 'path';
 import { query, initDB } from '../../../lib/db';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
 const CACHE_FILE_PATH = path.join(process.cwd(), 'data', 'categories_cache.json');
 const CACHE_DURATION = 3600000; // 1 час в миллисекундах
+
+// Получение категорий непосредственно из БД
+const getCategoriesFromDB = async () => {
+  try {
+    console.log('Попытка получить категории напрямую из БД...');
+    
+    // Убедимся, что соединение с БД инициализировано
+    await initDB();
+    
+    // Запрос категорий из БД
+    const sql = `
+      SELECT 
+        id, 
+        name, 
+        description, 
+        created_at, 
+        updated_at,
+        '' as image_url,
+        0 as position
+      FROM categories
+      ORDER BY id
+    `;
+    
+    const categories = await query(sql);
+    
+    if (!categories || !Array.isArray(categories)) {
+      console.error('Ошибка: результат запроса к БД не является массивом:', categories);
+      return [];
+    }
+    
+    console.log(`Получено ${categories.length} категорий из БД`);
+    
+    // Преобразуем данные в нужный формат
+    return categories.map((category, index) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description || '',
+      image_url: category.image_url || `/images/categories/default${(index % 5) + 1}.jpg`,
+      position: index + 1,
+      created_at: category.created_at,
+      updated_at: category.updated_at
+    }));
+  } catch (error) {
+    console.error('Ошибка при получении категорий из БД:', error);
+    return [];
+  }
+};
 
 // Убедимся, что директория существует
 const ensureDirectoryExists = (filePath: string) => {
@@ -58,55 +105,8 @@ const saveToCache = (categories: any) => {
   }
 };
 
-// Получение категорий непосредственно из БД
-const getCategoriesFromDB = async () => {
-  try {
-    console.log('Попытка получить категории напрямую из БД...');
-    
-    // Убедимся, что соединение с БД инициализировано
-    await initDB();
-    
-    // Запрос категорий из БД
-    const sql = `
-      SELECT 
-        id, 
-        name, 
-        description, 
-        created_at, 
-        updated_at,
-        '' as image_url,  -- Добавляем пустое поле image_url
-        0 as position    -- Добавляем поле position со значением 0
-      FROM categories
-      ORDER BY id
-    `;
-    
-    const categories = await query(sql);
-    
-    if (!categories || !Array.isArray(categories)) {
-      console.error('Ошибка: результат запроса к БД не является массивом:', categories);
-      return [];
-    }
-    
-    console.log(`Получено ${categories.length} категорий из БД`);
-    
-    // Преобразуем данные в нужный формат
-    return categories.map((category, index) => ({
-      id: category.id,
-      name: category.name,
-      description: category.description || '',
-      image_url: category.image_url || `/images/categories/default${(index % 5) + 1}.jpg`,
-      position: index + 1,
-      created_at: category.created_at,
-      updated_at: category.updated_at
-    }));
-  } catch (error) {
-    console.error('Ошибка при получении категорий из БД:', error);
-    return [];
-  }
-};
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Настройка CORS заголовков
+  // Настройка CORS заголовков - разрешаем любому источнику
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,DELETE');
@@ -117,20 +117,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Обработка предварительных запросов CORS
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  // Проверяем наличие данных в кэше
+  // Сначала пробуем получить данные из локальной БД
+  console.log('Пытаемся получить категории из локальной БД');
+  const dbCategories = await getCategoriesFromDB();
+  
+  if (dbCategories && dbCategories.length > 0) {
+    console.log(`Получено ${dbCategories.length} категорий из локальной БД, возвращаем их`);
+    saveToCache(dbCategories);
+    return res.status(200).json(dbCategories);
+  }
+
+  // Если в БД нет данных, проверяем наличие данных в кэше
   const cachedCategories = getCachedData();
   if (cachedCategories) {
     console.log('Возвращаем категории из кэша');
     return res.status(200).json(cachedCategories);
   }
 
+  // Как последний вариант, пытаемся получить данные с удаленного API
   try {
     // Получаем токен из заголовков запроса
     const token = req.headers.authorization;
@@ -139,12 +151,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const headers: Record<string, string> = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'Origin': 'https://frontend-production-8eb6.up.railway.app'
     };
 
     if (token) {
       headers['Authorization'] = token;
     }
 
+    console.log('Пытаемся получить категории с удаленного API:', API_BASE_URL);
+    
     // Делаем запрос к бэкенду с отключенными редиректами
     const response = await axios.get(`${API_BASE_URL}/menu/categories`, { 
       headers,
@@ -161,56 +176,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Возвращаем данные клиенту
     return res.status(200).json(response.data);
   } catch (error: any) {
-    console.error('Error fetching categories:', error);
+    console.error('Error fetching categories from remote API:', error.message);
     
-    // Специальная обработка для ошибки циклических редиректов
-    if (error.code === 'ERR_TOO_MANY_REDIRECTS' || error.message?.includes('Redirect')) {
-      console.log('Обнаружена ошибка циклических редиректов, пытаемся выполнить прямой запрос');
-      
-      try {
-        // Настраиваем базовые заголовки для прямого запроса
-        const directHeaders: Record<string, string> = {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        };
-
-        // Добавляем токен авторизации, если он был в исходном запросе
-        if (req.headers.authorization) {
-          directHeaders['Authorization'] = req.headers.authorization as string;
-        }
-        
-        // Пробуем выполнить запрос с другими настройками
-        const directResponse = await axios.get(`${API_BASE_URL}/menu/categories`, {
-          headers: directHeaders,
-          maxRedirects: 0,
-          validateStatus: null, // Принимаем любые статусы
-          timeout: 5000
-        });
-        
-        if (directResponse.data) {
-          console.log('Прямой запрос успешен, возвращаем данные');
-          saveToCache(directResponse.data);
-          return res.status(200).json(directResponse.data);
-        }
-      } catch (directError) {
-        console.error('Прямой запрос также завершился с ошибкой:', directError);
-      }
-    }
-    
-    // В случае ошибки пытаемся получить категории из БД
-    console.log('Пытаемся получить категории напрямую из БД');
-    const dbCategories = await getCategoriesFromDB();
-    
-    if (dbCategories && dbCategories.length > 0) {
-      console.log(`Получено ${dbCategories.length} категорий из БД, возвращаем их`);
-      saveToCache(dbCategories);
-      return res.status(200).json(dbCategories);
-    }
-    
-    // Если не удалось получить данные ни откуда, возвращаем ошибку
-    console.error('Не удалось получить категории ни из API, ни из БД');
-    return res.status(500).json({ error: 'Не удалось получить категории' });
+    // Если нет данных ни в БД, ни в кэше, ни на удаленном API, возвращаем ошибку
+    return res.status(500).json({ 
+      error: 'Не удалось получить категории ни из одного источника',
+      message: error.message
+    });
   }
 } 
