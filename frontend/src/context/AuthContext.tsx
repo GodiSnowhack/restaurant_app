@@ -1,3 +1,5 @@
+import React from 'react';
+
 // Функция инициализации состояния авторизации
 const initializeAuth = async () => {
   console.log('AuthStore: Начало инициализации');
@@ -10,4 +12,6 @@ const initializeAuth = async () => {
   }
   
   // ... existing code ...
-} 
+}
+
+export { initializeAuth }; 
