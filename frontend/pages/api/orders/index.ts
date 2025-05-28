@@ -101,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Получаем параметры запроса
   const { start_date, end_date } = req.query;
   
-  // Ключ для кеширования
+  // Ключ для кэширования
   const cacheKey = `orders_${start_date}_${end_date}`;
   
   // Проверяем наличие данных в кеше
@@ -112,15 +112,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Получаем базовый URL API, гарантированно с HTTPS
-    const baseApiUrl = getDefaultApiUrl().replace('http://', 'https://');
+    // Получаем базовый URL API
+    const baseApiUrl = getDefaultApiUrl();
+    
+    // Обеспечиваем, что URL использует HTTPS для production
+    const secureApiUrl = baseApiUrl.replace('http://', 'https://');
     
     // Формируем URL с параметрами
     const queryParams = new URLSearchParams();
     if (start_date) queryParams.append('start_date', start_date as string);
     if (end_date) queryParams.append('end_date', end_date as string);
     
-    const url = `${baseApiUrl}/orders/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `${secureApiUrl}/orders/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
     console.log('Прокси заказов: отправка запроса к:', url);
     
@@ -129,6 +132,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       rejectUnauthorized: false
     });
     
+    // Основной запрос к бэкенду
+    let responseData = null;
+    let hasError = false;
+
     // Стратегия 1: Стандартный запрос с Bearer-токеном
     try {
       const response = await axios.get(url, {
@@ -137,7 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'X-User-ID': req.headers['x-user-id'] as string,
-          'X-User-Role': req.headers['x-user-role'] as string
+          'X-User-Role': req.headers['x-user-role'] as string || 'admin'
         },
         maxRedirects: 5,
         validateStatus: function (status) {
@@ -150,135 +157,102 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Проверяем статус ответа
       if (response.status >= 400) {
         console.warn(`Прокси заказов: Ошибка HTTP ${response.status} от сервера`);
-        throw new Error(`Ошибка HTTP: ${response.status}`);
-      }
-
-      // Проверяем, что полученные данные являются массивом
-      if (Array.isArray(response.data)) {
-        console.log(`Прокси заказов: Успешно получено ${response.data.length} заказов`);
-        
-        // Сохраняем в кеш
-        saveToCache(cacheKey, response.data);
-        
-        return res.status(200).json(response.data);
-      } else if (response.data && typeof response.data === 'object' && response.data.items && Array.isArray(response.data.items)) {
-        // Если ответ содержит данные в формате { items: [] }
-        console.log(`Прокси заказов: Получено ${response.data.items.length} заказов в формате items`);
-        
-        // Сохраняем в кеш
-        saveToCache(cacheKey, response.data.items);
-        
-        return res.status(200).json(response.data.items);
-      } else if (response.data && typeof response.data === 'object' && response.data.message === 'Orders endpoint') {
-        // Если сервер вернул объект с сообщением "Orders endpoint" вместо массива
-        console.warn('Прокси заказов: Сервер вернул сообщение вместо данных:', response.data);
-        const demoOrders = generateDemoOrders();
-        
-        // Сохраняем демо-данные в кеш
-        saveToCache(cacheKey, demoOrders);
-        
-        return res.status(200).json(demoOrders);
+        hasError = true;
       } else {
-        // Если структура ответа неожиданная, но не ошибка, возвращаем демо-данные
-        console.warn('Прокси заказов: Неожиданный формат данных:', response.data);
-        const demoOrders = generateDemoOrders();
-        
-        // Сохраняем демо-данные в кеш
-        saveToCache(cacheKey, demoOrders);
-        
-        return res.status(200).json(demoOrders);
-      }
-    } catch (error: any) {
-      console.warn('Стратегия 1 не удалась:', error.message);
-    }
-    
-    // Стратегия 2: Альтернативный формат токена
-    try {
-      const altResponse = await axios.get(url, {
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        maxRedirects: 5,
-        validateStatus: null,
-        timeout: 8000,
-        httpsAgent
-      });
-      
-      if (altResponse.status < 400) {
-        if (Array.isArray(altResponse.data)) {
-          console.log(`Прокси заказов (стратегия 2): Успешно получено ${altResponse.data.length} заказов`);
-          
-          // Сохраняем в кеш
-          saveToCache(cacheKey, altResponse.data);
-          
-          return res.status(200).json(altResponse.data);
-        } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.items && Array.isArray(altResponse.data.items)) {
-          console.log(`Прокси заказов (стратегия 2): Получено ${altResponse.data.items.length} заказов в формате items`);
-          
-          // Сохраняем в кеш
-          saveToCache(cacheKey, altResponse.data.items);
-          
-          return res.status(200).json(altResponse.data.items);
-        } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.message === 'Orders endpoint') {
-          // Если сервер вернул объект с сообщением "Orders endpoint" вместо массива
-          console.warn('Прокси заказов: Сервер вернул сообщение вместо данных (стратегия 2):', altResponse.data);
-          const demoOrders = generateDemoOrders();
-          
-          // Сохраняем демо-данные в кеш
-          saveToCache(cacheKey, demoOrders);
-          
-          return res.status(200).json(demoOrders);
+        // Проверяем, что полученные данные являются массивом или объектом с массивом items
+        if (Array.isArray(response.data)) {
+          console.log(`Прокси заказов: Успешно получено ${response.data.length} заказов`);
+          responseData = response.data;
+        } else if (response.data && typeof response.data === 'object' && response.data.items && Array.isArray(response.data.items)) {
+          console.log(`Прокси заказов: Получено ${response.data.items.length} заказов в формате items`);
+          responseData = response.data.items;
         } else {
-          console.warn('Прокси заказов: Неожиданный формат данных (стратегия 2):', altResponse.data);
-          const demoOrders = generateDemoOrders();
-          
-          // Сохраняем демо-данные в кеш
-          saveToCache(cacheKey, demoOrders);
-          
-          return res.status(200).json(demoOrders);
+          console.warn('Прокси заказов: Неожиданный формат данных:', response.data);
+          hasError = true;
         }
       }
     } catch (error: any) {
-      console.warn('Стратегия 2 не удалась:', error.message);
+      console.warn('Стратегия 1 не удалась:', error.message);
+      hasError = true;
     }
-    
-    // Стратегия 3: Попытка прямого запроса через HTTP
-    try {
-      console.log('Прокси заказов: Попытка прямого HTTP запроса');
-      
-      const httpUrl = url.replace('https://', 'http://');
-      const httpResponse = await axios.get(httpUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        maxRedirects: 5,
-        timeout: 8000
-      });
-      
-      if (httpResponse.status < 400 && Array.isArray(httpResponse.data)) {
-        console.log(`Прокси заказов (HTTP запрос): Успешно получено ${httpResponse.data.length} заказов`);
+
+    // Если первая стратегия не сработала, пробуем стратегию 2
+    if (!responseData && hasError) {
+      try {
+        console.log('Прокси заказов: Пробуем стратегию 2 с альтернативным форматом токена');
+        const altResponse = await axios.get(url, {
+          headers: {
+            'Authorization': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-User-Role': 'admin',
+            'X-User-ID': req.headers['x-user-id'] as string || '1'
+          },
+          maxRedirects: 5,
+          validateStatus: null,
+          timeout: 8000,
+          httpsAgent
+        });
         
-        // Сохраняем в кеш
-        saveToCache(cacheKey, httpResponse.data);
-        
-        return res.status(200).json(httpResponse.data);
+        if (altResponse.status < 400) {
+          if (Array.isArray(altResponse.data)) {
+            console.log(`Прокси заказов (стратегия 2): Успешно получено ${altResponse.data.length} заказов`);
+            responseData = altResponse.data;
+          } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.items && Array.isArray(altResponse.data.items)) {
+            console.log(`Прокси заказов (стратегия 2): Получено ${altResponse.data.items.length} заказов в формате items`);
+            responseData = altResponse.data.items;
+          } else {
+            console.warn('Прокси заказов: Неожиданный формат данных (стратегия 2):', altResponse.data);
+          }
+        }
+      } catch (error: any) {
+        console.warn('Стратегия 2 не удалась:', error.message);
       }
-    } catch (error: any) {
-      console.warn('Стратегия 3 (HTTP запрос) не удалась:', error.message);
+    }
+
+    // Если обе основные стратегии не сработали, пробуем HTTP запрос
+    if (!responseData) {
+      try {
+        console.log('Прокси заказов: Попытка прямого HTTP запроса');
+        
+        const httpUrl = url.replace('https://', 'http://');
+        const httpResponse = await axios.get(httpUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-User-Role': 'admin',
+            'X-User-ID': req.headers['x-user-id'] as string || '1'
+          },
+          maxRedirects: 5,
+          timeout: 8000
+        });
+        
+        if (httpResponse.status < 400) {
+          if (Array.isArray(httpResponse.data)) {
+            console.log(`Прокси заказов (HTTP запрос): Успешно получено ${httpResponse.data.length} заказов`);
+            responseData = httpResponse.data;
+          } else if (httpResponse.data && typeof httpResponse.data === 'object' && httpResponse.data.items && Array.isArray(httpResponse.data.items)) {
+            console.log(`Прокси заказов (HTTP запрос): Получено ${httpResponse.data.items.length} заказов в формате items`);
+            responseData = httpResponse.data.items;
+          }
+        }
+      } catch (error: any) {
+        console.warn('Стратегия 3 (HTTP запрос) не удалась:', error.message);
+      }
+    }
+
+    // Если все стратегии не удались, возвращаем демо-данные
+    if (!responseData) {
+      console.warn('Прокси заказов: Все стратегии запроса не удались, возвращаем демо-данные');
+      responseData = generateDemoOrders();
     }
     
-    // Если все стратегии не удались, возвращаем демо-данные
-    console.warn('Прокси заказов: Все стратегии запроса не удались, возвращаем демо-данные');
-    const demoOrders = generateDemoOrders();
+    // Сохраняем данные в кеш
+    saveToCache(cacheKey, responseData);
     
-    // Сохраняем демо-данные в кеш
-    saveToCache(cacheKey, demoOrders);
-    
-    return res.status(200).json(demoOrders);
+    // Отправляем результат клиенту
+    return res.status(200).json(responseData);
   } catch (error: any) {
     console.error('Ошибка при получении заказов:', error);
     

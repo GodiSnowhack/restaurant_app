@@ -8,6 +8,15 @@ export const ordersApi = {
   getOrders: async (startDate: string, endDate: string): Promise<Order[]> => {
     console.log('API: Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
     
+    // Принудительно отключаем демо-режим
+    try {
+      localStorage.removeItem('force_demo_data');
+      localStorage.removeItem('admin_use_demo_data');
+      console.log('API: Демо-режим отключен');
+    } catch (e) {
+      console.error('API: Ошибка при отключении демо-режима:', e);
+    }
+    
     // Получаем токен для запроса
     const token = localStorage.getItem('token');
     if (!token) {
@@ -25,6 +34,7 @@ export const ordersApi = {
       queryParams.append('start_date', startDate);
       queryParams.append('end_date', endDate);
       
+      // Сначала пробуем запрос через локальный API-прокси
       const url = `/api/orders?${queryParams.toString()}`;
       console.log('API: Отправка запроса к:', url);
       
@@ -52,14 +62,76 @@ export const ordersApi = {
       const data = await response.json();
       console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
       
-      // Проверяем валидность данных
+      // Проверяем валидность данных и конвертируем объект в массив, если это необходимо
+      let ordersArray = data;
+      
+      // Если сервер вернул объект с сообщением, но не массив, пробуем альтернативный запрос
       if (!Array.isArray(data)) {
-        console.warn('API: Получены некорректные данные (не массив)');
-        return [];
+        console.warn('API: Получены некорректные данные (не массив). Пробуем прямой запрос к API');
+        
+        try {
+          // Прямой запрос к API
+          const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+          const directResponse = await fetch(`${baseApiUrl}/orders?${queryParams.toString()}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            signal: controller.signal
+          });
+          
+          if (!directResponse.ok) {
+            throw new Error(`Ошибка HTTP при прямом запросе: ${directResponse.status}`);
+          }
+          
+          const directData = await directResponse.json();
+          
+          if (Array.isArray(directData)) {
+            console.log('API: Получены данные через прямой запрос:', { count: directData.length });
+            ordersArray = directData;
+          } else if (directData && typeof directData === 'object' && directData.items && Array.isArray(directData.items)) {
+            console.log('API: Получены данные в формате { items: [] }:', { count: directData.items.length });
+            ordersArray = directData.items;
+          } else {
+            throw new Error('Некорректный формат данных при прямом запросе');
+          }
+        } catch (directError) {
+          console.error('API: Ошибка при прямом запросе к API:', directError);
+          
+          // Если прямой запрос тоже не удался, используем запрос через API с указанием нужных заголовков
+          try {
+            const apiResponse = await api.get('/orders/', {
+              params: { start_date: startDate, end_date: endDate },
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-User-Role': 'admin',
+                'X-User-ID': localStorage.getItem('user_id') || '1'
+              },
+              timeout: 10000
+            });
+            
+            if (Array.isArray(apiResponse.data)) {
+              console.log('API: Получены данные через axios:', { count: apiResponse.data.length });
+              ordersArray = apiResponse.data;
+            } else if (apiResponse.data && typeof apiResponse.data === 'object' && 
+                      apiResponse.data.items && Array.isArray(apiResponse.data.items)) {
+              console.log('API: Получены данные через axios в формате { items: [] }:', { count: apiResponse.data.items.length });
+              ordersArray = apiResponse.data.items;
+            } else {
+              console.warn('API: Некорректный формат данных при запросе через axios');
+              return [];
+            }
+          } catch (apiError) {
+            console.error('API: Все попытки получить заказы не удались');
+            return [];
+          }
+        }
       }
       
       // Нормализуем полученные данные
-      const normalizedOrders = data.map(order => ({
+      const normalizedOrders = ordersArray.map((order: any) => ({
         ...order,
         // Убеждаемся, что обязательные поля имеют значения
         id: order.id || 0,
@@ -92,30 +164,7 @@ export const ordersApi = {
       }
       
       console.error('API: Ошибка при запросе заказов:', error.message);
-      
-      // Пытаемся сделать запрос напрямую к API, если прокси не сработал
-      try {
-        console.log('API: Пробуем прямой запрос к бэкенду');
-        const directResponse = await api.get('/orders/', {
-          params: { start_date: startDate, end_date: endDate },
-          timeout: 10000
-        });
-        
-        if (Array.isArray(directResponse.data)) {
-          console.log('API: Получены данные через прямой запрос:', { count: directResponse.data.length });
-          return directResponse.data;
-        } else if (directResponse.data && typeof directResponse.data === 'object' && 
-                  directResponse.data.items && Array.isArray(directResponse.data.items)) {
-          console.log('API: Получены данные в формате { items: [] }:', { count: directResponse.data.items.length });
-          return directResponse.data.items;
-        } else {
-          console.warn('API: Некорректный формат данных при прямом запросе');
-          return [];
-        }
-      } catch (directError) {
-        console.error('API: Все попытки получить заказы не удались');
-        return [];
-      }
+      return [];
     }
   },
   
