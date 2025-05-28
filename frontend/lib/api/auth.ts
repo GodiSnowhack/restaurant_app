@@ -31,20 +31,23 @@ export const authApi: IAuthApi = {
         hasPassword: !!credentials.password
       });
 
-      // Формируем данные для отправки
-      const formData = new URLSearchParams();
-      formData.append('username', credentials.email);
-      formData.append('password', credentials.password);
-      formData.append('grant_type', 'password');
+      // Используем отдельную проверку для обязательных полей
+      if (!credentials.email || !credentials.password) {
+        console.error('Auth API: Отсутствуют обязательные поля');
+        throw new Error('Необходимо указать email и пароль');
+      }
 
-      // Отправляем запрос через внутренний прокси
+      // Отправляем запрос в формате JSON
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password
+        })
       });
 
       const data = await response.json();
