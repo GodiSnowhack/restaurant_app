@@ -18,12 +18,29 @@ export const reservationsApi = {
     try {
       console.log('[Reservations API] Начало запроса бронирований');
       
+      // Проверяем наличие кэша и его актуальность
+      const cachedTimestamp = localStorage.getItem(cacheTimeKey);
+      const cachedData = localStorage.getItem(cacheKey);
+      const now = Date.now();
+      const cacheAge = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
+      
+      // Используем кэш, если он не старше 5 минут и нет дополнительных параметров
+      if (!params && cachedData && cachedTimestamp && cacheAge < 5 * 60 * 1000) {
+        console.log('[Reservations API] Используем кэшированные данные (возраст кэша:', Math.round(cacheAge/1000), 'сек)');
+        return JSON.parse(cachedData);
+      }
+      
       // Получаем токен авторизации
       const token = await getAuthToken();
       console.log('[Reservations API] Токен авторизации:', token ? 'получен' : 'отсутствует');
       
       if (!token) {
         console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
+        // Возвращаем кэшированные данные если есть, иначе пустой массив
+        if (cachedData) {
+          console.log('[Reservations API] Используем кэшированные данные из-за отсутствия токена');
+          return JSON.parse(cachedData);
+        }
         return [];
       }
       
@@ -39,7 +56,7 @@ export const reservationsApi = {
         }
       }
       
-      // Используем локальный API-прокси вместо прямого обращения к бэкенду
+      // Пробуем сначала через API-прокси
       console.log(`[Reservations API] Отправка запроса на /api/reservations${queryParams}`);
       
       // Создаем контроллер для отмены запроса
@@ -47,8 +64,8 @@ export const reservationsApi = {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
       
       try {
-        // Отправляем запрос через локальный API-прокси
-        const response = await fetch(`/api/reservations${queryParams}`, {
+        // Сначала попробуем через прокси API
+        let response = await fetch(`/api/reservations${queryParams}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -59,6 +76,36 @@ export const reservationsApi = {
         });
         
         clearTimeout(timeoutId);
+        
+        // Если прокси вернул 404, пробуем прямой запрос к бэкенду
+        if (response.status === 404) {
+          console.log('[Reservations API] Прокси вернул 404, пробуем прямой запрос к бэкенду');
+          
+          // Получаем базовый URL API
+          const baseApiUrl = api.defaults.baseURL || '';
+          
+          // Создаем новый контроллер для второго запроса
+          const directController = new AbortController();
+          const directTimeoutId = setTimeout(() => directController.abort(), 10000);
+          
+          try {
+            response = await fetch(`${baseApiUrl}/reservations${queryParams}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              signal: directController.signal
+            });
+            
+            clearTimeout(directTimeoutId);
+          } catch (directError) {
+            clearTimeout(directTimeoutId);
+            console.error('[Reservations API] Ошибка при прямом запросе:', directError);
+            throw directError;
+          }
+        }
         
         if (!response.ok) {
           throw new Error(`Ошибка HTTP: ${response.status}`);
@@ -87,10 +134,26 @@ export const reservationsApi = {
         } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
           // На случай, если API возвращает данные в формате { items: [] }
           console.log(`[Reservations API] Получено ${data.items.length} бронирований в формате items`);
+          
+          // Кэшируем
+          if (!params) {
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(data.items));
+              localStorage.setItem(cacheTimeKey, Date.now().toString());
+            } catch (e) {
+              console.error('[Reservations API] Ошибка при кэшировании данных:', e);
+            }
+          }
+          
           return data.items;
         } else {
           console.warn('[Reservations API] Сервер вернул неожиданный формат данных:', data);
-          throw new Error('Сервер вернул неожиданный формат данных');
+          // Возвращаем кэшированные данные, если есть
+          if (cachedData) {
+            console.log('[Reservations API] Используем кэшированные данные из-за неожиданного формата');
+            return JSON.parse(cachedData);
+          }
+          return [];
         }
       } catch (error) {
         clearTimeout(timeoutId);

@@ -81,15 +81,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Исправляем проблему с дублированием /api в URL
-    // Убираем /api/v1 из baseApiUrl, если он есть
+    // Проверяем, содержит ли URL уже /api/v1
     let apiUrl = baseApiUrl;
-    if (apiUrl.endsWith('/api/v1')) {
-      apiUrl = apiUrl.slice(0, -7); // Удаляем "/api/v1"
-    }
     
     // Формируем корректный URL для запроса к бэкенду
-    const url = `${apiUrl}/api/reservations${query && Object.keys(query).length > 0 
+    // Важно: путь должен быть /api/v1/reservations, а не /api/reservations
+    const url = `${apiUrl.replace(/\/+$/, '')}/reservations${query && Object.keys(query).length > 0 
       ? `?${new URLSearchParams(query as Record<string, string>).toString()}` 
       : ''}`;
 
