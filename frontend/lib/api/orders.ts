@@ -43,15 +43,8 @@ export const ordersApi = {
         
         // Проверка валидности данных
         if (!Array.isArray(data)) {
-          console.warn('API: Данные не являются массивом, используем демо-данные');
-          return generateAdminOrdersDemoData();
-        }
-        
-        if (data.length === 0) {
-          console.log('API: Получен пустой массив заказов, возможно, нет данных за указанный период');
-          // Можно вернуть пустой массив или демо-данные
-          // Для лучшего UX возвращаем демо-данные
-          return generateAdminOrdersDemoData();
+          console.warn('API: Данные не являются массивом, пробуем прямой запрос');
+          throw new Error('Некорректный формат данных');
         }
         
         return data;
@@ -70,29 +63,30 @@ export const ordersApi = {
           
           // Проверка валидности данных
           if (!Array.isArray(response.data)) {
-            console.warn('API: Данные не являются массивом, используем демо-данные');
-            return generateAdminOrdersDemoData();
+            console.warn('API: Данные от API не являются массивом, проверяем структуру');
+            // Проверяем, есть ли поле items в ответе
+            if (response.data && typeof response.data === 'object' && response.data.items && Array.isArray(response.data.items)) {
+              console.log('API: Получены данные в формате { items: [] }');
+              return response.data.items;
+            } else {
+              throw new Error('Некорректный формат данных');
+            }
           }
           
           console.log('API: Получены данные заказов через api:', { count: response.data.length });
-          
-          if (response.data.length === 0) {
-            console.log('API: Получен пустой массив заказов, возможно, нет данных за указанный период');
-            return generateAdminOrdersDemoData();
-          }
-          
           return response.data;
         } catch (apiError) {
-          console.error('API: Ошибка при запросе через axios api:', apiError);
-          return generateAdminOrdersDemoData();
+          console.error('API: Критическая ошибка при запросе заказов:', apiError);
+          
+          // Только в крайнем случае возвращаем пустой массив
+          return [];
         }
       }
     } catch (error: any) {
       console.error('API: Ошибка при получении заказов:', error);
 
-      // В случае любой ошибки возвращаем демо-данные
-      console.log('API: Возвращаем демо-данные из-за ошибки API');
-      return generateAdminOrdersDemoData();
+      // В случае критической ошибки возвращаем пустой массив
+      return [];
     }
   },
   

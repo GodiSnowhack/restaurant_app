@@ -57,6 +57,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const order = orderResponse.data;
       console.log('[Order API] Получены данные заказа:', order);
 
+      // Если нет данных о блюдах, возвращаем заказ как есть
+      if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
+        return res.status(200).json(order);
+      }
+
       // Получаем информацию о каждом блюде
       const dishPromises = order.items.map(async (item: any) => {
         try {
@@ -69,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           return {
             ...item,
-            name: dishResponse.data.name || `Блюдо #${item.dish_id}`,
+            name: dishResponse.data.name || item.name || `Блюдо #${item.dish_id}`,
             description: dishResponse.data.description || ''
           };
         } catch (error) {
@@ -93,56 +98,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(orderWithDishDetails);
     } catch (error) {
       console.error('[Order API] Ошибка при получении заказа с сервера:', error);
-      // Возвращаем демо-данные
-      return res.status(200).json(generateDemoOrder(Number(id)));
+      
+      // В случае ошибки возвращаем объект с информацией об ошибке
+      return res.status(404).json({
+        message: `Заказ с ID ${id} не найден`,
+        error: 'order_not_found'
+      });
     }
   } catch (error: any) {
     console.error('[Order API] Критическая ошибка при получении заказа:', error);
     
-    // В любом случае возвращаем демо-данные
-    return res.status(200).json(generateDemoOrder(Number(id)));
+    // Возвращаем ошибку
+    return res.status(500).json({
+      message: 'Ошибка при получении заказа',
+      error: error.message
+    });
   }
-}
-
-// Функция для генерации демо-данных заказа по ID
-function generateDemoOrder(id: number) {
-  const now = new Date();
-  const createdAt = new Date(now);
-  createdAt.setDate(createdAt.getDate() - Math.floor(Math.random() * 10));
-  
-  const demoOrders = [
-    {
-      id: id,
-      user_id: 1,
-      waiter_id: 1,
-      status: 'confirmed',
-      payment_status: 'pending',
-      payment_method: 'card',
-      order_type: 'dine-in',
-      total_amount: 3500,
-      created_at: createdAt.toISOString(),
-      updated_at: now.toISOString(),
-      items: [
-        {
-          dish_id: 1,
-          quantity: 2,
-          price: 1200,
-          name: 'Стейк из говядины',
-          description: 'Сочный стейк из мраморной говядины с овощами гриль'
-        },
-        {
-          dish_id: 2,
-          quantity: 1,
-          price: 1100,
-          name: 'Паста Карбонара',
-          description: 'Классическая итальянская паста с беконом и сливочным соусом'
-        }
-      ],
-      table_number: 5,
-      customer_name: 'Александр Иванов',
-      customer_phone: '+7 (777) 111-22-33'
-    }
-  ];
-  
-  return demoOrders[0];
 } 

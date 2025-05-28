@@ -46,9 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log('Прокси заказов: отправка запроса к:', url);
     
-    // Пробуем несколько стратегий получения данных
-    
-    // Стратегия 1: Запрос с максимальной безопасностью
+    // Стратегия 1: Стандартный запрос с Bearer-токеном
     try {
       const response = await axios.get(url, {
         headers: {
@@ -58,25 +56,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'X-User-ID': req.headers['x-user-id'] as string,
           'X-User-Role': req.headers['x-user-role'] as string
         },
-        maxRedirects: 5, // Разрешаем перенаправления
+        maxRedirects: 5,
         validateStatus: function (status) {
           return status < 500; // Принимаем все статусы, кроме 5xx
         },
-        timeout: 8000, // 8 секунд таймаут
-        // Опции для предотвращения проблем с сертификатами
+        timeout: 8000,
         httpsAgent: new (require('https').Agent)({
-          rejectUnauthorized: false // Разрешаем самоподписанные сертификаты
+          rejectUnauthorized: false
         })
       });
 
       if (response.status < 400) {
-        return res.status(200).json(response.data);
+        // Проверяем, что полученные данные являются массивом
+        if (Array.isArray(response.data)) {
+          return res.status(200).json(response.data);
+        } else if (response.data && typeof response.data === 'object' && response.data.items && Array.isArray(response.data.items)) {
+          // Если ответ содержит данные в формате { items: [] }
+          return res.status(200).json(response.data.items);
+        } else {
+          // Если структура ответа неожиданная, но не ошибка, возвращаем пустой массив
+          console.warn('Прокси заказов: Неожиданный формат данных:', response.data);
+          return res.status(200).json([]);
+        }
       }
     } catch (error: any) {
       console.warn('Стратегия 1 не удалась:', error.message);
     }
     
-    // Стратегия 2: Альтернативный формат запроса
+    // Стратегия 2: Альтернативный формат токена
     try {
       const altResponse = await axios.get(url, {
         headers: {
@@ -90,21 +97,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       
       if (altResponse.status < 400) {
-        return res.status(200).json(altResponse.data);
+        if (Array.isArray(altResponse.data)) {
+          return res.status(200).json(altResponse.data);
+        } else if (altResponse.data && typeof altResponse.data === 'object' && altResponse.data.items && Array.isArray(altResponse.data.items)) {
+          return res.status(200).json(altResponse.data.items);
+        } else {
+          console.warn('Прокси заказов: Неожиданный формат данных (стратегия 2):', altResponse.data);
+          return res.status(200).json([]);
+        }
       }
     } catch (error: any) {
       console.warn('Стратегия 2 не удалась:', error.message);
     }
     
-    // Если не удалось получить данные, возвращаем демо-данные вместо пустого массива
-    console.log('Стратегии запроса не удались, возвращаем демо-данные для заказов');
-    return res.status(200).json(generateDemoOrders());
+    // Если все стратегии не удались, возвращаем пустой массив
+    console.warn('Прокси заказов: Все стратегии запроса не удались, возвращаем пустой массив');
+    return res.status(200).json([]);
   } catch (error: any) {
     console.error('Ошибка при получении заказов:', error);
     
-    // В любом случае ошибки возвращаем демо-данные
-    console.log('Возвращаем демо-данные из-за ошибки');
-    return res.status(200).json(generateDemoOrders());
+    // Возвращаем пустой массив при любой ошибке
+    return res.status(200).json([]);
   }
 }
 
