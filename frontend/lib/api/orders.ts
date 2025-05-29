@@ -1,7 +1,5 @@
 import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus } from './types';
-import { getDefaultApiUrl } from '../../src/config/defaults';
-import axios from 'axios';
 
 // Функция для создания тестовых данных заказов
 const getDemoOrders = (status?: string): Order[] => {
@@ -121,33 +119,6 @@ const getDemoOrders = (status?: string): Order[] => {
   return demoOrders;
 };
 
-// Вспомогательная функция для получения токена из localStorage с обработкой ошибок
-const getAuthToken = (): string | null => {
-  try {
-    return localStorage.getItem('token');
-  } catch (error) {
-    console.error('Ошибка при получении токена из localStorage:', error);
-    return null;
-  }
-};
-
-// Вспомогательная функция для получения данных из JWT токена
-const extractUserDataFromToken = (token: string): { id?: string, role?: string } => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    const { sub, role } = JSON.parse(jsonPayload);
-    return { id: sub, role };
-  } catch (error) {
-    console.error('Ошибка при извлечении данных из токена:', error);
-    return {};
-  }
-};
-
 // API функции для работы с заказами
 export const ordersApi = {
   // Получение всех заказов с возможностью фильтрации
@@ -158,140 +129,184 @@ export const ordersApi = {
     end_date?: string 
   }): Promise<Order[]> => {
     try {
-      // Проверяем режим демо-данных
-      let isDemoMode = false;
-      try {
-        isDemoMode = localStorage.getItem('admin_use_demo_data') === 'true';
-        console.log('API: Режим демо-данных', isDemoMode ? 'включен' : 'отключен');
-      } catch (e) {
-        console.error('API: Ошибка при проверке режима демо-данных:', e);
-      }
-      
-      // Возвращаем демо-данные, если режим включен
+      // Проверяем демо-режим
+      const isDemoMode = localStorage.getItem('admin_use_demo_data') === 'true';
       if (isDemoMode) {
-        console.log('API: Возвращаем демо-данные заказов');
+        console.log('Режим демо-данных включен');
         return getDemoOrders(params?.status);
       }
       
-      // Получаем токен авторизации
-      const token = getAuthToken();
+      console.log('Режим демо-данных отключен');
+      
+      // Формируем параметры запроса
+      let url = '/api/orders';
+      const queryParams: string[] = [];
+      
+      if (params) {
+        if (params.status) queryParams.push(`status=${params.status}`);
+        if (params.user_id) queryParams.push(`user_id=${params.user_id}`);
+        if (params.start_date) queryParams.push(`start_date=${params.start_date}`);
+        if (params.end_date) queryParams.push(`end_date=${params.end_date}`);
+      }
+      
+      if (queryParams.length > 0) {
+        url += `?${queryParams.join('&')}`;
+      }
+
+      // Получаем токен для авторизации
+      const token = localStorage.getItem('token');
       if (!token) {
-        console.error('API: Отсутствует токен авторизации. Возвращаем пустой список заказов.');
+        console.error('Отсутствует токен авторизации');
         return [];
       }
       
-      // Форматируем даты для вывода в лог
-      const startDateStr = params?.start_date ? new Date(params.start_date).toLocaleDateString() : 'не указана';
-      const endDateStr = params?.end_date ? new Date(params.end_date).toLocaleDateString() : 'не указана';
-      console.log(`API: Запрос заказов с ${startDateStr} по ${endDateStr}`);
-      
-      // Получаем данные пользователя из токена
-      const userData = extractUserDataFromToken(token);
-      console.log('API: Данные пользователя из токена:', userData);
-      
-      // Собираем параметры запроса
-      const queryParams = new URLSearchParams();
-      if (params?.status) queryParams.append('status', params.status);
-      if (params?.user_id) queryParams.append('user_id', params.user_id.toString());
-      if (params?.start_date) queryParams.append('start_date', params.start_date);
-      if (params?.end_date) queryParams.append('end_date', params.end_date);
-      
-      // Формируем URL для запроса через API-прокси
-      let url = '/api/orders';
-      const queryString = queryParams.toString();
-      if (queryString) {
-        url += `?${queryString}`;
-      }
-      
-      console.log(`API: Выполняем запрос заказов по URL: ${url}`);
-      
-      // Настраиваем заголовки запроса
+      // Формируем заголовки запроса с добавлением токена
       const headers: Record<string, string> = {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
       };
       
-      // Добавляем дополнительные заголовки для идентификации пользователя
-      if (userData.id) headers['X-User-ID'] = userData.id;
-      if (userData.role) headers['X-User-Role'] = userData.role;
-      
-      // Выполняем запрос с максимальной отказоустойчивостью
-      const maxRetries = 3;
-      let lastError = null;
-      
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          // Отправляем запрос с таймаутом 10 секунд
-          const response = await fetch(url, {
-            method: 'GET',
-            headers,
-            credentials: 'include',
-            cache: 'no-cache', // Отключаем кэширование
-            signal: AbortSignal.timeout(10000) // 10 секунд таймаут
-          });
-          
-          // Если статус не успешный, пробуем другой метод
-          if (!response.ok) {
-            console.warn(`API: Ошибка при получении заказов (попытка ${attempt + 1}/${maxRetries}): ${response.status} ${response.statusText}`);
-            
-            if (response.status === 401 || response.status === 403) {
-              console.error('API: Ошибка авторизации при получении заказов');
-              return [];
-            }
-            
-            // На последней попытке возвращаем демо-данные при ошибке
-            if (attempt === maxRetries - 1) {
-              console.warn('API: Не удалось получить данные с сервера, возвращаем демо-данные');
-              return getDemoOrders(params?.status);
-            }
-            
-            // Ждем перед следующей попыткой (экспоненциальная выдержка)
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-            continue;
-          }
-          
-          // Обрабатываем успешный ответ
-          const data = await response.json();
-          console.log(`API: Успешно получены данные заказов (${Array.isArray(data) ? data.length : 0} записей)`);
-          
-          // Проверяем структуру данных
-          if (!Array.isArray(data)) {
-            console.warn('API: Получены некорректные данные (не массив):', data);
-            return [];
-          }
-          
-          // Нормализуем данные заказов
-          const normalizedOrders = data.map(order => ({
-            ...order,
-            // Убеждаемся, что важные поля имеют значения по умолчанию
-            id: order.id || 0,
-            status: order.status || 'pending',
-            payment_status: order.payment_status || 'pending',
-            total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
-                        (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
-            total_price: typeof order.total_price === 'number' ? order.total_price : 
-                        (typeof order.total_price === 'string' ? parseFloat(order.total_price) : 0),
-            created_at: order.created_at || new Date().toISOString(),
-            items: Array.isArray(order.items) ? order.items : []
-          }));
-          
-          return normalizedOrders;
-        } catch (error) {
-          lastError = error;
-          console.error(`API: Ошибка при получении заказов (попытка ${attempt + 1}/${maxRetries}):`, error);
-          
-          // Ждем перед следующей попыткой
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-        }
+      // Добавляем идентификаторы пользователя и роли из токена
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        const { sub, role } = JSON.parse(jsonPayload);
+        if (sub) headers['X-User-ID'] = sub;
+        if (role) headers['X-User-Role'] = role;
+      } catch (e) {
+        console.error('Ошибка при извлечении данных из токена:', e);
       }
       
-      // Если все попытки не удались, возвращаем демо-данные
-      console.warn('API: Все попытки получения заказов не удались, возвращаем демо-данные');
-      return getDemoOrders(params?.status);
-    } catch (error) {
-      console.error('API: Критическая ошибка при получении заказов:', error);
-      return getDemoOrders(params?.status);
+      console.log(`Даты для запроса:`, { 
+        startDate: params?.start_date, 
+        endDate: params?.end_date 
+      });
+      
+      console.log(`Запрос заказов с параметрами:`, params);
+      
+      // Делаем запрос к API через прокси
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      // Проверяем статус ответа
+      if (!response.ok) {
+        console.error(`Ошибка при получении заказов: ${response.status}`);
+        
+        // Если API вернуло ошибку, возвращаем пустой массив
+        if (response.status === 401 || response.status === 403) {
+          console.error('Ошибка авторизации при получении заказов');
+          // Можно добавить логику для обновления токена или перенаправления на страницу входа
+        }
+        
+        return [];
+      }
+      
+      // Получаем данные
+      const data = await response.json();
+      console.log('Полученные заказы:', data);
+      
+      // Нормализуем данные
+      const orders = Array.isArray(data) ? data : [];
+      
+      // Нормализация данных для совместимости с типами
+      const normalizedOrders = orders.map(order => ({
+        ...order,
+        id: order.id || 0,
+        status: order.status || 'pending',
+        payment_status: order.payment_status || 'pending',
+        payment_method: order.payment_method || 'cash',
+        total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
+                      (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
+        total_price: typeof order.total_price === 'number' ? order.total_price : 
+                    (typeof order.total_price === 'string' ? parseFloat(order.total_price) : 0),
+        created_at: order.created_at || new Date().toISOString(),
+        items: Array.isArray(order.items) ? order.items.map((item: any) => ({
+          ...item,
+          dish_id: item.dish_id || 0,
+          quantity: item.quantity || 1,
+          price: typeof item.price === 'number' ? item.price : 
+                (typeof item.price === 'string' ? parseFloat(item.price) : 0),
+          name: item.name || item.dish_name || 'Неизвестное блюдо',
+          total_price: typeof item.total_price === 'number' ? item.total_price :
+                      (typeof item.price === 'number' && typeof item.quantity === 'number' ? 
+                      item.price * item.quantity : 0)
+        })) : []
+      }));
+      
+      console.log('Нормализованные заказы:', normalizedOrders);
+      
+      return normalizedOrders;
+    } catch (error: any) {
+      console.error('Ошибка при получении заказов:', error);
+      
+      // В случае ошибки, проверяем, нужно ли вернуть демо-данные
+      const useDemoDuringErrors = localStorage.getItem('use_demo_on_error') === 'true';
+      if (useDemoDuringErrors) {
+        console.log('Возвращаем демо-данные из-за ошибки');
+        return getDemoOrders(params?.status);
+      }
+      
+      return [];
+    }
+  },
+  
+  // Получение заказов, назначенных текущему официанту
+  getWaiterOrders: async (): Promise<Order[]> => {
+    try {
+      console.log('API: Запрос заказов для текущего официанта');
+      
+      // Получаем токен для авторизации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('API: Отсутствует токен авторизации');
+        return [];
+      }
+      
+      // Пробуем через API-прокси
+      try {
+        const response = await fetch('/api/waiter/orders', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': 'waiter'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (apiError: any) {
+        console.error('API: Ошибка при запросе заказов официанта:', apiError.message);
+        
+        // Если прокси недоступен, используем основной API
+        try {
+          const apiResponse = await api.get('/waiter/orders', {
+            headers: {
+              'X-User-Role': 'waiter'
+            }
+          });
+          return apiResponse.data || [];
+        } catch (error) {
+          console.error('API: Все попытки получить заказы официанта не удались');
+          return [];
+        }
+      }
+    } catch (error: any) {
+      console.error('API: Общая ошибка при получении заказов официанта:', error);
+      return [];
     }
   },
   
@@ -300,25 +315,8 @@ export const ordersApi = {
     try {
       console.log(`API: Запрос заказа #${id}`);
       
-      // Проверяем режим демо-данных
-      let isDemoMode = false;
-      try {
-        isDemoMode = localStorage.getItem('admin_use_demo_data') === 'true';
-      } catch (e) {
-        console.error('API: Ошибка при проверке режима демо-данных:', e);
-      }
-      
-      // Возвращаем демо-данные, если режим включен
-      if (isDemoMode) {
-        const demoOrders = getDemoOrders();
-        const demoOrder = demoOrders.find(order => order.id === id);
-        if (demoOrder) {
-          return demoOrder;
-        }
-      }
-      
       // Получаем токен для запроса
-      const token = getAuthToken();
+      const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Отсутствует токен авторизации');
       }
@@ -424,27 +422,82 @@ export const ordersApi = {
       throw error;
     }
   },
-  
-  // Обновление статуса оплаты заказа
-  updateOrderPaymentStatus: async (id: number, status: PaymentStatus): Promise<Order> => {
+
+  // Привязка заказа к официанту по коду
+  assignOrderByCode: async (code: string): Promise<AssignOrderResponse> => {
     try {
-      const response = await api.put(`/orders/${id}/payment-status`, { payment_status: status });
-      console.log(`API: Статус оплаты заказа ${id} успешно обновлен на ${status}`);
-      return response.data;
-    } catch (error) {
-      console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
-      throw error;
+      console.log('API: Привязка заказа по коду:', code);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch('/api/waiter/orders/bind', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'waiter'
+        },
+        body: JSON.stringify({ code })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        return {
+          success: false,
+          message: data.message || 'Не удалось привязать заказ'
+        };
+      }
+
+      return {
+        success: true,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        message: data.message || 'Заказ успешно привязан'
+      };
+    } catch (error: any) {
+      console.error('API: Ошибка при привязке заказа:', error);
+      return {
+        success: false,
+        message: error.message || 'Произошла ошибка при привязке заказа'
+      };
     }
   },
-  
-  // Назначение заказа официанту
-  assignOrder: async (orderId: number, waiterId: number): Promise<AssignOrderResponse> => {
+
+  // Обновление статуса оплаты заказа
+  updateOrderPaymentStatus: async (id: number, status: PaymentStatus): Promise<{ success: boolean; order: Order }> => {
     try {
-      const response = await api.post(`/orders/${orderId}/assign`, { waiter_id: waiterId });
-      console.log(`API: Заказ ${orderId} успешно назначен официанту ${waiterId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`API: Ошибка при назначении заказа ${orderId} официанту ${waiterId}:`, error);
+      console.log(`API: Обновление статуса оплаты заказа ${id} на ${status}`);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
+
+      const response = await fetch(`/api/orders/${id}/payment-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'waiter'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || `Ошибка при обновлении статуса оплаты заказа ${id}`);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
       throw error;
     }
   }

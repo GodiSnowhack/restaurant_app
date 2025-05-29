@@ -5,9 +5,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import WaiterLayout from '../../../components/WaiterLayout';
 import useAuthStore from '../../../lib/auth-store';
-import waiterApi from '../../../lib/api/waiter';
-import { ordersApi } from '../../../lib/api/orders';
-import { Order } from '../../../lib/api/types';
+import { waiterApi } from '../../../lib/api/waiter-api';
 import { formatPrice } from '../../../utils/priceFormatter';
 import { 
   ClockIcon, 
@@ -84,7 +82,6 @@ interface WaiterOrder {
   waiter_id: number;
 }
 
-// Вместо импорта используем локальное определение
 interface OrderItem {
   dish_id: number;
   quantity: number;
@@ -144,14 +141,7 @@ const WaiterOrdersPage: NextPage = () => {
       setError(null);
       try {
         console.log('WaiterOrders - Начало загрузки списка заказов');
-        
-        // Используем getAllOrders вместо getWaiterOrders
-        const data = await ordersApi.getAllOrders({
-          // Указываем параметры для фильтрации заказов официанта
-          // Можно добавить user_id если нужно
-          status: 'pending,confirmed,preparing,ready'
-        });
-        
+        const data = await waiterApi.getWaiterOrders();
         console.log('WaiterOrders - Получены данные заказов:', data);
         
         if (!data || !Array.isArray(data)) {
@@ -229,8 +219,7 @@ const WaiterOrdersPage: NextPage = () => {
     
     try {
       // Пытаемся обновить статус через API
-      const result = await waiterApi.updateOrder(orderId, newStatus);
-      const success = !!result;
+      const success = await waiterApi.updateOrderStatus(orderId, newStatus);
       
       // Обновляем UI, показывая, что загрузка завершена
       setOrders(prev => prev.map(order => 
