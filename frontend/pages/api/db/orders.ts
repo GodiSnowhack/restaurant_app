@@ -157,96 +157,248 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `;
 
     // Формируем URL для прямого запроса к базе данных
-    const dbEndpoint = `${cleanBaseUrl}/api/v1/db/query`;
-    console.log('API DB Proxy: Запрос к базе данных:', dbEndpoint);
+    const dbEndpoints = [
+      `${cleanBaseUrl}/api/v1/db/query`,
+      `${cleanBaseUrl}/api/db/query`,
+      `${cleanBaseUrl}/api/v1/db/execute`,
+      `${cleanBaseUrl}/api/db/execute`,
+      `${cleanBaseUrl}/api/v1/admin/db/query`,
+      `${cleanBaseUrl}/api/admin/db/query`
+    ];
     
-    const dbResponse = await axios.post(dbEndpoint, 
-      { query: dbQuery },
-      { 
-        headers,
-        httpsAgent,
-        timeout: 15000
-      }
-    );
+    let ordersResult = null;
+    let errorResponse = null;
     
-    if (dbResponse.status === 200 && dbResponse.data) {
-      console.log('API DB Proxy: Получены данные заказов из базы данных');
-      
-      // Получаем ID заказов для запроса товаров
-      const orders = dbResponse.data || [];
-      if (orders.length > 0) {
-        console.log(`API DB Proxy: Получено ${orders.length} заказов, получаем товары для них`);
+    // Пробуем все возможные эндпоинты для выполнения запроса
+    for (const dbEndpoint of dbEndpoints) {
+      try {
+        console.log('API DB Proxy: Попытка запроса к базе данных через:', dbEndpoint);
         
-        try {
-          // Получаем ID всех заказов
-          const orderIds = orders.map((order: any) => order.id).join(',');
-          
-          // Формируем запрос для получения товаров заказа
-          const orderItemsQuery = `
+        const dbResponse = await axios.post(dbEndpoint, 
+          { query: dbQuery },
+          { 
+            headers,
+            httpsAgent,
+            timeout: 15000,
+            validateStatus: status => true
+          }
+        );
+        
+        console.log('API DB Proxy: Статус ответа запроса к БД через', dbEndpoint, ':', dbResponse.status);
+        
+        if (dbResponse.status === 200 && dbResponse.data) {
+          if (Array.isArray(dbResponse.data)) {
+            ordersResult = dbResponse.data;
+            console.log('API DB Proxy: Получены данные заказов через', dbEndpoint);
+            break;
+          } else if (dbResponse.data && typeof dbResponse.data === 'object' && Array.isArray(dbResponse.data.data)) {
+            ordersResult = dbResponse.data.data;
+            console.log('API DB Proxy: Получены данные заказов через', dbEndpoint, 'в формате .data');
+            break;
+          } else if (dbResponse.data && typeof dbResponse.data === 'object' && Array.isArray(dbResponse.data.results)) {
+            ordersResult = dbResponse.data.results;
+            console.log('API DB Proxy: Получены данные заказов через', dbEndpoint, 'в формате .results');
+            break;
+          } else if (dbResponse.data && typeof dbResponse.data === 'object' && Array.isArray(dbResponse.data.rows)) {
+            ordersResult = dbResponse.data.rows;
+            console.log('API DB Proxy: Получены данные заказов через', dbEndpoint, 'в формате .rows');
+            break;
+          }
+        } else {
+          errorResponse = dbResponse;
+        }
+      } catch (endpointError: any) {
+        console.log('API DB Proxy: Ошибка при запросе к', dbEndpoint, ':', endpointError.message);
+      }
+    }
+    
+    // Если не удалось получить данные, попробуем альтернативный запрос
+    if (!ordersResult) {
+      console.log('API DB Proxy: Не удалось получить данные через API запросы, пробуем альтернативный запрос');
+      
+      // Альтернативный SQL-запрос с учетом возможно другой структуры БД
+      const altQuery = `
+        SELECT o.*, 
+          u.name as customer_name, 
+          u.phone as customer_phone
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.created_at >= '${start_date}' AND o.created_at <= '${end_date}'
+        ORDER BY o.created_at DESC
+      `;
+      
+      try {
+        console.log('API DB Proxy: Пробуем альтернативный SQL-запрос:', altQuery);
+        
+        // Пробуем другие возможные пути
+        for (const dbEndpoint of dbEndpoints) {
+          try {
+            const altResponse = await axios.post(dbEndpoint, 
+              { query: altQuery },
+              { 
+                headers,
+                httpsAgent,
+                timeout: 15000,
+                validateStatus: status => true
+              }
+            );
+            
+            if (altResponse.status === 200) {
+              if (Array.isArray(altResponse.data)) {
+                ordersResult = altResponse.data;
+                console.log('API DB Proxy: Получены данные через альтернативный SQL-запрос');
+                break;
+              } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.data)) {
+                ordersResult = altResponse.data.data;
+                break;
+              } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.results)) {
+                ordersResult = altResponse.data.results;
+                break;
+              } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.rows)) {
+                ordersResult = altResponse.data.rows;
+                break;
+              }
+            }
+          } catch (error: any) {
+            console.log('API DB Proxy: Ошибка при альтернативном запросе:', error.message);
+          }
+        }
+      } catch (altError) {
+        console.log('API DB Proxy: Ошибка при выполнении альтернативного запроса:', altError);
+      }
+    }
+    
+    // Если удалось получить данные заказов
+    if (ordersResult && ordersResult.length > 0) {
+      console.log(`API DB Proxy: Получено ${ordersResult.length} заказов, получаем товары для них`);
+      
+      try {
+        // Получаем ID всех заказов
+        const orderIds = ordersResult.map((order: any) => order.id).join(',');
+        
+        // Формируем запрос для получения товаров заказа
+        const orderItemsQuery = `
+          SELECT od.order_id, od.dish_id, od.quantity, od.price, d.name,
+                 (od.price * od.quantity) as total_price
+          FROM order_dish od
+          LEFT JOIN dishes d ON od.dish_id = d.id
+          WHERE od.order_id IN (${orderIds})
+        `;
+        
+        console.log('API DB Proxy: SQL запрос товаров:', orderItemsQuery);
+        
+        // Пробуем все возможные эндпоинты для выполнения запроса товаров
+        let itemsResult = null;
+        
+        for (const dbEndpoint of dbEndpoints) {
+          try {
+            const itemsResponse = await axios.post(dbEndpoint, 
+              { query: orderItemsQuery },
+              { 
+                headers,
+                httpsAgent,
+                timeout: 15000,
+                validateStatus: status => true
+              }
+            );
+            
+            if (itemsResponse.status === 200) {
+              if (Array.isArray(itemsResponse.data)) {
+                itemsResult = itemsResponse.data;
+                console.log('API DB Proxy: Получены товары заказов через', dbEndpoint);
+                break;
+              } else if (itemsResponse.data && typeof itemsResponse.data === 'object' && Array.isArray(itemsResponse.data.data)) {
+                itemsResult = itemsResponse.data.data;
+                break;
+              } else if (itemsResponse.data && typeof itemsResponse.data === 'object' && Array.isArray(itemsResponse.data.results)) {
+                itemsResult = itemsResponse.data.results;
+                break;
+              } else if (itemsResponse.data && typeof itemsResponse.data === 'object' && Array.isArray(itemsResponse.data.rows)) {
+                itemsResult = itemsResponse.data.rows;
+                break;
+              }
+            }
+          } catch (error: any) {
+            console.log('API DB Proxy: Ошибка при запросе товаров через', dbEndpoint, ':', error.message);
+          }
+        }
+        
+        // Если не удалось получить товары, пробуем альтернативный запрос
+        if (!itemsResult) {
+          const altItemsQuery = `
             SELECT od.order_id, od.dish_id, od.quantity, od.price, d.name,
-                   (od.price * od.quantity) as total_price
+                  od.price * od.quantity as total_price
             FROM order_dish od
             LEFT JOIN dishes d ON od.dish_id = d.id
             WHERE od.order_id IN (${orderIds})
           `;
           
-          console.log('API DB Proxy: SQL запрос товаров:', orderItemsQuery);
-          
-          // Выполняем запрос товаров
-          const itemsResponse = await axios.post(dbEndpoint, 
-            { query: orderItemsQuery },
-            { 
-              headers,
-              httpsAgent,
-              timeout: 15000
-            }
-          );
-          
-          if (itemsResponse.status === 200 && itemsResponse.data) {
-            console.log(`API DB Proxy: Получены товары заказов, количество: ${itemsResponse.data.length}`);
-            
-            // Группируем товары по заказам
-            const orderItems: {[key: number]: any[]} = {};
-            itemsResponse.data.forEach((item: any) => {
-              if (!orderItems[item.order_id]) {
-                orderItems[item.order_id] = [];
+          for (const dbEndpoint of dbEndpoints) {
+            try {
+              const altItemsResponse = await axios.post(dbEndpoint, 
+                { query: altItemsQuery },
+                { 
+                  headers,
+                  httpsAgent,
+                  timeout: 15000,
+                  validateStatus: status => true
+                }
+              );
+              
+              if (altItemsResponse.status === 200) {
+                if (Array.isArray(altItemsResponse.data)) {
+                  itemsResult = altItemsResponse.data;
+                  break;
+                } else if (altItemsResponse.data && typeof altItemsResponse.data === 'object' && Array.isArray(altItemsResponse.data.data)) {
+                  itemsResult = altItemsResponse.data.data;
+                  break;
+                } else if (altItemsResponse.data && typeof altItemsResponse.data === 'object' && Array.isArray(altItemsResponse.data.results)) {
+                  itemsResult = altItemsResponse.data.results;
+                  break;
+                } else if (altItemsResponse.data && typeof altItemsResponse.data === 'object' && Array.isArray(altItemsResponse.data.rows)) {
+                  itemsResult = altItemsResponse.data.rows;
+                  break;
+                }
               }
-              orderItems[item.order_id].push({
-                dish_id: item.dish_id,
-                quantity: item.quantity,
-                price: item.price,
-                name: item.name,
-                total_price: item.total_price
-              });
-            });
-            
-            // Добавляем товары к заказам
-            const ordersWithItems = orders.map((order: any) => {
-              return {
-                ...order,
-                items: orderItems[order.id] || []
-              };
-            });
-            
-            console.log('API DB Proxy: Сформированы заказы с товарами');
-            saveToCache(cacheKey, ordersWithItems);
-            return res.status(200).json(ordersWithItems);
-          } else {
-            console.log('API DB Proxy: Не удалось получить товары заказов, возвращаем заказы без товаров');
-            // Возвращаем заказы без товаров
-            const ordersWithoutItems = orders.map((order: any) => {
-              return {
-                ...order,
-                items: []
-              };
-            });
-            saveToCache(cacheKey, ordersWithoutItems);
-            return res.status(200).json(ordersWithoutItems);
+            } catch (error: any) {
+              console.log('API DB Proxy: Ошибка при альтернативном запросе товаров:', error.message);
+            }
           }
-        } catch (itemsError: any) {
-          console.log('API DB Proxy: Ошибка при получении товаров:', itemsError.message);
+        }
+        
+        if (itemsResult && itemsResult.length > 0) {
+          console.log(`API DB Proxy: Получены товары заказов, количество: ${itemsResult.length}`);
+          
+          // Группируем товары по заказам
+          const orderItems: {[key: number]: any[]} = {};
+          itemsResult.forEach((item: any) => {
+            if (!orderItems[item.order_id]) {
+              orderItems[item.order_id] = [];
+            }
+            orderItems[item.order_id].push({
+              dish_id: item.dish_id,
+              quantity: item.quantity,
+              price: item.price,
+              name: item.name,
+              total_price: item.total_price
+            });
+          });
+          
+          // Добавляем товары к заказам
+          const ordersWithItems = ordersResult.map((order: any) => {
+            return {
+              ...order,
+              items: orderItems[order.id] || []
+            };
+          });
+          
+          console.log('API DB Proxy: Сформированы заказы с товарами');
+          saveToCache(cacheKey, ordersWithItems);
+          return res.status(200).json(ordersWithItems);
+        } else {
+          console.log('API DB Proxy: Не удалось получить товары заказов, возвращаем заказы без товаров');
           // Возвращаем заказы без товаров
-          const ordersWithoutItems = orders.map((order: any) => {
+          const ordersWithoutItems = ordersResult.map((order: any) => {
             return {
               ...order,
               items: []
@@ -255,16 +407,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           saveToCache(cacheKey, ordersWithoutItems);
           return res.status(200).json(ordersWithoutItems);
         }
-      } else {
-        console.log('API DB Proxy: Заказы не найдены, возвращаем пустой массив');
-        return res.status(200).json([]);
+      } catch (itemsError: any) {
+        console.log('API DB Proxy: Ошибка при получении товаров:', itemsError.message);
+        // Возвращаем заказы без товаров
+        const ordersWithoutItems = ordersResult.map((order: any) => {
+          return {
+            ...order,
+            items: []
+          };
+        });
+        saveToCache(cacheKey, ordersWithoutItems);
+        return res.status(200).json(ordersWithoutItems);
       }
     } else {
-      console.log('API DB Proxy: Не удалось получить данные из базы данных, возвращаем пустой массив');
+      console.log('API DB Proxy: Заказы не найдены или произошла ошибка');
+      if (errorResponse) {
+        console.log('API DB Proxy: Последняя ошибка:', errorResponse.status, errorResponse.statusText, errorResponse.data);
+      }
+      
+      // Пустой результат
       return res.status(200).json([]);
     }
   } catch (error: any) {
-    console.log('API DB Proxy: Ошибка при запросе к базе данных:', error.message);
+    console.log('API DB Proxy: Общая ошибка при запросе к базе данных:', error.message);
     return res.status(200).json([]);
   }
 } 

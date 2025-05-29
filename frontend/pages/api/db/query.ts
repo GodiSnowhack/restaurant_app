@@ -102,7 +102,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `${cleanBaseUrl}/api/v1/db/execute`,
       `${cleanBaseUrl}/api/db/execute`,
       `${cleanBaseUrl}/api/v1/admin/db/query`,
-      `${cleanBaseUrl}/api/admin/db/query`
+      `${cleanBaseUrl}/api/admin/db/query`,
+      `${cleanBaseUrl}/api/v1/db/query`,
+      `${cleanBaseUrl}/api/db/query`
     ];
     
     let queryResponse = null;
@@ -125,12 +127,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log('API DB Query: Статус ответа:', response.status);
         
-        if (response.status === 200 && response.data) {
-          queryResponse = response.data;
-          console.log('API DB Query: Успешное выполнение запроса');
-          break;
+        if (response.status === 200) {
+          if (Array.isArray(response.data)) {
+            queryResponse = response.data;
+            console.log('API DB Query: Успешное выполнение запроса через', dbEndpoint);
+            break;
+          } else if (response.data && typeof response.data === 'object' && Array.isArray(response.data.data)) {
+            queryResponse = response.data.data;
+            console.log('API DB Query: Успешное выполнение запроса через', dbEndpoint, '(формат data)');
+            break;
+          } else if (response.data && typeof response.data === 'object' && Array.isArray(response.data.results)) {
+            queryResponse = response.data.results;
+            console.log('API DB Query: Успешное выполнение запроса через', dbEndpoint, '(формат results)');
+            break;
+          } else if (response.data && typeof response.data === 'object' && Array.isArray(response.data.rows)) {
+            queryResponse = response.data.rows;
+            console.log('API DB Query: Успешное выполнение запроса через', dbEndpoint, '(формат rows)');
+            break;
+          } else {
+            responseError = { 
+              message: 'Ответ получен, но формат данных не распознан', 
+              data: response.data 
+            };
+          }
         } else {
-          console.log('API DB Query: Ошибка выполнения запроса, статус:', response.status);
           responseError = response.data || { message: `Ошибка API, статус: ${response.status}` };
         }
       } catch (endpointError: any) {
@@ -144,8 +164,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else {
       console.log('API DB Query: Все попытки выполнения запроса не удались');
       
-      // Если все эндпоинты не сработали, пробуем альтернативный подход
-      console.log('API DB Query: Возвращаем пустой массив данных');
+      if (responseError) {
+        console.log('API DB Query: Последняя ошибка:', JSON.stringify(responseError).substring(0, 300));
+      }
+      
+      // Пробуем альтернативный запрос
+      try {
+        // Изменяем синтаксис запроса для SQLite
+        let altQuery = query;
+        
+        // Если запрос был формата SELECT...FROM...WHERE, попробуем переформатировать его
+        if (query.toLowerCase().includes('select') && query.toLowerCase().includes('from')) {
+          console.log('API DB Query: Пробуем альтернативный синтаксис запроса');
+          
+          // Замена функций (например, PostgreSQL -> SQLite)
+          altQuery = query
+            .replace(/ILIKE/g, 'LIKE')
+            .replace(/\bnow\(\)/gi, "datetime('now')")
+            .replace(/::timestamp/g, '')
+            .replace(/::date/g, '');
+          
+          for (const dbEndpoint of dbEndpoints) {
+            try {
+              console.log('API DB Query: Попытка альтернативного запроса к:', dbEndpoint);
+              
+              const altResponse = await axios.post(dbEndpoint, 
+                { query: altQuery, safe: true },
+                { 
+                  headers,
+                  httpsAgent,
+                  timeout: 15000,
+                  validateStatus: status => true
+                }
+              );
+              
+              if (altResponse.status === 200) {
+                if (Array.isArray(altResponse.data)) {
+                  console.log('API DB Query: Успешное выполнение альтернативного запроса');
+                  return res.status(200).json(altResponse.data);
+                } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.data)) {
+                  console.log('API DB Query: Успешное выполнение альтернативного запроса (формат data)');
+                  return res.status(200).json(altResponse.data.data);
+                } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.results)) {
+                  console.log('API DB Query: Успешное выполнение альтернативного запроса (формат results)');
+                  return res.status(200).json(altResponse.data.results);
+                } else if (altResponse.data && typeof altResponse.data === 'object' && Array.isArray(altResponse.data.rows)) {
+                  console.log('API DB Query: Успешное выполнение альтернативного запроса (формат rows)');
+                  return res.status(200).json(altResponse.data.rows);
+                }
+              }
+            } catch (altEndpointError) {
+              // Продолжаем пробовать другие эндпоинты
+            }
+          }
+        }
+      } catch (altError) {
+        console.log('API DB Query: Ошибка при выполнении альтернативного запроса');
+      }
       
       // Возвращаем пустой массив вместо ошибки
       return res.status(200).json([]);
