@@ -35,7 +35,9 @@ const WaiterDashboard = ({ children }: { children: React.ReactNode }) => {
     const fetchAssignedOrdersCount = async () => {
       try {
         setLoading(true);
-        const orders = await ordersApi.getWaiterOrders();
+        const orders = await ordersApi.getAllOrders({
+          status: 'pending,confirmed,preparing,ready' // Запрашиваем только активные заказы
+        });
         // Подсчитываем только активные заказы (не завершенные и не отмененные)
         const activeOrders = orders.filter(
           order => !['completed', 'cancelled'].includes(order.status)
