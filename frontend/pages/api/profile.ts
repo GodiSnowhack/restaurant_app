@@ -3,9 +3,44 @@ import { getDefaultApiUrl } from '../../src/config/defaults';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 const CACHE_FILE_PATH = path.join(process.cwd(), 'data', 'profile_cache.json');
 const CACHE_DURATION = 24 * 3600000; // 24 часа в миллисекундах
+
+// Структура JWT payload
+interface JWTPayload {
+  sub: string;  // ID пользователя
+  role: string; // Роль пользователя
+  exp: number;  // Время истечения
+}
+
+// Функция для декодирования токена и получения данных пользователя
+const getUserFromToken = (token: string): { id: string; role: string } | null => {
+  try {
+    if (!token || !token.startsWith('Bearer ')) {
+      return null;
+    }
+    
+    const tokenValue = token.substring(7); // Убираем 'Bearer '
+    console.log('Profile Proxy - Декодирование токена');
+    
+    const decoded = jwtDecode<JWTPayload>(tokenValue);
+    console.log('Profile Proxy - Декодирован токен:', {
+      id: decoded.sub,
+      role: decoded.role,
+      exp: new Date(decoded.exp * 1000).toISOString()
+    });
+    
+    return {
+      id: decoded.sub,
+      role: decoded.role
+    };
+  } catch (error) {
+    console.error('Profile Proxy - Ошибка декодирования токена:', error);
+    return null;
+  }
+};
 
 // Убедимся, что директория существует
 const ensureDirectoryExists = (filePath: string) => {
@@ -57,15 +92,38 @@ const saveToCache = (profile: any) => {
   }
 };
 
-// Данные-заглушки для профиля
-const FALLBACK_PROFILE = {
-  id: 1,
-  email: 'admin@example.com',
-  full_name: 'Администратор',
-  role: 'admin',
-  is_active: true,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
+// Создание заглушки профиля на основе токена
+const getFallbackProfile = (token: string | undefined) => {
+  // Если есть токен, пытаемся извлечь из него данные
+  if (token) {
+    const userData = getUserFromToken(token);
+    if (userData) {
+      console.log('Profile Proxy - Создание заглушки из токена:', userData);
+      return {
+        id: parseInt(userData.id),
+        email: `user${userData.id}@example.com`, // Примерный email
+        full_name: `Пользователь ${userData.id}`,
+        role: userData.role,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        from_token: true
+      };
+    }
+  }
+  
+  // Если нет токена или не удалось декодировать, используем стандартную заглушку
+  console.log('Profile Proxy - Использование стандартной заглушки профиля');
+  return {
+    id: -1, // Отрицательный ID, чтобы было понятно, что это заглушка
+    email: 'offline@example.com',
+    full_name: 'Офлайн пользователь',
+    role: 'client',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    from_token: false
+  };
 };
 
 export default async function handler(
@@ -103,8 +161,9 @@ export default async function handler(
 
     if (!token) {
       console.log('Profile Proxy - Нет токена авторизации, возвращаем заглушку');
-      saveToCache(FALLBACK_PROFILE);
-      return res.status(200).json(FALLBACK_PROFILE);
+      const fallbackProfile = getFallbackProfile(undefined);
+      saveToCache(fallbackProfile);
+      return res.status(200).json(fallbackProfile);
     }
 
     const profileUrl = `${baseApiUrl}/users/me`;
@@ -144,13 +203,14 @@ export default async function handler(
   } catch (error: any) {
     console.error('Profile Proxy - Ошибка:', error.message);
     
-    // В случае ошибки возвращаем заглушку
+    // В случае ошибки используем данные из токена для заглушки
     console.log('Возвращаем заглушку профиля из-за ошибки API');
+    const fallbackProfile = getFallbackProfile(req.headers.authorization);
     
     // Сохраняем заглушку в кэш
-    saveToCache(FALLBACK_PROFILE);
+    saveToCache(fallbackProfile);
     
     // Возвращаем заглушку клиенту
-    return res.status(200).json(FALLBACK_PROFILE);
+    return res.status(200).json(fallbackProfile);
   }
 } 

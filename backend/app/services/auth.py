@@ -70,7 +70,7 @@ def get_current_user(
     
     try:
         # Добавляем логирование для отладки
-        print(f"Получен токен: {token[:10]}...")
+        print(f"AUTH DEBUG: Получен токен: {token[:10]}...")
         
         payload = jwt.decode(
             token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
@@ -78,31 +78,31 @@ def get_current_user(
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
         
-        print(f"Декодирован payload: {payload}")
+        print(f"AUTH DEBUG: Декодирован payload: {payload}")
         
         if user_id is None:
-            print("ID пользователя отсутствует в токене")
+            print("AUTH DEBUG: ID пользователя отсутствует в токене")
             raise credentials_exception
         
         token_data = TokenPayload(sub=int(user_id), exp=payload.get("exp"), role=role)
         
         if datetime.fromtimestamp(token_data.exp) < datetime.now():
-            print(f"Токен истек: {datetime.fromtimestamp(token_data.exp)} < {datetime.now()}")
+            print(f"AUTH DEBUG: Токен истек: {datetime.fromtimestamp(token_data.exp)} < {datetime.now()}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Токен истек",
                 headers={"WWW-Authenticate": "Bearer"},
             )
             
-        print(f"Ищем пользователя с ID: {token_data.sub}")
+        print(f"AUTH DEBUG: Ищем пользователя с ID: {token_data.sub}")
         user = db.query(User).filter(User.id == token_data.sub).first()
         
         if user is None:
-            print("Пользователь не найден в базе данных")
+            print(f"AUTH DEBUG: Пользователь с ID {token_data.sub} не найден в базе данных")
             raise credentials_exception
         
         if not user.is_active:
-            print(f"Пользователь {user.id} неактивен")
+            print(f"AUTH DEBUG: Пользователь {user.id} неактивен")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Неактивный пользователь",
@@ -110,14 +110,14 @@ def get_current_user(
         
         # Проверяем соответствие роли в токене и в базе данных
         if role and role != user.role:
-            print(f"Несоответствие ролей: токен={role}, база={user.role}")
+            print(f"AUTH DEBUG: Несоответствие ролей: токен={role}, база={user.role}")
             raise credentials_exception
         
-        print(f"Успешно получен пользователь: ID={user.id}, роль={user.role}")
+        print(f"AUTH DEBUG: Успешно получен пользователь: ID={user.id}, email={user.email}, роль={user.role}")
         return user
         
     except JWTError as e:
-        print(f"Ошибка при декодировании JWT: {str(e)}")
+        print(f"AUTH DEBUG: Ошибка при декодировании JWT: {str(e)}")
         raise credentials_exception
 
 

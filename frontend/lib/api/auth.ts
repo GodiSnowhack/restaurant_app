@@ -1,5 +1,5 @@
-import { LoginCredentials, RegisterCredentials, LoginResponse, User } from '../types/auth';
-import { saveToken, saveUser } from '../utils/auth';
+import { LoginCredentials, RegisterCredentials, LoginResponse, User, UserRole } from '../types/auth';
+import { saveToken, saveUser, getUserFromToken } from '../utils/auth';
 import axios from 'axios';
 
 // Используем внутренние прокси вместо прямого обращения к бэкенду
@@ -129,8 +129,14 @@ export const authApi: IAuthApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
+      // Получаем данные пользователя из токена
+      const tokenUserData = getUserFromToken();
+      if (tokenUserData) {
+        console.log('Auth API: Данные из токена:', tokenUserData);
+      }
+
       // Используем внутренний прокси-эндпоинт для профиля
-      const response = await fetch(`${API_BASE_URL}/profile`, {
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -140,12 +146,34 @@ export const authApi: IAuthApi = {
       });
 
       if (!response.ok) {
-        // Если у нас есть кэшированный пользователь, используем его
+        console.log('Auth API: Ошибка при запросе профиля, код:', response.status);
+        
+        // Если у нас есть данные из токена, создаем профиль на их основе
+        if (tokenUserData) {
+          console.log('Auth API: Создаем профиль на основе данных из токена');
+          const tempProfile = {
+            id: parseInt(tokenUserData.id),
+            email: tokenUserData.email,
+            role: tokenUserData.role as UserRole,
+            is_active: true,
+            full_name: `Пользователь ${tokenUserData.id}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            from_token: true
+          };
+          
+          // Сохраняем этот профиль в кэш
+          saveUser(tempProfile as User);
+          return tempProfile as User;
+        }
+        
+        // Если нет данных из токена, пробуем использовать кэшированный профиль
         const cachedUser = localStorage.getItem('user');
         if (cachedUser) {
           console.log('Auth API: Используем кэшированные данные пользователя');
           return JSON.parse(cachedUser);
         }
+        
         throw new Error('Ошибка получения профиля');
       }
 
@@ -160,7 +188,27 @@ export const authApi: IAuthApi = {
     } catch (error: any) {
       console.error('Auth API: Ошибка получения профиля', error);
       
-      // В случае ошибки проверяем, есть ли кэшированные данные
+      // Получаем данные из токена
+      const tokenUserData = getUserFromToken();
+      if (tokenUserData) {
+        console.log('Auth API: Создаем профиль на основе данных из токена после ошибки');
+        const tempProfile = {
+          id: parseInt(tokenUserData.id),
+          email: tokenUserData.email,
+          role: tokenUserData.role as UserRole,
+          is_active: true,
+          full_name: `Пользователь ${tokenUserData.id}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          from_token: true
+        };
+        
+        // Сохраняем этот профиль в кэш
+        saveUser(tempProfile as User);
+        return tempProfile as User;
+      }
+      
+      // В случае ошибки и отсутствия данных из токена, проверяем кэшированные данные
       const cachedUser = localStorage.getItem('user');
       if (cachedUser) {
         console.log('Auth API: Используем кэшированные данные пользователя после ошибки');

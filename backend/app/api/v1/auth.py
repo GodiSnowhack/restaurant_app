@@ -149,6 +149,7 @@ def read_users_me(
     """
     Получение информации о текущем пользователе
     """
+    print(f"AUTH API DEBUG: Запрос /auth/me для пользователя ID={current_user.id}, email={current_user.email}, роль={current_user.role}")
     return current_user
 
 
@@ -159,4 +160,5 @@ def read_user_profile(
     """
     Получение профиля текущего пользователя
     """
+    print(f"AUTH API DEBUG: Запрос /auth/profile для пользователя ID={current_user.id}, email={current_user.email}, роль={current_user.role}")
     return current_user 
