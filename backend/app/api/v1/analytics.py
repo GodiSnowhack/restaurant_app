@@ -175,266 +175,149 @@ def get_dashboard_statistics(
 
 
 @router.get("/financial", response_model=Dict[str, Any])
-def get_financial_metrics(
-    start_date: str = Query(None),
-    end_date: str = Query(None),
+def get_financial_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    category_id: int = None,
+    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Получение финансовых метрик
+    Возвращает финансовую аналитику ресторана
     """
-    # Проверяем права доступа: только администратор может просматривать статистику
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    
     try:
-        # Логируем входные параметры для отладки
-        print(f"Запрос финансовых метрик с параметрами: startDate={start_date}, endDate={end_date}")
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Конвертируем строковые даты в datetime
-        start_datetime = None
-        end_datetime = None
-        
-        if start_date:
-            try:
-                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-            except Exception as e:
-                print(f"Ошибка при преобразовании start_date: {e}")
-                start_datetime = datetime.now() - timedelta(days=30)
-        
-        if end_date:
-            try:
-                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-            except Exception as e:
-                print(f"Ошибка при преобразовании end_date: {e}")
-                end_datetime = datetime.now()
-        
-        # Логируем преобразованные даты
-        print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
-        
-        # Если даты не указаны или некорректны, используем значения по умолчанию
-        if not start_datetime:
-            start_datetime = datetime.now() - timedelta(days=30)
-            print(f"Используем дату по умолчанию для начала: {start_datetime}")
-        if not end_datetime:
-            end_datetime = datetime.now()
-            print(f"Используем дату по умолчанию для конца: {end_datetime}")
-            
-        # Используем новую функцию для получения комплексных финансовых метрик
-        result = analytics.get_financial_metrics(db, start_datetime, end_datetime)
-        return result
+        return analytics.get_financial_metrics(db, start, end, category_id, use_mock_data)
     except Exception as e:
-        print(f"Ошибка при получении финансовых метрик: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка при получении финансовых метрик: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении финансовой аналитики: {str(e)}")
 
 
 @router.get("/menu", response_model=Dict[str, Any])
-def get_menu_metrics(
-    start_date: str = Query(None),
-    end_date: str = Query(None),
+def get_menu_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    category_id: int = None,
+    dish_id: int = None,
+    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Получение метрик по меню
+    Возвращает аналитику по меню ресторана
     """
-    # Проверяем права доступа: только администратор может просматривать статистику
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    
     try:
-        # Логируем входные параметры для отладки
-        print(f"Запрос метрик меню с параметрами: startDate={start_date}, endDate={end_date}")
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Конвертируем строковые даты в datetime
-        start_datetime = parse_date(start_date)
-        end_datetime = parse_date(end_date)
-        
-        # Логируем преобразованные даты
-        print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
-        
-        # Если даты не указаны или некорректны, используем значения по умолчанию
-        if not start_datetime:
-            start_datetime = datetime.now() - timedelta(days=30)
-            print(f"Используем дату по умолчанию для начала: {start_datetime}")
-        if not end_datetime:
-            end_datetime = datetime.now()
-            print(f"Используем дату по умолчанию для конца: {end_datetime}")
-        
-        # Используем новую функцию для получения комплексных метрик меню
-        result = analytics.get_menu_metrics(db, start_datetime, end_datetime)
-        return result
+        return analytics.get_menu_metrics(db, start, end, category_id, dish_id, use_mock_data)
     except Exception as e:
-        # Логируем ошибку
-        print(f"Ошибка при получении метрик меню: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при получении метрик меню: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении аналитики меню: {str(e)}")
 
 
 @router.get("/customers", response_model=Dict[str, Any])
-def get_customer_metrics(
-    start_date: str = Query(None),
-    end_date: str = Query(None),
+def get_customers_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    user_id: int = None,
+    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Получение метрик по клиентам
+    Возвращает аналитику по клиентам ресторана
     """
-    # Проверяем права доступа: только администратор может просматривать статистику
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    
     try:
-        # Логируем входные параметры для отладки
-        print(f"Запрос метрик клиентов с параметрами: startDate={start_date}, endDate={end_date}")
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Конвертируем строковые даты в datetime
-        start_datetime = parse_date(start_date)
-        end_datetime = parse_date(end_date)
-        
-        # Логируем преобразованные даты
-        print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
-        
-        # Если даты не указаны или некорректны, используем значения по умолчанию
-        if not start_datetime:
-            start_datetime = datetime.now() - timedelta(days=30)
-            print(f"Используем дату по умолчанию для начала: {start_datetime}")
-        if not end_datetime:
-            end_datetime = datetime.now()
-            print(f"Используем дату по умолчанию для конца: {end_datetime}")
-        
-        # Используем новую функцию для получения комплексных метрик клиентов
-        result = analytics.get_customer_metrics(db, start_datetime, end_datetime)
-        return result
+        return analytics.get_customer_metrics(db, start, end, user_id, use_mock_data)
     except Exception as e:
-        # Логируем ошибку
-        print(f"Ошибка при получении метрик клиентов: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка при получении метрик клиентов: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении аналитики клиентов: {str(e)}")
 
 
 @router.get("/operational", response_model=Dict[str, Any])
-def get_operational_metrics(
-    start_date: str = Query(None),
-    end_date: str = Query(None),
+def get_operational_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Получение операционных метрик
+    Возвращает операционную аналитику ресторана
     """
-    # Проверяем права доступа: только администратор может просматривать статистику
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    
     try:
-        # Логируем входные параметры для отладки
-        print(f"Запрос операционных метрик с параметрами: startDate={start_date}, endDate={end_date}")
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Конвертируем строковые даты в datetime
-        start_datetime = parse_date(start_date)
-        end_datetime = parse_date(end_date)
-        
-        # Логируем преобразованные даты
-        print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
-        
-        # Если даты не указаны или некорректны, используем значения по умолчанию
-        if not start_datetime:
-            start_datetime = datetime.now() - timedelta(days=30)
-            print(f"Используем дату по умолчанию для начала: {start_datetime}")
-        if not end_datetime:
-            end_datetime = datetime.now()
-            print(f"Используем дату по умолчанию для конца: {end_datetime}")
-        
-        # Проверяем, что начальная дата не позже конечной
-        if start_datetime > end_datetime:
-            print(f"Начальная дата ({start_datetime}) позже конечной ({end_datetime}), меняем местами")
-            start_datetime, end_datetime = end_datetime, start_datetime
-        
-        # Проверяем даты на будущее
-        now = datetime.now()
-        if end_datetime > now:
-            print(f"Конечная дата {end_datetime} в будущем, используем текущую дату {now}")
-            end_datetime = now
-        if start_datetime > now:
-            print(f"Начальная дата {start_datetime} в будущем, используем дату месяц назад")
-            start_datetime = now - timedelta(days=30)
-        
-        # Используем новую функцию для получения комплексных операционных метрик
-        print(f"Запрашиваем операционные метрики с {start_datetime} по {end_datetime}")
-        result = analytics.get_operational_metrics(db, start_datetime, end_datetime)
-        print(f"Успешно получены операционные метрики")
-        return result
+        return analytics.get_operational_metrics(db, start, end, use_mock_data)
     except Exception as e:
-        # Логируем ошибку детально
-        import traceback
-        print(f"Ошибка при получении операционных метрик: {e}")
-        print(traceback.format_exc())
-        
-        # Возвращаем ошибку клиенту
-        raise HTTPException(status_code=500, detail=f"Ошибка при получении операционных метрик: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении операционной аналитики: {str(e)}")
 
 
 @router.get("/predictive", response_model=Dict[str, Any])
-def get_predictive_metrics(
-    start_date: str = Query(None),
-    end_date: str = Query(None),
+def get_predictive_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Получение предиктивных метрик
+    Возвращает предиктивную аналитику ресторана
     """
-    # Проверяем права доступа: только администратор может просматривать статистику
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    
     try:
-        # Логируем входные параметры для отладки
-        print(f"Запрос предиктивных метрик с параметрами: startDate={start_date}, endDate={end_date}")
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Конвертируем строковые даты в datetime
-        start_datetime = parse_date(start_date)
-        end_datetime = parse_date(end_date)
-        
-        # Логируем преобразованные даты
-        print(f"Преобразованные даты: start_datetime={start_datetime}, end_datetime={end_datetime}")
-        
-        # Если даты не указаны или некорректны, используем значения по умолчанию
-        if not start_datetime:
-            start_datetime = datetime.now() - timedelta(days=30)
-            print(f"Используем дату по умолчанию для начала: {start_datetime}")
-        if not end_datetime:
-            end_datetime = datetime.now()
-            print(f"Используем дату по умолчанию для конца: {end_datetime}")
-        
-        # Проверяем, что начальная дата не позже конечной
-        if start_datetime > end_datetime:
-            print(f"Начальная дата ({start_datetime}) позже конечной ({end_datetime}), меняем местами")
-            start_datetime, end_datetime = end_datetime, start_datetime
-        
-        # Проверяем даты на будущее
-        now = datetime.now()
-        if end_datetime > now:
-            print(f"Конечная дата {end_datetime} в будущем, используем текущую дату {now}")
-            end_datetime = now
-        if start_datetime > now:
-            print(f"Начальная дата {start_datetime} в будущем, используем дату месяц назад")
-            start_datetime = now - timedelta(days=30)
-        
-        # Используем новую функцию для получения комплексных предиктивных метрик
-        print(f"Запрашиваем предиктивные метрики с {start_datetime} по {end_datetime}")
-        result = analytics.get_predictive_metrics(db, start_datetime, end_datetime)
-        print(f"Успешно получены предиктивные метрики")
-        return result
+        return analytics.get_predictive_metrics(db, start, end, use_mock_data)
     except Exception as e:
-        # Логируем ошибку детально
-        import traceback
-        print(f"Ошибка при получении предиктивных метрик: {e}")
-        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении предиктивной аналитики: {str(e)}")
+
+
+@router.get("/dashboard")
+def get_dashboard_analytics(
+    start_date: str = None,
+    end_date: str = None,
+    use_mock_data: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Возвращает сводную аналитику для дашборда
+    """
+    try:
+        # Преобразуем строковые даты в объекты datetime
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Возвращаем ошибку клиенту
-        raise HTTPException(status_code=500, detail=f"Ошибка при получении предиктивных метрик: {str(e)}") 
+        # Собираем базовые метрики из различных источников для дашборда
+        financial = analytics.get_financial_metrics(db, start, end, None, use_mock_data)
+        menu = analytics.get_menu_metrics(db, start, end, None, None, use_mock_data)
+        customers = analytics.get_customer_metrics(db, start, end, None, use_mock_data)
+        
+        # Формируем сводку для дашборда
+        dashboard_data = {
+            "summary": {
+                "totalRevenue": financial.get("totalRevenue", 0),
+                "totalOrders": financial.get("orderCount", 0),
+                "averageCheck": financial.get("averageOrderValue", 0),
+                "customersCount": customers.get("totalCustomers", 0)
+            },
+            "period": {
+                "startDate": start_date or (start.isoformat().split("T")[0]),
+                "endDate": end_date or (end.isoformat().split("T")[0])
+            }
+        }
+        
+        return dashboard_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении данных дашборда: {str(e)}") 

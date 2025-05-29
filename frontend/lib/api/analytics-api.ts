@@ -21,10 +21,12 @@ const getApiBaseUrl = () => {
     
     // Проверяем, находимся ли мы в Railway
     if (host.includes('railway.app')) {
+      // В Railway используем константную ссылку на бэкенд
       return 'https://backend-production-1a78.up.railway.app/api/v1/analytics';
     }
     
-    return `http://${host}:8000/api/v1/analytics`;
+    // Для локальной разработки
+    return `http://localhost:8000/api/v1/analytics`;
   }
   
   // По умолчанию возвращаем стандартный URL для локальной разработки
@@ -175,55 +177,89 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
     // Проверяем, работаем ли мы в Railway
     const isRailway = typeof window !== 'undefined' && window.location.hostname.includes('railway.app');
     
-    // Если мы в Railway, сначала пробуем использовать локальный API
+    // На Railway сначала делаем запрос к бэкенду
     if (isRailway) {
-      console.log(`Пробуем использовать локальный API для ${endpoint}`);
+      console.log(`Отправляем запрос к бэкенду Railway для ${endpoint}`);
       try {
-        // Пробуем запросить данные с локального API v1/analytics
-        const localEndpoint = endpoint.split('/').pop() || endpoint;
-        const localParams = new URLSearchParams(queryParams.substring(1));
-        localParams.append('useMockData', 'true');
+        const config = {
+          params: {
+            useMockData: false,
+            currentTimestamp: Date.now()
+          },
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        };
         
-        const localApiUrl = `/api/v1/analytics/${localEndpoint}?${localParams.toString()}`;
+        const backendUrl = 'https://backend-production-1a78.up.railway.app/api/v1/analytics';
+        const fullUrl = `${backendUrl}${url}`;
+        console.log(`Полный URL запроса: ${fullUrl}`);
         
-        const localResponse = await fetch(localApiUrl, {
+        const response = await fetch(fullUrl, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
         
-        if (localResponse.ok) {
-          const data = await localResponse.json();
-          console.log(`Получены данные с локального API для ${endpoint}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Получены данные с бэкенда для ${endpoint}`);
           return data;
+        } else {
+          console.error(`Ошибка при запросе к бэкенду: ${response.status} ${response.statusText}`);
+          // Если запрос к бэкенду не удался, используем локальный API
+          throw new Error(`Ошибка запроса к бэкенду: ${response.status}`);
         }
-      } catch (localError) {
-        console.error(`Не удалось получить данные с локального API для ${endpoint}:`, localError);
-      }
-    }
-    
-    // Пытаемся использовать удаленный API
-    const config = {
-      params: {
-        useMockData: false,
-        currentTimestamp: Date.now()
-      }
-    };
-    
-    try {
-      // Пытаемся сделать запрос к бэкенду
-      const response = await analyticsAxios.get<T>(url, config);
-      return response.data;
-    } catch (error: any) {
-      console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
-      
-      // Если мы ещё не пробовали локальный API и получаем ошибку, пробуем его
-      if (!isRailway) {
-        console.log(`Пробуем использовать локальный API для ${endpoint}`);
+      } catch (backendError) {
+        console.error(`Не удалось получить данные с бэкенда для ${endpoint}:`, backendError);
         
+        // Пробуем использовать локальный API в случае ошибки
         try {
-          // Пробуем запросить данные с локального API v1/analytics
+          const localEndpoint = endpoint.split('/').pop() || endpoint;
+          const localParams = new URLSearchParams(queryParams.substring(1));
+          localParams.append('useMockData', 'true');
+          
+          const localApiUrl = `/api/v1/analytics/${localEndpoint}?${localParams.toString()}`;
+          console.log(`Попытка использовать локальный API: ${localApiUrl}`);
+          
+          const localResponse = await fetch(localApiUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (localResponse.ok) {
+            const data = await localResponse.json();
+            console.log(`Получены данные с локального API для ${endpoint}`);
+            return data;
+          } else {
+            throw new Error(`Ошибка запроса к локальному API: ${localResponse.status}`);
+          }
+        } catch (localError) {
+          console.error(`Не удалось получить данные с локального API для ${endpoint}:`, localError);
+          return getMockData(endpoint.split('/').pop() || '') as T;
+        }
+      }
+    } else {
+      // Локальная разработка: пробуем использовать локальный бэкенд
+      try {
+        // Пытаемся сделать запрос к локальному бэкенду
+        const config = {
+          params: {
+            useMockData: false,
+            currentTimestamp: Date.now()
+          }
+        };
+        
+        const response = await analyticsAxios.get<T>(url, config);
+        return response.data;
+      } catch (error: any) {
+        console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
+        
+        // Если запрос к локальному бэкенду не удался, пробуем локальный API
+        try {
           const localEndpoint = endpoint.split('/').pop() || endpoint;
           const localParams = new URLSearchParams(queryParams.substring(1));
           localParams.append('useMockData', 'true');
@@ -245,14 +281,14 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
         } catch (localError) {
           console.error(`Не удалось получить данные с локального API для ${endpoint}:`, localError);
         }
+        
+        // В случае всех ошибок возвращаем мок-данные
+        console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
+        return getMockData(endpoint.split('/').pop() || '') as T;
       }
-      
-      // В случае ошибки возвращаем мок-данные
-      console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
-      return getMockData(endpoint.split('/').pop() || '') as T;
     }
   } catch (error: any) {
-    console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
+    console.error(`Критическая ошибка при запросе аналитики ${endpoint}:`, error.message);
     
     // В случае ошибки возвращаем мок-данные
     console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
