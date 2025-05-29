@@ -61,11 +61,12 @@ const saveToCache = (key: string, data: any) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Получаем данные из запроса
+  const { method, query, body } = req;
+  const token = req.headers.authorization;
+  const userId = req.headers['x-user-id'];
+  
   try {
-    const { method, query, body } = req;
-    const token = req.headers.authorization;
-    const userId = req.headers['x-user-id'];
-
     // Формируем ключ для кеширования
     const cacheKey = `reservations_${JSON.stringify(query)}`;
     
@@ -141,22 +142,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       clearTimeout(timeoutId);
       console.error('[API Proxy] Ошибка при отправке запроса:', fetchError.message);
       
-      // В случае ошибки сети возвращаем демо-данные
-      const demoReservations = generateDemoReservations();
-      
-      // Сохраняем демо-данные в кеш
-      saveToCache(cacheKey, demoReservations);
-      
-      // Отправляем демо-данные клиенту
-      res.status(200).json(demoReservations);
+      // Проверяем наличие авторизации
+      const hasAuthToken = !!token;
+      if (hasAuthToken) {
+        // Если пользователь авторизован, не отправляем демо-данные, а возвращаем ошибку
+        console.log('[API Proxy] Пользователь авторизован, но произошла ошибка запроса. Возвращаем ошибку.');
+        
+        // Проверяем наличие кэшированных данных
+        const cachedData = getFromCache(cacheKey);
+        if (cachedData) {
+          console.log('[API Proxy] Возвращаем кэшированные данные из-за ошибки запроса');
+          return res.status(200).json(cachedData);
+        }
+        
+        // Если кэша нет, возвращаем ошибку
+        return res.status(503).json({ 
+          error: 'Ошибка соединения с сервером',
+          message: fetchError.message,
+          instructions: 'Пожалуйста, обновите страницу или попробуйте позже'
+        });
+      } else {
+        // Для неавторизованных пользователей можно вернуть демо-данные
+        console.log('[API Proxy] Пользователь не авторизован, возвращаем демо-данные');
+        const demoReservations = generateDemoReservations();
+        saveToCache(cacheKey, demoReservations);
+        return res.status(200).json(demoReservations);
+      }
     }
   } catch (error: any) {
     console.error('[API Proxy] Ошибка при обработке запроса бронирований:', error);
     
-    // В случае любой ошибки возвращаем демо-данные
-    const demoReservations = generateDemoReservations();
-    
-    res.status(200).json(demoReservations);
+    // Проверяем наличие авторизации
+    const hasAuthToken = !!token;
+    if (hasAuthToken) {
+      // Для авторизованных пользователей возвращаем ошибку
+      return res.status(500).json({ 
+        error: 'Внутренняя ошибка сервера',
+        message: error.message,
+        instructions: 'Пожалуйста, обновите страницу или попробуйте позже'
+      });
+    } else {
+      // Для неавторизованных пользователей возвращаем демо-данные
+      const demoReservations = generateDemoReservations();
+      return res.status(200).json(demoReservations);
+    }
   }
 }
 

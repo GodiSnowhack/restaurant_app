@@ -107,7 +107,37 @@ export const reservationsApi = {
           }
         }
         
+        // Проверяем статус ответа
         if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          
+          // Если сервер вернул структурированную ошибку с инструкциями
+          if (errorData && (errorData.error || errorData.message)) {
+            console.error('[Reservations API] Сервер вернул ошибку:', errorData);
+            
+            // Если статус 503 (сервис недоступен), показываем сообщение пользователю
+            if (response.status === 503) {
+              // Используем кэшированные данные, если они есть
+              const cachedData = localStorage.getItem(cacheKey);
+              if (cachedData) {
+                console.log('[Reservations API] Используем кэшированные данные из-за ошибки сервера');
+                try {
+                  return JSON.parse(cachedData);
+                } catch (e) {
+                  console.error('[Reservations API] Ошибка при разборе кэшированных данных');
+                }
+              }
+              
+              // Если кэша нет, показываем уведомление
+              if (typeof window !== 'undefined') {
+                // Показываем уведомление (здесь можно использовать любой механизм уведомлений)
+                console.warn('[Reservations API] Показываем уведомление пользователю:', errorData.instructions || errorData.message);
+              }
+            }
+            
+            throw new Error(errorData.message || errorData.error || 'Ошибка сервера');
+          }
+          
           throw new Error(`Ошибка HTTP: ${response.status}`);
         }
         
