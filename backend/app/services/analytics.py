@@ -413,18 +413,18 @@ def get_financial_metrics(
         
         # Если данные не найдены, возвращаем пустые метрики
         if not orders_data:
-        return {
-            "totalRevenue": 0,
-            "totalCost": 0,
-            "grossProfit": 0,
-            "profitMargin": 0,
-            "averageOrderValue": 0,
-            "orderCount": 0,
-            "revenueByCategory": {},
-            "revenueByTimeOfDay": {},
-            "revenueByDayOfWeek": {},
-            "revenueTrend": [],
-            "period": {
+            return {
+                "totalRevenue": 0,
+                "totalCost": 0,
+                "grossProfit": 0,
+                "profitMargin": 0,
+                "averageOrderValue": 0,
+                "orderCount": 0,
+                "revenueByCategory": {},
+                "revenueByTimeOfDay": {},
+                "revenueByDayOfWeek": {},
+                "revenueTrend": [],
+                "period": {
                     "startDate": start_date.strftime("%Y-%m-%d"),
                     "endDate": end_date.strftime("%Y-%m-%d")
                 }
@@ -567,7 +567,7 @@ def get_menu_metrics(
         
         # В случае ошибки или отсутствия данных возвращаем мок-данные
         return get_mock_menu_metrics(start_date, end_date)
-            except Exception as e:
+    except Exception as e:
         # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
         print(f"Ошибка при получении метрик меню: {e}")
         return get_mock_menu_metrics(start_date, end_date)
