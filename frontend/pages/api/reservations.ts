@@ -3,6 +3,14 @@ import { getDefaultApiUrl } from '../../src/config/defaults';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import { jwtDecode } from 'jwt-decode';
+
+// Интерфейс для JWT токена
+interface JWTPayload {
+  sub: string;  // ID пользователя
+  role: string; // Роль пользователя
+  exp: number;  // Время истечения
+}
 
 // Путь к кешу
 const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
@@ -60,40 +68,97 @@ const saveToCache = (key: string, data: any) => {
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Получаем данные из запроса
-  const { method, query, body } = req;
-  const token = req.headers.authorization;
-  const userId = req.headers['x-user-id'];
-  
+// Получаем данные из JWT токена
+const getUserFromToken = (token: string): { id: string; role: string } | null => {
   try {
-    // Формируем ключ для кеширования
-    const cacheKey = `reservations_${JSON.stringify(query)}`;
+    if (!token || !token.startsWith('Bearer ')) {
+      return null;
+    }
+    
+    const tokenValue = token.substring(7); // Убираем 'Bearer '
+    const decoded = jwtDecode<JWTPayload>(tokenValue);
+    
+    return {
+      id: decoded.sub,
+      role: decoded.role
+    };
+  } catch (error) {
+    console.error('Ошибка при декодировании токена:', error);
+    return null;
+  }
+};
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const { method, query, body } = req;
+    const token = req.headers.authorization;
+    
+    console.log('Reservations API Proxy: Получен запрос', { 
+      method, 
+      hasQuery: !!query && Object.keys(query).length > 0, 
+      hasBody: !!body,
+      hasToken: !!token
+    });
+    
+    // Проверяем токен и получаем данные пользователя
+    const userData = token ? getUserFromToken(token) : null;
+    
+    if (!userData && method === 'GET') {
+      console.log('Reservations API Proxy: Запрос без авторизации отклонен');
+      return res.status(401).json({ 
+        error: 'Необходима авторизация',
+        message: 'Для просмотра бронирований необходимо войти в систему'
+      });
+    }
+    
+    // Используем ID пользователя из токена
+    const userId = userData?.id || req.headers['x-user-id'];
+    const userRole = userData?.role || 'client';
+    
+    console.log('Reservations API Proxy: Данные пользователя', { userId, userRole });
+
+    // Формируем ключ для кеширования с учетом пользователя
+    // Важно: разные пользователи должны видеть разные данные
+    const cacheKey = `reservations_${userId}_${userRole}_${JSON.stringify(query)}`;
     
     // Проверяем наличие данных в кеше
     if (method === 'GET') {
       const cachedData = getFromCache(cacheKey);
       if (cachedData) {
-        console.log('API Proxy: Данные бронирований получены из кеша');
+        console.log('Reservations API Proxy: Данные бронирований получены из кеша');
         return res.status(200).json(cachedData);
       }
     }
 
     // Получаем базовый URL API
-    let baseApiUrl = getDefaultApiUrl();
+    const baseApiUrl = getDefaultApiUrl();
     
-    // Важно: путь должен быть /api/v1/reservations
-    // Убедимся что URL правильно сформирован и содержит /api/v1
-    if (!baseApiUrl.includes('/api/v1')) {
-      baseApiUrl = baseApiUrl.replace(/\/+$/, '') + '/api/v1';
+    // Проверяем, содержит ли URL уже /api/v1
+    let apiUrl = baseApiUrl;
+    
+    // Создаем копию query параметров, чтобы добавить user_id для клиентов
+    const queryParams = new URLSearchParams();
+    
+    // Добавляем все существующие параметры запроса
+    if (query) {
+      Object.entries(query).forEach(([key, value]) => {
+        if (value) {
+          queryParams.append(key, Array.isArray(value) ? value[0] : String(value));
+        }
+      });
+    }
+    
+    // Если пользователь - клиент, добавляем его ID в параметры запроса
+    // чтобы обеспечить фильтрацию только своих бронирований
+    if (userRole === 'client' && userId) {
+      queryParams.append('user_id', String(userId));
     }
     
     // Формируем корректный URL для запроса к бэкенду
-    const url = `${baseApiUrl.replace(/\/+$/, '')}/reservations${query && Object.keys(query).length > 0 
-      ? `?${new URLSearchParams(query as Record<string, string>).toString()}` 
-      : ''}`;
+    const queryString = queryParams.toString();
+    const url = `${apiUrl.replace(/\/+$/, '')}/reservations${queryString ? `?${queryString}` : ''}`;
 
-    console.log('API Proxy: Отправка запроса на', url);
+    console.log('Reservations API Proxy: Отправка запроса на', url);
 
     // Формируем заголовки запроса
     const headers: Record<string, string> = {
@@ -106,7 +171,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers['Authorization'] = token;
     }
     if (userId) {
-      headers['X-User-ID'] = userId.toString();
+      headers['X-User-ID'] = String(userId);
+    }
+    if (userRole) {
+      headers['X-User-Role'] = userRole;
     }
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
@@ -116,7 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Отправляем запрос к бэкенду с таймаутом
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Увеличиваем таймаут до 15 секунд
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const response = await fetch(url, {
@@ -129,145 +197,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       clearTimeout(timeoutId);
+
+      // Получаем данные ответа
+      const data = await response.json();
       
-      console.log(`API Proxy: Получен ответ, статус ${response.status}, тип: ${response.headers.get('content-type')}`);
-      
-      // Проверяем, что ответ успешный
-      if (!response.ok) {
-        throw new Error(`HTTP ошибка: ${response.status} ${response.statusText}`);
-      }
-      
-      // Проверяем Content-Type
-      const contentType = response.headers.get('content-type');
-      if (contentType && !contentType.includes('application/json')) {
-        console.warn(`API Proxy: Некорректный Content-Type: ${contentType}`);
-      }
-      
-      // Получаем текст ответа сначала
-      const text = await response.text();
-      
-      // Логируем начало ответа для отладки
-      console.log(`API Proxy: Начало ответа: ${text.substring(0, 100)}...`);
-      
-      // Пробуем парсить JSON
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (jsonError: any) {
-        console.error('API Proxy: Ошибка парсинга JSON:', jsonError);
-        throw new Error(`Ошибка парсинга JSON: ${jsonError.message}. Текст ответа: ${text.substring(0, 100)}...`);
-      }
+      console.log('Reservations API Proxy: Получен ответ', {
+        status: response.status,
+        itemsCount: Array.isArray(data) ? data.length : 'не массив'
+      });
 
       // Если это GET запрос, кешируем результат
-      if (method === 'GET') {
+      if (method === 'GET' && response.ok) {
         saveToCache(cacheKey, data);
       }
 
       // Отправляем ответ клиенту
-      return res.status(200).json(data);
+      res.status(response.status).json(data);
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      console.error('[API Proxy] Ошибка при отправке запроса:', fetchError.message);
+      console.error('Reservations API Proxy: Ошибка при отправке запроса:', fetchError.message);
       
-      // Проверяем наличие авторизации
-      const hasAuthToken = !!token;
+      // В случае ошибки сети возвращаем демо-данные только для конкретного пользователя
+      const demoReservations = generateDemoReservations(userId ? Number(userId) : undefined, userRole);
       
-      // Проверяем наличие кэшированных данных
-      const cachedData = getFromCache(cacheKey);
-      if (cachedData) {
-        console.log('[API Proxy] Возвращаем кэшированные данные из-за ошибки запроса');
-        return res.status(200).json(cachedData);
-      }
+      // Сохраняем демо-данные в кеш
+      saveToCache(cacheKey, demoReservations);
       
-      // Если пользователь авторизован и кэша нет, пробуем сделать запрос альтернативным способом
-      if (hasAuthToken) {
-        try {
-          // Попробуем запросить данные через альтернативный URL
-          const altBaseUrl = baseApiUrl.includes('/api/v1') 
-            ? baseApiUrl.replace('/api/v1', '') 
-            : baseApiUrl;
-            
-          const altUrl = `${altBaseUrl.replace(/\/+$/, '')}/reservations${query && Object.keys(query).length > 0 
-            ? `?${new URLSearchParams(query as Record<string, string>).toString()}` 
-            : ''}`;
-            
-          console.log('[API Proxy] Пробуем альтернативный URL:', altUrl);
-          
-          const altController = new AbortController();
-          const altTimeoutId = setTimeout(() => altController.abort(), 10000);
-          
-          const altResponse = await fetch(altUrl, {
-            method,
-            headers,
-            signal: altController.signal,
-            // @ts-ignore
-            agent: altUrl.startsWith('https') ? httpsAgent : undefined
-          });
-          
-          clearTimeout(altTimeoutId);
-          
-          if (!altResponse.ok) {
-            throw new Error(`Альтернативный запрос: HTTP ошибка ${altResponse.status}`);
-          }
-          
-          const altText = await altResponse.text();
-          console.log(`[API Proxy] Альтернативный ответ получен: ${altText.substring(0, 100)}...`);
-          
-          const altData = JSON.parse(altText);
-          
-          // Кэшируем результат
-          if (method === 'GET') {
-            saveToCache(cacheKey, altData);
-          }
-          
-          // Возвращаем данные
-          return res.status(200).json(altData);
-        } catch (altError) {
-          console.error('[API Proxy] Ошибка альтернативного запроса:', altError);
-          
-          // Возвращаем демо-данные для авторизованных пользователей, только если нет кэша
-          console.log('[API Proxy] Возвращаем демо-данные для авторизованного пользователя (нет кэша)');
-          const demoReservations = generateDemoReservations();
-          saveToCache(cacheKey, demoReservations);
-          return res.status(200).json(demoReservations);
-        }
-      } else {
-        // Для неавторизованных пользователей возвращаем демо-данные
-        console.log('[API Proxy] Пользователь не авторизован, возвращаем демо-данные');
-        const demoReservations = generateDemoReservations();
-        saveToCache(cacheKey, demoReservations);
-        return res.status(200).json(demoReservations);
-      }
+      // Отправляем демо-данные клиенту
+      res.status(200).json(demoReservations);
     }
   } catch (error: any) {
-    console.error('[API Proxy] Ошибка при обработке запроса бронирований:', error);
+    console.error('Reservations API Proxy: Ошибка при обработке запроса:', error);
     
-    // Проверяем наличие кэшированных данных
-    const cacheKey = `reservations_${JSON.stringify(query)}`;
-    const cachedData = getFromCache(cacheKey);
-    if (cachedData) {
-      console.log('[API Proxy] Возвращаем кэшированные данные из-за общей ошибки');
-      return res.status(200).json(cachedData);
-    }
+    // В случае любой ошибки возвращаем демо-данные
+    // Получаем ID пользователя из токена
+    const token = req.headers.authorization;
+    const userData = token ? getUserFromToken(token) : null;
+    const userId = userData?.id || req.headers['x-user-id'];
+    const userRole = userData?.role || 'client';
     
-    // Проверяем наличие авторизации
-    const hasAuthToken = !!token;
-    if (hasAuthToken) {
-      // Для авторизованных пользователей без кэша возвращаем демо-данные
-      console.log('[API Proxy] Возвращаем демо-данные для авторизованного пользователя (общая ошибка)');
-      const demoReservations = generateDemoReservations();
-      return res.status(200).json(demoReservations);
-    } else {
-      // Для неавторизованных пользователей возвращаем демо-данные
-      console.log('[API Proxy] Пользователь не авторизован, возвращаем демо-данные');
-      const demoReservations = generateDemoReservations();
-      return res.status(200).json(demoReservations);
-    }
+    const demoReservations = generateDemoReservations(userId ? Number(userId) : undefined, userRole);
+    
+    res.status(200).json(demoReservations);
   }
 }
 
-// Функция для генерации демо-данных бронирований
-function generateDemoReservations() {
+// Функция для генерации демо-данных бронирований с учетом пользователя
+function generateDemoReservations(userId?: number, userRole?: string) {
   const now = new Date();
   
   // Генерируем дату в прошлом со случайным смещением (до 10 дней назад)
@@ -304,9 +280,18 @@ function generateDemoReservations() {
     const reservation_time = getRandomFutureDate();
     const status = statuses[getRandomInt(0, statuses.length - 1)];
     
+    // Используем переданный userId или генерируем случайный
+    const reservationUserId = userId || getRandomInt(1, 5);
+    
+    // Если пользователь обычный клиент, то генерируем только его бронирования
+    // Если админ или официант - генерируем бронирования для разных пользователей
+    const actualUserId = (userRole === 'admin' || userRole === 'waiter') 
+      ? getRandomInt(1, 5) 
+      : reservationUserId;
+    
     reservations.push({
       id,
-      user_id: getRandomInt(1, 5),
+      user_id: actualUserId,
       table_id: getRandomInt(1, 10),
       table_number: getRandomInt(1, 10),
       guests_count: getRandomInt(1, 6),
@@ -322,6 +307,6 @@ function generateDemoReservations() {
     });
   }
   
-  console.log(`[API Proxy] Сгенерировано ${reservations.length} демо-бронирований`);
+  console.log(`Reservations API Proxy: Сгенерировано ${reservations.length} демо-бронирований для пользователя ${userId || 'гость'} с ролью ${userRole || 'client'}`);
   return reservations;
 } 

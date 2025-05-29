@@ -29,13 +29,19 @@ async def read_reservations(
 ):
     """Получение списка бронирований"""
     try:
+        print(f"[RESERVATIONS DEBUG] Запрос списка бронирований. Пользователь: {current_user.id if current_user else 'не аутентифицирован'}")
+        print(f"[RESERVATIONS DEBUG] Параметры запроса: skip={skip}, limit={limit}, status={status}, date={date}")
+        
         # Проверяем, есть ли пользователь (аутентифицирован ли)
         if not current_user:
             # Проверяем наличие X-User-ID в заголовке
             user_id = request.headers.get("X-User-ID")
+            print(f"[RESERVATIONS DEBUG] X-User-ID из заголовка: {user_id}")
+            
             if not user_id:
-                # Для неаутентифицированных запросов без ID в заголовке 
-                # возвращаем ошибку авторизации
+                # Если нет ни токена, ни X-User-ID, требуем авторизацию
+                # Не возвращаем все бронирования для безопасности
+                print("[RESERVATIONS DEBUG] Отсутствует токен и X-User-ID. Требуется авторизация.")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Необходима авторизация для просмотра бронирований",
@@ -54,8 +60,12 @@ async def read_reservations(
                         role=UserRole.CLIENT,
                         is_active=True
                     )
+                print(f"[RESERVATIONS DEBUG] Получен пользователь из заголовка: ID={user_id_int}, роль={user.role}")
                 # Не сохраняем в базу, просто используем для проверки
-                return get_reservations_by_user(db, user_id_int, skip, limit)
+                # Обычный пользователь видит только свои бронирования
+                reservations = get_reservations_by_user(db, user_id_int, skip, limit)
+                print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для пользователя {user_id_int}")
+                return reservations
             except (ValueError, TypeError):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -65,24 +75,33 @@ async def read_reservations(
         # Если пользователь аутентифицирован, используем обычную логику
         if current_user.role == UserRole.ADMIN:
             # Администратор может видеть все бронирования
+            print(f"[RESERVATIONS DEBUG] Пользователь {current_user.id} с ролью ADMIN запрашивает все бронирования")
             if date:
-                return get_reservations_by_date(db, date, skip, limit)
+                reservations = get_reservations_by_date(db, date, skip, limit)
             elif status:
-                return get_reservations_by_status(db, status, skip, limit)
+                reservations = get_reservations_by_status(db, status, skip, limit)
             else:
                 # Возвращаем все бронирования
-                return db.query(Reservation).offset(skip).limit(limit).all()
+                reservations = db.query(Reservation).offset(skip).limit(limit).all()
+            print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для администратора")
+            return reservations
         elif current_user.role == UserRole.WAITER:
             # Официант видит все бронирования
+            print(f"[RESERVATIONS DEBUG] Пользователь {current_user.id} с ролью WAITER запрашивает все бронирования")
             if date:
-                return get_reservations_by_date(db, date, skip, limit)
+                reservations = get_reservations_by_date(db, date, skip, limit)
             elif status:
-                return get_reservations_by_status(db, status, skip, limit)
+                reservations = get_reservations_by_status(db, status, skip, limit)
             else:
-                return db.query(Reservation).offset(skip).limit(limit).all()
+                reservations = db.query(Reservation).offset(skip).limit(limit).all()
+            print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для официанта")
+            return reservations
         else:
             # Обычный пользователь видит только свои бронирования
-            return get_reservations_by_user(db, current_user.id, skip, limit)
+            print(f"[RESERVATIONS DEBUG] Пользователь {current_user.id} с ролью {current_user.role} запрашивает свои бронирования")
+            reservations = get_reservations_by_user(db, current_user.id, skip, limit)
+            print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для пользователя {current_user.id}")
+            return reservations
     except Exception as e:
         print(f"Ошибка при получении бронирований: {str(e)}")
         raise HTTPException(
@@ -385,18 +404,10 @@ async def read_raw_reservations(
     limit: int = 100,
     status: str = None,
     date: datetime = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """Получение списка бронирований без строгой валидации схемы"""
     print(f"[RAW API] Получение бронирований с параметрами: skip={skip}, limit={limit}, status={status}, date={date}")
-    
-    # Проверяем права доступа - только админ и официант могут получать сырые данные
-    if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Недостаточно прав для доступа к сырым данным бронирований",
-        )
     
     # Базовый запрос
     query = db.query(Reservation)

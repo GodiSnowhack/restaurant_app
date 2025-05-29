@@ -32,7 +32,7 @@ export const DEFAULT_URLS = {
   },
   production: {
     // Используем точный URL из переменной среды Railway
-    api: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app',
+    api: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1',
     frontend: process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://frontend-production-8eb6.up.railway.app',
     orders: 'https://backend-production-1a78.up.railway.app/api/v1/orders/'
   }
