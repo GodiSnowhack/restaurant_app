@@ -1,6 +1,86 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { query } from '../../../../lib/db';
 
+// Мок-данные для аналитики меню
+const mockMenuData = {
+  topSellingDishes: [
+    { dishId: 1, dishName: "Стейк Рибай", salesCount: 105, revenue: 210000, percentage: 25.2 },
+    { dishId: 2, dishName: "Цезарь с курицей", salesCount: 89, revenue: 133500, percentage: 16.1 },
+    { dishId: 3, dishName: "Паста Карбонара", salesCount: 76, revenue: 95000, percentage: 11.4 },
+    { dishId: 4, dishName: "Борщ", salesCount: 70, revenue: 84000, percentage: 10.1 },
+    { dishId: 5, dishName: "Тирамису", salesCount: 68, revenue: 74800, percentage: 9.0 }
+  ],
+  leastSellingDishes: [
+    { dishId: 30, dishName: "Салат Оливье", salesCount: 15, revenue: 18000, percentage: 2.2 },
+    { dishId: 31, dishName: "Окрошка", salesCount: 12, revenue: 14400, percentage: 1.7 },
+    { dishId: 32, dishName: "Рататуй", salesCount: 10, revenue: 15000, percentage: 1.8 },
+    { dishId: 33, dishName: "Суп-пюре из тыквы", salesCount: 8, revenue: 9600, percentage: 1.2 },
+    { dishId: 34, dishName: "Салат из морепродуктов", salesCount: 5, revenue: 7500, percentage: 0.9 }
+  ],
+  popularCategories: [
+    { categoryId: 1, categoryName: "Основные блюда", dishesCount: 12, salesCount: 320, revenue: 480000, percentage: 42.5 },
+    { categoryId: 2, categoryName: "Салаты", dishesCount: 8, salesCount: 220, revenue: 264000, percentage: 23.4 },
+    { categoryId: 3, categoryName: "Супы", dishesCount: 5, salesCount: 150, revenue: 150000, percentage: 13.3 },
+    { categoryId: 4, categoryName: "Десерты", dishesCount: 7, salesCount: 180, revenue: 162000, percentage: 14.4 },
+    { categoryId: 5, categoryName: "Напитки", dishesCount: 10, salesCount: 120, revenue: 72000, percentage: 6.4 }
+  ],
+  popularCombinations: [
+    { 
+      combination: ["Стейк Рибай", "Красное вино"], 
+      count: 78, 
+      revenue: 195000,
+      dishes: [
+        { dishId: 1, dishName: "Стейк Рибай" },
+        { dishId: 21, dishName: "Красное вино" }
+      ]
+    },
+    { 
+      combination: ["Цезарь с курицей", "Паста Карбонара"], 
+      count: 45, 
+      revenue: 112500,
+      dishes: [
+        { dishId: 2, dishName: "Цезарь с курицей" },
+        { dishId: 3, dishName: "Паста Карбонара" }
+      ]
+    },
+    { 
+      combination: ["Борщ", "Хлеб", "Компот"], 
+      count: 40, 
+      revenue: 64000,
+      dishes: [
+        { dishId: 4, dishName: "Борщ" },
+        { dishId: 11, dishName: "Хлеб" },
+        { dishId: 25, dishName: "Компот" }
+      ]
+    }
+  ],
+  profitableItems: [
+    { dishId: 1, dishName: "Стейк Рибай", costPrice: 600, sellPrice: 2000, margin: 70.0, salesCount: 105, revenue: 210000, profit: 147000 },
+    { dishId: 6, dishName: "Лосось на гриле", costPrice: 550, sellPrice: 1800, margin: 69.4, salesCount: 60, revenue: 108000, profit: 75000 },
+    { dishId: 2, dishName: "Цезарь с курицей", costPrice: 450, sellPrice: 1500, margin: 70.0, salesCount: 89, revenue: 133500, profit: 93450 }
+  ],
+  menuItemTrends: Array.from({ length: 30 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30 + i);
+    return {
+      date: date.toISOString().split('T')[0],
+      items: [
+        { dishId: 1, dishName: "Стейк Рибай", count: Math.round(5 + Math.random() * 5) },
+        { dishId: 2, dishName: "Цезарь с курицей", count: Math.round(3 + Math.random() * 4) },
+        { dishId: 3, dishName: "Паста Карбонара", count: Math.round(2 + Math.random() * 3) }
+      ]
+    };
+  }),
+  period: {
+    startDate: (() => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - 1);
+      return date.toISOString().split('T')[0];
+    })(),
+    endDate: new Date().toISOString().split('T')[0]
+  }
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -11,6 +91,13 @@ export default async function handler(
   if (req.method !== 'GET') {
     console.log('API /menu: Неверный метод запроса:', req.method);
     return res.status(405).json({ message: 'Метод не разрешен' });
+  }
+
+  // Проверяем, запрошены ли мок-данные
+  const { useMockData } = req.query;
+  if (useMockData === 'true') {
+    console.log('API /menu: Возвращаем мок-данные по запросу');
+    return res.status(200).json(mockMenuData);
   }
 
   try {
@@ -458,45 +545,9 @@ export default async function handler(
     return res.status(200).json(response);
   } catch (error) {
     console.error('API /menu: Критическая ошибка:', error);
-    // Возвращаем мок-данные в случае ошибки
-    const mockResponse = {
-      topSellingDishes: [
-        { dishId: 1, dishName: 'Борщ', salesCount: 150, revenue: 22500, percentage: 20 },
-        { dishId: 2, dishName: 'Пицца Маргарита', salesCount: 200, revenue: 40000, percentage: 27 },
-        { dishId: 3, dishName: 'Стейк из говядины', salesCount: 100, revenue: 45000, percentage: 13 },
-        { dishId: 4, dishName: 'Цезарь с курицей', salesCount: 180, revenue: 27000, percentage: 24 },
-        { dishId: 5, dishName: 'Тирамису', salesCount: 120, revenue: 18000, percentage: 16 }
-      ],
-      mostProfitableDishes: [
-        { dishId: 3, dishName: 'Стейк из говядины', salesCount: 100, revenue: 45000, percentage: 30, costPrice: 25000, profit: 20000, profitMargin: 44 },
-        { dishId: 2, dishName: 'Пицца Маргарита', salesCount: 200, revenue: 40000, percentage: 26, costPrice: 24000, profit: 16000, profitMargin: 40 },
-        { dishId: 4, dishName: 'Цезарь с курицей', salesCount: 180, revenue: 27000, percentage: 18, costPrice: 14400, profit: 12600, profitMargin: 47 },
-        { dishId: 1, dishName: 'Борщ', salesCount: 150, revenue: 22500, percentage: 15, costPrice: 10500, profit: 12000, profitMargin: 53 },
-        { dishId: 5, dishName: 'Тирамису', salesCount: 120, revenue: 18000, percentage: 12, costPrice: 7200, profit: 10800, profitMargin: 60 }
-      ],
-      leastSellingDishes: [
-        { dishId: 6, dishName: 'Греческий салат', salesCount: 50, revenue: 8000, percentage: 7 },
-        { dishId: 7, dishName: 'Суп Том Ям', salesCount: 40, revenue: 10000, percentage: 5 },
-        { dishId: 8, dishName: 'Паста Карбонара', salesCount: 35, revenue: 9000, percentage: 5 },
-        { dishId: 9, dishName: 'Чизкейк', salesCount: 30, revenue: 6000, percentage: 4 },
-        { dishId: 10, dishName: 'Наполеон', salesCount: 25, revenue: 5000, percentage: 3 }
-      ],
-      averageCookingTime: 15,
-      categoryPopularity: {
-        1: 20,
-        2: 27,
-        3: 13,
-        4: 24,
-        5: 16
-      },
-      menuItemSalesTrend: {},
-      period: {
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
-      }
-    };
     
-    console.log('API /menu: Отправка мок-данных из-за ошибки');
-    return res.status(200).json(mockResponse);
+    // В случае ошибки возвращаем мок-данные
+    console.log('API /menu: Возвращаем мок-данные из-за ошибки');
+    return res.status(200).json(mockMenuData);
   }
 } 

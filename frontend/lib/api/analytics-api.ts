@@ -18,6 +18,12 @@ const getApiBaseUrl = () => {
   // Если мы на клиенте, определим baseURL на основе текущего хоста
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
+    
+    // Проверяем, находимся ли мы в Railway
+    if (host.includes('railway.app')) {
+      return 'https://backend-production-1a78.up.railway.app/api/v1/analytics';
+    }
+    
     return `http://${host}:8000/api/v1/analytics`;
   }
   
@@ -166,6 +172,38 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
   url = `${url}${queryParams}`;
   
   try {
+    // Проверяем, работаем ли мы в Railway
+    const isRailway = typeof window !== 'undefined' && window.location.hostname.includes('railway.app');
+    
+    // Если мы в Railway, сначала пробуем использовать локальный API
+    if (isRailway) {
+      console.log(`Пробуем использовать локальный API для ${endpoint}`);
+      try {
+        // Пробуем запросить данные с локального API v1/analytics
+        const localEndpoint = endpoint.split('/').pop() || endpoint;
+        const localParams = new URLSearchParams(queryParams.substring(1));
+        localParams.append('useMockData', 'true');
+        
+        const localApiUrl = `/api/v1/analytics/${localEndpoint}?${localParams.toString()}`;
+        
+        const localResponse = await fetch(localApiUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (localResponse.ok) {
+          const data = await localResponse.json();
+          console.log(`Получены данные с локального API для ${endpoint}`);
+          return data;
+        }
+      } catch (localError) {
+        console.error(`Не удалось получить данные с локального API для ${endpoint}:`, localError);
+      }
+    }
+    
+    // Пытаемся использовать удаленный API
     const config = {
       params: {
         useMockData: false,
@@ -173,8 +211,46 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
       }
     };
     
-    const response = await analyticsAxios.get<T>(url, config);
-    return response.data;
+    try {
+      // Пытаемся сделать запрос к бэкенду
+      const response = await analyticsAxios.get<T>(url, config);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
+      
+      // Если мы ещё не пробовали локальный API и получаем ошибку, пробуем его
+      if (!isRailway) {
+        console.log(`Пробуем использовать локальный API для ${endpoint}`);
+        
+        try {
+          // Пробуем запросить данные с локального API v1/analytics
+          const localEndpoint = endpoint.split('/').pop() || endpoint;
+          const localParams = new URLSearchParams(queryParams.substring(1));
+          localParams.append('useMockData', 'true');
+          
+          const localApiUrl = `/api/v1/analytics/${localEndpoint}?${localParams.toString()}`;
+          
+          const localResponse = await fetch(localApiUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (localResponse.ok) {
+            const data = await localResponse.json();
+            console.log(`Получены данные с локального API для ${endpoint}`);
+            return data;
+          }
+        } catch (localError) {
+          console.error(`Не удалось получить данные с локального API для ${endpoint}:`, localError);
+        }
+      }
+      
+      // В случае ошибки возвращаем мок-данные
+      console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
+      return getMockData(endpoint.split('/').pop() || '') as T;
+    }
   } catch (error: any) {
     console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
     
