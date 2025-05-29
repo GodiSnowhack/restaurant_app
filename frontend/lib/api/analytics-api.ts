@@ -550,8 +550,8 @@ const analyticsApi = {
         ...baseCustomerData,
         customerDemographics: {
           ...baseCustomerData.customerDemographics,
-          age: dashboardData.customerDemographics?.age || baseCustomerData.customerDemographics?.age,
-          gender: dashboardData.customerDemographics?.gender || baseCustomerData.customerDemographics?.gender
+          age_groups: dashboardData.customerDemographics?.age_groups || baseCustomerData.customerDemographics?.age_groups,
+          total_customers: dashboardData.customerDemographics?.total_customers || baseCustomerData.customerDemographics?.total_customers || baseCustomerData.totalCustomers
         },
         visitFrequency: dashboardData.visitFrequency || baseCustomerData.visitFrequency
       };
