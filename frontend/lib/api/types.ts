@@ -112,6 +112,7 @@ export interface OrderItem {
   dish_image?: string;
   created_at?: string;
   updated_at?: string | null;
+  total_price?: number;
 }
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';

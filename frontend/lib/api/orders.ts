@@ -1,191 +1,221 @@
 import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus } from './types';
 
+// Функция для создания тестовых данных заказов
+const getDemoOrders = (status?: string): Order[] => {
+  // Базовый список заказов для тестирования
+  const demoOrders: Order[] = [
+    {
+      id: 1001,
+      user_id: 1,
+      status: 'pending',
+      payment_status: 'unpaid',
+      payment_method: 'cash',
+      order_type: 'dine_in',
+      table_number: 5,
+      total_amount: 3500,
+      total_price: 3500,
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      customer_name: 'Иван Петров',
+      customer_phone: '+7 (999) 123-45-67',
+      is_urgent: true,
+      order_code: 'ORD-1001',
+      items: [
+        {
+          id: 1,
+          dish_id: 101,
+          name: 'Борщ',
+          quantity: 2,
+          price: 500,
+          total_price: 1000,
+          special_instructions: 'Без сметаны'
+        },
+        {
+          id: 2,
+          dish_id: 102,
+          name: 'Стейк Рибай',
+          quantity: 1,
+          price: 2500,
+          total_price: 2500
+        }
+      ]
+    },
+    {
+      id: 1002,
+      user_id: 2,
+      status: 'completed',
+      payment_status: 'paid',
+      payment_method: 'card',
+      order_type: 'delivery',
+      total_amount: 1800,
+      total_price: 1800,
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
+      completed_at: new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString(),
+      customer_name: 'Анна Сидорова',
+      customer_phone: '+7 (999) 987-65-43',
+      delivery_address: 'ул. Ленина, д. 10, кв. 5',
+      order_code: 'ORD-1002',
+      items: [
+        {
+          id: 3,
+          dish_id: 103,
+          name: 'Пицца Маргарита',
+          quantity: 1,
+          price: 800,
+          total_price: 800
+        },
+        {
+          id: 4,
+          dish_id: 104,
+          name: 'Тирамису',
+          quantity: 2,
+          price: 500,
+          total_price: 1000
+        }
+      ]
+    },
+    {
+      id: 1003,
+      user_id: 1,
+      status: 'processing',
+      payment_status: 'unpaid',
+      payment_method: 'cash',
+      order_type: 'pickup',
+      total_amount: 2200,
+      total_price: 2200,
+      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
+      customer_name: 'Иван Петров',
+      customer_phone: '+7 (999) 123-45-67',
+      order_code: 'ORD-1003',
+      items: [
+        {
+          id: 5,
+          dish_id: 105,
+          name: 'Суши-сет "Филадельфия"',
+          quantity: 1,
+          price: 1500,
+          total_price: 1500
+        },
+        {
+          id: 6,
+          dish_id: 106,
+          name: 'Мисо-суп',
+          quantity: 2,
+          price: 350,
+          total_price: 700
+        }
+      ]
+    }
+  ];
+
+  // Если указан статус, фильтруем заказы
+  if (status) {
+    return demoOrders.filter(order => order.status === status);
+  }
+
+  return demoOrders;
+};
+
 // API функции для работы с заказами
 export const ordersApi = {
   // Получение всех заказов с возможностью фильтрации
-  getOrders: async (startDate: string, endDate: string): Promise<Order[]> => {
-    console.log('API: Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
-    
+  getAllOrders: async (params?: { 
+    status?: string, 
+    user_id?: number, 
+    start_date?: string, 
+    end_date?: string 
+  }): Promise<Order[]> => {
     try {
-      // Получаем токен для запроса
+      // Отключаем демо-режим при запросе реальных данных
+      const isDemoMode = localStorage.getItem('admin_use_demo_data') === 'true';
+      if (isDemoMode) {
+        console.log('Режим демо-данных включен');
+        return getDemoOrders(params?.status);
+      }
+      
+      console.log('Режим демо-данных отключен');
+      
+      // Формируем параметры запроса
+      let url = '/api/orders';
+      const queryParams: string[] = [];
+      
+      if (params) {
+        if (params.status) queryParams.push(`status=${params.status}`);
+        if (params.user_id) queryParams.push(`user_id=${params.user_id}`);
+        if (params.start_date) queryParams.push(`start_date=${params.start_date}`);
+        if (params.end_date) queryParams.push(`end_date=${params.end_date}`);
+      }
+      
+      if (queryParams.length > 0) {
+        url += `?${queryParams.join('&')}`;
+      }
+
+      // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('API: Отсутствует токен авторизации');
+        console.error('Отсутствует токен авторизации');
         return [];
       }
       
-      // Проверяем наличие кэша и его актуальность
-      const cacheKey = `orders_data_${startDate}_${endDate}`;
-      const cacheTimeKey = `orders_cache_timestamp_${startDate}_${endDate}`;
-      const cachedTimestamp = localStorage.getItem(cacheTimeKey);
-      const cachedData = localStorage.getItem(cacheKey);
-      const now = Date.now();
-      const cacheAge = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
-      
-      // Используем кэш, если он не старше 5 минут
-      if (cachedData && cachedTimestamp && cacheAge < 5 * 60 * 1000) {
-        console.log('API: Используем кэшированные данные (возраст кэша:', Math.round(cacheAge/1000), 'сек)');
-        return JSON.parse(cachedData);
-      }
-      
-      // Преобразуем даты в формат YYYY-MM-DD, если они уже не в этом формате
-      const formatSimpleDate = (dateStr: string): string => {
-        if (!dateStr) return '';
-        if (dateStr.length <= 10) return dateStr; // Если уже в формате YYYY-MM-DD
-        try {
-          const date = new Date(dateStr);
-          return date.toISOString().split('T')[0]; // Возвращаем только часть с датой (YYYY-MM-DD)
-        } catch (e) {
-          console.error('API: Ошибка форматирования даты:', e);
-          return dateStr;
-        }
+      // Формируем заголовки запроса с добавлением токена
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
       };
       
-      const simpleStartDate = formatSimpleDate(startDate);
-      const simpleEndDate = formatSimpleDate(endDate);
-      
-      console.log('API: Запрос с упрощенными датами:', { start_date: simpleStartDate, end_date: simpleEndDate });
-      
-      // Формируем URL для запроса с корректным кодированием параметров
-      const queryParams = new URLSearchParams();
-      queryParams.append('start_date', simpleStartDate);
-      queryParams.append('end_date', simpleEndDate);
-      
-      // Получаем роль пользователя
-      const userRole = localStorage.getItem('user_role') || 'customer';
-      
-      // Создаем контроллер для отмены запроса
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
-      
+      // Добавляем идентификаторы пользователя и роли из токена
       try {
-        // Отправляем запрос через локальный API-прокси
-        const url = `/api/orders?${queryParams.toString()}`;
-        console.log('API: Отправка запроса к:', url);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole === 'admin' ? 'admin' : 'customer'
-          },
-          cache: 'no-cache',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Проверяем статус ответа
-        if (!response.ok) {
-          console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
-          
-          // Для администратора пробуем получить данные напрямую из БД
-          if (userRole === 'admin') {
-            console.log('API: Пробуем получить данные администратора напрямую из БД');
-            const dbUrl = `/api/db/orders?${queryParams.toString()}`;
-            
-            // Создаем новый контроллер для второго запроса
-            const dbController = new AbortController();
-            const dbTimeoutId = setTimeout(() => dbController.abort(), 10000);
-            
-            try {
-              const dbResponse = await fetch(dbUrl, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  'Authorization': `Bearer ${token}`,
-                  'X-User-Role': 'admin'
-                },
-                cache: 'no-cache',
-                signal: dbController.signal
-              });
-              
-              clearTimeout(dbTimeoutId);
-              
-              if (dbResponse.ok) {
-                const dbData = await dbResponse.json();
-                console.log('API: Получены данные заказов из БД:', { count: Array.isArray(dbData) ? dbData.length : 'не массив' });
-                
-                if (Array.isArray(dbData)) {
-                  // Кэшируем результат
-                  try {
-                    localStorage.setItem(cacheKey, JSON.stringify(dbData));
-                    localStorage.setItem(cacheTimeKey, Date.now().toString());
-                  } catch (e) {
-                    console.error('API: Ошибка при кэшировании данных:', e);
-                  }
-                  
-                  return dbData;
-                }
-              }
-            } catch (dbError) {
-              clearTimeout(dbTimeoutId);
-              console.error('API: Ошибка при запросе к БД:', dbError);
-            }
-          }
-          
-          // Возвращаем кэшированные данные, если есть
-          if (cachedData) {
-            console.log('API: Используем кэшированные данные из-за ошибки');
-            return JSON.parse(cachedData);
-          }
-          
-          return [];
-        }
-        
-        // Получаем данные ответа
-        const data = await response.json();
-        console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
-        
-        if (Array.isArray(data)) {
-          // Кэшируем результат
-          try {
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-            localStorage.setItem(cacheTimeKey, Date.now().toString());
-          } catch (e) {
-            console.error('API: Ошибка при кэшировании данных:', e);
-          }
-          
-          return data;
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          // На случай если API возвращает данные в формате { items: [] }
-          try {
-            localStorage.setItem(cacheKey, JSON.stringify(data.items));
-            localStorage.setItem(cacheTimeKey, Date.now().toString());
-          } catch (e) {
-            console.error('API: Ошибка при кэшировании данных:', e);
-          }
-          
-          return data.items;
-        } else {
-          console.warn('API: Неожиданный формат данных:', data);
-          
-          // Возвращаем кэшированные данные, если есть
-          if (cachedData) {
-            console.log('API: Используем кэшированные данные из-за неожиданного формата');
-            return JSON.parse(cachedData);
-          }
-          
-          return [];
-        }
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        console.error('API: Ошибка при запросе заказов:', fetchError);
-        
-        // Возвращаем кэшированные данные в случае ошибки
-        if (cachedData) {
-          console.log('API: Используем кэшированные данные из-за ошибки');
-          return JSON.parse(cachedData);
-        }
-        
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        const { sub, role } = JSON.parse(jsonPayload);
+        if (sub) headers['X-User-ID'] = sub;
+        if (role) headers['X-User-Role'] = role;
+      } catch (e) {
+        console.error('Ошибка при извлечении данных из токена:', e);
+      }
+      
+      console.log(`Даты для запроса:`, { 
+        startDate: params?.start_date, 
+        endDate: params?.end_date 
+      });
+      
+      console.log(`Запрос заказов с параметрами:`, { 
+        start_date: params?.start_date,
+        end_date: params?.end_date
+      });
+      
+      // Отправляем запрос через локальный API-прокси
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      // Проверяем статус ответа
+      if (!response.ok) {
+        console.error(`Ошибка при получении заказов: ${response.status}`);
         return [];
       }
+      
+      // Получаем данные и обрабатываем их
+      const data = await response.json();
+      console.log('Полученные заказы:', data);
+      
+      // Нормализуем данные
+      const orders = Array.isArray(data) ? data : [];
+      console.log('Нормализованные заказы:', orders);
+      
+      return orders;
     } catch (error: any) {
-      console.error('API: Общая ошибка при запросе заказов:', error.message);
+      console.error('Ошибка при получении заказов:', error);
       return [];
     }
   },
@@ -434,60 +464,6 @@ export const ordersApi = {
     }
   }
 };
-
-// Добавим функцию для генерации демо-заказов официанта
-function generateWaiterDemoOrders(): Order[] {
-  return [
-    {
-      id: 1001,
-      user_id: 1,
-      waiter_id: 1,
-      status: 'confirmed',
-      payment_status: 'unpaid',
-      payment_method: 'cash',
-      order_type: 'dine-in',
-      total_amount: 3200,
-      total_price: 3200,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      items: [
-        {
-          dish_id: 2,
-          quantity: 2,
-          price: 1600,
-          name: 'Стейк'
-        }
-      ],
-      table_number: 3,
-      customer_name: 'Иван Петров',
-      customer_phone: '+7 (700) 111-22-33'
-    },
-    {
-      id: 1002,
-      user_id: 2,
-      waiter_id: 1,
-      status: 'preparing',
-      payment_status: 'unpaid',
-      payment_method: 'card',
-      order_type: 'dine-in',
-      total_amount: 1800,
-      total_price: 1800,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      items: [
-        {
-          dish_id: 3,
-          quantity: 1,
-          price: 1800,
-          name: 'Паста'
-        }
-      ],
-      table_number: 7,
-      customer_name: 'Мария Сидорова',
-      customer_phone: '+7 (700) 222-33-44'
-    }
-  ];
-}
 
 // Функция для генерации демо-данных заказов для админки
 function generateAdminOrdersDemoData(): Order[] {

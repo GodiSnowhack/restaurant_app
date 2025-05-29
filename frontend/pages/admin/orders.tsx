@@ -115,7 +115,10 @@ const AdminOrdersPage: NextPage = () => {
       
       // Получаем заказы через API
       console.log('Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
-      const ordersData = await ordersApi.getOrders(startDate, endDate);
+      const ordersData = await ordersApi.getAllOrders({
+        start_date: startDate,
+        end_date: endDate
+      });
       
       console.log('Полученные заказы:', ordersData);
       
