@@ -184,15 +184,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     switch (targetEndpoint) {
       case 'financial':
         const financialData = await dbQuery(SQL_QUERIES.financial, [startDate, endDate]);
+        const financialDataArray = Array.isArray(financialData) ? financialData : [];
         
         // Формируем объект для ответа
         result = {
-          totalRevenue: financialData[0]?.totalRevenue || 0,
-          totalCost: financialData[0]?.totalCost || 0,
-          grossProfit: financialData[0]?.grossProfit || 0,
-          profitMargin: financialData[0]?.profitMargin || 0,
-          averageOrderValue: financialData[0]?.averageOrderValue || 0,
-          orderCount: financialData[0]?.orderCount || 0,
+          totalRevenue: financialDataArray[0]?.totalRevenue || 0,
+          totalCost: financialDataArray[0]?.totalCost || 0,
+          grossProfit: financialDataArray[0]?.grossProfit || 0,
+          profitMargin: financialDataArray[0]?.profitMargin || 0,
+          averageOrderValue: financialDataArray[0]?.averageOrderValue || 0,
+          orderCount: financialDataArray[0]?.orderCount || 0,
           revenueByCategory: {} as Record<string, number>,
           revenueByTimeOfDay: {} as Record<string, number>,
           revenueByDayOfWeek: {} as Record<string, number>,
@@ -217,9 +218,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `, [startDate, endDate]);
         
         // Добавляем данные по категориям в результат
-        categoryData.forEach((cat: any) => {
-          result.revenueByCategory[cat.categoryId] = cat.revenue;
-        });
+        if (Array.isArray(categoryData)) {
+          categoryData.forEach((cat: any) => {
+            result.revenueByCategory[cat.categoryId] = cat.revenue;
+          });
+        }
         
         // Получаем тренд выручки за период
         const trendData = await dbQuery(`
@@ -234,7 +237,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ORDER BY date(o.created_at)
         `, [startDate, endDate]);
         
-        result.revenueTrend = trendData;
+        if (Array.isArray(trendData)) {
+          result.revenueTrend = trendData;
+        }
         break;
         
       case 'menu':
@@ -294,20 +299,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'customers':
         try {
           const customerData = await dbQuery(SQL_QUERIES.customers, [startDate, endDate, startDate, endDate]);
+          const customerDataArray = Array.isArray(customerData) ? customerData : [];
           
           result = {
-            totalCustomers: customerData[0]?.totalCustomers || 0,
-            newCustomers: customerData[0]?.newCustomers || 0,
-            returningCustomers: customerData[0]?.returningCustomers || 0,
-            customerRetentionRate: customerData[0]?.returnRate || 0,
-            returnRate: customerData[0]?.returnRate || 0,
-            averageVisitsPerCustomer: customerData[0]?.averageVisitsPerCustomer || 0,
-            customerSatisfaction: customerData[0]?.customerSatisfaction || 0,
+            totalCustomers: customerDataArray[0]?.totalCustomers || 0,
+            newCustomers: customerDataArray[0]?.newCustomers || 0,
+            returningCustomers: customerDataArray[0]?.returningCustomers || 0,
+            customerRetentionRate: customerDataArray[0]?.returnRate || 0,
+            returnRate: customerDataArray[0]?.returnRate || 0,
+            averageVisitsPerCustomer: customerDataArray[0]?.averageVisitsPerCustomer || 0,
+            customerSatisfaction: customerDataArray[0]?.customerSatisfaction || 0,
             customerSegmentation: {},
             topCustomers: [],
             customerDemographics: {
-              age: {},
-              gender: {}
+              age_groups: {},
+              total_customers: 0
             },
             period: { startDate, endDate }
           };
@@ -344,17 +350,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
       case 'operational':
         const operationalData = await dbQuery(SQL_QUERIES.operational, [startDate, endDate, startDate, endDate, startDate, endDate]);
+        const operationalDataArray = Array.isArray(operationalData) ? operationalData : [];
         
         result = {
-          averageOrderPreparationTime: operationalData[0]?.averageOrderPreparationTime || 0,
-          averageTableTurnoverTime: operationalData[0]?.averageTableTurnoverTime || 0,
-          tablesCount: operationalData[0]?.tablesCount || 0,
+          averageOrderPreparationTime: operationalDataArray[0]?.averageOrderPreparationTime || 0,
+          averageTableTurnoverTime: operationalDataArray[0]?.averageTableTurnoverTime || 0,
+          tablesCount: operationalDataArray[0]?.tablesCount || 0,
           averageTableUtilization: 0, // Заглушка
-          averageOrdersPerTable: operationalData[0]?.averageOrdersPerTable || 0,
+          averageOrdersPerTable: operationalDataArray[0]?.averageOrdersPerTable || 0,
           tableUtilization: {} as Record<string, number>,
           peakHours: {} as Record<string, number>,
           staffEfficiency: {} as Record<string, any>,
-          orderCompletionRates: operationalData[0]?.orderCompletionRates ? JSON.parse(operationalData[0].orderCompletionRates) : {},
+          orderCompletionRates: operationalDataArray[0]?.orderCompletionRates ? JSON.parse(operationalDataArray[0].orderCompletionRates) : {},
           period: { startDate, endDate }
         };
         
@@ -370,11 +377,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `, [startDate, endDate]);
         
         // Рассчитываем утилизацию столиков (упрощенная логика)
-        const maxOrdersPerTable = Math.max(...tableData.map((t: any) => t.orderCount), 1);
-        tableData.forEach((t: any) => {
+        const tableDataArray = Array.isArray(tableData) ? tableData : [];
+        const maxOrdersPerTable = tableDataArray.length > 0 ? 
+          Math.max(...tableDataArray.map((t: any) => t.orderCount), 1) : 1;
+          
+        tableDataArray.forEach((t: any) => {
           result.tableUtilization[t.table_id] = Math.round((t.orderCount / maxOrdersPerTable) * 100);
         });
-        
+
         // Получаем пиковые часы
         const hourlyData = await dbQuery(`
           SELECT 
@@ -382,64 +392,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             COUNT(*) as orderCount
           FROM orders
           WHERE created_at BETWEEN ? AND ?
-          GROUP BY hour
+          GROUP BY strftime('%H:00', created_at)
           ORDER BY orderCount DESC
+          LIMIT 5
         `, [startDate, endDate]);
         
         // Преобразуем пиковые часы в проценты от максимума
-        const maxHourlyOrders = Math.max(...hourlyData.map((h: any) => h.orderCount), 1);
-        hourlyData.forEach((h: any) => {
-          result.peakHours[h.hour] = Math.round((h.orderCount / maxHourlyOrders) * 100);
-        });
+        const hourlyDataArray = Array.isArray(hourlyData) ? hourlyData : [];
+        if (hourlyDataArray.length > 0) {
+          const maxHourlyOrders = Math.max(...hourlyDataArray.map((h: any) => h.orderCount), 1);
+          hourlyDataArray.forEach((h: any) => {
+            result.peakHours[h.hour] = Math.round((h.orderCount / maxHourlyOrders) * 100);
+          });
+        }
         break;
         
       case 'predictive':
-        const predictiveData = await dbQuery(SQL_QUERIES.predictive, [endDate, endDate]);
+        const salesData = await dbQuery(SQL_QUERIES.predictive, [startDate, endDate]);
+        const salesDataArray = Array.isArray(salesData) ? salesData : [];
         
         result = {
-          salesForecast: predictiveData[0]?.salesForecast ? JSON.parse(predictiveData[0].salesForecast) : [],
+          salesForecast: salesDataArray[0]?.salesForecast ? 
+            JSON.parse(salesDataArray[0].salesForecast) : [],
           inventoryForecast: {},
-          staffingNeeds: {
-            'monday': { '10-14': 3, '14-18': 4, '18-22': 5 },
-            'tuesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
-            'wednesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
-            'thursday': { '10-14': 4, '14-18': 5, '18-22': 6 },
-            'friday': { '10-14': 5, '14-18': 6, '18-22': 7 },
-            'saturday': { '10-14': 6, '14-18': 7, '18-22': 8 },
-            'sunday': { '10-14': 5, '14-18': 6, '18-22': 6 }
-          },
+          staffingNeeds: {},
           peakTimePrediction: {},
           suggestedPromotions: [],
           period: { startDate, endDate }
         };
-        
-        // Получаем прогнозы по запасам (упрощенная логика)
-        const inventoryData = await dbQuery(`
-          SELECT 
-            i.id,
-            i.name,
-            i.quantity as currentStock,
-            (
-              SELECT SUM(ri.quantity * oi.quantity)
-              FROM recipe_ingredients ri
-              JOIN menu_items m ON ri.recipe_id = m.recipe_id
-              JOIN order_items oi ON m.id = oi.menu_item_id
-              JOIN orders o ON oi.order_id = o.id
-              WHERE ri.ingredient_id = i.id
-                AND o.created_at BETWEEN date(?, '-7 days') AND ?
-            ) as weeklyUsage
-          FROM ingredients i
-          ORDER BY weeklyUsage DESC NULLS LAST
-          LIMIT 10
-        `, [endDate, endDate]);
-        
-        // Преобразуем данные по запасам
-        inventoryData.forEach((i: any) => {
-          if (i.id && i.weeklyUsage) {
-            result.inventoryForecast[i.id] = Math.round(i.weeklyUsage * 1.1); // Прогноз с 10% запасом
-          }
-        });
-        
         break;
         
       case 'dashboard':
@@ -473,11 +453,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ) as avgPreparationTime
         `, [startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate]);
         
+        // Проверяем, что результат является массивом и имеет элементы
+        const firstDashboardRecord = Array.isArray(dashboardData) && dashboardData.length > 0 
+          ? dashboardData[0] 
+          : null;
+        
         result = {
-          revenue: dashboardData[0]?.totalRevenue || 0,
-          orders: dashboardData[0]?.ordersCount || 0,
-          customers: dashboardData[0]?.customersCount || 0,
-          avgPreparationTime: dashboardData[0]?.avgPreparationTime || 0,
+          revenue: firstDashboardRecord?.totalRevenue || 0,
+          orders: firstDashboardRecord?.ordersCount || 0,
+          customers: firstDashboardRecord?.customersCount || 0,
+          avgPreparationTime: firstDashboardRecord?.avgPreparationTime || 0,
           period: { startDate, endDate }
         };
         break;
@@ -508,10 +493,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         break;
         
       default:
-        return res.status(404).json({ 
-          error: 'Not Found', 
-          message: `Эндпоинт '${targetEndpoint}' не найден` 
-        });
+        try {
+          // Для неизвестных эндпоинтов возвращаем обобщенные данные дашборда
+          const dashboardData = await dbQuery(`
+            SELECT 
+              COALESCE(SUM(oi.price * oi.quantity), 0) as totalRevenue,
+              COUNT(DISTINCT o.id) as totalOrders,
+              CASE 
+                WHEN COUNT(DISTINCT o.id) > 0 
+                THEN ROUND(SUM(oi.price * oi.quantity) / COUNT(DISTINCT o.id), 0)
+                ELSE 0 
+              END as averageCheck,
+              COUNT(DISTINCT o.customer_id) as customersCount
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            WHERE o.status NOT IN ('cancelled', 'rejected')
+              AND o.created_at BETWEEN ? AND ?
+          `, [startDate, endDate]);
+          
+          const dashboardDataArray = Array.isArray(dashboardData) ? dashboardData : [];
+          
+          result = {
+            summary: {
+              totalRevenue: dashboardDataArray[0]?.totalRevenue || 0,
+              totalOrders: dashboardDataArray[0]?.totalOrders || 0,
+              averageCheck: dashboardDataArray[0]?.averageCheck || 0,
+              customersCount: dashboardDataArray[0]?.customersCount || 0
+            },
+            period: { startDate, endDate }
+          };
+        } catch (err) {
+          console.error('[Analytics API] Ошибка при получении данных дашборда:', err);
+          return res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Ошибка при получении данных дашборда'
+          });
+        }
     }
 
     // Возвращаем результат
