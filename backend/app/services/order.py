@@ -123,7 +123,9 @@ def get_orders(
     status: Optional[str] = None,
     user_id: Optional[int] = None,
     waiter_id: Optional[int] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Получение списка заказов с возможностью фильтрации
@@ -136,12 +138,14 @@ def get_orders(
         user_id: Фильтр по ID пользователя (если указан)
         waiter_id: Фильтр по ID официанта (если указан)
         search: Поисковая строка (если указана)
+        start_date: Начальная дата для фильтрации (формат YYYY-MM-DD)
+        end_date: Конечная дата для фильтрации (формат YYYY-MM-DD)
 
     Returns:
         Список словарей с данными заказов
     """
     try:
-        logger.info(f"Получение заказов с параметрами: skip={skip}, limit={limit}, status={status}, user_id={user_id}, waiter_id={waiter_id}, search={search}")
+        logger.info(f"Получение заказов с параметрами: skip={skip}, limit={limit}, status={status}, user_id={user_id}, waiter_id={waiter_id}, search={search}, start_date={start_date}, end_date={end_date}")
         
         # Используем чистый SQL запрос для получения заказов, чтобы обойти проблему с enum
         query = """
@@ -177,12 +181,24 @@ def get_orders(
             query += " AND (o.order_code LIKE :search OR o.customer_name LIKE :search OR o.customer_phone LIKE :search)"
             params["search"] = search_pattern
             
+        # Добавляем фильтрацию по датам, если указаны
+        if start_date:
+            query += " AND DATE(o.created_at) >= DATE(:start_date)"
+            params["start_date"] = start_date
+            
+        if end_date:
+            query += " AND DATE(o.created_at) <= DATE(:end_date)"
+            params["end_date"] = end_date
+            
         # Добавляем сортировку и пагинацию
         query += " ORDER BY o.created_at DESC LIMIT :limit OFFSET :skip"
         params["limit"] = limit
         params["skip"] = skip
         
         # Выполняем запрос с параметрами
+        logger.info(f"SQL запрос: {query}")
+        logger.info(f"Параметры запроса: {params}")
+        
         result = db.execute(text(query), params).fetchall()
         
         logger.info(f"Найдено заказов: {len(result)}")

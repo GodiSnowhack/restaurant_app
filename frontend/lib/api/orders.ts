@@ -60,17 +60,17 @@ export const ordersApi = {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
       
       try {
-        // Отправляем запрос через локальный API-прокси
-        const url = `/api/orders?${queryParams.toString()}`;
-        console.log('API: Отправка запроса к:', url);
+        // Пробуем запрос напрямую к API v1
+        const apiUrl = `/api/v1/orders?${queryParams.toString()}`;
+        console.log('API: Отправка запроса к v1 API:', apiUrl);
         
-        const response = await fetch(url, {
+        const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`,
-            'X-User-Role': userRole === 'admin' ? 'admin' : 'customer'
+            'X-User-Role': userRole
           },
           cache: 'no-cache',
           signal: controller.signal
@@ -79,27 +79,108 @@ export const ordersApi = {
         clearTimeout(timeoutId);
         
         // Проверяем статус ответа
-        if (!response.ok) {
-          console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('API: Получены данные заказов от v1 API:', { count: Array.isArray(data) ? data.length : 'не массив' });
           
-          // Для администратора пробуем получить данные напрямую из БД
-          if (userRole === 'admin') {
-            console.log('API: Пробуем получить данные администратора напрямую из БД');
-            const dbUrl = `/api/db/orders?${queryParams.toString()}`;
-            
-            // Создаем новый контроллер для второго запроса
-            const dbController = new AbortController();
-            const dbTimeoutId = setTimeout(() => dbController.abort(), 10000);
-            
+          // Убедимся, что мы работаем со списком
+          const orders = Array.isArray(data) ? data : (data && data.items && Array.isArray(data.items)) ? data.items : [];
+          
+          // Кэшируем результат
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(orders));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+          } catch (e) {
+            console.error('API: Ошибка при кэшировании данных:', e);
+          }
+          
+          return orders;
+        }
+        
+        // Если прямой запрос не удался, пробуем запрос через API-прокси
+        console.log('API: Запрос к v1 API не удался, пробуем через прокси');
+        
+        const proxyUrl = `/api/orders?${queryParams.toString()}`;
+        console.log('API: Отправка запроса через прокси:', proxyUrl);
+        
+        const proxyController = new AbortController();
+        const proxyTimeoutId = setTimeout(() => proxyController.abort(), 10000);
+        
+        const proxyResponse = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': userRole
+          },
+          cache: 'no-cache',
+          signal: proxyController.signal
+        });
+        
+        clearTimeout(proxyTimeoutId);
+        
+        if (proxyResponse.ok) {
+          const proxyData = await proxyResponse.json();
+          console.log('API: Получены данные заказов через прокси:', { count: Array.isArray(proxyData) ? proxyData.length : 'не массив' });
+          
+          // Убедимся, что мы работаем со списком
+          const orders = Array.isArray(proxyData) ? proxyData : (proxyData && proxyData.items && Array.isArray(proxyData.items)) ? proxyData.items : [];
+          
+          // Кэшируем результат
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(orders));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+          } catch (e) {
+            console.error('API: Ошибка при кэшировании данных:', e);
+          }
+          
+          return orders;
+        }
+        
+        // Если оба запроса не удались и мы админ, пробуем прямой запрос к БД
+        if (userRole === 'admin') {
+          console.log('API: Пробуем получить данные администратора напрямую из БД');
+          
+          // Пробуем разные пути для запроса к БД
+          const dbUrls = [
+            `/api/v1/db/query`,
+            `/api/db/query`,
+            `/api/admin/db/query`
+          ];
+          
+          const query = {
+            sql: `SELECT 
+                o.id, o.user_id, o.waiter_id, o.table_number, 
+                o.status, o.payment_status, o.payment_method,
+                o.created_at, o.updated_at, o.total_amount,
+                o.comment, o.customer_name, o.customer_phone,
+                o.customer_age_group, o.order_code, o.reservation_code,
+                o.is_urgent, o.is_group_order, o.completed_at
+              FROM orders o
+              WHERE DATE(o.created_at) >= DATE('${simpleStartDate}')
+              AND DATE(o.created_at) <= DATE('${simpleEndDate}')
+              ORDER BY o.created_at DESC
+              LIMIT 100`
+          };
+          
+          for (const dbUrl of dbUrls) {
             try {
+              console.log(`API: Пробуем запрос к: ${dbUrl}`);
+              
+              const dbController = new AbortController();
+              const dbTimeoutId = setTimeout(() => dbController.abort(), 5000);
+              
               const dbResponse = await fetch(dbUrl, {
-                method: 'GET',
+                method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json',
                   'Authorization': `Bearer ${token}`,
-                  'X-User-Role': 'admin'
+                  'X-User-Role': 'admin',
+                  'X-User-Id': localStorage.getItem('user_id') || '1'
                 },
+                body: JSON.stringify(query),
                 cache: 'no-cache',
                 signal: dbController.signal
               });
@@ -110,7 +191,7 @@ export const ordersApi = {
                 const dbData = await dbResponse.json();
                 console.log('API: Получены данные заказов из БД:', { count: Array.isArray(dbData) ? dbData.length : 'не массив' });
                 
-                if (Array.isArray(dbData)) {
+                if (Array.isArray(dbData) && dbData.length > 0) {
                   // Кэшируем результат
                   try {
                     localStorage.setItem(cacheKey, JSON.stringify(dbData));
@@ -122,63 +203,27 @@ export const ordersApi = {
                   return dbData;
                 }
               }
-            } catch (dbError) {
-              clearTimeout(dbTimeoutId);
-              console.error('API: Ошибка при запросе к БД:', dbError);
+            } catch (urlError) {
+              console.error(`API: Ошибка при запросе к ${dbUrl}:`, urlError);
             }
           }
-          
-          // Возвращаем кэшированные данные, если есть
-          if (cachedData) {
-            console.log('API: Используем кэшированные данные из-за ошибки');
-            return JSON.parse(cachedData);
-          }
-          
-          return [];
         }
         
-        // Получаем данные ответа
-        const data = await response.json();
-        console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
-        
-        if (Array.isArray(data)) {
-          // Кэшируем результат
-          try {
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-            localStorage.setItem(cacheTimeKey, Date.now().toString());
-          } catch (e) {
-            console.error('API: Ошибка при кэшировании данных:', e);
-          }
-          
-          return data;
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          // На случай если API возвращает данные в формате { items: [] }
-          try {
-            localStorage.setItem(cacheKey, JSON.stringify(data.items));
-            localStorage.setItem(cacheTimeKey, Date.now().toString());
-          } catch (e) {
-            console.error('API: Ошибка при кэшировании данных:', e);
-          }
-          
-          return data.items;
-        } else {
-          console.warn('API: Неожиданный формат данных:', data);
-          
-          // Возвращаем кэшированные данные, если есть
-          if (cachedData) {
-            console.log('API: Используем кэшированные данные из-за неожиданного формата');
-            return JSON.parse(cachedData);
-          }
-          
-          return [];
+        // Если все запросы не удались, возвращаем кэшированные данные или пустой массив
+        if (cachedData) {
+          console.log('API: Все запросы не удались. Используем кэшированные данные.');
+          return JSON.parse(cachedData);
         }
-      } catch (fetchError) {
+        
+        console.log('API: Все запросы не удались, кэш отсутствует. Возвращаем пустой массив.');
+        return [];
+      } catch (requestError) {
         clearTimeout(timeoutId);
-        console.error('API: Ошибка при запросе заказов:', fetchError);
+        console.error('API: Ошибка при выполнении запроса:', requestError);
         
         // Возвращаем кэшированные данные в случае ошибки
         if (cachedData) {
-          console.log('API: Используем кэшированные данные из-за ошибки');
+          console.log('API: Используем кэшированные данные из-за ошибки запроса');
           return JSON.parse(cachedData);
         }
         

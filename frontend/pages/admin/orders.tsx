@@ -1,626 +1,337 @@
-import { useState, useEffect } from 'react';
-import { NextPage } from 'next';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import Layout from '../../components/Layout';
-import useAuthStore from '../../lib/auth-store';
-import { ordersApi } from '../../lib/api/orders';
-import { Order } from '../../lib/api/types';
+import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeftIcon,
-  CalendarIcon,
-  CheckIcon,
-  ClockIcon,
-  CurrencyDollarIcon,
-  ExclamationTriangleIcon as ExclamationIcon,
-  EyeIcon,
-  XMarkIcon as XIcon
-} from '@heroicons/react/24/outline';
-import { formatPrice } from '../../utils/priceFormatter';
+  Box, Typography, Paper, Table, TableBody, TableCell, 
+  TableHead, TableRow, Button, Card, CardContent, TableContainer,
+  TextField, IconButton, Chip, Grid, CircularProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  FormControl, InputLabel, Select, MenuItem
+} from '@mui/material';
+import { Edit, Delete, Refresh, Search, Print, AttachMoney } from '@mui/icons-material';
+import Layout from '../../components/Layout';
+import { ordersApi } from '../../lib/api/orders';
+import { format, addDays, subDays, parseISO } from 'date-fns';
+import { Order } from '../../lib/api/types';
 
-type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-
-const AdminOrdersPage: NextPage = () => {
-  const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
+const OrdersPage = () => {
+  // Состояние для хранения заказов и фильтров
   const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<OrderStatus | 'all'>('all');
-  const [dateRange, setDateRange] = useState(() => {
-    // Получаем текущую дату
-    const today = new Date();
-    
-    // Вычисляем дату 7 дней назад
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
-    
-    // Форматируем даты в формате YYYY-MM-DD
-    const formatDate = (date: Date) => {
-      return date.toISOString().split('T')[0];
-    };
-    
-    return {
-      start: formatDate(sevenDaysAgo),
-      end: formatDate(today)
-    };
-  });
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
-  // State для отслеживания режима демо-данных
-  const [useDemoData, setUseDemoData] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [demoMode, setDemoMode] = useState(false);
   
-  // Эффект для загрузки настройки demo-режима из localStorage
+  // Эффект для загрузки заказов при монтировании компонента или изменении дат
   useEffect(() => {
-    const demoSetting = localStorage?.getItem('admin_use_demo_data') === 'true';
-    setUseDemoData(demoSetting);
-  }, []);
-
-  useEffect(() => {
-      fetchOrders();
-  }, [activeTab, dateRange]);
-
-  const fetchOrders = async () => {
-    try {
-      setIsLoading(true);
+    // Проверяем, нужно ли включить демо-режим (для локальной разработки)
+    const isDemo = localStorage.getItem('demo_mode') === 'true';
+    setDemoMode(isDemo);
+    console.log('Режим демо-данных', isDemo ? 'включен' : 'отключен');
+    
+    // Функция для загрузки заказов
+    const fetchOrders = async () => {
+      setLoading(true);
       setError(null);
       
-      // Обрабатываем режим демо-данных
-      if (useDemoData) {
-        try {
-          localStorage.setItem('force_demo_data', 'true');
-          console.log('Включен режим демо-данных');
-        } catch (e) {
-          console.error('Ошибка при включении режима демо-данных:', e);
-        }
-      } else {
-        try {
-          localStorage.removeItem('force_demo_data');
-          console.log('Режим демо-данных отключен');
-        } catch (e) {
-          console.error('Ошибка при отключении режима демо-данных:', e);
-        }
-      }
-      
-      // Подготавливаем даты для API запроса
-      let startDate = dateRange.start;
-      let endDate = dateRange.end;
-      
-      // Проверяем валидность дат
       try {
-        // Преобразуем в объекты Date
-        const startDateObj = new Date(dateRange.start);
-        const endDateObj = new Date(dateRange.end);
+        // Используем строковые даты напрямую
+        const formattedStartDate = startDate;
+        const formattedEndDate = endDate;
         
-        // Проверяем, что даты валидны и не в будущем
-        const now = new Date();
+        console.log('Даты для запроса:', { startDate: formattedStartDate, endDate: formattedEndDate });
         
-        // Если end дата в будущем, используем текущую дату
-        if (endDateObj > now) {
-          endDateObj.setTime(now.getTime());
-          endDate = endDateObj.toISOString().split('T')[0];
-        }
+        // Получаем заказы с сервера
+        const fetchedOrders = await ordersApi.getOrders(formattedStartDate, formattedEndDate);
         
-        // Проверяем, что start дата не после end даты
-        if (startDateObj > endDateObj) {
-          // Если начальная дата после конечной, устанавливаем её на 7 дней до конечной
-          startDateObj.setTime(endDateObj.getTime() - 7 * 24 * 60 * 60 * 1000);
-          startDate = startDateObj.toISOString().split('T')[0];
-        }
+        console.log('Полученные заказы:', fetchedOrders);
         
-        console.log('Даты для запроса:', { startDate, endDate });
-      } catch (dateError) {
-        console.error('Ошибка при обработке дат:', dateError);
-      }
-      
-      // Получаем заказы через API
-      console.log('Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
-      const ordersData = await ordersApi.getOrders(startDate, endDate);
-      
-      console.log('Полученные заказы:', ordersData);
-      
-      if (Array.isArray(ordersData)) {
-        // Фильтруем заказы по статусу, если выбран конкретный статус
-        let filteredOrders = ordersData;
-        if (activeTab !== 'all') {
-          // Учитываем возможное разное написание статусов (верхний/нижний регистр)
-          const statusLower = activeTab.toLowerCase();
-          filteredOrders = ordersData.filter(order => 
-            order.status?.toLowerCase() === statusLower
-          );
+        if (Array.isArray(fetchedOrders)) {
+          // Нормализуем данные заказов
+          const normalizedOrders = fetchedOrders.map(order => ({
+            ...order,
+            id: order.id || 0,
+            status: order.status || 'pending',
+            created_at: order.created_at || new Date().toISOString(),
+            total_amount: order.total_amount || order.total_price || 0,
+            items: Array.isArray(order.items) ? order.items : []
+          }));
           
-          console.log(`Отфильтровано ${filteredOrders.length} заказов со статусом ${activeTab}`);
+          console.log('Нормализованные заказы:', normalizedOrders);
+          setOrders(normalizedOrders);
+          applyFilters(normalizedOrders, searchTerm, statusFilter);
+        } else {
+          console.error('Ошибка: полученные данные не являются массивом');
+          setError('Данные получены в неверном формате');
+          setOrders([]);
+          setFilteredOrders([]);
         }
-        
-        // Нормализуем данные заказов
-        const normalizedOrders = filteredOrders.map(order => ({
-          ...order,
-          // Убеждаемся, что важные поля имеют значения по умолчанию
-          id: order.id || 0,
-          status: order.status || 'pending',
-          payment_status: order.payment_status || 'pending',
-          payment_method: order.payment_method || 'card',
-          total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
-                       (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
-          // Преобразуем строку в объект Date только если она существует
-          created_at: order.created_at || new Date().toISOString(),
-          updated_at: order.updated_at,
-          completed_at: order.completed_at,
-          customer_name: order.customer_name || '',
-          customer_phone: order.customer_phone || '',
-          // Нормализуем массив товаров
-          items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-            ...item,
-            dish_id: item.dish_id || 0,
-            quantity: item.quantity || 1,
-            price: typeof item.price === 'number' ? item.price : 
-                  (typeof item.price === 'string' ? parseFloat(item.price) : 0),
-            name: item.name || item.dish_name || 'Неизвестное блюдо',
-            // Вычисляем полную стоимость позиции
-            total: (item.quantity || 1) * (typeof item.price === 'number' ? item.price : 
-                  (typeof item.price === 'string' ? parseFloat(item.price) : 0))
-          })) : []
-        }));
-        
-        console.log('Нормализованные заказы:', normalizedOrders);
-        setOrders(normalizedOrders);
-      } else {
-        console.error('API вернул неверный формат данных:', ordersData);
-        setError('Полученные данные имеют неверный формат. Ожидался массив заказов.');
+      } catch (err) {
+        console.error('Ошибка при загрузке заказов:', err);
+        setError('Не удалось загрузить заказы. Проверьте соединение с сервером.');
         setOrders([]);
+        setFilteredOrders([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error('Ошибка при загрузке заказов:', error);
-      setError(error.message || 'Не удалось загрузить заказы');
-      // Если нет данных, устанавливаем пустой массив
-      setOrders([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Функция для получения русского названия статуса заказа
-  const getStatusText = (status: string | undefined): string => {
-    if (!status) return 'Неизвестен';
-    
-    const statusMap: Record<string, string> = {
-      'pending': 'Новый',
-      'confirmed': 'Подтвержден',
-      'preparing': 'Готовится',
-      'ready': 'Готов',
-      'completed': 'Завершен',
-      'cancelled': 'Отменен',
-      // Добавляем статусы из API на всякий случай
-      'PENDING': 'Новый',
-      'CONFIRMED': 'Подтвержден',
-      'PREPARING': 'Готовится',
-      'READY': 'Готов',
-      'COMPLETED': 'Завершен',
-      'CANCELLED': 'Отменен',
     };
     
-    return statusMap[status] || status;
-  };
-
-  // Функция для получения русского названия статуса оплаты
-  const getPaymentStatusText = (status: string | undefined): string => {
-    if (!status) return 'Неизвестен';
+    fetchOrders();
+  }, [startDate, endDate, refreshKey]);
+  
+  // Функция для применения фильтров к заказам
+  const applyFilters = (ordersList: Order[], search: string, status: string) => {
+    let result = [...ordersList];
     
-    const statusMap: Record<string, string> = {
-      'pending': 'Ожидает оплаты',
-      'paid': 'Оплачен',
-      'failed': 'Ошибка оплаты',
-      'refunded': 'Возврат средств',
-      // Добавляем статусы из API на всякий случай
-      'PENDING': 'Ожидает оплаты',
-      'PAID': 'Оплачен',
-      'FAILED': 'Ошибка оплаты',
-      'REFUNDED': 'Возврат средств',
-      'unpaid': 'Ожидает оплаты',
-      'UNPAID': 'Ожидает оплаты',
-    };
-    
-    return statusMap[status] || status;
-  };
-
-  // Обновляем функцию получения бейджа статуса заказа
-  const getStatusBadge = (status: string | undefined) => {
-    if (!status) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
-          Неизвестен
-        </span>
+    // Фильтрация по поисковому запросу
+    if (search.trim() !== '') {
+      const searchLower = search.toLowerCase();
+      result = result.filter(order => 
+        (order.customer_name && order.customer_name.toLowerCase().includes(searchLower)) ||
+        (order.customer_phone && order.customer_phone.toLowerCase().includes(searchLower)) ||
+        (order.id && order.id.toString().includes(searchLower)) ||
+        (order.order_code && order.order_code.toLowerCase().includes(searchLower))
       );
     }
     
-    const statusLower = status.toLowerCase();
-    
-    switch (statusLower) {
-      case 'pending':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
-            <ClockIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      case 'confirmed':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
-            <CheckIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      case 'preparing':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
-            <ClockIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      case 'ready':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 border border-teal-300">
-            <CheckIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      case 'completed':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
-            <CheckIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      case 'cancelled':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-            <XIcon className="h-3 w-3 mr-1" />
-            {getStatusText(status)}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
-            {getStatusText(status)}
-          </span>
-        );
+    // Фильтрация по статусу
+    if (status !== 'all') {
+      result = result.filter(order => order.status === status);
     }
+    
+    setFilteredOrders(result);
   };
-
-  // Функция для получения статуса оплаты
-  const getPaymentStatusIcon = (status: string | undefined) => {
-    if (!status) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
-          Неизвестен
-        </span>
-      );
-    }
-    
-    const statusLower = status.toLowerCase();
-    
-    switch (statusLower) {
-      case 'paid':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-300">
-            <CheckIcon className="h-3 w-3 mr-1" />
-            {getPaymentStatusText(status)}
-          </span>
-        );
-      case 'pending':
-      case 'unpaid':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-            <ClockIcon className="h-3 w-3 mr-1" />
-            {getPaymentStatusText(status)}
-          </span>
-        );
-      case 'failed':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-            <ExclamationIcon className="h-3 w-3 mr-1" />
-            {getPaymentStatusText(status)}
-          </span>
-        );
-      case 'refunded':
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
-            <ArrowLeftIcon className="h-3 w-3 mr-1" />
-            {getPaymentStatusText(status)}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
-            {getPaymentStatusText(status)}
-          </span>
-        );
-    }
+  
+  // Обработчик изменения поискового запроса
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    applyFilters(orders, value, statusFilter);
   };
-
-  const formatDate = (dateString: string | undefined) => {
+  
+  // Обработчик изменения фильтра статуса
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setStatusFilter(value);
+    applyFilters(orders, searchTerm, value);
+  };
+  
+  // Обработчик обновления данных
+  const handleRefresh = () => {
+    setRefreshKey(prevKey => prevKey + 1);
+  };
+  
+  // Обработчики изменения дат
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+  };
+  
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+  };
+  
+  // Функция для форматирования даты
+  const formatDateTime = (dateStr: string | undefined) => {
+    if (!dateStr) return 'Н/Д';
     try {
-      // Проверяем, что dateString существует и является строкой
-      if (!dateString || typeof dateString !== 'string') {
-        return 'Недоступно';
-      }
-      
-      // Пытаемся создать объект даты
-      const date = new Date(dateString);
-      
-      // Проверяем валидность даты
-      if (isNaN(date.getTime())) {
-        return 'Недоступно';
-      }
-      
-      // Форматируем дату
-      return new Intl.DateTimeFormat('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).format(date);
-    } catch (error) {
-      console.error('Ошибка при форматировании даты:', error);
-      return 'Недоступно';
+      const date = parseISO(dateStr);
+      return format(date, 'dd.MM.yyyy HH:mm');
+    } catch (e) {
+      return 'Неверная дата';
     }
   };
-
-  const handleDateRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setDateRange(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleUpdateStatus = async (id: number, newStatus: OrderStatus) => {
-    try {
-      setUpdatingOrderId(id);
-      
-      console.log(`Обновление статуса заказа #${id} на ${newStatus}`);
-      
-      await ordersApi.updateOrderStatus(id, newStatus);
-      
-      await fetchOrders();
-      
-      alert(`Статус заказа #${id} успешно изменен на "${newStatus}"`);
-    } catch (error) {
-      console.error('Ошибка при обновлении статуса заказа:', error);
-      alert('Произошла ошибка при обновлении статуса заказа');
-    } finally {
-      setUpdatingOrderId(null);
+  
+  // Функция для получения цветового кода статуса
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'warning';
+      case 'confirmed': return 'info';
+      case 'preparing': return 'primary';
+      case 'ready': return 'success';
+      case 'completed': return 'success';
+      case 'cancelled': return 'error';
+      default: return 'default';
     }
   };
-
-  const filteredOrders = activeTab === 'all' 
-    ? orders 
-    : orders.filter(order => order.status === activeTab);
-
-  if (isLoading) {
-    return (
-      <Layout title="Управление заказами | Админ-панель">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  
+  // Функция для получения русского названия статуса
+  const getStatusLabel = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'Ожидание';
+      case 'confirmed': return 'Подтвержден';
+      case 'preparing': return 'Готовится';
+      case 'ready': return 'Готов';
+      case 'completed': return 'Завершен';
+      case 'cancelled': return 'Отменен';
+      default: return status;
+    }
+  };
 
   return (
     <Layout title="Управление заказами | Админ-панель">
-      <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold dark:text-white">Управление заказами</h1>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const newValue = !useDemoData;
-                localStorage.setItem('admin_use_demo_data', newValue ? 'true' : 'false');
-                setUseDemoData(newValue);
-                alert(`Режим демо-данных ${newValue ? 'включен' : 'выключен'}`);
-                fetchOrders();
-              }}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md flex items-center"
-            >
-              {useDemoData ? 
-                'Использовать реальные данные' : 
-                'Использовать демо-данные'}
-            </button>
-            <Link
-              href="/admin"
-              className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
-            >
-              <ArrowLeftIcon className="w-5 h-5 mr-1" />
-              Назад к панели управления
-            </Link>
-          </div>
-        </div>
-        
-        {/* Фильтры */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-6">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'all'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'pending'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Новые
-            </button>
-            <button
-              onClick={() => setActiveTab('confirmed')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'confirmed'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Подтвержденные
-            </button>
-            <button
-              onClick={() => setActiveTab('preparing')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'preparing'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              В процессе
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'completed'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Завершенные
-            </button>
-            <button
-              onClick={() => setActiveTab('cancelled')}
-              className={`px-3 py-1.5 text-sm rounded-full ${
-                activeTab === 'cancelled'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Отмененные
-            </button>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">С:</span>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => handleDateRangeChange(e)}
-                name="start"
-                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
-              />
-            </div>
-            <div className="flex items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">По:</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => handleDateRangeChange(e)}
-                name="end"
-                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
-              />
-            </div>
-            <button
-              onClick={() => fetchOrders()}
-              className="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary-dark"
-            >
-              Применить
-            </button>
-          </div>
-        </div>
-        
-        {/* Таблица заказов */}
-        {isLoading ? (
-          <div className="flex justify-center items-center p-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : error ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-            <ExclamationIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Ошибка загрузки данных</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
-            <button
-              onClick={() => fetchOrders()}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">Заказы не найдены</p>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Дата
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Клиент
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Сумма
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Статус заказа
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Статус оплаты
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {order.id}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {formatDate(order.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {order.customer_name || 'Гость'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
-                        {formatPrice(order.total_amount || order.total_price || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(order.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getPaymentStatusIcon(order.payment_status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link href={`/admin/orders/${order.id}`} className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-4">
-                          <EyeIcon className="h-5 w-5 inline" /> Просмотр
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <Box sx={{ p: 3 }}>
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h5" component="h2" sx={{ mb: 3 }}>
+              Фильтры и управление
+            </Typography>
+            
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="Начальная дата"
+                  type="date"
+                  value={startDate}
+                  onChange={handleStartDateChange}
+                  fullWidth
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="Конечная дата"
+                  type="date"
+                  value={endDate}
+                  onChange={handleEndDateChange}
+                  fullWidth
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth>
+                  <InputLabel id="status-filter-label">Статус</InputLabel>
+                  <Select
+                    labelId="status-filter-label"
+                    value={statusFilter}
+                    label="Статус"
+                    onChange={handleStatusChange}
+                  >
+                    <MenuItem value="all">Все статусы</MenuItem>
+                    <MenuItem value="pending">Ожидание</MenuItem>
+                    <MenuItem value="confirmed">Подтвержден</MenuItem>
+                    <MenuItem value="preparing">Готовится</MenuItem>
+                    <MenuItem value="ready">Готов</MenuItem>
+                    <MenuItem value="completed">Завершен</MenuItem>
+                    <MenuItem value="cancelled">Отменен</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Поиск"
+                  variant="outlined"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  InputProps={{
+                    startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Refresh />}
+                  onClick={handleRefresh}
+                  sx={{ height: '56px' }}
+                  fullWidth
+                >
+                  Обновить
+                </Button>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
         )}
-      </div>
+        
+        {demoMode && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Демо-режим активен. Показаны тестовые данные.
+          </Alert>
+        )}
+        
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : filteredOrders.length > 0 ? (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>№</TableCell>
+                  <TableCell>Дата и время</TableCell>
+                  <TableCell>Клиент</TableCell>
+                  <TableCell>Статус</TableCell>
+                  <TableCell>Сумма</TableCell>
+                  <TableCell>Столик</TableCell>
+                  <TableCell>Позиций</TableCell>
+                  <TableCell>Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredOrders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>{order.id}</TableCell>
+                    <TableCell>{formatDateTime(order.created_at)}</TableCell>
+                    <TableCell>
+                      {order.customer_name || 'Н/Д'}
+                      {order.customer_phone && <div>{order.customer_phone}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={getStatusLabel(order.status)} 
+                        color={getStatusColor(order.status) as any}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{order.total_amount?.toLocaleString()} ₸</TableCell>
+                    <TableCell>{order.table_number || 'Н/Д'}</TableCell>
+                    <TableCell>{order.items?.length || 0}</TableCell>
+                    <TableCell>
+                      <IconButton size="small" color="primary" title="Редактировать">
+                        <Edit />
+                      </IconButton>
+                      <IconButton size="small" color="secondary" title="Оплата">
+                        <AttachMoney />
+                      </IconButton>
+                      <IconButton size="small" color="default" title="Печать">
+                        <Print />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h6">Заказы не найдены</Typography>
+            <Typography variant="body2" color="textSecondary">
+              Попробуйте изменить параметры фильтрации или выбрать другой диапазон дат
+            </Typography>
+          </Paper>
+        )}
+      </Box>
     </Layout>
   );
 };
 
-export default AdminOrdersPage; 
+export default OrdersPage; 
