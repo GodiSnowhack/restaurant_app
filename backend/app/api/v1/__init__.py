@@ -3,8 +3,8 @@ API v1 router and endpoints
 """
 
 from fastapi import APIRouter
-from app.api.v1 import menu, settings, analytics
-from app.api.v1.endpoints import orders, categories, auth, reservations
+from app.api.v1 import menu, settings, analytics, auth
+from app.api.v1.endpoints import orders, categories, reservations
 from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
