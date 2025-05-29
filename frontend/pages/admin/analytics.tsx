@@ -2608,8 +2608,8 @@ const AdminAnalyticsPage: NextPage = () => {
                   <h4 className={`font-medium mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>Возрастные группы</h4>
                   
                   <div className="space-y-4">
-                    {(customerMetrics.customerDemographics?.age && Object.entries(customerMetrics.customerDemographics.age).length > 0) ? (
-                      Object.entries(customerMetrics.customerDemographics.age).map(([ageGroup, percentage]) => (
+                    {(customerMetrics.customerDemographics?.age_groups && Object.entries(customerMetrics.customerDemographics.age_groups).length > 0) ? (
+                      Object.entries(customerMetrics.customerDemographics.age_groups).map(([ageGroup, percentage]) => (
                         <div key={ageGroup} className="mb-4">
                           <div className="flex justify-between items-center mb-1">
                             <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{ageGroup}</span>

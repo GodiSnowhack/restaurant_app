@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const authResult = verifyAuth(req);
   if (!authResult.isAuthenticated) {
     return res.status(401).json({ error: 'Unauthorized' });
-  }
+    }
 
   // Получаем параметры запроса
   const { startDate, endDate } = req.query;
@@ -115,7 +115,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       query(mostProfitableDishesQuery, [startDate, endDate]),
       query(leastSellingDishesQuery, [startDate, endDate, startDate, endDate])
     ]);
-
+        
     // Формирование результата
     const result = {
       topSellingDishes,
