@@ -8,12 +8,20 @@ import os
 
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.database.session import SessionLocal
+from app.database.session import SessionLocal, create_tables
 from app.core.init_db import init_db
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Создаем все таблицы в базе данных
+try:
+    logger.info("Создание таблиц базы данных...")
+    create_tables()
+    logger.info("Таблицы успешно созданы")
+except Exception as e:
+    logger.error(f"Ошибка при создании таблиц: {e}")
 
 # Инициализируем базу данных при запуске
 db = SessionLocal()

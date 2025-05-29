@@ -15,6 +15,6 @@ class OrderItem(Base):
     price = Column(Float, nullable=False)  # Цена на момент заказа
     created_at = Column(DateTime, default=func.now())
     
-    # Отношения
-    order = relationship("app.models.order.Order", back_populates="order_items")
-    dish = relationship("app.models.menu.Dish", back_populates="order_items") 
+    # Упрощенные отношения без back_populates или backref
+    order = relationship("app.models.order.Order")
+    dish = relationship("app.models.menu.Dish") 

@@ -84,6 +84,8 @@ class Dish(Base):
     tags = relationship("Tag", secondary=dish_tag, back_populates="dishes")
     feedbacks = relationship("Feedback", back_populates="dish", cascade="all, delete-orphan")
     order_dishes = relationship("OrderDish", back_populates="dish")
+    # Добавляем отношение к OrderItem
+    # order_items = relationship("OrderItem", back_populates="dish")
     
     @property
     def orders(self):

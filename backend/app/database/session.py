@@ -50,6 +50,15 @@ SessionLocal = sessionmaker(
 # Базовый класс для создания моделей
 Base = declarative_base()
 
+# Функция для создания всех таблиц
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+    
+# Функция для очистки и пересоздания схемы БД
+def reset_database():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
 # Функция-зависимость для получения сессии БД
 def get_db():
     db = SessionLocal()
