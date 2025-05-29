@@ -60,16 +60,19 @@ const AdminPage: NextPage = () => {
         // Проверка наличия заказов напрямую - для отладки
         console.log('Проверка наличия заказов в базе данных...');
         try {
-          if (ordersApi && typeof ordersApi.getOrders === 'function') {
+          if (ordersApi && typeof ordersApi.getAllOrders === 'function') {
             // Получаем заказы за последние 30 дней
             const endDate = new Date().toISOString().split('T')[0];
             const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const orders = await ordersApi.getOrders(startDate, endDate);
+            const orders = await ordersApi.getAllOrders({
+              start_date: startDate,
+              end_date: endDate
+            });
             console.log('AdminDashboard - Заказы за последние 30 дней:', orders);
             console.log('AdminDashboard - Количество заказов:', orders.length);
             console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
           } else {
-            console.error('AdminDashboard - ordersApi или метод getOrders недоступен');
+            console.error('AdminDashboard - ordersApi или метод getAllOrders недоступен');
           }
         } catch (ordersError) {
           console.error('AdminDashboard - Ошибка при запросе заказов:', ordersError);
