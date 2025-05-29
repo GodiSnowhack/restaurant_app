@@ -82,212 +82,40 @@ const AdminOrdersPage: NextPage = () => {
         }
       }
       
-      // Подготавливаем параметры для API запроса с корректными названиями полей
-      const params: any = {};
+      // Подготавливаем даты для API запроса
+      let startDate = dateRange.start;
+      let endDate = dateRange.end;
       
-      // Добавляем даты в формате YYYY-MM-DD для корректного диапазона
-      if (dateRange.start && dateRange.end) {
-        try {
-          // Преобразуем в объекты Date
-          const startDate = new Date(dateRange.start);
-          const endDate = new Date(dateRange.end);
-          
-          // Устанавливаем время (начало и конец дня)
-          startDate.setHours(0, 0, 0, 0);
-          endDate.setHours(23, 59, 59, 999);
-          
-          // Проверяем, что даты валидны и не в будущем
-          const now = new Date();
-          
-          // Если end дата в будущем, используем текущую дату
-          if (endDate > now) {
-            endDate.setTime(now.getTime());
-          }
-          
-          // Проверяем, что start дата не после end даты
-          if (startDate > endDate) {
-            // Если начальная дата после конечной, устанавливаем её на 7 дней до конечной
-            startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-          }
-          
-          // Форматируем даты в формате YYYY-MM-DD
-          const formatDate = (date: Date) => {
-            return date.toISOString().split('T')[0];
-          };
-          
-          console.log('Даты для запроса:', {
-            startDate: formatDate(startDate),
-            endDate: formatDate(endDate)
-          });
-          
-          params.start_date = formatDate(startDate);
-          params.end_date = formatDate(endDate);
-        } catch (dateError) {
-          console.error('Ошибка при обработке дат:', dateError);
-          // В случае ошибки используем текущую дату и 7 дней назад
-          const now = new Date();
-          const sevenDaysAgo = new Date(now);
-          sevenDaysAgo.setDate(now.getDate() - 7);
-          
-          // Форматируем даты в формате YYYY-MM-DD
-          params.start_date = sevenDaysAgo.toISOString().split('T')[0];
-          params.end_date = now.toISOString().split('T')[0];
-        }
-      }
-      
-      // Добавляем статус в параметры, если выбран конкретный статус
-      if (activeTab !== 'all') {
-        params.status = activeTab;
-      }
-      
-      console.log('Запрос заказов с параметрами:', params);
-      
-      // Получаем заказы через API с учетом потенциальных проблем с сетью
-      let ordersData;
-      
+      // Проверяем валидность дат
       try {
-        // Первая попытка: через основной API заказов
-        ordersData = await ordersApi.getOrders(
-          params.start_date,
-          params.end_date
-        );
-      } catch (apiError) {
-        console.error('Первая попытка получения заказов не удалась:', apiError);
+        // Преобразуем в объекты Date
+        const startDateObj = new Date(dateRange.start);
+        const endDateObj = new Date(dateRange.end);
         
-        // Вторая попытка: пробуем получить данные напрямую из БД
-        try {
-          // Делаем явный запрос через fetch к API базы данных
-          const token = localStorage.getItem('token');
-          
-          if (!token) {
-            throw new Error('Отсутствует токен авторизации');
-          }
-          
-          const response = await fetch(`/api/db/orders?start_date=${encodeURIComponent(params.start_date)}&end_date=${encodeURIComponent(params.end_date)}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'X-User-Role': 'admin'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Ошибка HTTP: ${response.status}`);
-          }
-          
-          ordersData = await response.json();
-          console.log('Данные получены через прямой запрос к базе данных');
-        } catch (fetchError) {
-          console.error('Вторая попытка тоже не удалась:', fetchError);
-          
-          // Третья попытка: прямой SQL-запрос
-          try {
-            const token = localStorage.getItem('token');
-            
-            if (!token) {
-              throw new Error('Отсутствует токен авторизации');
-            }
-            
-            // Формируем SQL-запрос для получения заказов
-            const query = `
-              SELECT o.* 
-              FROM orders o
-              WHERE o.created_at >= '${params.start_date}' AND o.created_at <= '${params.end_date}'
-              ${activeTab !== 'all' ? `AND o.status = '${activeTab}'` : ''}
-              ORDER BY o.created_at DESC
-            `;
-            
-            const dbResponse = await fetch('/api/db/query', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${token}`,
-                'X-User-Role': 'admin'
-              },
-              body: JSON.stringify({ query })
-            });
-            
-            if (!dbResponse.ok) {
-              throw new Error(`Ошибка HTTP: ${dbResponse.status}`);
-            }
-            
-            const ordersResult = await dbResponse.json();
-            
-            if (Array.isArray(ordersResult) && ordersResult.length > 0) {
-              // Получаем ID всех заказов
-              const orderIds = ordersResult.map((order: any) => order.id).join(',');
-              
-              // Формируем запрос для получения товаров заказа
-              const itemsQuery = `
-                SELECT od.order_id, od.dish_id, od.quantity, od.price, d.name,
-                       (od.price * od.quantity) as total_price
-                FROM order_dish od
-                LEFT JOIN dishes d ON od.dish_id = d.id
-                WHERE od.order_id IN (${orderIds})
-              `;
-              
-              const itemsResponse = await fetch('/api/db/query', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  'Authorization': `Bearer ${token}`,
-                  'X-User-Role': 'admin'
-                },
-                body: JSON.stringify({ query: itemsQuery })
-              });
-              
-              if (!itemsResponse.ok) {
-                // Если не удалось получить товары, вернем заказы без товаров
-                ordersData = ordersResult.map((order: any) => ({
-                  ...order,
-                  items: []
-                }));
-              } else {
-                const itemsResult = await itemsResponse.json();
-                
-                // Группируем товары по заказам
-                const orderItems: {[key: number]: any[]} = {};
-                itemsResult.forEach((item: any) => {
-                  if (!orderItems[item.order_id]) {
-                    orderItems[item.order_id] = [];
-                  }
-                  orderItems[item.order_id].push({
-                    dish_id: item.dish_id,
-                    quantity: item.quantity,
-                    price: item.price,
-                    name: item.name,
-                    total_price: item.total_price
-                  });
-                });
-                
-                // Добавляем товары к заказам
-                ordersData = ordersResult.map((order: any) => ({
-                  ...order,
-                  items: orderItems[order.id] || []
-                }));
-              }
-            } else {
-              ordersData = [];
-            }
-            
-            console.log('Данные получены через прямой SQL-запрос');
-          } catch (sqlError) {
-            console.error('Третья попытка тоже не удалась:', sqlError);
-            
-            // Если обе попытки не удались, используем демо-данные
-            if (useDemoData) {
-              console.log('Использование демо-данных согласно настройкам');
-              throw new Error('Не удалось получить данные. Используются демо-данные.');
-            } else {
-              throw new Error('Не удалось получить данные заказов. Пожалуйста, проверьте подключение к интернету и повторите попытку.');
-            }
-          }
+        // Проверяем, что даты валидны и не в будущем
+        const now = new Date();
+        
+        // Если end дата в будущем, используем текущую дату
+        if (endDateObj > now) {
+          endDateObj.setTime(now.getTime());
+          endDate = endDateObj.toISOString().split('T')[0];
         }
+        
+        // Проверяем, что start дата не после end даты
+        if (startDateObj > endDateObj) {
+          // Если начальная дата после конечной, устанавливаем её на 7 дней до конечной
+          startDateObj.setTime(endDateObj.getTime() - 7 * 24 * 60 * 60 * 1000);
+          startDate = startDateObj.toISOString().split('T')[0];
+        }
+        
+        console.log('Даты для запроса:', { startDate, endDate });
+      } catch (dateError) {
+        console.error('Ошибка при обработке дат:', dateError);
       }
+      
+      // Получаем заказы через API
+      console.log('Запрос заказов с параметрами:', { start_date: startDate, end_date: endDate });
+      const ordersData = await ordersApi.getOrders(startDate, endDate);
       
       console.log('Полученные заказы:', ordersData);
       

@@ -15,6 +15,20 @@ export const ordersApi = {
         return [];
       }
       
+      // Проверяем наличие кэша и его актуальность
+      const cacheKey = `orders_data_${startDate}_${endDate}`;
+      const cacheTimeKey = `orders_cache_timestamp_${startDate}_${endDate}`;
+      const cachedTimestamp = localStorage.getItem(cacheTimeKey);
+      const cachedData = localStorage.getItem(cacheKey);
+      const now = Date.now();
+      const cacheAge = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
+      
+      // Используем кэш, если он не старше 5 минут
+      if (cachedData && cachedTimestamp && cacheAge < 5 * 60 * 1000) {
+        console.log('API: Используем кэшированные данные (возраст кэша:', Math.round(cacheAge/1000), 'сек)');
+        return JSON.parse(cachedData);
+      }
+      
       // Преобразуем даты в формат YYYY-MM-DD, если они уже не в этом формате
       const formatSimpleDate = (dateStr: string): string => {
         if (!dateStr) return '';
@@ -41,58 +55,137 @@ export const ordersApi = {
       // Получаем роль пользователя
       const userRole = localStorage.getItem('user_role') || 'customer';
       
-      // Отправляем запрос через локальный API-прокси
-      const url = `/api/orders?${queryParams.toString()}`;
-      console.log('API: Отправка запроса к:', url);
+      // Создаем контроллер для отмены запроса
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-User-Role': userRole === 'admin' ? 'admin' : 'customer'
-        },
-        cache: 'no-cache'
-      });
-      
-      // Проверяем статус ответа
-      if (!response.ok) {
-        console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
+      try {
+        // Отправляем запрос через локальный API-прокси
+        const url = `/api/orders?${queryParams.toString()}`;
+        console.log('API: Отправка запроса к:', url);
         
-        // Для администратора пробуем получить данные напрямую из БД
-        if (userRole === 'admin') {
-          console.log('API: Пробуем получить данные администратора напрямую из БД');
-          const dbUrl = `/api/db/orders?${queryParams.toString()}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': userRole === 'admin' ? 'admin' : 'customer'
+          },
+          cache: 'no-cache',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Проверяем статус ответа
+        if (!response.ok) {
+          console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
           
-          const dbResponse = await fetch(dbUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'X-User-Role': 'admin'
-            },
-            cache: 'no-cache'
-          });
-          
-          if (dbResponse.ok) {
-            const dbData = await dbResponse.json();
-            console.log('API: Получены данные заказов из БД:', { count: Array.isArray(dbData) ? dbData.length : 'не массив' });
-            return Array.isArray(dbData) ? dbData : [];
+          // Для администратора пробуем получить данные напрямую из БД
+          if (userRole === 'admin') {
+            console.log('API: Пробуем получить данные администратора напрямую из БД');
+            const dbUrl = `/api/db/orders?${queryParams.toString()}`;
+            
+            // Создаем новый контроллер для второго запроса
+            const dbController = new AbortController();
+            const dbTimeoutId = setTimeout(() => dbController.abort(), 10000);
+            
+            try {
+              const dbResponse = await fetch(dbUrl, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                  'X-User-Role': 'admin'
+                },
+                cache: 'no-cache',
+                signal: dbController.signal
+              });
+              
+              clearTimeout(dbTimeoutId);
+              
+              if (dbResponse.ok) {
+                const dbData = await dbResponse.json();
+                console.log('API: Получены данные заказов из БД:', { count: Array.isArray(dbData) ? dbData.length : 'не массив' });
+                
+                if (Array.isArray(dbData)) {
+                  // Кэшируем результат
+                  try {
+                    localStorage.setItem(cacheKey, JSON.stringify(dbData));
+                    localStorage.setItem(cacheTimeKey, Date.now().toString());
+                  } catch (e) {
+                    console.error('API: Ошибка при кэшировании данных:', e);
+                  }
+                  
+                  return dbData;
+                }
+              }
+            } catch (dbError) {
+              clearTimeout(dbTimeoutId);
+              console.error('API: Ошибка при запросе к БД:', dbError);
+            }
           }
+          
+          // Возвращаем кэшированные данные, если есть
+          if (cachedData) {
+            console.log('API: Используем кэшированные данные из-за ошибки');
+            return JSON.parse(cachedData);
+          }
+          
+          return [];
+        }
+        
+        // Получаем данные ответа
+        const data = await response.json();
+        console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
+        
+        if (Array.isArray(data)) {
+          // Кэшируем результат
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+          } catch (e) {
+            console.error('API: Ошибка при кэшировании данных:', e);
+          }
+          
+          return data;
+        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
+          // На случай если API возвращает данные в формате { items: [] }
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(data.items));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+          } catch (e) {
+            console.error('API: Ошибка при кэшировании данных:', e);
+          }
+          
+          return data.items;
+        } else {
+          console.warn('API: Неожиданный формат данных:', data);
+          
+          // Возвращаем кэшированные данные, если есть
+          if (cachedData) {
+            console.log('API: Используем кэшированные данные из-за неожиданного формата');
+            return JSON.parse(cachedData);
+          }
+          
+          return [];
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('API: Ошибка при запросе заказов:', fetchError);
+        
+        // Возвращаем кэшированные данные в случае ошибки
+        if (cachedData) {
+          console.log('API: Используем кэшированные данные из-за ошибки');
+          return JSON.parse(cachedData);
         }
         
         return [];
       }
-      
-      // Получаем данные ответа
-      const data = await response.json();
-      console.log('API: Получены данные заказов:', { count: Array.isArray(data) ? data.length : 'не массив' });
-      
-      return Array.isArray(data) ? data : [];
     } catch (error: any) {
-      console.error('API: Ошибка при запросе заказов:', error.message);
+      console.error('API: Общая ошибка при запросе заказов:', error.message);
       return [];
     }
   },
