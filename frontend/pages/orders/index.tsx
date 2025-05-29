@@ -62,7 +62,10 @@ const OrdersPage: NextPage = () => {
       console.log('Даты для запроса:', { startDate: startDateStr, endDate: endDateStr, now: now.toISOString() });
       
       // Используем API клиент с обработкой ошибок
-      const data = await ordersApi.getOrders(startDateStr, endDateStr);
+      const data = await ordersApi.getAllOrders({
+        start_date: startDateStr,
+        end_date: endDateStr
+      });
       console.log('Полученные заказы:', data);
       
       // Проверяем полученные данные

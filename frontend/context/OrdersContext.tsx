@@ -75,7 +75,10 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     try {
       console.log(`OrdersContext: Загрузка заказов с ${newStartDate} по ${newEndDate}`);
-      const orderData = await ordersApi.getOrders(newStartDate, newEndDate);
+      const orderData = await ordersApi.getAllOrders({
+        start_date: newStartDate,
+        end_date: newEndDate
+      });
       
       if (Array.isArray(orderData)) {
         // Проверяем и нормализуем данные заказов
@@ -124,10 +127,11 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     try {
       console.log(`OrdersContext: Загрузка заказов со статусом "${status}"`);
-      const orderData = await ordersApi.getOrders(
-        startDate || currentDateRange.startDate, 
-        endDate || currentDateRange.endDate
-      );
+      const orderData = await ordersApi.getAllOrders({
+        start_date: startDate || currentDateRange.startDate, 
+        end_date: endDate || currentDateRange.endDate,
+        status: status
+      });
       
       // Фильтруем заказы по статусу (учитываем верхний и нижний регистр)
       const lowerStatus = status.toLowerCase();
