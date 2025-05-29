@@ -1,97 +1,32 @@
-import axios, { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios from 'axios';
 import { 
   FinancialMetrics, 
-  CustomerMetrics,
-  OperationalMetrics,
+  MenuMetrics, 
+  CustomerMetrics, 
+  OperationalMetrics, 
+  PredictiveMetrics,
   AnalyticsFilters
 } from '../../types/analytics';
-import { api } from './core';
 
-// Добавляем недостающие интерфейсы
-interface MenuMetrics {
-  topSellingDishes: Array<{
-    dishId: number;
-    dishName: string;
-    salesCount: number;
-    revenue: number;
-    profitMargin: number;
-  }>;
-  mostProfitableDishes: Array<{
-    dishId: number;
-    dishName: string;
-    salesCount: number;
-    revenue: number;
-    percentage: number;
-    costPrice: number;
-    profit: number;
-    profitMargin: number;
-  }>;
-  leastSellingDishes: Array<{
-    dishId: number;
-    dishName: string;
-    salesCount: number;
-    revenue: number;
-    percentage: number;
-  }>;
-  averageCookingTime: number;
-  categoryPopularity: Record<string, number>;
-  menuItemSalesTrend: Record<string, Array<{ date: string; value: number }>>;
-  menuItemPerformance: Array<{
-    dishId: number;
-    dishName: string;
-    salesCount: number;
-    revenue: number;
-    profitMargin: number;
-  }>;
-  categoryPerformance: Record<string, {
-    salesPercentage: number;
-    averageOrderValue: number;
-    averageProfitMargin: number;
-  }>;
-  period: {
-    startDate: string;
-    endDate: string;
-  };
-}
-
-interface PredictiveMetrics {
-  salesForecast: Array<{
-    date: string;
-    value: number;
-  }>;
-  inventoryForecast: Record<string, any>;
-  staffingNeeds: Record<string, Record<string, number>>;
-  peakTimePrediction: Record<string, any>;
-  suggestedPromotions: Array<{
-    dishId: number;
-    dishName: string;
-    suggestedDiscount: number;
-    potentialRevenue: number;
-  }>;
-  period: {
-    startDate: string;
-    endDate: string;
-  };
-}
-
-export interface CustomerDemographics {
-  age_groups: Record<string, number>;
-  total_customers: number;
-}
-
-export interface AnalyticsData {
-  // ... other fields ...
-  customerDemographics: CustomerDemographics;
-}
-
-// Получаем базовый URL для API аналитики
-const getAnalyticsBaseUrl = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-  return `${baseUrl}/analytics`;
+// Функция для получения базового URL для API
+const getApiBaseUrl = () => {
+  // Используем URL из переменной окружения, если он задан
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return `${process.env.NEXT_PUBLIC_API_URL}/analytics`;
+  }
+  
+  // Если мы на клиенте, определим baseURL на основе текущего хоста
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    return `http://${host}:8000/api/v1/analytics`;
+  }
+  
+  // По умолчанию возвращаем стандартный URL для локальной разработки
+  return 'http://localhost:8000/api/v1/analytics';
 };
 
 // Базовый URL для всех API аналитики
-const API_BASE_URL = getAnalyticsBaseUrl();
+const API_BASE_URL = getApiBaseUrl();
 
 // Настройка Axios для запросов аналитики
 const analyticsAxios = axios.create({
@@ -101,12 +36,11 @@ const analyticsAxios = axios.create({
     'Accept': 'application/json'
   },
   timeout: 20000, // Увеличиваем таймаут до 20 сек
-  withCredentials: true,
-  maxRedirects: 0 // Отключаем автоматические редиректы для предотвращения циклических редиректов
+  withCredentials: true
 });
 
 // Добавляем токен авторизации к каждому запросу
-analyticsAxios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+analyticsAxios.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -117,12 +51,12 @@ analyticsAxios.interceptors.request.use((config: InternalAxiosRequestConfig) => 
 // Получение текущего диапазона дат
 const getDefaultDateRange = () => {
   const today = new Date();
-  const nextWeek = new Date(today);
-  nextWeek.setDate(today.getDate() + 7);
+  const oneMonthAgo = new Date(today);
+  oneMonthAgo.setMonth(today.getMonth() - 1);
   
   return {
-    startDate: today.toISOString().split('T')[0],
-    endDate: nextWeek.toISOString().split('T')[0]
+    startDate: oneMonthAgo.toISOString().split('T')[0],
+    endDate: today.toISOString().split('T')[0]
   };
 };
 
@@ -201,33 +135,52 @@ const validateDateRange = (filters?: AnalyticsFilters): AnalyticsFilters => {
   return result;
 };
 
-// Функция для получения аналитических данных
+// Универсальная функция запроса для всех типов аналитики
 async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): Promise<T> {
+  // Проверяем и корректируем период дат
+  const validatedFilters = validateDateRange(filters);
+  
+  // Конвертируем даты в формат, который принимает сервер (YYYY-MM-DD)
+  const startDate = validatedFilters.startDate ? 
+    new Date(validatedFilters.startDate).toISOString().split('T')[0] : 
+    getDefaultDateRange().startDate;
+  
+  const endDate = validatedFilters.endDate ? 
+    new Date(validatedFilters.endDate).toISOString().split('T')[0] : 
+    getDefaultDateRange().endDate;
+  
+  // Создаем новый объект фильтров с правильным форматом дат
+  const formattedFilters = {
+    ...validatedFilters,
+    startDate,
+    endDate
+  };
+  
+  const queryParams = buildQueryParams(formattedFilters);
+  
+  // Формируем полный URL запроса
+  let url = endpoint;
+  if (!endpoint.startsWith('/')) {
+    url = `/${endpoint}`;
+  }
+  url = `${url}${queryParams}`;
+  
   try {
-    console.log(`[Analytics] Запрос данных для ${endpoint} с фильтрами:`, filters);
-
-    // В режиме разработки или при недоступности API используем моковые данные
-    if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_USE_MOCKS === 'true') {
-      console.log('[Analytics] Используем моковые данные');
-      return getMockData(endpoint);
-    }
-
-    const queryParams = buildQueryParams(filters);
-    const url = `${getAnalyticsBaseUrl()}/${endpoint}${queryParams}`;
+    const config = {
+      params: {
+        useMockData: false,
+        currentTimestamp: Date.now()
+      }
+    };
     
-    console.log(`[Analytics] Отправка запроса на ${url}`);
+    const response = await analyticsAxios.get<T>(url, config);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Ошибка при запросе аналитики ${endpoint}:`, error.message);
     
-    try {
-      const response = await api.get<T>(url);
-      return response.data;
-    } catch (error) {
-      console.error(`[Analytics] Ошибка при запросе к ${url}:`, error);
-      console.log('[Analytics] Возвращаем моковые данные из-за ошибки');
-      return getMockData(endpoint);
-    }
-  } catch (error) {
-    console.error('[Analytics] Критическая ошибка:', error);
-    return getMockData(endpoint);
+    // В случае ошибки возвращаем мок-данные
+    console.log(`Возвращаем мок-данные для ${endpoint.split('/').pop()}`);
+    return getMockData(endpoint.split('/').pop() || '') as T;
   }
 }
 
@@ -307,7 +260,12 @@ function getMockData(endpoint: string): any {
         { dishId: 2, dishName: "Пицца Маргарита", salesCount: 78, revenue: 195000, profitMargin: 38 },
         { dishId: 3, dishName: "Карбонара", salesCount: 70, revenue: 175000, profitMargin: 36 },
         { dishId: 4, dishName: "Цезарь с курицей", salesCount: 62, revenue: 155000, profitMargin: 34 },
-        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 }
+        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 },
+        { dishId: 6, dishName: "Борщ", salesCount: 46, revenue: 92000, profitMargin: 30 },
+        { dishId: 7, dishName: "Пельмени", salesCount: 42, revenue: 105000, profitMargin: 32 },
+        { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, profitMargin: 44 },
+        { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, profitMargin: 46 },
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, profitMargin: 40 }
       ],
       
       mostProfitableDishes: [
@@ -315,7 +273,7 @@ function getMockData(endpoint: string): any {
         { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, percentage: 3.5, costPrice: 47250, profit: 40250, profitMargin: 46 },
         { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, percentage: 7.6, costPrice: 106400, profit: 83600, profitMargin: 44 },
         { dishId: 1, dishName: "Бургер Классический", salesCount: 85, revenue: 212500, percentage: 8.5, costPrice: 127500, profit: 85000, profitMargin: 40 },
-        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, percentage: 3.2, costPrice: 48000, profit: 32000, profitMargin: 40 }
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, percentage: 3.2, costPrice: 48000, profit: 32000, profitMargin: 40 },
       ],
       
       leastSellingDishes: [
@@ -323,77 +281,81 @@ function getMockData(endpoint: string): any {
         { dishId: 16, dishName: "Тар-тар из говядины", salesCount: 15, revenue: 60000, percentage: 2.4 },
         { dishId: 17, dishName: "Паста с морепродуктами", salesCount: 18, revenue: 72000, percentage: 2.88 },
         { dishId: 18, dishName: "Фуа-гра", salesCount: 20, revenue: 120000, percentage: 4.8 },
-        { dishId: 19, dishName: "Устрицы", salesCount: 22, revenue: 132000, percentage: 5.28 }
+        { dishId: 19, dishName: "Устрицы", salesCount: 22, revenue: 132000, percentage: 5.28 },
       ],
       
       averageCookingTime: 18,
       
       categoryPopularity: {
-        "Горячие блюда": 40,
-        "Супы": 15,
-        "Салаты": 20,
-        "Десерты": 15,
-        "Напитки": 10
+        1: 30, // Супы
+        2: 40, // Основные блюда
+        3: 15, // Салаты
+        4: 10, // Десерты
+        5: 5   // Напитки
       },
       
       menuItemSalesTrend: {
-        "Бургер Классический": [
-          { date: '2023-05-20', value: 12 },
-          { date: '2023-05-21', value: 14 },
-          { date: '2023-05-22', value: 10 },
-          { date: '2023-05-23', value: 15 },
-          { date: '2023-05-24', value: 16 },
-          { date: '2023-05-25', value: 18 },
-          { date: '2023-05-26', value: 20 }
+        1: [
+          { date: '2023-04-25', value: 12 },
+          { date: '2023-04-26', value: 14 },
+          { date: '2023-04-27', value: 10 },
+          { date: '2023-04-28', value: 15 },
+          { date: '2023-04-29', value: 16 },
+          { date: '2023-04-30', value: 18 },
         ],
-        "Пицца Маргарита": [
-          { date: '2023-05-20', value: 10 },
-          { date: '2023-05-21', value: 12 },
-          { date: '2023-05-22', value: 14 },
-          { date: '2023-05-23', value: 11 },
-          { date: '2023-05-24', value: 9 },
-          { date: '2023-05-25', value: 15 },
-          { date: '2023-05-26', value: 17 }
+        2: [
+          { date: '2023-04-25', value: 10 },
+          { date: '2023-04-26', value: 12 },
+          { date: '2023-04-27', value: 14 },
+          { date: '2023-04-28', value: 11 },
+          { date: '2023-04-29', value: 9 },
+          { date: '2023-04-30', value: 15 },
         ]
       },
       
+      // Добавляем данные для производительности элементов меню (для матрицы BCG)
       menuItemPerformance: [
         { dishId: 1, dishName: "Бургер Классический", salesCount: 85, revenue: 212500, profitMargin: 40 },
         { dishId: 2, dishName: "Пицца Маргарита", salesCount: 78, revenue: 195000, profitMargin: 38 },
         { dishId: 3, dishName: "Карбонара", salesCount: 70, revenue: 175000, profitMargin: 36 },
         { dishId: 4, dishName: "Цезарь с курицей", salesCount: 62, revenue: 155000, profitMargin: 34 },
-        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 }
+        { dishId: 5, dishName: "Стейк Рибай", salesCount: 54, revenue: 270000, profitMargin: 42 },
+        { dishId: 6, dishName: "Борщ", salesCount: 46, revenue: 92000, profitMargin: 30 },
+        { dishId: 7, dishName: "Пельмени", salesCount: 42, revenue: 105000, profitMargin: 32 },
+        { dishId: 8, dishName: "Суши-сет", salesCount: 38, revenue: 190000, profitMargin: 44 },
+        { dishId: 9, dishName: "Тирамису", salesCount: 35, revenue: 87500, profitMargin: 46 },
+        { dishId: 10, dishName: "Наполеон", salesCount: 32, revenue: 80000, profitMargin: 40 }
       ],
       
+      // Добавляем данные о производительности категорий
       categoryPerformance: {
-        "Горячие блюда": {
-          salesPercentage: 35.2,
-          averageOrderValue: 5200,
-          averageProfitMargin: 42
-        },
-        "Супы": {
+        "1": { // Супы
           salesPercentage: 18.5,
           averageOrderValue: 2500,
           averageProfitMargin: 35
         },
-        "Салаты": {
+        "2": { // Основные блюда
+          salesPercentage: 35.2,
+          averageOrderValue: 5200,
+          averageProfitMargin: 42
+        },
+        "3": { // Салаты
           salesPercentage: 15.7,
           averageOrderValue: 2200,
           averageProfitMargin: 38
         },
-        "Десерты": {
+        "4": { // Десерты
           salesPercentage: 12.3,
           averageOrderValue: 1800,
           averageProfitMargin: 45
         },
-        "Напитки": {
+        "5": { // Напитки
           salesPercentage: 18.3,
           averageOrderValue: 1200,
           averageProfitMargin: 60
         }
       },
-      
-      period: getDefaultDateRange()
+      period: defaultDateRange
     },
     
     customers: {
@@ -411,14 +373,17 @@ function getMockData(endpoint: string): any {
       returnRateChange: 3.2,
       averageOrderValueChange: 5.8,
       customerDemographics: {
-        age_groups: {
+        age: {
           '18-24': 15,
           '25-34': 35,
           '35-44': 25,
           '45-54': 15,
           '55+': 10
         },
-        total_customers: 1200
+        gender: {
+          'Мужчины': 45,
+          'Женщины': 55
+        }
       },
       visitTimes: {
         'Утро (8-12)': 20,
@@ -488,10 +453,16 @@ function getMockData(endpoint: string): any {
     },
     
     predictive: {
-      salesForecast: Array.from({ length: 7 }, (_, i) => {
+      salesForecast: Array.from({ length: 14 }, (_, i) => {
+        // Создаем даты, начиная с текущего дня и добавляя нужное количество дней
         const date = new Date();
         date.setDate(date.getDate() + i);
-        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        
+        // Генерируем реалистичные данные продаж (тренд роста в выходные)
+        const dayOfWeek = date.getDay(); // 0 - воскресенье, 6 - суббота
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        
+        // База + случайное отклонение + повышение в выходные
         const baseValue = 350000;
         const randomFactor = Math.random() * 50000 - 25000;
         const weekendBonus = isWeekend ? 100000 : 0;
@@ -501,94 +472,32 @@ function getMockData(endpoint: string): any {
           value: Math.round(baseValue + randomFactor + weekendBonus)
         };
       }),
-      
-      inventoryForecast: {
-        ingredients: [
-          { name: 'Мясо', currentStock: 50, recommendedStock: 75, reorderPoint: 30 },
-          { name: 'Овощи', currentStock: 80, recommendedStock: 100, reorderPoint: 40 },
-          { name: 'Молочные продукты', currentStock: 60, recommendedStock: 80, reorderPoint: 35 }
-        ],
-        recommendations: [
-          'Увеличить запас мяса на 25 кг',
-          'Текущий запас овощей оптимален',
-          'Заказать молочные продукты в течение 2 дней'
-        ]
-      },
-      
+      inventoryForecast: {},
       staffingNeeds: {
-        'Понедельник': { 
-          '10:00-14:00': { waiters: 3, cooks: 2 },
-          '14:00-18:00': { waiters: 4, cooks: 3 },
-          '18:00-22:00': { waiters: 5, cooks: 4 }
-        },
-        'Вторник': {
-          '10:00-14:00': { waiters: 3, cooks: 2 },
-          '14:00-18:00': { waiters: 4, cooks: 3 },
-          '18:00-22:00': { waiters: 5, cooks: 4 }
-        },
-        'Среда': {
-          '10:00-14:00': { waiters: 3, cooks: 2 },
-          '14:00-18:00': { waiters: 4, cooks: 3 },
-          '18:00-22:00': { waiters: 5, cooks: 4 }
-        },
-        'Четверг': {
-          '10:00-14:00': { waiters: 4, cooks: 3 },
-          '14:00-18:00': { waiters: 5, cooks: 4 },
-          '18:00-22:00': { waiters: 6, cooks: 5 }
-        },
-        'Пятница': {
-          '10:00-14:00': { waiters: 5, cooks: 4 },
-          '14:00-18:00': { waiters: 6, cooks: 5 },
-          '18:00-22:00': { waiters: 7, cooks: 6 }
-        },
-        'Суббота': {
-          '10:00-14:00': { waiters: 6, cooks: 5 },
-          '14:00-18:00': { waiters: 7, cooks: 6 },
-          '18:00-22:00': { waiters: 8, cooks: 7 }
-        },
-        'Воскресенье': {
-          '10:00-14:00': { waiters: 5, cooks: 4 },
-          '14:00-18:00': { waiters: 6, cooks: 5 },
-          '18:00-22:00': { waiters: 6, cooks: 5 }
-        }
+        'monday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'tuesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'wednesday': { '10-14': 3, '14-18': 4, '18-22': 5 },
+        'thursday': { '10-14': 4, '14-18': 5, '18-22': 6 },
+        'friday': { '10-14': 5, '14-18': 6, '18-22': 7 },
+        'saturday': { '10-14': 6, '14-18': 7, '18-22': 8 },
+        'sunday': { '10-14': 5, '14-18': 6, '18-22': 6 }
       },
-      
-      peakTimePrediction: {
-        weekday: {
-          'lunch': { start: '12:00', end: '14:00', expectedGuests: 80 },
-          'dinner': { start: '18:00', end: '20:00', expectedGuests: 120 }
-        },
-        weekend: {
-          'lunch': { start: '13:00', end: '15:00', expectedGuests: 100 },
-          'dinner': { start: '19:00', end: '21:00', expectedGuests: 150 }
-        }
-      },
-      
+      peakTimePrediction: {},
       suggestedPromotions: [
         {
           dishId: 5,
-          dishName: "Стейк Рибай",
+          dishName: "Фирменный стейк",
           suggestedDiscount: 15,
-          potentialRevenue: 85000,
-          reason: "Низкие продажи в будние дни"
+          potentialRevenue: 45000
         },
         {
           dishId: 12,
           dishName: "Салат Греческий",
           suggestedDiscount: 10,
-          potentialRevenue: 42000,
-          reason: "Повышение спроса на здоровую пищу"
-        },
-        {
-          dishId: 8,
-          dishName: "Суши-сет",
-          suggestedDiscount: 20,
-          potentialRevenue: 65000,
-          reason: "Высокая конкуренция в сегменте"
+          potentialRevenue: 28000
         }
       ],
-      
-      period: getDefaultDateRange()
+      period: defaultDateRange
     }
   };
   
@@ -641,8 +550,8 @@ const analyticsApi = {
         ...baseCustomerData,
         customerDemographics: {
           ...baseCustomerData.customerDemographics,
-          age_groups: dashboardData.customerDemographics?.age_groups || baseCustomerData.customerDemographics?.age_groups,
-          total_customers: dashboardData.customerDemographics?.total_customers || baseCustomerData.customerDemographics?.total_customers
+          age: dashboardData.customerDemographics?.age || baseCustomerData.customerDemographics?.age,
+          gender: dashboardData.customerDemographics?.gender || baseCustomerData.customerDemographics?.gender
         },
         visitFrequency: dashboardData.visitFrequency || baseCustomerData.visitFrequency
       };

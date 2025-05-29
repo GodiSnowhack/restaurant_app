@@ -1,177 +1,137 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { getDefaultApiUrl } from '../../../src/config/defaults';
-import axios from 'axios';
-import { getMockData } from '../analytics';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { query } from '../../../lib/db';
 
-/**
- * API-прокси для получения аналитики по меню
- */
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
+// Функция проверки авторизации
+const verifyAuth = (req: NextApiRequest): { isAuthenticated: boolean } => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return { isAuthenticated: false };
+    }
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    // В реальном приложении здесь должна быть настоящая проверка токена
+    return { isAuthenticated: true };
+  } catch (err) {
+    console.error('Ошибка верификации токена:', err);
+    return { isAuthenticated: false };
   }
+};
 
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  // Проверка авторизации
+  const authResult = verifyAuth(req);
+  if (!authResult.isAuthenticated) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Получаем параметры запроса
+  const { startDate, endDate } = req.query;
 
   try {
-    const token = req.headers.authorization;
-    
-    if (!token) {
-      console.warn('Analytics API (menu) - Отсутствует токен авторизации, возвращаем заглушку');
-      return res.status(200).json(getMockData('menu'));
-    }
+    // SQL запрос для получения топ продаваемых блюд
+    const topSellingDishesQuery = `
+      SELECT 
+        mi.id as dishId,
+        mi.name as dishName,
+        mi.category_id as categoryId,
+        c.name as categoryName,
+        COUNT(oi.id) as salesCount,
+        SUM(oi.price * oi.quantity) as revenue,
+        ROUND(SUM(oi.price * oi.quantity) / (
+          SELECT SUM(price * quantity) 
+          FROM order_items 
+          JOIN orders o ON order_items.order_id = o.id
+          WHERE o.status NOT IN ('cancelled', 'rejected')
+            AND o.created_at BETWEEN ? AND ?
+        ) * 100, 1) as percentage
+      FROM menu_items mi
+      JOIN order_items oi ON mi.id = oi.menu_item_id
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE o.status NOT IN ('cancelled', 'rejected')
+        AND o.created_at BETWEEN ? AND ?
+      GROUP BY mi.id, mi.name, mi.category_id, c.name
+      ORDER BY revenue DESC
+      LIMIT 10
+    `;
 
-    // Проверяем формат токена и при необходимости корректируем
-    let authHeader = token;
-    if (!token.startsWith('Bearer ')) {
-      authHeader = `Bearer ${token}`;
-    }
+    // SQL запрос для получения самых прибыльных блюд
+    const mostProfitableDishesQuery = `
+      SELECT 
+        mi.id as dishId,
+        mi.name as dishName,
+        mi.category_id as categoryId,
+        c.name as categoryName,
+        COUNT(oi.id) as salesCount,
+        SUM(oi.price * oi.quantity) as revenue,
+        SUM(oi.cost_price * oi.quantity) as costPrice,
+        SUM((oi.price - oi.cost_price) * oi.quantity) as profit,
+        ROUND(SUM((oi.price - oi.cost_price) * oi.quantity) / SUM(oi.price * oi.quantity) * 100, 1) as profitMargin
+      FROM menu_items mi
+      JOIN order_items oi ON mi.id = oi.menu_item_id
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE o.status NOT IN ('cancelled', 'rejected')
+        AND o.created_at BETWEEN ? AND ?
+      GROUP BY mi.id, mi.name, mi.category_id, c.name
+      ORDER BY profit DESC
+      LIMIT 10
+    `;
 
-    const baseApiUrl = getDefaultApiUrl();
-    
-    // Получаем все параметры запроса
-    const queryParams = new URLSearchParams();
-    Object.entries(req.query).forEach(([key, value]) => {
-      if (value) {
-        if (Array.isArray(value)) {
-          value.forEach(v => queryParams.append(key, v));
-        } else {
-          queryParams.append(key, value as string);
-        }
-      }
-    });
-    
-    const analyticsUrl = `${baseApiUrl}/analytics/menu${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    // SQL запрос для получения наименее продаваемых блюд
+    const leastSellingDishesQuery = `
+      SELECT 
+        mi.id as dishId,
+        mi.name as dishName,
+        mi.category_id as categoryId,
+        c.name as categoryName,
+        COUNT(oi.id) as salesCount,
+        SUM(oi.price * oi.quantity) as revenue,
+        ROUND(SUM(oi.price * oi.quantity) / (
+          SELECT SUM(price * quantity) 
+          FROM order_items 
+          JOIN orders o ON order_items.order_id = o.id
+          WHERE o.status NOT IN ('cancelled', 'rejected')
+            AND o.created_at BETWEEN ? AND ?
+        ) * 100, 1) as percentage
+      FROM menu_items mi
+      JOIN order_items oi ON mi.id = oi.menu_item_id
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE o.status NOT IN ('cancelled', 'rejected')
+        AND o.created_at BETWEEN ? AND ?
+      GROUP BY mi.id, mi.name, mi.category_id, c.name
+      ORDER BY salesCount ASC
+      LIMIT 10
+    `;
 
-    console.log('Analytics API (menu) - Отправка запроса на', analyticsUrl);
-    console.log('Analytics API (menu) - Заголовки:', { 
-      Authorization: authHeader.substring(0, 15) + '...'
-    });
+    // Выполнение запросов
+    const [topSellingDishes, mostProfitableDishes, leastSellingDishes] = await Promise.all([
+      query(topSellingDishesQuery, [startDate, endDate, startDate, endDate]),
+      query(mostProfitableDishesQuery, [startDate, endDate]),
+      query(leastSellingDishesQuery, [startDate, endDate, startDate, endDate])
+    ]);
 
-    try {
-      // Отправляем запрос на бэкенд
-      const response = await axios.get(analyticsUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': authHeader
-        },
-        maxRedirects: 0,
-        validateStatus: function (status) {
-          return status < 500; // Принимаем все статусы, кроме 5xx
-        },
-        timeout: 10000 // 10 секунд таймаут
-      });
+    // Формирование результата
+    const result = {
+      topSellingDishes,
+      mostProfitableDishes,
+      leastSellingDishes,
+      // Дополнительные метрики
+      averageCookingTime: 15, // Заглушка для среднего времени приготовления
+      categoryPopularity: {}, // Заглушка для популярности категорий
+      menuItemSalesTrend: {}, // Заглушка для трендов продаж
+      period: { startDate, endDate }
+    };
 
-      // Если ответ не успешный, возвращаем заглушку
-      if (response.status >= 400) {
-        console.warn('Analytics API (menu) - Ошибка от сервера:', {
-          status: response.status,
-          data: response.data
-        });
-        
-        console.log('Analytics API (menu) - Возвращаем заглушку из-за ошибки API');
-        return res.status(200).json(getMockData('menu'));
-      }
-
-      let data = response.data;
-
-      console.log('Analytics API (menu) - Ответ от сервера:', {
-        status: response.status,
-        dataType: typeof data,
-        dataKeys: data && typeof data === 'object' ? Object.keys(data) : []
-      });
-
-      // Проверяем структуру данных и преобразуем их, если необходимо
-      if (data && typeof data === 'object') {
-        // Гарантируем, что все поля будут в правильном формате
-        const menuData = {
-          topSellingDishes: Array.isArray(data.topSellingDishes) || Array.isArray(data.top_selling_dishes)
-            ? (data.topSellingDishes || data.top_selling_dishes || []).map((dish: any) => ({
-                dishId: Number(dish.dishId || dish.dish_id || 0),
-                dishName: String(dish.dishName || dish.dish_name || ''),
-                categoryId: dish.categoryId || dish.category_id ? Number(dish.categoryId || dish.category_id) : undefined,
-                categoryName: dish.categoryName || dish.category_name ? String(dish.categoryName || dish.category_name) : undefined,
-                salesCount: Number(dish.salesCount || dish.sales_count || 0),
-                revenue: Number(dish.revenue || 0),
-                percentage: Number(dish.percentage || 0)
-              }))
-            : getMockData('menu').topSellingDishes,
-          
-          mostProfitableDishes: Array.isArray(data.mostProfitableDishes) || Array.isArray(data.most_profitable_dishes)
-            ? (data.mostProfitableDishes || data.most_profitable_dishes || []).map((dish: any) => ({
-                dishId: Number(dish.dishId || dish.dish_id || 0),
-                dishName: String(dish.dishName || dish.dish_name || ''),
-                categoryId: dish.categoryId || dish.category_id ? Number(dish.categoryId || dish.category_id) : undefined,
-                categoryName: dish.categoryName || dish.category_name ? String(dish.categoryName || dish.category_name) : undefined,
-                salesCount: Number(dish.salesCount || dish.sales_count || 0),
-                revenue: Number(dish.revenue || 0),
-                percentage: Number(dish.percentage || 0),
-                costPrice: Number(dish.costPrice || dish.cost_price || 0),
-                profit: Number(dish.profit || 0),
-                profitMargin: Number(dish.profitMargin || dish.profit_margin || 0)
-              }))
-            : getMockData('menu').mostProfitableDishes,
-          
-          leastSellingDishes: Array.isArray(data.leastSellingDishes) || Array.isArray(data.least_selling_dishes)
-            ? (data.leastSellingDishes || data.least_selling_dishes || []).map((dish: any) => ({
-                dishId: Number(dish.dishId || dish.dish_id || 0),
-                dishName: String(dish.dishName || dish.dish_name || ''),
-                categoryId: dish.categoryId || dish.category_id ? Number(dish.categoryId || dish.category_id) : undefined,
-                categoryName: dish.categoryName || dish.category_name ? String(dish.categoryName || dish.category_name) : undefined,
-                salesCount: Number(dish.salesCount || dish.sales_count || 0),
-                revenue: Number(dish.revenue || 0),
-                percentage: Number(dish.percentage || 0)
-              }))
-            : getMockData('menu').leastSellingDishes,
-          
-          averageCookingTime: Number(data.averageCookingTime || data.average_cooking_time || 18),
-          
-          categoryPopularity: data.categoryPopularity || data.category_popularity || {},
-          
-          menuItemSalesTrend: data.menuItemSalesTrend || data.menu_item_sales_trend || {},
-          
-          categoryPerformance: data.categoryPerformance || data.category_performance || {},
-          
-          period: data.period || { 
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-          }
-        };
-        
-        // Возвращаем преобразованные данные
-        return res.status(200).json(menuData);
-      }
-
-      // Если данные не соответствуют ожидаемой структуре, возвращаем заглушку
-      console.log('Analytics API (menu) - Неправильная структура данных, возвращаем заглушку');
-      return res.status(200).json(getMockData('menu'));
-    } catch (apiError: any) {
-      // Если произошла ошибка при запросе к API, возвращаем заглушку
-      console.error('Analytics API (menu) - Ошибка при запросе к серверу:', apiError.message || apiError);
-      console.log('Analytics API (menu) - Возвращаем заглушку из-за ошибки запроса');
-      return res.status(200).json(getMockData('menu'));
-    }
-  } catch (error: any) {
-    console.error('Analytics API (menu) - Критическая ошибка:', error);
-    
-    // В любом случае возвращаем заглушку
-    console.log('Analytics API (menu) - Возвращаем заглушку из-за критической ошибки');
-    return res.status(200).json(getMockData('menu'));
+    return res.status(200).json(result);
+  } catch (err) {
+    const error = err as Error;
+    console.error('Ошибка при получении аналитики меню:', error);
+    return res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 } 
