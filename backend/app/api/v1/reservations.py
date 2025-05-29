@@ -34,20 +34,21 @@ async def read_reservations(
             # Проверяем наличие X-User-ID в заголовке
             user_id = request.headers.get("X-User-ID")
             if not user_id:
-                # Если нет ни токена, ни X-User-ID, возвращаем все бронирования
-                # Это нужно для работы публичной части сайта
-                if date:
-                    return get_reservations_by_date(db, date, skip, limit)
-                elif status:
-                    return get_reservations_by_status(db, status, skip, limit)
-                else:
-                    return db.query(Reservation).offset(skip).limit(limit).all()
+                # Для неаутентифицированных запросов без ID в заголовке 
+                # возвращаем ошибку авторизации
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Необходима авторизация для просмотра бронирований",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             
             # Пытаемся получить пользователя по ID из заголовка
             try:
                 user_id_int = int(user_id)
                 user = db.query(User).filter(User.id == user_id_int).first()
                 if not user:
+                    # Для неизвестного пользователя из заголовка создаем временного
+                    # с ролью клиента для ограничения доступа
                     user = User(
                         id=user_id_int,
                         email=f"temp_{user_id_int}@example.com",
@@ -55,7 +56,7 @@ async def read_reservations(
                         role=UserRole.CLIENT,
                         is_active=True
                     )
-                # Не сохраняем в базу, просто используем для проверки
+                # Обычный пользователь видит только свои бронирования
                 return get_reservations_by_user(db, user_id_int, skip, limit)
             except (ValueError, TypeError):
                 raise HTTPException(

@@ -34,46 +34,52 @@ async def read_reservations(
             # Проверяем наличие X-User-ID в заголовке
             user_id = request.headers.get("X-User-ID")
             if not user_id:
-                # Для неавторизованных пользователей возвращаем только публичные данные или ошибку
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Необходима авторизация для просмотра бронирований"
-                )
+                # Если нет ни токена, ни X-User-ID, возвращаем все бронирования
+                # Это нужно для работы публичной части сайта
+                if date:
+                    return get_reservations_by_date(db, date, skip, limit)
+                elif status:
+                    return get_reservations_by_status(db, status, skip, limit)
+                else:
+                    return db.query(Reservation).offset(skip).limit(limit).all()
             
             # Пытаемся получить пользователя по ID из заголовка
             try:
                 user_id_int = int(user_id)
                 user = db.query(User).filter(User.id == user_id_int).first()
                 if not user:
-                    # Если пользователь не найден, но есть ID - возвращаем только его бронирования
-                    return get_reservations_by_user(db, user_id_int, skip, limit)
-                # Если пользователь найден - проверяем его роль
-                if user.role in [UserRole.ADMIN, UserRole.WAITER]:
-                    # Администраторы и официанты видят все бронирования
-                    if date:
-                        return get_reservations_by_date(db, date, skip, limit)
-                    elif status:
-                        return get_reservations_by_status(db, status, skip, limit)
-                    else:
-                        return db.query(Reservation).offset(skip).limit(limit).all()
-                else:
-                    # Обычные пользователи видят только свои бронирования
-                    return get_reservations_by_user(db, user_id_int, skip, limit)
+                    user = User(
+                        id=user_id_int,
+                        email=f"temp_{user_id_int}@example.com",
+                        full_name="Временный пользователь",
+                        role=UserRole.CLIENT,
+                        is_active=True
+                    )
+                # Не сохраняем в базу, просто используем для проверки
+                return get_reservations_by_user(db, user_id_int, skip, limit)
             except (ValueError, TypeError):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Неверный формат ID пользователя"
+                    detail="Неверный формат ID пользователя",
                 )
         
         # Если пользователь аутентифицирован, используем обычную логику
-        if current_user.role in [UserRole.ADMIN, UserRole.WAITER]:
-            # Администратор и официант могут видеть все бронирования
+        if current_user.role == UserRole.ADMIN:
+            # Администратор может видеть все бронирования
             if date:
                 return get_reservations_by_date(db, date, skip, limit)
             elif status:
                 return get_reservations_by_status(db, status, skip, limit)
             else:
                 # Возвращаем все бронирования
+                return db.query(Reservation).offset(skip).limit(limit).all()
+        elif current_user.role == UserRole.WAITER:
+            # Официант видит все бронирования
+            if date:
+                return get_reservations_by_date(db, date, skip, limit)
+            elif status:
+                return get_reservations_by_status(db, status, skip, limit)
+            else:
                 return db.query(Reservation).offset(skip).limit(limit).all()
         else:
             # Обычный пользователь видит только свои бронирования

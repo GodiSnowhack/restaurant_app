@@ -16,6 +16,21 @@ def read_user_me(
     current_user: User = Depends(get_current_user)
 ):
     """Получение информации о текущем пользователе"""
+    # Проверяем, нужно ли обновить токен
+    if hasattr(current_user, 'needs_token_refresh') and current_user.needs_token_refresh:
+        print(f"Требуется обновление токена для пользователя {current_user.id}")
+        return {
+            "id": current_user.id,
+            "email": current_user.email,
+            "role": current_user.role,
+            "is_active": current_user.is_active,
+            "full_name": current_user.full_name,
+            "phone": current_user.phone,
+            "created_at": current_user.created_at,
+            "updated_at": current_user.updated_at,
+            "needs_token_refresh": True
+        }
+    
     print(f"Возвращаем данные пользователя {current_user.id}, роль: {current_user.role}")
     # Возвращаем полные данные пользователя
     return {
@@ -26,7 +41,8 @@ def read_user_me(
         "full_name": current_user.full_name,
         "phone": current_user.phone,
         "created_at": current_user.created_at,
-        "updated_at": current_user.updated_at
+        "updated_at": current_user.updated_at,
+        "needs_token_refresh": False
     }
 
 

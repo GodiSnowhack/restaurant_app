@@ -109,10 +109,9 @@ def get_current_user(
             )
         
         # Проверяем соответствие роли в токене и в базе данных
-        # Всегда используем роль из базы данных, игнорируем роль из токена
         if role and role != user.role:
             print(f"Несоответствие ролей: токен={role}, база={user.role}")
-            # Оставляем роль из базы данных как основную
+            raise credentials_exception
         
         print(f"Успешно получен пользователь: ID={user.id}, роль={user.role}")
         return user
