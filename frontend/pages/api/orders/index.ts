@@ -112,7 +112,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // Получаем ID и роль пользователя из заголовков
   const userId = req.headers['x-user-id'] as string || '1';
-  const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+  const userRole = (req.headers['x-user-role'] as string || '').toLowerCase();
+
+  // Для администраторов используем прямой доступ к базе данных
+  if (userRole === 'admin') {
+    console.log('API Proxy: Пользователь - администратор, используем прямой доступ к БД');
+    try {
+      // Перенаправляем запрос на API базы данных
+      const dbResponse = await fetch(`${req.headers.host}/api/db/orders?start_date=${encodeURIComponent(start_date as string)}&end_date=${encodeURIComponent(end_date as string)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'admin',
+          'X-User-ID': userId
+        }
+      });
+      
+      if (dbResponse.ok) {
+        const dbData = await dbResponse.json();
+        console.log('API Proxy: Получены данные заказов для администратора из БД');
+        return res.status(200).json(dbData);
+      }
+    } catch (dbError) {
+      console.log('API Proxy: Ошибка при запросе к БД:', dbError);
+      // Продолжаем выполнение и пробуем другие методы
+    }
+  }
 
   // Логгируем параметры запроса
   console.log('API Proxy: Параметры запроса:', {

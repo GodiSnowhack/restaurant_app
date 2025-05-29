@@ -106,7 +106,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // Получаем ID и роль пользователя из заголовков
   const userId = req.headers['x-user-id'] as string || '1';
-  const userRole = (req.headers['x-user-role'] as string || 'admin').toLowerCase();
+  const userRole = (req.headers['x-user-role'] as string || '').toLowerCase();
+
+  // Проверяем, что пользователь - администратор
+  if (userRole !== 'admin') {
+    console.log('API DB Proxy: Попытка получения заказов неадминистратором:', userRole);
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Доступ запрещен. Требуются права администратора.' 
+    });
+  }
 
   // Получаем базовый URL API
   const baseApiUrl = getDefaultApiUrl();

@@ -141,7 +141,7 @@ const AdminOrdersPage: NextPage = () => {
       let ordersData;
       
       try {
-        // Первая попытка: основной метод получения заказов
+        // Первая попытка: через основной API заказов
         ordersData = await ordersApi.getOrders(
           params.start_date,
           params.end_date
@@ -149,21 +149,22 @@ const AdminOrdersPage: NextPage = () => {
       } catch (apiError) {
         console.error('Первая попытка получения заказов не удалась:', apiError);
         
-        // Вторая попытка: пробуем получить данные с другими настройками
+        // Вторая попытка: пробуем получить данные напрямую из БД
         try {
-          // Делаем явный запрос через fetch с большим таймаутом
+          // Делаем явный запрос через fetch к API базы данных
           const token = localStorage.getItem('token');
           
           if (!token) {
             throw new Error('Отсутствует токен авторизации');
           }
           
-          const response = await fetch(`/api/orders?start_date=${encodeURIComponent(params.start_date)}&end_date=${encodeURIComponent(params.end_date)}`, {
+          const response = await fetch(`/api/db/orders?start_date=${encodeURIComponent(params.start_date)}&end_date=${encodeURIComponent(params.end_date)}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'X-User-Role': 'admin'
             }
           });
           
@@ -172,18 +173,113 @@ const AdminOrdersPage: NextPage = () => {
           }
           
           ordersData = await response.json();
-          console.log('Данные получены через альтернативный метод');
+          console.log('Данные получены через прямой запрос к базе данных');
         } catch (fetchError) {
           console.error('Вторая попытка тоже не удалась:', fetchError);
           
-          // Если обе попытки не удались, используем демо-данные
-          if (useDemoData) {
-            console.log('Использование демо-данных согласно настройкам');
+          // Третья попытка: прямой SQL-запрос
+          try {
+            const token = localStorage.getItem('token');
             
-            // Здесь мы не генерируем данные, а рассчитываем на то, что API-прокси вернет демо-данные
-            throw new Error('Не удалось получить данные. Используются демо-данные.');
-          } else {
-            throw new Error('Не удалось получить данные заказов. Пожалуйста, проверьте подключение к интернету и повторите попытку.');
+            if (!token) {
+              throw new Error('Отсутствует токен авторизации');
+            }
+            
+            // Формируем SQL-запрос для получения заказов
+            const query = `
+              SELECT o.* 
+              FROM orders o
+              WHERE o.created_at >= '${params.start_date}' AND o.created_at <= '${params.end_date}'
+              ${activeTab !== 'all' ? `AND o.status = '${activeTab}'` : ''}
+              ORDER BY o.created_at DESC
+            `;
+            
+            const dbResponse = await fetch('/api/db/query', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-User-Role': 'admin'
+              },
+              body: JSON.stringify({ query })
+            });
+            
+            if (!dbResponse.ok) {
+              throw new Error(`Ошибка HTTP: ${dbResponse.status}`);
+            }
+            
+            const ordersResult = await dbResponse.json();
+            
+            if (Array.isArray(ordersResult) && ordersResult.length > 0) {
+              // Получаем ID всех заказов
+              const orderIds = ordersResult.map((order: any) => order.id).join(',');
+              
+              // Формируем запрос для получения товаров заказа
+              const itemsQuery = `
+                SELECT od.order_id, od.dish_id, od.quantity, od.price, d.name,
+                       (od.price * od.quantity) as total_price
+                FROM order_dish od
+                LEFT JOIN dishes d ON od.dish_id = d.id
+                WHERE od.order_id IN (${orderIds})
+              `;
+              
+              const itemsResponse = await fetch('/api/db/query', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                  'X-User-Role': 'admin'
+                },
+                body: JSON.stringify({ query: itemsQuery })
+              });
+              
+              if (!itemsResponse.ok) {
+                // Если не удалось получить товары, вернем заказы без товаров
+                ordersData = ordersResult.map((order: any) => ({
+                  ...order,
+                  items: []
+                }));
+              } else {
+                const itemsResult = await itemsResponse.json();
+                
+                // Группируем товары по заказам
+                const orderItems: {[key: number]: any[]} = {};
+                itemsResult.forEach((item: any) => {
+                  if (!orderItems[item.order_id]) {
+                    orderItems[item.order_id] = [];
+                  }
+                  orderItems[item.order_id].push({
+                    dish_id: item.dish_id,
+                    quantity: item.quantity,
+                    price: item.price,
+                    name: item.name,
+                    total_price: item.total_price
+                  });
+                });
+                
+                // Добавляем товары к заказам
+                ordersData = ordersResult.map((order: any) => ({
+                  ...order,
+                  items: orderItems[order.id] || []
+                }));
+              }
+            } else {
+              ordersData = [];
+            }
+            
+            console.log('Данные получены через прямой SQL-запрос');
+          } catch (sqlError) {
+            console.error('Третья попытка тоже не удалась:', sqlError);
+            
+            // Если обе попытки не удались, используем демо-данные
+            if (useDemoData) {
+              console.log('Использование демо-данных согласно настройкам');
+              throw new Error('Не удалось получить данные. Используются демо-данные.');
+            } else {
+              throw new Error('Не удалось получить данные заказов. Пожалуйста, проверьте подключение к интернету и повторите попытку.');
+            }
           }
         }
       }

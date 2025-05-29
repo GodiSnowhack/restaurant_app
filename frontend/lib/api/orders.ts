@@ -20,6 +20,9 @@ export const ordersApi = {
       queryParams.append('start_date', startDate);
       queryParams.append('end_date', endDate);
       
+      // Получаем роль пользователя
+      const userRole = localStorage.getItem('user_role') || 'customer';
+      
       // Отправляем запрос через локальный API-прокси
       const url = `/api/orders?${queryParams.toString()}`;
       console.log('API: Отправка запроса к:', url);
@@ -29,7 +32,8 @@ export const ordersApi = {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': userRole === 'admin' ? 'admin' : 'customer'
         },
         cache: 'no-cache'
       });
@@ -37,6 +41,30 @@ export const ordersApi = {
       // Проверяем статус ответа
       if (!response.ok) {
         console.warn(`API: Ошибка при запросе: ${response.status} ${response.statusText}`);
+        
+        // Для администратора пробуем получить данные напрямую из БД
+        if (userRole === 'admin') {
+          console.log('API: Пробуем получить данные администратора напрямую из БД');
+          const dbUrl = `/api/db/orders?${queryParams.toString()}`;
+          
+          const dbResponse = await fetch(dbUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              'X-User-Role': 'admin'
+            },
+            cache: 'no-cache'
+          });
+          
+          if (dbResponse.ok) {
+            const dbData = await dbResponse.json();
+            console.log('API: Получены данные заказов из БД:', { count: Array.isArray(dbData) ? dbData.length : 'не массив' });
+            return Array.isArray(dbData) ? dbData : [];
+          }
+        }
+        
         return [];
       }
       
