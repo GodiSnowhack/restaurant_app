@@ -187,33 +187,118 @@ const AdminAnalyticsPage: NextPage = () => {
       if (menuResult.status === 'fulfilled') {
         const menuResponse = menuResult.value as MenuMetrics;
         
-        // Дополнительная обработка данных меню, если нужно
-        if ((!menuResponse.categoryPerformance || Object.keys(menuResponse.categoryPerformance).length === 0)) {
-          // ... существующий код обработки ...
+        // Убедимся, что все необходимые поля существуют
+        if (!menuResponse.menuItemSalesTrend) {
+          menuResponse.menuItemSalesTrend = {};
+        }
+        
+        if (!menuResponse.categoryPerformance) {
+          menuResponse.categoryPerformance = {};
+        }
+        
+        if (!menuResponse.menuItemPerformance) {
+          menuResponse.menuItemPerformance = [];
+        }
+        
+        // Проверим наличие массивов
+        if (!Array.isArray(menuResponse.topSellingDishes)) {
+          menuResponse.topSellingDishes = [];
+        }
+        
+        if (!Array.isArray(menuResponse.mostProfitableDishes)) {
+          menuResponse.mostProfitableDishes = [];
+        }
+        
+        if (!Array.isArray(menuResponse.leastSellingDishes)) {
+          menuResponse.leastSellingDishes = [];
         }
         
         setMenuMetrics(menuResponse);
-              } else {
+      } else {
         console.error('Ошибка при загрузке метрик меню:', menuResult.reason);
         setError(prev => (prev ? `${prev}\nОшибка загрузки метрик меню.` : 'Ошибка загрузки метрик меню.'));
       }
       
       if (customersResult.status === 'fulfilled') {
-        setCustomerMetrics(customersResult.value as CustomerMetrics);
+        const customerResponse = customersResult.value as CustomerMetrics;
+        
+        // Убедимся, что все необходимые поля существуют
+        if (!customerResponse.customerDemographics) {
+          customerResponse.customerDemographics = {
+            age_groups: {},
+            total_customers: customerResponse.totalCustomers || 0
+          };
+        }
+        
+        if (!customerResponse.customerDemographics.age_groups) {
+          customerResponse.customerDemographics.age_groups = {};
+        }
+        
+        if (!customerResponse.visitFrequency) {
+          customerResponse.visitFrequency = {};
+        }
+        
+        if (!Array.isArray(customerResponse.topCustomers)) {
+          customerResponse.topCustomers = [];
+        }
+        
+        setCustomerMetrics(customerResponse);
       } else {
         console.error('Ошибка при загрузке метрик клиентов:', customersResult.reason);
         setError(prev => (prev ? `${prev}\nОшибка загрузки метрик клиентов.` : 'Ошибка загрузки метрик клиентов.'));
       }
       
       if (operationalResult.status === 'fulfilled') {
-        setOperationalMetrics(operationalResult.value as OperationalMetrics);
+        const operationalResponse = operationalResult.value as OperationalMetrics;
+        
+        // Убедимся, что все необходимые поля существуют
+        if (!operationalResponse.peakHours) {
+          operationalResponse.peakHours = {};
+        }
+        
+        if (!operationalResponse.staffEfficiency) {
+          operationalResponse.staffEfficiency = {};
+        }
+        
+        if (!operationalResponse.tableUtilization) {
+          operationalResponse.tableUtilization = {};
+        }
+        
+        if (!operationalResponse.orderCompletionRates) {
+          operationalResponse.orderCompletionRates = {};
+        }
+        
+        setOperationalMetrics(operationalResponse);
       } else {
         console.error('Ошибка при загрузке операционных метрик:', operationalResult.reason);
         setError(prev => (prev ? `${prev}\nОшибка загрузки операционных метрик.` : 'Ошибка загрузки операционных метрик.'));
       }
       
       if (predictiveResult.status === 'fulfilled') {
-        setPredictiveMetrics(predictiveResult.value as PredictiveMetrics);
+        const predictiveResponse = predictiveResult.value as PredictiveMetrics;
+        
+        // Убедимся, что все необходимые поля существуют
+        if (!Array.isArray(predictiveResponse.salesForecast)) {
+          predictiveResponse.salesForecast = [];
+        }
+        
+        if (!predictiveResponse.inventoryForecast) {
+          predictiveResponse.inventoryForecast = {};
+        }
+        
+        if (!predictiveResponse.staffingNeeds) {
+          predictiveResponse.staffingNeeds = {};
+        }
+        
+        if (!predictiveResponse.peakTimePrediction) {
+          predictiveResponse.peakTimePrediction = {};
+        }
+        
+        if (!Array.isArray(predictiveResponse.suggestedPromotions)) {
+          predictiveResponse.suggestedPromotions = [];
+        }
+        
+        setPredictiveMetrics(predictiveResponse);
       } else {
         console.error('Ошибка при загрузке предиктивных метрик:', predictiveResult.reason);
         setError(prev => (prev ? `${prev}\nОшибка загрузки предиктивных метрик.` : 'Ошибка загрузки предиктивных метрик.'));
@@ -227,32 +312,31 @@ const AdminAnalyticsPage: NextPage = () => {
       const hasPredictive = predictiveResult.status === 'fulfilled';
       
       if (hasFinancial && hasMenu && hasCustomers && hasOperational && hasPredictive) {
-        generateBusinessRecommendations(
-          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
-          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
-          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
-          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
-          (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
-        );
+        try {
+          generateBusinessRecommendations(
+            (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+            (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+            (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+            (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
+            (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
+          );
 
-        generateBusinessAlerts(
-          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
-          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
-          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
-          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value
-        );
+          generateBusinessAlerts(
+            (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+            (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+            (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+            (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value
+          );
 
-        generateWhatIfScenarios(
-          (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
-          (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
-          (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
-          (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
-          (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
-        );
-      } else {
-        // Показываем уведомление, что некоторые данные недоступны
-        if (!error) {
-          setError('Некоторые данные не загружены. Часть функциональности может быть недоступна.');
+          generateWhatIfScenarios(
+            (financialResult as PromiseFulfilledResult<FinancialMetrics>).value, 
+            (menuResult as PromiseFulfilledResult<MenuMetrics>).value, 
+            (customersResult as PromiseFulfilledResult<CustomerMetrics>).value, 
+            (operationalResult as PromiseFulfilledResult<OperationalMetrics>).value, 
+            (predictiveResult as PromiseFulfilledResult<PredictiveMetrics>).value
+          );
+        } catch (err) {
+          console.error('Ошибка при генерации бизнес-рекомендаций:', err);
         }
       }
     } catch (error) {
@@ -731,10 +815,55 @@ const AdminAnalyticsPage: NextPage = () => {
     }
   };
 
-  // Изменяем conditional rendering контента страницы
+  // Функция для отображения компонентов графиков с учетом проверки данных
   const renderContent = () => {
-    if (isLoading) return <LoadingSpinner />;
+    // Проверка наличия данных перед отрисовкой
+    const hasFinancialData = financialMetrics !== null;
+    const hasMenuData = menuMetrics !== null;
+    const hasCustomerData = customerMetrics !== null;
+    const hasOperationalData = operationalMetrics !== null;
+    const hasPredictiveData = predictiveMetrics !== null;
     
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="large" />
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className={`p-6 rounded-lg ${isDark ? 'bg-red-900/20 text-red-300' : 'bg-red-50 text-red-600'} mb-6 text-center`}>
+          <ExclamationTriangleIcon className="h-12 w-12 mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">Ошибка загрузки данных</h3>
+          <p className="whitespace-pre-line">{error}</p>
+          <button 
+            onClick={() => loadAnalyticsData()}
+            className={`mt-4 px-4 py-2 rounded-md text-sm font-medium ${isDark ? 'bg-red-700 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      );
+    }
+
+    if (!hasFinancialData && !hasMenuData && !hasCustomerData && !hasOperationalData && !hasPredictiveData) {
+      return (
+        <div className={`p-6 rounded-lg ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-50 text-gray-600'} mb-6 text-center`}>
+          <ExclamationTriangleIcon className={`h-12 w-12 mx-auto mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          <h3 className="text-lg font-medium mb-2">Нет данных для отображения</h3>
+          <p>Не удалось загрузить данные аналитики для выбранного периода.</p>
+          <button 
+            onClick={() => loadAnalyticsData()}
+            className={`mt-4 px-4 py-2 rounded-md text-sm font-medium ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'dashboard':
         return renderDashboardView();
@@ -750,7 +879,13 @@ const AdminAnalyticsPage: NextPage = () => {
         return renderCustomersView();
       default:
         return renderDashboardView();
-  }
+    }
+  };
+
+  // Функция для безопасного получения параметров из объектов данных с проверкой на null/undefined
+  const safeGet = <T, K extends keyof T>(obj: T | null, key: K, defaultValue: T[K]): T[K] => {
+    if (!obj) return defaultValue;
+    return obj[key] !== undefined ? obj[key] : defaultValue;
   };
 
   // Если данные не загружены, показываем сообщение об ошибке
@@ -804,9 +939,9 @@ const AdminAnalyticsPage: NextPage = () => {
 
   // Безопасное отображение графика статусов заказов с проверкой наличия данных
   const renderOrderStatuses = () => {
-    // Проверяем наличие данных операционных метрик
-    if (!operationalMetrics || !operationalMetrics.orderCompletionRates || Object.keys(operationalMetrics.orderCompletionRates).length === 0) {
-      // Используем мок-данные для отображения, если реальных данных нет
+    // Проверка наличия данных
+    if (!operationalMetrics || !operationalMetrics.orderCompletionRates) {
+      // Используем демо-данные
       const mockData = {
         'В ожидании': 15.2,
         'В обработке': 22.8,
@@ -838,7 +973,7 @@ const AdminAnalyticsPage: NextPage = () => {
 
       return (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'} mb-4`}>
+          <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'} mb-4 col-span-full`}>
             <p className={`${isDark ? 'text-gray-300' : 'text-gray-700'} text-sm text-center mb-2`}>
               Используются демонстрационные данные о статусах заказов
             </p>
@@ -858,10 +993,13 @@ const AdminAnalyticsPage: NextPage = () => {
       );
     }
 
+    // Убедимся, что у нас есть объект с данными о статусах
+    const orderStatuses = operationalMetrics.orderCompletionRates || {};
+    
     // Фильтрация статусов заказов (удаление статуса "Доставлен")
-    const filteredOrderStatuses = Object.entries(operationalMetrics.orderCompletionRates)
+    const filteredOrderStatuses = Object.entries(orderStatuses)
       .filter(([status]) => {
-        const lowerStatus = status.toLowerCase();
+        const lowerStatus = (status || '').toLowerCase();
         return !lowerStatus.includes('delivered') && 
                !lowerStatus.includes('доставлен');
       })
