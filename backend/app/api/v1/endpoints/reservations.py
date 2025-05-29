@@ -34,14 +34,13 @@ async def read_reservations(
             # Проверяем наличие X-User-ID в заголовке
             user_id = request.headers.get("X-User-ID")
             if not user_id:
-                # Если нет ни токена, ни X-User-ID, возвращаем все бронирования
-                # Это нужно для работы публичной части сайта
-                if date:
-                    return get_reservations_by_date(db, date, skip, limit)
-                elif status:
-                    return get_reservations_by_status(db, status, skip, limit)
-                else:
-                    return db.query(Reservation).offset(skip).limit(limit).all()
+                # Для неаутентифицированных запросов без ID в заголовке 
+                # возвращаем ошибку авторизации
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Необходима авторизация для просмотра бронирований",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             
             # Пытаемся получить пользователя по ID из заголовка
             try:
@@ -386,10 +385,18 @@ async def read_raw_reservations(
     limit: int = 100,
     status: str = None,
     date: datetime = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Получение списка бронирований без строгой валидации схемы"""
     print(f"[RAW API] Получение бронирований с параметрами: skip={skip}, limit={limit}, status={status}, date={date}")
+    
+    # Проверяем права доступа - только админ и официант могут получать сырые данные
+    if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для доступа к сырым данным бронирований",
+        )
     
     # Базовый запрос
     query = db.query(Reservation)
