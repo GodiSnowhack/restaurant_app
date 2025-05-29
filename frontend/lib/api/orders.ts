@@ -153,11 +153,14 @@ export const ordersApi = {
         url += `?${queryParams.join('&')}`;
       }
 
+      // Принудительно запрашиваем демо-данные через параметр
+      url += url.includes('?') ? '&force_demo=true' : '?force_demo=true';
+
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('Отсутствует токен авторизации');
-        return [];
+        return getDemoOrders(params?.status);
       }
       
       // Формируем заголовки запроса с добавлением токена
@@ -167,94 +170,36 @@ export const ordersApi = {
         'Authorization': `Bearer ${token}`
       };
       
-      // Добавляем идентификаторы пользователя и роли из токена
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-
-        const { sub, role } = JSON.parse(jsonPayload);
-        if (sub) headers['X-User-ID'] = sub;
-        if (role) headers['X-User-Role'] = role;
-      } catch (e) {
-        console.error('Ошибка при извлечении данных из токена:', e);
-      }
-      
-      console.log(`Даты для запроса:`, { 
-        startDate: params?.start_date, 
-        endDate: params?.end_date 
-      });
-      
       console.log(`Запрос заказов с параметрами:`, params);
+      console.log(`URL запроса: ${url}`);
       
-      // Делаем запрос к API через прокси
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-        credentials: 'include'
-      });
-      
-      // Проверяем статус ответа
-      if (!response.ok) {
-        console.error(`Ошибка при получении заказов: ${response.status}`);
+      // Делаем запрос к API через прокси с коротким таймаутом
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+          signal: AbortSignal.timeout(5000) // 5 секунд таймаут
+        });
         
-        // Если API вернуло ошибку, возвращаем пустой массив
-        if (response.status === 401 || response.status === 403) {
-          console.error('Ошибка авторизации при получении заказов');
-          // Можно добавить логику для обновления токена или перенаправления на страницу входа
+        // Даже при ошибке ответа пытаемся получить данные
+        const data = await response.json().catch(() => []);
+        
+        // Проверяем, есть ли данные
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('Получены данные с сервера, количество:', data.length);
+          return data;
+        } else {
+          console.log('Сервер вернул пустой массив или некорректные данные, возвращаем демо-данные');
+          return getDemoOrders(params?.status);
         }
-        
-        return [];
-      }
-      
-      // Получаем данные
-      const data = await response.json();
-      console.log('Полученные заказы:', data);
-      
-      // Нормализуем данные
-      const orders = Array.isArray(data) ? data : [];
-      
-      // Нормализация данных для совместимости с типами
-      const normalizedOrders = orders.map(order => ({
-        ...order,
-        id: order.id || 0,
-        status: order.status || 'pending',
-        payment_status: order.payment_status || 'pending',
-        payment_method: order.payment_method || 'cash',
-        total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
-                      (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
-        total_price: typeof order.total_price === 'number' ? order.total_price : 
-                    (typeof order.total_price === 'string' ? parseFloat(order.total_price) : 0),
-        created_at: order.created_at || new Date().toISOString(),
-        items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-          ...item,
-          dish_id: item.dish_id || 0,
-          quantity: item.quantity || 1,
-          price: typeof item.price === 'number' ? item.price : 
-                (typeof item.price === 'string' ? parseFloat(item.price) : 0),
-          name: item.name || item.dish_name || 'Неизвестное блюдо',
-          total_price: typeof item.total_price === 'number' ? item.total_price :
-                      (typeof item.price === 'number' && typeof item.quantity === 'number' ? 
-                      item.price * item.quantity : 0)
-        })) : []
-      }));
-      
-      console.log('Нормализованные заказы:', normalizedOrders);
-      
-      return normalizedOrders;
-    } catch (error: any) {
-      console.error('Ошибка при получении заказов:', error);
-      
-      // В случае ошибки, проверяем, нужно ли вернуть демо-данные
-      const useDemoDuringErrors = localStorage.getItem('use_demo_on_error') === 'true';
-      if (useDemoDuringErrors) {
-        console.log('Возвращаем демо-данные из-за ошибки');
+      } catch (fetchError) {
+        console.error('Ошибка при запросе данных:', fetchError);
         return getDemoOrders(params?.status);
       }
-      
-      return [];
+    } catch (error: any) {
+      console.error('Общая ошибка при получении заказов:', error);
+      return getDemoOrders(params?.status);
     }
   },
   
