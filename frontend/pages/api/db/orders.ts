@@ -87,8 +87,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Получаем параметры запроса
   const { start_date, end_date } = req.query;
   
+  // Преобразуем даты в формат YYYY-MM-DD
+  const formatSimpleDate = (dateStr: string | string[] | undefined): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(Array.isArray(dateStr) ? dateStr[0] : dateStr);
+      return date.toISOString().split('T')[0]; // Возвращаем только часть с датой (YYYY-MM-DD)
+    } catch (e) {
+      console.log('API DB Proxy: Ошибка форматирования даты:', e);
+      return '';
+    }
+  };
+  
+  const simpleStartDate = formatSimpleDate(start_date);
+  const simpleEndDate = formatSimpleDate(end_date);
+  
+  console.log('API DB Proxy: Упрощенные даты:', { start_date: simpleStartDate, end_date: simpleEndDate });
+  
   // Ключ для кеширования
-  const cacheKey = `orders_direct_${start_date}_${end_date}`;
+  const cacheKey = `orders_direct_${simpleStartDate}_${simpleEndDate}`;
   
   // Проверяем наличие данных в кеше
   const cachedData = getFromCache(cacheKey);
@@ -152,7 +169,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const dbQuery = `
       SELECT o.* 
       FROM orders o
-      WHERE o.created_at >= '${start_date}' AND o.created_at <= '${end_date}'
+      WHERE o.created_at >= '${simpleStartDate}' AND o.created_at <= '${simpleEndDate}'
       ORDER BY o.created_at DESC
     `;
 
@@ -223,7 +240,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           u.phone as customer_phone
         FROM orders o
         LEFT JOIN users u ON o.user_id = u.id
-        WHERE o.created_at >= '${start_date}' AND o.created_at <= '${end_date}'
+        WHERE o.created_at >= '${simpleStartDate}' AND o.created_at <= '${simpleEndDate}'
         ORDER BY o.created_at DESC
       `;
       

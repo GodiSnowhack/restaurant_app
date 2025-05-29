@@ -15,10 +15,28 @@ export const ordersApi = {
         return [];
       }
       
+      // Преобразуем даты в формат YYYY-MM-DD, если они уже не в этом формате
+      const formatSimpleDate = (dateStr: string): string => {
+        if (!dateStr) return '';
+        if (dateStr.length <= 10) return dateStr; // Если уже в формате YYYY-MM-DD
+        try {
+          const date = new Date(dateStr);
+          return date.toISOString().split('T')[0]; // Возвращаем только часть с датой (YYYY-MM-DD)
+        } catch (e) {
+          console.error('API: Ошибка форматирования даты:', e);
+          return dateStr;
+        }
+      };
+      
+      const simpleStartDate = formatSimpleDate(startDate);
+      const simpleEndDate = formatSimpleDate(endDate);
+      
+      console.log('API: Запрос с упрощенными датами:', { start_date: simpleStartDate, end_date: simpleEndDate });
+      
       // Формируем URL для запроса с корректным кодированием параметров
       const queryParams = new URLSearchParams();
-      queryParams.append('start_date', startDate);
-      queryParams.append('end_date', endDate);
+      queryParams.append('start_date', simpleStartDate);
+      queryParams.append('end_date', simpleEndDate);
       
       // Получаем роль пользователя
       const userRole = localStorage.getItem('user_role') || 'customer';

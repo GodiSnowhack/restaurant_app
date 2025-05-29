@@ -85,15 +85,15 @@ const AdminOrdersPage: NextPage = () => {
       // Подготавливаем параметры для API запроса с корректными названиями полей
       const params: any = {};
       
-      // Добавляем даты с учетом времени для корректного диапазона
+      // Добавляем даты в формате YYYY-MM-DD для корректного диапазона
       if (dateRange.start && dateRange.end) {
         try {
-          // Дата начала - начало дня (00:00:00)
+          // Преобразуем в объекты Date
           const startDate = new Date(dateRange.start);
-          startDate.setHours(0, 0, 0, 0);
-          
-          // Дата окончания - конец дня (23:59:59)
           const endDate = new Date(dateRange.end);
+          
+          // Устанавливаем время (начало и конец дня)
+          startDate.setHours(0, 0, 0, 0);
           endDate.setHours(23, 59, 59, 999);
           
           // Проверяем, что даты валидны и не в будущем
@@ -110,14 +110,18 @@ const AdminOrdersPage: NextPage = () => {
             startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
           }
           
+          // Форматируем даты в формате YYYY-MM-DD
+          const formatDate = (date: Date) => {
+            return date.toISOString().split('T')[0];
+          };
+          
           console.log('Даты для запроса:', {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            now: now.toISOString()
+            startDate: formatDate(startDate),
+            endDate: formatDate(endDate)
           });
           
-          params.start_date = startDate.toISOString();
-          params.end_date = endDate.toISOString();
+          params.start_date = formatDate(startDate);
+          params.end_date = formatDate(endDate);
         } catch (dateError) {
           console.error('Ошибка при обработке дат:', dateError);
           // В случае ошибки используем текущую дату и 7 дней назад
@@ -125,8 +129,9 @@ const AdminOrdersPage: NextPage = () => {
           const sevenDaysAgo = new Date(now);
           sevenDaysAgo.setDate(now.getDate() - 7);
           
-          params.start_date = sevenDaysAgo.toISOString();
-          params.end_date = now.toISOString();
+          // Форматируем даты в формате YYYY-MM-DD
+          params.start_date = sevenDaysAgo.toISOString().split('T')[0];
+          params.end_date = now.toISOString().split('T')[0];
         }
       }
       
