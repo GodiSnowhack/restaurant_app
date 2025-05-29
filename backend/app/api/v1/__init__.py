@@ -3,7 +3,7 @@ API v1 router and endpoints
 """
 
 from fastapi import APIRouter
-from app.api.v1 import menu, settings
+from app.api.v1 import menu, settings, analytics
 from app.api.v1.endpoints import orders, categories, auth, reservations
 from app.api.v1.users import router as users_router
 
@@ -16,6 +16,7 @@ api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
 api_router.include_router(reservations.router, prefix="/reservations", tags=["reservations"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 
 @api_router.get("/health", tags=["system"])
 async def health_check():
