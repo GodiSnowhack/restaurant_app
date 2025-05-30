@@ -437,4 +437,96 @@ async def read_raw_reservations(
     
     print(f"[RAW API] Получено {len(reservations)} бронирований")
     
-    return reservations 
+    return reservations
+
+
+@router.patch("/{reservation_id}/status", response_model=ReservationResponse)
+async def update_reservation_status(
+    request: Request,
+    reservation_id: int,
+    status_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_optional_current_user)
+):
+    """Обновление статуса бронирования"""
+    # Проверяем авторизацию через X-User-ID если нет JWT
+    if not current_user:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Не удалось подтвердить учетные данные",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        try:
+            user_id_int = int(user_id)
+            current_user = db.query(User).filter(User.id == user_id_int).first()
+            
+            if not current_user:
+                current_user = User(
+                    id=user_id_int,
+                    email=f"temp_{user_id_int}@example.com",
+                    full_name="Временный пользователь",
+                    role=UserRole.CLIENT,
+                    is_active=True
+                )
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Неверный формат ID пользователя",
+            )
+    
+    # Получаем бронирование
+    reservation = get_reservation(db, reservation_id)
+    
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Бронирование не найдено",
+        )
+    
+    # Проверяем права доступа
+    if current_user.id != reservation.user_id and current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для изменения статуса этого бронирования",
+        )
+    
+    # Получаем новый статус
+    try:
+        new_status = status_data.get("status")
+        if not new_status:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Не указан новый статус бронирования",
+            )
+        
+        # Проверяем существование указанного статуса
+        if new_status not in [s.value for s in ReservationStatus]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Недопустимый статус: {new_status}",
+            )
+        
+        # Проверяем текущий статус бронирования
+        if reservation.status in [ReservationStatus.CANCELLED, ReservationStatus.COMPLETED]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя изменить статус отмененного или завершенного бронирования",
+            )
+        
+        # Создаем объект для обновления только статуса
+        update_data = ReservationUpdate(status=new_status)
+        
+        # Обновляем бронирование
+        updated_reservation = update_reservation(db, reservation_id, update_data)
+        print(f"[DEBUG] Статус бронирования #{reservation_id} обновлен на {new_status}")
+        
+        return updated_reservation
+    except Exception as e:
+        print(f"[ERROR] Ошибка при обновлении статуса бронирования: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении статуса бронирования: {str(e)}",
+        ) 

@@ -56,9 +56,11 @@ def create_reservation(
     
     # Если код бронирования не указан, генерируем его
     if not original_code:
-        # Генерируем уникальный код бронирования
-        chars = string.ascii_uppercase + string.digits
-        original_code = 'RES-' + ''.join(random.choice(chars) for _ in range(6))
+        # Генерируем уникальный код бронирования в формате XXX-XXX
+        chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # Исключены похожие символы I, O, 0, 1
+        part1 = ''.join(random.choice(chars) for _ in range(3))
+        part2 = ''.join(random.choice(chars) for _ in range(3))
+        original_code = f"{part1}-{part2}"
         print(f"[DEBUG] Сгенерирован код бронирования: {original_code}")
     
     print(f"[DEBUG] Создаем бронирование с кодом: {original_code}")
