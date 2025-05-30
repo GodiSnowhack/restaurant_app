@@ -69,6 +69,18 @@ const ensureHttpsUrl = (url: string): string => {
   return url;
 };
 
+// Проверка токена перед отправкой запроса
+const validateToken = (token: string | undefined): boolean => {
+  if (!token) return false;
+  
+  try {
+    // Базовая проверка формата JWT - должен быть непустой строкой с двумя точками
+    return token.trim().split('.').length === 3;
+  } catch (e) {
+    return false;
+  }
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -173,27 +185,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Формируем ключ для кеша на основе параметров
     const cacheKey = `orders_${status || ''}_${user_id || ''}_${start_date || ''}_${end_date || ''}`;
-    
-    // Очищаем кеш перед каждым запросом, чтобы всегда получать актуальные данные
-    try {
-      if (fs.existsSync(ORDERS_CACHE_FILE)) {
-        fs.unlinkSync(ORDERS_CACHE_FILE);
-        console.log('API Proxy (GET): Кеш заказов очищен для получения актуальных данных');
-      }
-    } catch (cacheError) {
-      console.error('API Proxy (GET): Ошибка при очистке кеша:', cacheError);
-    }
 
     // Получаем токен авторизации
     const token = req.headers.authorization?.replace('Bearer ', '') || '';
     console.log('API Proxy (GET): Получен токен:', token ? 'Токен присутствует' : 'Токен отсутствует');
     
-    // Если токен отсутствует, возвращаем ошибку авторизации
-    if (!token) {
-      console.error('API Proxy (GET): Отсутствует токен авторизации');
+    // Базовая проверка токена
+    if (!token || !validateToken(token)) {
+      console.error('API Proxy (GET): Отсутствует или некорректный токен авторизации');
       return res.status(401).json({
         success: false,
-        message: 'Отсутствует токен авторизации'
+        message: 'Отсутствует или некорректный токен авторизации'
       });
     }
     
@@ -201,7 +203,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseApiUrl = ensureHttpsUrl(getDefaultApiUrl());
     console.log('API Proxy (GET): Базовый URL API:', baseApiUrl);
     
-    // Формируем URL для запроса - убираем возможные дублирования путей
+    // Формируем URL для запроса
     let ordersApiUrl = `${baseApiUrl}/orders`;
     
     // Проверяем и исправляем URL
@@ -270,15 +272,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         maxRedirects: 5
       });
       
+      // Добавляем специальные настройки для обработки редиректов
       const response = await axios.get(fullUrl, {
         headers,
         httpsAgent,
-        timeout: 10000,
-        maxRedirects: 5
+        timeout: 20000, // Увеличиваем таймаут
+        maxRedirects: 5,
+        validateStatus: function (status) {
+          // Разрешаем статусы 2xx и 3xx (включая редиректы)
+          return status >= 200 && status < 400;
+        },
+        // Обработка редиректов вручную при необходимости
+        beforeRedirect: (options, { headers }) => {
+          // Сохраняем авторизацию при редиректе
+          options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${token}`
+          };
+          console.log('API Proxy (GET): Перенаправление на:', options.url);
+        }
       });
       
       console.log(`API Proxy (GET): Получен ответ от бэкенда с кодом ${response.status}`);
-      console.log('API Proxy (GET): Заголовки ответа:', response.headers);
       
       // Обрабатываем ответ
       const data = response.data;
@@ -318,6 +333,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (error.response) {
         console.error('API Proxy (GET): Статус ошибки:', error.response.status);
         console.error('API Proxy (GET): Данные ошибки:', error.response.data);
+        
+        // Попробуем выполнить запрос напрямую к другому эндпоинту, если это 401
+        if (error.response.status === 401) {
+          try {
+            console.log('API Proxy (GET): Пробуем альтернативный эндпоинт...');
+            // Используем другой путь - попробуем добавить слеш в конце URL
+            const altUrl = ordersApiUrl.endsWith('/') ? ordersApiUrl : `${ordersApiUrl}/`;
+            const altFullUrl = queryString ? `${altUrl}?${queryString}` : altUrl;
+            
+            console.log('API Proxy (GET): Альтернативный URL:', altFullUrl);
+            
+            const altResponse = await axios.get(altFullUrl, {
+              headers,
+              httpsAgent,
+              timeout: 10000
+            });
+            
+            if (altResponse.status === 200 && altResponse.data) {
+              console.log('API Proxy (GET): Успешный ответ от альтернативного эндпоинта');
+              const altData = Array.isArray(altResponse.data) 
+                ? altResponse.data 
+                : (altResponse.data.items || altResponse.data.data || []);
+              
+              // Сохраняем в кеш
+              saveToCache(cacheKey, altData);
+              
+              // Возвращаем клиенту
+              return res.status(200).json(altData);
+            }
+          } catch (altError) {
+            console.error('API Proxy (GET): Ошибка при запросе к альтернативному эндпоинту:', altError);
+          }
+        }
         
         return res.status(error.response.status).json({
           success: false,

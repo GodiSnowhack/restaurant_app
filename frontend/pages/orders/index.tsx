@@ -19,7 +19,7 @@ import { Alert, Button, Paper, Typography, Box } from '@mui/material';
 
 const OrdersPage: NextPage = () => {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, fetchUserProfile } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>('');
@@ -28,17 +28,29 @@ const OrdersPage: NextPage = () => {
     endDate: new Date()
   });
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [attemptCount, setAttemptCount] = useState(0);
 
   useEffect(() => {
     // Проверяем статус авторизации при загрузке страницы
-    if (!isAuthenticated) {
-      router.push('/auth/login?redirect=/orders');
-      return;
-    }
+    const checkAuthentication = async () => {
+      try {
+        // Пробуем загрузить профиль для обновления токена
+        await fetchUserProfile();
+        // Загружаем заказы
+        fetchOrders();
+      } catch (error) {
+        console.error('Ошибка при проверке авторизации:', error);
+        setError('Для просмотра заказов необходимо войти в систему');
+        router.push('/auth/login?redirect=/orders');
+      }
+    };
     
-    // Загружаем заказы только если пользователь авторизован
-    fetchOrders();
-  }, [isAuthenticated, router]);
+    if (!isAuthenticated) {
+      checkAuthentication();
+    } else {
+      fetchOrders();
+    }
+  }, [isAuthenticated, router, attemptCount, fetchUserProfile]);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -46,6 +58,15 @@ const OrdersPage: NextPage = () => {
     
     // Проверяем авторизацию
     if (!isAuthenticated) {
+      setError('Для просмотра заказов необходимо войти в систему');
+      setIsLoading(false);
+      router.push('/auth/login?redirect=/orders');
+      return;
+    }
+    
+    // Проверяем наличие токена
+    const token = localStorage.getItem('token');
+    if (!token) {
       setError('Для просмотра заказов необходимо войти в систему');
       setIsLoading(false);
       router.push('/auth/login?redirect=/orders');
@@ -88,8 +109,22 @@ const OrdersPage: NextPage = () => {
       
       if (error.message === 'Требуется авторизация' || 
           (error.response && error.response.status === 401)) {
-        setError('Для просмотра заказов необходимо войти в систему');
-        // Перенаправляем на страницу входа
+        setError('Для просмотра заказов необходимо войти в систему или обновить авторизацию');
+        
+        // Пробуем обновить профиль
+        try {
+          await fetchUserProfile();
+          
+          // Если удалось обновить профиль, повторяем запрос заказов
+          if (localStorage.getItem('token')) {
+            setAttemptCount(prev => prev + 1);
+            return;
+          }
+        } catch (profileError) {
+          console.error('Не удалось обновить профиль:', profileError);
+        }
+        
+        // Если не удалось обновить профиль, перенаправляем на страницу входа
         setTimeout(() => {
           router.push('/auth/login?redirect=/orders');
         }, 1000);
@@ -100,6 +135,17 @@ const OrdersPage: NextPage = () => {
       setOrders([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const retryFetchOrders = async () => {
+    try {
+      // Пробуем обновить профиль перед повторным запросом
+      await fetchUserProfile();
+      setAttemptCount(prev => prev + 1);
+    } catch (error) {
+      console.error('Ошибка при обновлении профиля:', error);
+      router.push('/auth/login?redirect=/orders');
     }
   };
 
@@ -188,7 +234,7 @@ const OrdersPage: NextPage = () => {
             severity="error"
             sx={{ mt: 2, mb: 2 }}
             action={
-              <Button color="inherit" size="small" onClick={fetchOrders}>
+              <Button color="inherit" size="small" onClick={retryFetchOrders}>
                 Повторить
               </Button>
             }
@@ -211,7 +257,7 @@ const OrdersPage: NextPage = () => {
               <Button 
                 variant="outlined" 
                 color="primary" 
-                onClick={fetchOrders}
+                onClick={retryFetchOrders}
               >
                 Обновить
               </Button>

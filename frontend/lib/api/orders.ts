@@ -13,7 +13,7 @@ export const ordersApi = {
   }): Promise<Order[]> => {
     try {
       console.log('🔄 Начинаем запрос заказов с параметрами:', params);
-      
+
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       
@@ -30,50 +30,69 @@ export const ordersApi = {
       if (params?.start_date) queryParams.set('start_date', params.start_date);
       if (params?.end_date) queryParams.set('end_date', params.end_date);
       
-      // Приоритетно используем API-прокси для предотвращения проблем с CORS и Mixed Content
-      try {
-        // Формируем URL для запроса через прокси
-        const proxyUrl = '/api/orders';
-        const url = queryParams.toString() ? `${proxyUrl}?${queryParams.toString()}` : proxyUrl;
-        
-        console.log(`📡 Отправка запроса через API-прокси: ${url}`);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'same-origin'
-        });
-        
-        // Проверяем ответ
-        if (!response.ok) {
-          throw new Error(`Ошибка API-прокси: ${response.status}`);
-        }
-        
-        // Получаем данные
-        const data = await response.json();
-        console.log(`✅ Получены данные заказов через API-прокси:`, data);
-        
-        // Обрабатываем различные форматы ответа
-        if (Array.isArray(data)) {
-          console.log(`📊 Количество полученных заказов: ${data.length}`);
-          return data;
-        } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
-          console.log(`📊 Количество полученных заказов: ${data.items.length}`);
-          return data.items;
-        } else {
-          console.error('❌ Неверный формат данных:', data);
-          return [];
-        }
-      } catch (error) {
-        console.error('❌ Ошибка при запросе через API-прокси:', error);
-        throw error; // Пробрасываем ошибку для обработки в компоненте
+      // Формируем URL для запроса
+      const url = queryParams.toString() 
+        ? `/api/orders?${queryParams.toString()}` 
+        : '/api/orders';
+      
+      console.log(`📡 Отправка запроса к API-прокси: ${url}`);
+      
+      // Получаем данные из localStorage для отладки
+      const userId = localStorage.getItem('userId');
+      const userRole = localStorage.getItem('userRole');
+      
+      console.log('📊 Данные пользователя:', {
+        userId: userId || 'не найден',
+        role: userRole || 'не найден',
+        hasToken: !!token
+      });
+      
+      // Используем axios для запроса с полным контролем над заголовками
+      const response = await axios.get(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(userId ? { 'X-User-ID': userId } : {}),
+          ...(userRole ? { 'X-User-Role': userRole } : {})
+        },
+        withCredentials: false,
+        timeout: 15000
+      });
+      
+      // Проверяем ответ
+      if (response.status !== 200) {
+        throw new Error(`Ошибка при запросе: ${response.status}`);
       }
-    } catch (error) {
+      
+      // Получаем данные
+      const data = response.data;
+      console.log(`✅ Получены данные заказов:`, data);
+      
+      // Обрабатываем различные форматы ответа
+      if (Array.isArray(data)) {
+        console.log(`📊 Количество полученных заказов: ${data.length}`);
+        return data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
+        console.log(`📊 Количество полученных заказов: ${data.items.length}`);
+        return data.items;
+      } else {
+        console.error('❌ Неверный формат данных:', data);
+        return [];
+      }
+    } catch (error: any) {
       console.error('❌ Общая ошибка при получении заказов:', error);
+      
+      // Проверяем истекший токен
+      if (error.response && error.response.status === 401) {
+        console.log('🔑 Токен авторизации истек или недействителен. Пробуем обновить авторизацию...');
+        
+        // Удаляем текущий токен, чтобы система перенаправила на авторизацию
+        localStorage.removeItem('token');
+        
+        throw new Error('Требуется авторизация');
+      }
+      
       throw error; // Пробрасываем ошибку для обработки в компоненте
     }
   },
