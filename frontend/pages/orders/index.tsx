@@ -15,7 +15,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
-import { Alert, Button, Paper, Typography } from '@mui/material';
+import { Alert, Button, Paper, Typography, Box } from '@mui/material';
 
 const OrdersPage: NextPage = () => {
   const router = useRouter();
@@ -30,13 +30,10 @@ const OrdersPage: NextPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-
+    // Загружаем данные даже если пользователь не авторизован, 
+    // чтобы показать демо-данные
     fetchOrders();
-  }, [isAuthenticated, router]);
+  }, []);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -51,6 +48,9 @@ const OrdersPage: NextPage = () => {
     console.log('Запрашиваем заказы с параметрами:', params);
     
     try {
+      // Проверяем токен авторизации для вывода информации в интерфейсе
+      const isAuthorized = !!localStorage.getItem('token');
+      
       // Получаем заказы с сервера
       const ordersData = await ordersApi.getAllOrders(params);
       console.log('Получены заказы:', ordersData);
@@ -62,7 +62,11 @@ const OrdersPage: NextPage = () => {
       } else if (ordersData.length === 0) {
         console.log('Получен пустой список заказов');
         setOrders([]);
-        // Не показываем ошибку для пустого списка
+        
+        // Показываем разные сообщения в зависимости от авторизации
+        if (!isAuthorized) {
+          setError('Для просмотра ваших заказов необходимо авторизоваться');
+        }
       } else {
         // Сортируем заказы по дате (новые в начале)
         const sortedOrders = [...ordersData].sort((a, b) => {
@@ -73,6 +77,12 @@ const OrdersPage: NextPage = () => {
         });
         
         setOrders(sortedOrders);
+        
+        // Если заказы загружены, но пользователь не авторизован,
+        // показываем уведомление, что это демо-данные
+        if (!isAuthorized && sortedOrders.length > 0) {
+          setError('Вы видите демонстрационные данные. Для просмотра ваших заказов необходимо авторизоваться');
+        }
       }
     } catch (error) {
       console.error('Ошибка при получении заказов:', error);
@@ -187,14 +197,24 @@ const OrdersPage: NextPage = () => {
                 ? 'Попробуйте изменить параметры фильтрации'
                 : 'В системе пока нет заказов'}
             </Typography>
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              sx={{ mt: 2 }}
-              onClick={fetchOrders}
-            >
-              Обновить
-            </Button>
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
+              <Button 
+                variant="outlined" 
+                color="primary" 
+                onClick={fetchOrders}
+              >
+                Обновить
+              </Button>
+              {!localStorage.getItem('token') && (
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={() => router.push('/auth/login')}
+                >
+                  Войти в систему
+                </Button>
+              )}
+            </Box>
           </Paper>
         )}
 

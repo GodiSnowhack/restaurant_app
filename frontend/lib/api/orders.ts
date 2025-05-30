@@ -15,9 +15,10 @@ export const ordersApi = {
       
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
+      
+      // Проверяем наличие токена
       if (!token) {
-        console.error('❌ Ошибка: Отсутствует токен авторизации');
-        return [];
+        console.warn('⚠️ Токен авторизации отсутствует, пытаемся загрузить данные без авторизации');
       }
       
       // Строим строку запроса
@@ -27,25 +28,47 @@ export const ordersApi = {
       if (params?.start_date) queryParams.set('start_date', params.start_date);
       if (params?.end_date) queryParams.set('end_date', params.end_date);
       
-      // Формируем URL для запроса (используем относительный путь)
-      const baseUrl = '/api/v1/orders'; // Используем правильный эндпоинт API
+      // Формируем URL для запроса через прокси
+      const baseUrl = '/api/orders';
       const url = queryParams.toString() ? `${baseUrl}?${queryParams.toString()}` : baseUrl;
       
-      console.log(`📡 Отправка запроса на: ${url}`);
+      console.log(`📡 Отправка запроса через прокси на: ${url}`);
       
-      // Отправляем запрос напрямую к бэкенду
+      // Отправляем запрос через прокси с обработкой возможных ошибок авторизации
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': token ? `Bearer ${token}` : ''
         },
         credentials: 'include'
       });
       
       // Проверяем статус ответа
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.warn(`⚠️ Ошибка авторизации (${response.status}), пытаемся получить демо-данные`);
+          
+          // Повторяем запрос без токена, чтобы получить демо-данные
+          const demoResponse = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+          
+          if (!demoResponse.ok) {
+            console.error(`❌ Не удалось получить демо-данные: ${demoResponse.status}`);
+            return [];
+          }
+          
+          const demoData = await demoResponse.json();
+          return Array.isArray(demoData) ? demoData : [];
+        }
+        
         console.error(`❌ Ошибка HTTP: ${response.status} ${response.statusText}`);
         throw new Error(`Ошибка HTTP: ${response.status}`);
       }
@@ -68,54 +91,37 @@ export const ordersApi = {
     } catch (error) {
       console.error('❌ Ошибка при получении заказов:', error);
       
-      // Пробуем запасной вариант через прокси
+      // Пробуем получить демо-данные как запасной вариант
       try {
-        console.log('🔄 Пробуем запасной вариант через прокси...');
+        console.log('🔄 Пробуем получить демо-данные...');
         
-        // Формируем параметры запроса
-        const queryParams = new URLSearchParams();
-        if (params?.status) queryParams.set('status', params.status);
-        if (params?.user_id) queryParams.set('user_id', params.user_id.toString());
-        if (params?.start_date) queryParams.set('start_date', params.start_date);
-        if (params?.end_date) queryParams.set('end_date', params.end_date);
-        
-        // Формируем URL для запроса (используем прокси)
-        const baseUrl = '/api/orders';
-        const url = queryParams.toString() ? `${baseUrl}?${queryParams.toString()}` : baseUrl;
-        
-        console.log(`📡 Отправка запроса через прокси на: ${url}`);
-        
-        const token = localStorage.getItem('token');
+        const url = '/api/orders';
         const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          },
-          credentials: 'include'
+            // Не отправляем токен
+          }
         });
         
         if (!response.ok) {
-          console.error(`❌ Ошибка прокси-запроса: ${response.status} ${response.statusText}`);
+          console.error(`❌ Ошибка при получении демо-данных: ${response.status}`);
           return [];
         }
         
         const data = await response.json();
-        console.log(`✅ Получены данные заказов через прокси:`, data);
+        console.log(`✅ Получены демо-данные:`, data);
         
         if (Array.isArray(data)) {
-          console.log(`📊 Количество полученных заказов через прокси: ${data.length}`);
           return data;
         } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
-          console.log(`📊 Количество полученных заказов через прокси: ${data.items.length}`);
           return data.items;
         } else {
-          console.error('❌ Неверный формат данных через прокси:', data);
           return [];
         }
-      } catch (proxyError) {
-        console.error('❌ Ошибка при получении заказов через прокси:', proxyError);
+      } catch (demoError) {
+        console.error('❌ Не удалось получить даже демо-данные:', demoError);
         return [];
       }
     }
