@@ -213,6 +213,78 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Проверка метода запроса
+  if (req.method === 'POST') {
+    try {
+      // Получаем токен авторизации
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({
+          success: false,
+          message: 'Отсутствует токен авторизации'
+        });
+      }
+
+      // Получаем базовый URL API
+      const baseApiUrl = getDefaultApiUrl();
+      console.log('API Proxy (POST): Базовый URL API:', baseApiUrl);
+
+      // Формируем URL для запроса
+      let ordersApiUrl = baseApiUrl + '/orders/';
+      if (ordersApiUrl.includes('//orders')) {
+        ordersApiUrl = ordersApiUrl.replace('//orders', '/orders');
+      }
+
+      console.log('API Proxy (POST): URL для создания заказа:', ordersApiUrl);
+      console.log('API Proxy (POST): Данные заказа:', req.body);
+
+      // Заголовки запроса
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      // Получаем ID пользователя из заголовков или из тела запроса
+      const userId = req.headers['x-user-id'] as string || req.body.user_id;
+      if (userId) {
+        headers['X-User-ID'] = userId.toString();
+      }
+
+      // Создаем HTTPS агент для безопасных запросов
+      const httpsAgent = new https.Agent({
+        rejectUnauthorized: false
+      });
+
+      // Отправляем запрос на создание заказа
+      const response = await axios.post(ordersApiUrl, req.body, {
+        headers,
+        httpsAgent,
+        timeout: 10000
+      });
+
+      // Возвращаем результат
+      return res.status(response.status).json(response.data);
+    } catch (error: any) {
+      console.error('API Proxy (POST): Ошибка при создании заказа:', error.message);
+      
+      // Если есть ответ от сервера, возвращаем его статус и данные
+      if (error.response) {
+        return res.status(error.response.status).json({
+          success: false,
+          message: 'Ошибка при создании заказа',
+          error: error.response.data
+        });
+      }
+      
+      // Если нет ответа, возвращаем общую ошибку
+      return res.status(500).json({
+        success: false,
+        message: 'Ошибка при создании заказа',
+        error: error.message
+      });
+    }
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({
       success: false,

@@ -299,11 +299,38 @@ export const ordersApi = {
       
       // Получаем токен для запроса
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Отсутствует токен авторизации');
+      }
       
-      // Отправляем запрос через основной API
-      const response = await api.post('/orders', order);
-      console.log('API: Заказ успешно создан через API, ID:', response.data.id);
-      return response.data;
+      // Пробуем сначала через локальный API-прокси
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(order)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Ошибка HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('API: Заказ успешно создан через API-прокси, ID:', data.id);
+        return data;
+      } catch (proxyError: any) {
+        console.error('API: Ошибка при создании заказа через API-прокси:', proxyError.message);
+        console.log('API: Пробуем создать заказ через основной API...');
+        
+        // Если прокси не сработал, пробуем через основной API
+        const response = await api.post('/orders', order);
+        console.log('API: Заказ успешно создан через основной API, ID:', response.data.id);
+        return response.data;
+      }
     } catch (error) {
       console.error('API: Ошибка при создании заказа:', error);
       throw error;
