@@ -19,7 +19,7 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
         user_id=user_id,
         table_number=order_in.table_number,
         status=order_in.status,
-        total_price=100.0
+        total_amount=100.0
     )
 
 def get_orders(
@@ -112,8 +112,7 @@ def get_orders(
                 "status": order.status,
                 "payment_status": order.payment_status,
                 "payment_method": order.payment_method,
-                "total_amount": float(order.total_price),
-                "total_price": float(order.total_price),
+                "total_amount": float(order.total_amount),
                 "comment": order.comment,
                 "special_instructions": order.comment,
                 "created_at": order.created_at.isoformat() if order.created_at else None,

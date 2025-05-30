@@ -18,7 +18,6 @@ class OrderOut(BaseModel):
     payment_status: Optional[str] = "unpaid"
     payment_method: Optional[str] = "cash"
     total_amount: Optional[float] = 0.0
-    total_price: Optional[float] = 0.0
     comment: Optional[str] = None
     special_instructions: Optional[str] = None
     created_at: str

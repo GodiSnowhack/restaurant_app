@@ -56,7 +56,6 @@ def get_order(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
             "is_urgent": db_order.is_urgent or False,
             "is_group_order": db_order.is_group_order or False,
             "total_amount": float(db_order.total_amount) if db_order.total_amount is not None else 0.0,
-            "total_price": float(db_order.total_amount) if db_order.total_amount is not None else 0.0,
             "created_at": db_order.created_at or datetime.utcnow(),
             "updated_at": db_order.updated_at,
             "completed_at": db_order.completed_at,
@@ -248,46 +247,23 @@ def get_orders(
                 order_dict["items"] = items
                 
                 # Добавляем обязательные поля, которые могут отсутствовать в результате запроса
-                if "total_price" not in order_dict:
-                    order_dict["total_price"] = float(order_dict.get("total_amount", 0)) or 0.0
-                
-                if "special_instructions" not in order_dict:
-                    order_dict["special_instructions"] = order_dict.get("comment", "")
-                
-                # Преобразуем None значения для удобства работы с JSON
-                for key, value in list(order_dict.items()):
-                    if value is None:
-                        if key in ["is_urgent", "is_group_order"]:
-                            order_dict[key] = False
-                        elif key in ["total_amount", "total_price"]:
-                            order_dict[key] = 0.0
-                        elif key in ["customer_name", "customer_phone"]:
-                            order_dict[key] = ""
-                        else:
-                            order_dict[key] = ""
-                
-                # Убедимся, что обязательные поля присутствуют
-                if "customer_name" not in order_dict:
-                    order_dict["customer_name"] = ""
-                if "customer_phone" not in order_dict:
-                    order_dict["customer_phone"] = ""
                 if "total_amount" not in order_dict:
                     order_dict["total_amount"] = 0.0
                 
+                # Преобразуем ключи enum в их строковые значения
+                for key in ["status", "payment_status", "payment_method"]:
+                    if key in order_dict and order_dict[key] and hasattr(order_dict[key], "value"):
+                        order_dict[key] = order_dict[key].value
+                        
+                # Преобразуем datetime в строки для JSON
+                for key in ["created_at", "updated_at", "completed_at"]:
+                    if key in order_dict and order_dict[key] and isinstance(order_dict[key], datetime):
+                        order_dict[key] = order_dict[key].isoformat()
+                
                 formatted_orders.append(order_dict)
             except Exception as e:
-                logger.error(f"Ошибка при обработке заказа {getattr(row, 'id', 'unknown')}: {str(e)}")
-                # Добавляем минимальную информацию о заказе
-                try:
-                    minimal_order = {
-                        "id": row._mapping.get("id", 0),
-                        "status": row._mapping.get("status", "unknown"),
-                        "created_at": row._mapping.get("created_at", datetime.utcnow()).isoformat() if isinstance(row._mapping.get("created_at"), datetime) else datetime.utcnow().isoformat(),
-                        "items": []
-                    }
-                    formatted_orders.append(minimal_order)
-                except:
-                    logger.error(f"Не удалось создать даже минимальную информацию о заказе")
+                logger.error(f"Ошибка при обработке заказа: {str(e)}")
+                logger.exception(e)
         
         # Если не удалось получить ни одного заказа, возвращаем тестовый заказ
         if not formatted_orders:
@@ -346,39 +322,9 @@ def get_orders(
         return formatted_orders
         
     except Exception as e:
-        logger.error(f"Ошибка при получении заказов: {str(e)}")
-        logger.error(traceback.format_exc())
-        # В случае критической ошибки возвращаем тестовый заказ
-        logger.warning("Возвращаем тестовый заказ из-за критической ошибки")
-        return [{
-            "id": 999,
-            "user_id": 1,
-            "status": "pending",
-            "payment_status": "unpaid",
-            "total_price": 2500.0,
-            "created_at": datetime.utcnow().isoformat(),
-            "customer_name": "Тестовый Клиент",
-            "order_code": "TEST123",
-            "is_urgent": True,
-            "items": [
-                {
-                    "id": 1,
-                    "dish_id": 1,
-                    "name": "Тестовое блюдо 1",
-                    "price": 1500.0,
-                    "quantity": 1,
-                    "total_price": 1500.0
-                },
-                {
-                    "id": 2,
-                    "dish_id": 2,
-                    "name": "Тестовое блюдо 2",
-                    "price": 1000.0,
-                    "quantity": 1,
-                    "total_price": 1000.0
-                }
-            ]
-        }]
+        logger.error(f"Ошибка при получении списка заказов: {str(e)}")
+        logger.exception(e)
+        return []
 
 
 def get_orders_for_user(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[Order]:

@@ -72,7 +72,7 @@ class Order(Base):
     
     status = Column(String, default="pending")
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
-    total_price = Column(Float, default=0.0)
+    total_amount = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
     is_urgent = Column(Boolean, default=False)
     is_group_order = Column(Boolean, default=False)
@@ -107,7 +107,7 @@ class Order(Base):
             "waiter_id": self.waiter_id,
             "table_number": self.table_number,
             "status": self.status,
-            "total_price": self.total_price,
+            "total_price": self.total_amount,
             "comment": self.comment,
             "created_at": self.created_at.isoformat() if self.created_at else datetime.utcnow().isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
