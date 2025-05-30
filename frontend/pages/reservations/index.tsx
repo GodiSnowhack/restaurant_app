@@ -373,14 +373,30 @@ const ReservationsPage: NextPage = () => {
   };
 
   const formatDateTime = (dateTimeString: string) => {
-    const date = new Date(dateTimeString);
-    return new Intl.DateTimeFormat('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    try {
+      // Проверяем, что dateTimeString существует и валиден
+      if (!dateTimeString) {
+        return 'Дата не указана';
+      }
+      
+      const date = new Date(dateTimeString);
+      
+      // Проверяем, что дата валидна
+      if (isNaN(date.getTime())) {
+        return 'Некорректная дата';
+      }
+      
+      return new Intl.DateTimeFormat('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error('Ошибка при форматировании даты:', error);
+      return 'Ошибка формата даты';
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -934,8 +950,14 @@ const ReservationsPage: NextPage = () => {
                           ${isDark ? 'text-gray-300' : 'text-gray-500'}
                         `}>
                           {reservation.reservation_date && reservation.reservation_time 
-                            ? `${reservation.reservation_date}, ${reservation.reservation_time}` 
-                            : formatDateTime(reservation.reservation_time)
+                            ? (
+                              typeof reservation.reservation_time === 'string' && reservation.reservation_time.includes('T') 
+                                ? formatDateTime(reservation.reservation_time) 
+                                : `${reservation.reservation_date}, ${reservation.reservation_time}`
+                              ) 
+                            : reservation.reservation_time 
+                              ? formatDateTime(reservation.reservation_time) 
+                              : 'Дата не указана'
                           }
                         </td>
                         <td className={`
@@ -951,8 +973,8 @@ const ReservationsPage: NextPage = () => {
                           {getStatusBadge(reservation.status)}
                         </td>
                         <td className={`
-                          px-6 py-4 whitespace-nowrap text-right text-sm font-medium
-                          ${isDark ? 'text-gray-300' : 'text-gray-500'}
+                          px-6 py-4 whitespace-nowrap text-sm font-medium
+                          ${isDark ? 'text-gray-100' : 'text-gray-900'}
                         `}>
                           <Link href={`/reservations/${reservation.id}`} className="text-primary hover:underline">
                             Подробнее

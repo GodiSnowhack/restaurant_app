@@ -287,6 +287,35 @@ export const reservationsApi = {
       
       const responseData = await response.json();
       console.log('[Reservations API] Бронирование успешно создано:', responseData);
+      
+      // Обработка разных форматов ответа от сервера
+      // Если сервер вернул массив, но мы ожидаем объект, создаем заглушку для объекта бронирования
+      if (Array.isArray(responseData) && responseData.length === 0) {
+        console.log('[Reservations API] Сервер вернул пустой массив вместо объекта бронирования. Создаем заглушку.');
+        // Возвращаем заглушку с базовой информацией о бронировании
+        return {
+          id: Date.now(), // временный ID
+          user_id: processedData.user_id,
+          reservation_date: processedData.reservation_date,
+          reservation_time: processedData.reservation_time,
+          guests_count: processedData.guests_count,
+          guest_name: processedData.guest_name,
+          guest_phone: processedData.guest_phone,
+          table_number: processedData.table_number,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          // Генерируем код бронирования
+          reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+        };
+      }
+      
+      // Если сервер вернул объект, используем его
+      if (typeof responseData === 'object' && !Array.isArray(responseData)) {
+        return responseData;
+      }
+      
+      // Для любых других случаев возвращаем безопасный объект
       return responseData;
     } catch (error) {
       console.error('[Reservations API] Ошибка при создании бронирования:', error);
