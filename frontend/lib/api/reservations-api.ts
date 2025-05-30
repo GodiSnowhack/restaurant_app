@@ -57,7 +57,7 @@ export const reservationsApi = {
    * Получение списка бронирований
    * @param options Параметры запроса: булевое значение forceRefresh или объект с параметрами фильтрации
    */
-  getReservations: async (options?: boolean | { status?: string; date?: string }): Promise<Reservation[]> => {
+  getReservations: async (options?: boolean | { status?: string; date?: string; userId?: number }): Promise<Reservation[]> => {
     // Определяем, является ли options флагом forceRefresh или объектом с параметрами фильтрации
     const forceRefresh = typeof options === 'boolean' ? options : false;
     const filterParams = typeof options === 'object' ? options : {};
@@ -72,6 +72,9 @@ export const reservationsApi = {
       // Проверяем роль пользователя (для админа и официанта всегда свежие данные)
       const userRole = localStorage.getItem('user_role') || '';
       const isAdminOrWaiter = userRole === 'admin' || userRole === 'waiter';
+      
+      // Получаем ID текущего пользователя
+      const currentUserId = parseInt(localStorage.getItem('user_id') || '0');
       
       // Если есть кешированные данные и они не устарели, используем их (если не запрошено принудительное обновление)
       // Для админа кеш действует только 60 секунд
@@ -102,7 +105,22 @@ export const reservationsApi = {
             });
           }
           
+          // Фильтрация по ID пользователя
+          if (filterParams.userId) {
+            filteredData = filteredData.filter((r: Reservation) => r.user_id === filterParams.userId);
+          } else if (!isAdminOrWaiter && currentUserId > 0) {
+            // Если не администратор и не официант, и ID пользователя не указан явно в параметрах,
+            // то фильтруем по текущему пользователю (для клиентов)
+            filteredData = filteredData.filter((r: Reservation) => r.user_id === currentUserId);
+          }
+          
           return filteredData;
+        }
+        
+        // Если нет параметров фильтрации, но пользователь не админ/официант,
+        // фильтруем по текущему пользователю (для клиентов)
+        if (!isAdminOrWaiter && currentUserId > 0) {
+          return cachedData.data.filter((r: Reservation) => r.user_id === currentUserId);
         }
         
         return cachedData.data;
@@ -125,6 +143,10 @@ export const reservationsApi = {
         
         if (filterParams.date) {
           queryParams.append('date', filterParams.date);
+        }
+        
+        if (filterParams.userId) {
+          queryParams.append('user_id', filterParams.userId.toString());
         }
         
         const queryString = queryParams.toString();
@@ -174,7 +196,22 @@ export const reservationsApi = {
           });
         }
         
+        // Фильтрация по ID пользователя
+        if (filterParams.userId) {
+          filteredData = filteredData.filter((r: Reservation) => r.user_id === filterParams.userId);
+        } else if (!isAdminOrWaiter && currentUserId > 0) {
+          // Если не администратор и не официант, и ID пользователя не указан явно в параметрах,
+          // то фильтруем по текущему пользователю (для клиентов)
+          filteredData = filteredData.filter((r: Reservation) => r.user_id === currentUserId);
+        }
+        
         return filteredData;
+      }
+      
+      // Если нет параметров фильтрации, но пользователь не админ/официант,
+      // фильтруем по текущему пользователю (для клиентов)
+      if (!isAdminOrWaiter && currentUserId > 0) {
+        return data.filter((r: Reservation) => r.user_id === currentUserId);
       }
       
       return data;
@@ -185,6 +222,11 @@ export const reservationsApi = {
       const cachedData = getCachedReservations();
       if (cachedData?.data) {
         console.log('[Reservations API] Возвращаем кешированные данные из-за ошибки');
+        
+        // Получаем роль пользователя
+        const userRole = localStorage.getItem('user_role') || '';
+        const isAdminOrWaiter = userRole === 'admin' || userRole === 'waiter';
+        const currentUserId = parseInt(localStorage.getItem('user_id') || '0');
         
         // Если переданы параметры фильтрации, применяем их к кешированным данным
         if (typeof options === 'object' && Object.keys(filterParams).length > 0) {
@@ -208,7 +250,22 @@ export const reservationsApi = {
             });
           }
           
+          // Фильтрация по ID пользователя
+          if (filterParams.userId) {
+            filteredData = filteredData.filter((r: Reservation) => r.user_id === filterParams.userId);
+          } else if (!isAdminOrWaiter && currentUserId > 0) {
+            // Если не администратор и не официант, и ID пользователя не указан явно в параметрах,
+            // то фильтруем по текущему пользователю (для клиентов)
+            filteredData = filteredData.filter((r: Reservation) => r.user_id === currentUserId);
+          }
+          
           return filteredData;
+        }
+        
+        // Если нет параметров фильтрации, но пользователь не админ/официант,
+        // фильтруем по текущему пользователю (для клиентов)
+        if (!isAdminOrWaiter && currentUserId > 0) {
+          return cachedData.data.filter((r: Reservation) => r.user_id === currentUserId);
         }
         
         return cachedData.data;

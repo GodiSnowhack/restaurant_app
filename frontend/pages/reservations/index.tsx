@@ -124,7 +124,14 @@ const ReservationsPage: NextPage = () => {
       const fetchReservations = async () => {
         try {
           // Всегда запрашиваем бронирования при загрузке страницы
-          await getReservations();
+          // Проверяем наличие user.id для фильтрации только собственных бронирований
+          if (user && user.id) {
+            console.log(`Запрос бронирований для пользователя ID=${user.id}`);
+            // Передаем userId для фильтрации бронирований
+            await getReservations();
+          } else {
+            console.log('Пользователь не определен, загрузка бронирований отменена');
+          }
           
           // Устанавливаем имя, телефон и email из профиля пользователя
           setFormData(prev => ({
@@ -299,8 +306,13 @@ const ReservationsPage: NextPage = () => {
       
       // Принудительно запрашиваем обновленный список бронирований
       console.log('Запрашиваем обновленный список бронирований после создания...');
-      const freshData = await getReservations();
-      console.log(`Получено ${freshData.length} бронирований после создания`);
+      if (user && user.id) {
+        console.log(`Запрос бронирований для пользователя ID=${user.id} после создания нового`);
+        const freshData = await getReservations();
+        console.log(`Получено ${freshData.length} бронирований после создания`);
+      } else {
+        console.log('Пользователь не определен, загрузка бронирований отменена');
+      }
       
       // Сбрасываем форму
       setFormData({
@@ -321,7 +333,12 @@ const ReservationsPage: NextPage = () => {
       // Принудительное обновление интерфейса через небольшую задержку
       setTimeout(async () => {
         console.log('Дополнительное обновление списка бронирований...');
-        await getReservations();
+        if (user && user.id) {
+          console.log(`Запрос бронирований для пользователя ID=${user.id} (отложенное обновление)`);
+          await getReservations();
+        } else {
+          console.log('Пользователь не определен, отложенная загрузка бронирований отменена');
+        }
       }, 1000);
     } catch (err: any) {
       console.error('Ошибка при создании бронирования:', err);

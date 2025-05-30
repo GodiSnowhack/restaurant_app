@@ -38,9 +38,22 @@ const useReservationsStore = create<ReservationsState>()(
           set({ isLoading: true, error: null });
           
           try {
+            // Проверяем роль пользователя и его ID
+            const userRole = localStorage.getItem('user_role') || '';
+            const isAdminOrWaiter = userRole === 'admin' || userRole === 'waiter';
+            const currentUserId = parseInt(localStorage.getItem('user_id') || '0');
+            
             // Принудительно запрашиваем свежие данные
             console.log('Запрос списка бронирований из хранилища');
-            const reservations = await reservationsApi.getReservations(true);
+            
+            // Если пользователь не админ/официант, добавляем параметр userId для фильтрации
+            let reservations;
+            if (!isAdminOrWaiter && currentUserId > 0) {
+              console.log(`Запрос бронирований для пользователя ID=${currentUserId}`);
+              reservations = await reservationsApi.getReservations({ userId: currentUserId });
+            } else {
+              reservations = await reservationsApi.getReservations(true);
+            }
             
             if (!reservations || !Array.isArray(reservations)) {
               console.error('Получен некорректный ответ при запросе бронирований:', reservations);
