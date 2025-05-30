@@ -23,11 +23,13 @@ class Settings(BaseSettings):
     # Валидатор assemble_cors_origins обработает строку из переменной окружения.
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000", # Для локальной разработки фронтенда
+        "http://localhost:3001", # Для локальной разработки фронтенда
+        "http://127.0.0.1:3000", # Для локальной разработки фронтенда
+        "http://127.0.0.1:3001", # Для локальной разработки фронтенда
         "http://frontend-production-8eb6.up.railway.app",  # HTTP вариант
         "https://frontend-production-8eb6.up.railway.app", # HTTPS вариант
         "http://backend-production-1a78.up.railway.app",   # HTTP бэкенд
         "https://backend-production-1a78.up.railway.app",  # HTTPS бэкенд
-        "*"  # Разрешить все источники (для тестирования)
     ]
 
     # Railway specific settings

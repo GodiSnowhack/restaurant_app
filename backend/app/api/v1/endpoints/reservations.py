@@ -150,6 +150,12 @@ async def create_reservation_endpoint(
             )
     
     # Проверяем, что выбранная дата в будущем
+    if not reservation_in.reservation_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Не указано время бронирования",
+        )
+    
     if reservation_in.reservation_time <= datetime.now():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

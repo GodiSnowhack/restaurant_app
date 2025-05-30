@@ -100,6 +100,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       hasToken: !!token
     });
     
+    if (method === 'POST') {
+      console.log('Reservations API Proxy: POST запрос с данными:', body);
+    }
+    
     // Проверяем токен и получаем данные пользователя
     const userData = token ? getUserFromToken(token) : null;
     
@@ -135,6 +139,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Проверяем, содержит ли URL уже /api/v1
     let apiUrl = baseApiUrl;
+    if (!apiUrl.includes('/api/v1')) {
+      apiUrl = `${apiUrl.replace(/\/+$/, '')}/api/v1`;
+    }
+    
+    // Обрабатываем данные для POST запроса
+    let processedBody = body;
+    if (method === 'POST' && body) {
+      // Преобразование данных, если необходимо
+      processedBody = { ...body };
+      
+      // Убеждаемся, что user_id установлен (если не указан явно)
+      if (!processedBody.user_id && userId) {
+        processedBody.user_id = userId;
+      }
+      
+      console.log('Reservations API Proxy: Обработанные данные для POST запроса:', processedBody);
+    }
     
     // Создаем копию query параметров, чтобы добавить user_id для клиентов
     const queryParams = new URLSearchParams();
@@ -190,7 +211,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const response = await fetch(url, {
         method,
         headers,
-        body: method !== 'GET' && body ? JSON.stringify(body) : undefined,
+        body: method !== 'GET' && processedBody ? JSON.stringify(processedBody) : undefined,
         signal: controller.signal,
         // @ts-ignore - добавляем агент напрямую
         agent: url.startsWith('https') ? httpsAgent : undefined

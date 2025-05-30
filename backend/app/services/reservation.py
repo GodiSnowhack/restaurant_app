@@ -54,6 +54,13 @@ def create_reservation(
     # Сохраняем исходный код бронирования для логирования
     original_code = reservation_in.reservation_code
     
+    # Если код бронирования не указан, генерируем его
+    if not original_code:
+        # Генерируем уникальный код бронирования
+        chars = string.ascii_uppercase + string.digits
+        original_code = 'RES-' + ''.join(random.choice(chars) for _ in range(6))
+        print(f"[DEBUG] Сгенерирован код бронирования: {original_code}")
+    
     print(f"[DEBUG] Создаем бронирование с кодом: {original_code}")
     
     # Создаем объект без commit для проверки
