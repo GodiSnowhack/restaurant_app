@@ -299,35 +299,35 @@ export default async function profileProxy(req: NextApiRequest, res: NextApiResp
     }
     
     // Если ни API запрос, ни данные из токена не сработали
-    // Определяем код ошибки на основе последней ошибки
-    let statusCode = 404;
-    let errorMessage = 'Не удалось получить профиль пользователя';
-    
-    if (lastError) {
-      if (lastError.status === 401) {
-        statusCode = 401;
-        errorMessage = 'Недействительный токен авторизации';
-      } else if (lastError.code === 'ECONNABORTED') {
-        statusCode = 504;
-        errorMessage = 'Превышено время ожидания ответа от сервера';
-      } else if (lastError.code === 'ECONNREFUSED') {
-        statusCode = 503;
-        errorMessage = 'Не удалось подключиться к серверу';
+      // Определяем код ошибки на основе последней ошибки
+      let statusCode = 404;
+      let errorMessage = 'Не удалось получить профиль пользователя';
+      
+      if (lastError) {
+        if (lastError.status === 401) {
+          statusCode = 401;
+          errorMessage = 'Недействительный токен авторизации';
+        } else if (lastError.code === 'ECONNABORTED') {
+          statusCode = 504;
+          errorMessage = 'Превышено время ожидания ответа от сервера';
+        } else if (lastError.code === 'ECONNREFUSED') {
+          statusCode = 503;
+          errorMessage = 'Не удалось подключиться к серверу';
+        }
       }
-    }
-    
-    console.error(`Profile API - Не удалось получить профиль после ${attempts} попыток`);
-    
-    return res.status(statusCode).json({
-      detail: errorMessage,
-      message: 'Не удалось получить данные профиля',
-      status: statusCode,
-      isMobile,
-      attempts,
-      last_error: process.env.NODE_ENV === 'development' ? lastError : undefined,
-      server_checked: isServerAvailable,
-      timestamp: new Date().toISOString()
-    });
+      
+      console.error(`Profile API - Не удалось получить профиль после ${attempts} попыток`);
+      
+      return res.status(statusCode).json({
+        detail: errorMessage,
+        message: 'Не удалось получить данные профиля',
+        status: statusCode,
+        isMobile,
+        attempts,
+        last_error: process.env.NODE_ENV === 'development' ? lastError : undefined,
+        server_checked: isServerAvailable,
+        timestamp: new Date().toISOString()
+      });
   } catch (error: any) {
     console.error('Profile API - Критическая ошибка:', error);
     

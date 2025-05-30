@@ -90,6 +90,12 @@ const useReservationsStore = create<ReservationsState>()(
                 isLoading: false,
                 lastUpdated: Date.now()
               }));
+              
+              // После создания нового бронирования обновляем список всех бронирований
+              setTimeout(() => {
+                const { getReservations } = get();
+                getReservations();
+              }, 1000);
             }
             
             return newReservation;

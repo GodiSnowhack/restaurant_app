@@ -30,14 +30,28 @@ def optimize_sqlite_connection(dbapi_connection, connection_record):
     # Включаем журнал упреждающей записи (WAL) для поддержки параллельного чтения и записи
     dbapi_connection.execute("PRAGMA journal_mode=WAL")
     
-    # Отключаем синхронизацию с диском для повышения производительности
-    dbapi_connection.execute("PRAGMA synchronous=NORMAL")
+    # Улучшаем надежность за счет производительности
+    dbapi_connection.execute("PRAGMA synchronous=FULL")
     
     # Включаем внешние ключи
     dbapi_connection.execute("PRAGMA foreign_keys=ON")
     
-    # Устанавливаем таймаут для транзакций
-    dbapi_connection.execute("PRAGMA busy_timeout=5000")
+    # Увеличиваем таймаут для транзакций
+    dbapi_connection.execute("PRAGMA busy_timeout=10000")
+    
+    # Включаем строгий режим
+    dbapi_connection.execute("PRAGMA strict=ON")
+    
+    # Настройка кэша
+    dbapi_connection.execute("PRAGMA cache_size=-20000")
+    
+    # Включаем защиту от повреждения данных
+    dbapi_connection.execute("PRAGMA secure_delete=ON")
+    
+    # Ограничиваем размер БД (100 MB)
+    dbapi_connection.execute("PRAGMA max_page_count=25000")
+    
+    print("[DB] SQLite оптимизация выполнена")
 
 # Создаем фабрику сессий
 SessionLocal = sessionmaker(
@@ -54,6 +68,20 @@ Base = declarative_base()
 def create_tables():
     Base.metadata.create_all(bind=engine)
     
+    # Проверяем состояние базы данных
+    with engine.connect() as conn:
+        result = conn.execute("PRAGMA integrity_check")
+        integrity = result.scalar()
+        print(f"[DB] Проверка целостности базы данных: {integrity}")
+        
+        result = conn.execute("PRAGMA journal_mode")
+        journal_mode = result.scalar()
+        print(f"[DB] Режим журнала: {journal_mode}")
+        
+        result = conn.execute("PRAGMA synchronous")
+        sync_mode = result.scalar()
+        print(f"[DB] Режим синхронизации: {sync_mode}")
+
 # Функция для очистки и пересоздания схемы БД
 def reset_database():
     Base.metadata.drop_all(bind=engine)

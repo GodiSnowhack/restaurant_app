@@ -45,10 +45,14 @@ async def read_reservations(
             # Пытаемся получить пользователя по ID из заголовка
             try:
                 user_id_int = int(user_id)
+                print(f"[RESERVATIONS DEBUG] Запрос списка бронирований. Пользователь: {user_id_int}")
+                print(f"[RESERVATIONS DEBUG] Параметры запроса: skip={skip}, limit={limit}, status={status}, date={date}")
+                
                 user = db.query(User).filter(User.id == user_id_int).first()
                 if not user:
                     # Для неизвестного пользователя из заголовка создаем временного
                     # с ролью клиента для ограничения доступа
+                    print(f"[RESERVATIONS DEBUG] Пользователь {user_id_int} не найден, создаем временного")
                     user = User(
                         id=user_id_int,
                         email=f"temp_{user_id_int}@example.com",
@@ -56,8 +60,22 @@ async def read_reservations(
                         role=UserRole.CLIENT,
                         is_active=True
                     )
-                # Обычный пользователь видит только свои бронирования
-                return get_reservations_by_user(db, user_id_int, skip, limit)
+                    # Сохраняем пользователя
+                    db.add(user)
+                    db.commit()
+                    print(f"[RESERVATIONS DEBUG] Временный пользователь {user_id_int} создан")
+                
+                # Получаем список бронирований пользователя
+                print(f"[RESERVATIONS DEBUG] Пользователь {user_id_int} с ролью {user.role} запрашивает свои бронирования")
+                reservations = get_reservations_by_user(db, user_id_int, skip, limit)
+                print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для пользователя {user_id_int}")
+                
+                # Выводим список ID всех найденных бронирований
+                if reservations:
+                    ids = [r.id for r in reservations]
+                    print(f"[RESERVATIONS DEBUG] Список ID бронирований: {ids}")
+                
+                return reservations
             except (ValueError, TypeError):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -84,7 +102,10 @@ async def read_reservations(
                 return db.query(Reservation).offset(skip).limit(limit).all()
         else:
             # Обычный пользователь видит только свои бронирования
-            return get_reservations_by_user(db, current_user.id, skip, limit)
+            print(f"[RESERVATIONS DEBUG] Пользователь {current_user.id} с ролью {current_user.role} запрашивает свои бронирования")
+            reservations = get_reservations_by_user(db, current_user.id, skip, limit)
+            print(f"[RESERVATIONS DEBUG] Возвращаем {len(reservations)} бронирований для пользователя {current_user.id}")
+            return reservations
     except Exception as e:
         print(f"Ошибка при получении бронирований: {str(e)}")
         raise HTTPException(
@@ -116,10 +137,12 @@ async def create_reservation_endpoint(
         
         try:
             user_id_int = int(user_id)
+            print(f"[RESERVATIONS DEBUG] Поиск пользователя по ID {user_id_int}")
             current_user = db.query(User).filter(User.id == user_id_int).first()
             
             # Если пользователя с таким ID нет, создаем временного
             if not current_user:
+                print(f"[RESERVATIONS DEBUG] Пользователь {user_id_int} не найден, создаем временного")
                 current_user = User(
                     id=user_id_int,
                     email=f"temp_{user_id_int}@example.com",
@@ -127,10 +150,10 @@ async def create_reservation_endpoint(
                     role=UserRole.CLIENT,
                     is_active=True
                 )
-                # Здесь можно сохранить в базу, если нужно
-                # db.add(current_user)
-                # db.commit()
-                # db.refresh(current_user)
+                # Сохраняем временного пользователя в базу для обеспечения связей
+                db.add(current_user)
+                db.commit()
+                print(f"[RESERVATIONS DEBUG] Временный пользователь {user_id_int} создан и сохранен")
         except (ValueError, TypeError):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -153,14 +176,36 @@ async def create_reservation_endpoint(
                 detail=f"Бронирование с кодом {reservation_in.reservation_code} уже существует",
             )
     
+    # Явно устанавливаем user_id в данных бронирования
+    user_id = current_user.id
+    print(f"[RESERVATIONS DEBUG] Создание бронирования для пользователя {user_id}")
+    
     # Создаем бронирование
-    db_reservation = create_reservation(db, current_user.id, reservation_in)
+    db_reservation = create_reservation(db, user_id, reservation_in)
     
-    # Проверяем, что код бронирования установлен правильно
-    print(f"[DEBUG API] После создания бронирования: ID={db_reservation.id}, код={db_reservation.reservation_code}, исходный код={reservation_in.reservation_code}")
+    # Проверяем, что бронирование создано и имеет правильный user_id
+    if db_reservation.user_id != user_id:
+        print(f"[CRITICAL] Несоответствие ID пользователя: ожидаемый={user_id}, фактический={db_reservation.user_id}")
+        # Исправляем
+        db_reservation.user_id = user_id
+        db.add(db_reservation)
+        db.commit()
+        db.refresh(db_reservation)
     
-    if db_reservation.reservation_code != reservation_in.reservation_code:
-        print(f"[CRITICAL] НЕСООТВЕТСТВИЕ КОДОВ БРОНИРОВАНИЯ: отправлено={reservation_in.reservation_code}, сохранено={db_reservation.reservation_code}")
+    # Еще раз проверяем данные
+    print(f"[RESERVATIONS DEBUG] Бронирование создано: ID={db_reservation.id}, Пользователь={db_reservation.user_id}, Код={db_reservation.reservation_code}")
+    
+    # Проверим, что бронирование есть в списке пользователя
+    user_reservations = get_reservations_by_user(db, user_id, 0, 100)
+    found = False
+    for r in user_reservations:
+        if r.id == db_reservation.id:
+            found = True
+            print(f"[RESERVATIONS DEBUG] Бронирование найдено в списке пользователя")
+            break
+    
+    if not found:
+        print(f"[CRITICAL] Бронирование НЕ НАЙДЕНО в списке пользователя после создания!")
     
     return db_reservation
 
