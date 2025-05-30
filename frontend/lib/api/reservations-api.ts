@@ -55,8 +55,13 @@ const saveReservationsToCache = (data: Reservation[]): void => {
 export const reservationsApi = {
   /**
    * Получение списка бронирований
+   * @param options Параметры запроса: булевое значение forceRefresh или объект с параметрами фильтрации
    */
-  getReservations: async (forceRefresh: boolean = false): Promise<Reservation[]> => {
+  getReservations: async (options?: boolean | { status?: string; date?: string }): Promise<Reservation[]> => {
+    // Определяем, является ли options флагом forceRefresh или объектом с параметрами фильтрации
+    const forceRefresh = typeof options === 'boolean' ? options : false;
+    const filterParams = typeof options === 'object' ? options : {};
+    
     try {
       console.log('[Reservations API] Начало запроса бронирований');
       
@@ -67,6 +72,32 @@ export const reservationsApi = {
       // Если есть кешированные данные и они не устарели, используем их (если не запрошено принудительное обновление)
       if (cachedData?.data && cachedData.timestamp && cacheAge < 300 && !forceRefresh) {
         console.log(`[Reservations API] Используем кэшированные данные (возраст кэша: ${Math.floor(cacheAge)} сек)`);
+        
+        // Если переданы параметры фильтрации, применяем их к кешированным данным
+        if (Object.keys(filterParams).length > 0) {
+          let filteredData = [...cachedData.data];
+          
+          // Фильтрация по статусу
+          if (filterParams.status) {
+            filteredData = filteredData.filter(r => r.status === filterParams.status);
+          }
+          
+          // Фильтрация по дате
+          if (filterParams.date) {
+            filteredData = filteredData.filter(r => {
+              if (r.reservation_time) {
+                return r.reservation_time.startsWith(filterParams.date!);
+              }
+              if (r.reservation_date) {
+                return r.reservation_date === filterParams.date;
+              }
+              return false;
+            });
+          }
+          
+          return filteredData;
+        }
+        
         return cachedData.data;
       }
       
@@ -75,8 +106,25 @@ export const reservationsApi = {
       // Получаем токен авторизации
       const token = await getAuthToken();
       
-      // Проверяем что мы используем правильный URL для прокси
-      const url = '/api/reservations';
+      // Формируем URL с учетом параметров фильтрации
+      let url = '/api/reservations';
+      
+      if (typeof options === 'object' && Object.keys(filterParams).length > 0) {
+        const queryParams = new URLSearchParams();
+        
+        if (filterParams.status) {
+          queryParams.append('status', filterParams.status);
+        }
+        
+        if (filterParams.date) {
+          queryParams.append('date', filterParams.date);
+        }
+        
+        const queryString = queryParams.toString();
+        if (queryString) {
+          url += `?${queryString}`;
+        }
+      }
       
       // Запрашиваем данные с сервера
       const response = await fetch(url, {
@@ -97,6 +145,31 @@ export const reservationsApi = {
       // Сохраняем в кеше
       saveReservationsToCache(data);
       
+      // Если переданы параметры фильтрации, применяем их к полученным данным
+      if (typeof options === 'object' && Object.keys(filterParams).length > 0) {
+        let filteredData = [...data];
+        
+        // Фильтрация по статусу
+        if (filterParams.status) {
+          filteredData = filteredData.filter(r => r.status === filterParams.status);
+        }
+        
+        // Фильтрация по дате
+        if (filterParams.date) {
+          filteredData = filteredData.filter(r => {
+            if (r.reservation_time) {
+              return r.reservation_time.startsWith(filterParams.date!);
+            }
+            if (r.reservation_date) {
+              return r.reservation_date === filterParams.date;
+            }
+            return false;
+          });
+        }
+        
+        return filteredData;
+      }
+      
       return data;
     } catch (error) {
       console.error('[Reservations API] Ошибка при получении бронирований:', error);
@@ -105,6 +178,32 @@ export const reservationsApi = {
       const cachedData = getCachedReservations();
       if (cachedData?.data) {
         console.log('[Reservations API] Возвращаем кешированные данные из-за ошибки');
+        
+        // Если переданы параметры фильтрации, применяем их к кешированным данным
+        if (typeof options === 'object' && Object.keys(filterParams).length > 0) {
+          let filteredData = [...cachedData.data];
+          
+          // Фильтрация по статусу
+          if (filterParams.status) {
+            filteredData = filteredData.filter(r => r.status === filterParams.status);
+          }
+          
+          // Фильтрация по дате
+          if (filterParams.date) {
+            filteredData = filteredData.filter(r => {
+              if (r.reservation_time) {
+                return r.reservation_time.startsWith(filterParams.date!);
+              }
+              if (r.reservation_date) {
+                return r.reservation_date === filterParams.date;
+              }
+              return false;
+            });
+          }
+          
+          return filteredData;
+        }
+        
         return cachedData.data;
       }
       
