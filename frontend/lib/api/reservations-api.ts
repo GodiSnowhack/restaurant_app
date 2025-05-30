@@ -663,14 +663,25 @@ const getApiUrl = () => {
 };
 
 /**
- * Генерирует код бронирования в нужном формате (6 символов)
+ * Генерирует код бронирования в нужном формате (XXX-XXX)
  */
 function generateReservationCode(): string {
   const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Исключены похожие символы I, O, 0, 1
   let result = '';
   const charactersLength = characters.length;
-  for (let i = 0; i < 6; i++) { // Генерируем ровно 6 символов
+  
+  // Генерируем первые 3 символа
+  for (let i = 0; i < 3; i++) {
     result += characters.charAt(Math.floor(Math.random() * charactersLength));
   }
-  return `RES${result}`; // Формат "RES" + 6 символов
+  
+  // Добавляем дефис
+  result += '-';
+  
+  // Генерируем последние 3 символа
+  for (let i = 0; i < 3; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  
+  return result; // Формат "XXX-XXX"
 } 

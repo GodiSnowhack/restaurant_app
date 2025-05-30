@@ -448,6 +448,31 @@ const ReservationsPage: NextPage = () => {
     }
   };
 
+  // Функция для форматирования кода бронирования
+  const formatReservationCode = (code: string | undefined) => {
+    // Если код не определен, возвращаем пустую строку
+    if (!code) return '';
+    
+    // Проверяем, соответствует ли код новому формату XXX-XXX
+    if (code.includes('-') && code.length === 7) {
+      return code;
+    }
+    
+    // Для старых кодов в формате RES... возвращаем только последние 7 символов
+    if (code.startsWith('RES')) {
+      const cleanCode = code.replace('RES', '');
+      if (cleanCode.length >= 6) {
+        // Преобразуем в формат XXX-XXX
+        const part1 = cleanCode.substring(0, 3);
+        const part2 = cleanCode.substring(3, 6);
+        return `${part1}-${part2}`;
+      }
+    }
+    
+    // Для всех остальных случаев возвращаем код как есть
+    return code;
+  };
+
   const availableTables = getAvailableTables();
   const floorPlanTables = getFloorPlanTables();
 
@@ -952,7 +977,7 @@ const ReservationsPage: NextPage = () => {
                         `}>
                           <div className="flex items-center space-x-2">
                             <KeyIcon className="h-4 w-4 text-primary" />
-                            <span>{reservation.reservation_code}</span>
+                            <span>{formatReservationCode(reservation.reservation_code)}</span>
                           </div>
                         </td>
                         <td className={`

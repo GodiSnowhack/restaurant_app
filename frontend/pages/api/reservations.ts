@@ -413,7 +413,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     ...processedBody,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
-                    reservation_code: `RES${generateReservationCode(6)}`
+                    reservation_code: generateReservationCode(6)
                   };
                   
                   // Очищаем кеш для пользователя
@@ -449,7 +449,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...processedBody,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          reservation_code: `RES${generateReservationCode(6)}`
+          reservation_code: generateReservationCode(6)
         };
         
         // Очищаем кеш для пользователя
@@ -493,7 +493,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log('Reservations API Proxy: Сервер вернул пустой ответ, создаем объект бронирования');
             
             // Создаем объект бронирования с данными из запроса
-            const reservationCode = `RES${generateReservationCode(6)}`;
+            const reservationCode = generateReservationCode(6);
             const mockReservation = {
               id: Date.now(),
               ...processedBody,
@@ -538,7 +538,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Если сервер не вернул user_id, добавляем его из запроса
             user_id: data.user_id || processedBody.user_id,
             // Если сервер не вернул reservation_code, генерируем его
-            reservation_code: data.reservation_code || `RES${generateReservationCode(6)}`
+            reservation_code: data.reservation_code || generateReservationCode(6)
           };
           
           console.log('Reservations API Proxy: Возвращаем данные бронирования:', reservation);
@@ -579,7 +579,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...processedBody,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            reservation_code: `RES${generateReservationCode(6)}`
+            reservation_code: generateReservationCode(6)
           };
           
           console.log('Reservations API Proxy: Возвращаем созданный объект бронирования из-за ошибки:', mockReservation);
@@ -606,7 +606,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               ...processedBody,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              reservation_code: `RES${generateReservationCode(6)}`
+              reservation_code: generateReservationCode(6)
             };
             
             // Очищаем кеш для пользователя
@@ -634,7 +634,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...processedBody,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            reservation_code: `RES${generateReservationCode(6)}`
+            reservation_code: generateReservationCode(6)
           };
           
           // Очищаем кеш для пользователя
@@ -662,7 +662,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...processedBody,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          reservation_code: `RES${generateReservationCode(6)}`
+          reservation_code: generateReservationCode(6)
         };
         
         // Очищаем кеш для пользователя
@@ -768,7 +768,7 @@ function generateDemoReservations(userId?: number, userRole?: string) {
       guest_phone: `+7 (${getRandomInt(900, 999)}) ${getRandomInt(100, 999)}-${getRandomInt(10, 99)}-${getRandomInt(10, 99)}`,
       guest_email: `user${getRandomInt(1, 999)}@example.com`,
       comment: Math.random() < 0.3 ? 'Комментарий к бронированию' : null,
-      reservation_code: `RES${generateReservationCode(6)}`
+      reservation_code: generateReservationCode(6)
     });
   }
   
@@ -781,8 +781,19 @@ function generateReservationCode(length: number): string {
   const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Исключены похожие символы I, O, 0, 1
   let result = '';
   const charactersLength = characters.length;
-  for (let i = 0; i < length; i++) {
+  
+  // Генерируем первые 3 символа
+  for (let i = 0; i < 3; i++) {
     result += characters.charAt(Math.floor(Math.random() * charactersLength));
   }
+  
+  // Добавляем дефис
+  result += '-';
+  
+  // Генерируем последние 3 символа
+  for (let i = 0; i < 3; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  
   return result;
 } 
