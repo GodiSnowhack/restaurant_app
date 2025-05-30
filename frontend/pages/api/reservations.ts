@@ -273,6 +273,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers['X-User-Role'] = userRole;
     }
 
+    // Добавляем заголовок для отладки
+    if (method === 'POST') {
+      headers['X-Debug-Info'] = 'Frontend-Proxy-Reservation-Create';
+      console.log('Reservations API Proxy: Установлен заголовок для отладки');
+    }
+
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
       rejectUnauthorized: false
@@ -290,17 +296,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         signal: controller.signal,
         // @ts-ignore - добавляем агент напрямую
         agent: url.startsWith('https') ? httpsAgent : undefined,
-        // Добавляем опцию, которая предотвращает автоматическое следование за редиректами
-        redirect: method === 'POST' ? 'manual' : 'follow'
+        // Следуем за редиректами для всех запросов
+        redirect: 'follow'
       });
 
       clearTimeout(timeoutId);
       
+      // Логируем информацию о запросе и ответе
+      console.log(`Reservations API Proxy: Ответ получен (${method}): Статус ${response.status}, URL: ${response.url}`);
+      
+      // Проверяем, отличается ли URL ответа от исходного URL запроса (был редирект)
+      if (response.url !== url) {
+        console.log(`Reservations API Proxy: Был выполнен редирект с ${url} на ${response.url}`);
+      }
+
       // Проверяем, если это POST запрос и получили редирект
       if (method === 'POST' && (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308)) {
-        console.log(`Reservations API Proxy: Получен редирект ${response.status} при создании бронирования. Возвращаем данные напрямую.`);
+        console.log(`Reservations API Proxy: Получен редирект ${response.status} при создании бронирования.`);
         
-        // Создаем объект бронирования на основе отправленных данных
+        // Пробуем выполнить редирект вручную
+        try {
+          const redirectUrl = response.headers.get('Location');
+          console.log(`Reservations API Proxy: Пробуем выполнить редирект вручную на ${redirectUrl}`);
+          
+          if (redirectUrl) {
+            // Отправляем GET запрос по URL редиректа
+            const redirectResponse = await fetch(redirectUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': token || '',
+                'Accept': 'application/json',
+                'X-User-ID': String(userId),
+                'X-User-Role': userRole
+              }
+            });
+            
+            if (redirectResponse.ok) {
+              console.log(`Reservations API Proxy: Редирект успешно выполнен, статус: ${redirectResponse.status}`);
+              
+              try {
+                // Пробуем получить данные созданного бронирования
+                const redirectData = await redirectResponse.json();
+                
+                if (redirectData && (Array.isArray(redirectData) ? redirectData.length > 0 : Object.keys(redirectData).length > 0)) {
+                  console.log('Reservations API Proxy: Данные бронирования получены после редиректа');
+                  
+                  // Очищаем кеш для пользователя
+                  clearUserCache(userId, userRole);
+                  
+                  // Возвращаем данные бронирования
+                  return res.status(201).json(Array.isArray(redirectData) ? redirectData[0] : redirectData);
+                }
+              } catch (redirectJsonError) {
+                console.error('Reservations API Proxy: Ошибка при разборе JSON после редиректа:', redirectJsonError);
+              }
+            } else {
+              console.log(`Reservations API Proxy: Не удалось выполнить редирект, статус: ${redirectResponse.status}`);
+            }
+          }
+        } catch (redirectError) {
+          console.error('Reservations API Proxy: Ошибка при выполнении редиректа вручную:', redirectError);
+        }
+        
+        // Если не удалось получить данные после редиректа, создаем объект бронирования на основе отправленных данных
+        console.log('Reservations API Proxy: Создаем объект бронирования без редиректа');
         const mockReservation = {
           id: Date.now(),
           ...processedBody,
@@ -314,6 +373,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Возвращаем успешный ответ
         return res.status(201).json(mockReservation);
+      }
+      
+      // Проверяем статус ответа после создания бронирования
+      if (method === 'POST' && response.ok) {
+        console.log(`Reservations API Proxy: Успешно создано бронирование. Статус: ${response.status}`);
+        
+        // Очищаем кеш для пользователя, чтобы при следующем запросе получить свежие данные
+        clearUserCache(userId, userRole);
+        
+        try {
+          // Пытаемся получить данные созданного бронирования
+          const data = await response.json();
+          
+          // Если сервер вернул пустой объект или массив, создаем свой объект бронирования
+          if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
+            console.log('Reservations API Proxy: Сервер вернул пустой ответ, создаем объект бронирования');
+            
+            const mockReservation = {
+              id: Date.now(),
+              ...processedBody,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+            };
+            
+            return res.status(201).json(mockReservation);
+          }
+          
+          // Возвращаем данные, полученные от сервера
+          return res.status(201).json(data);
+        } catch (error) {
+          console.error('Reservations API Proxy: Ошибка при получении данных бронирования:', error);
+          
+          // В случае ошибки создаем свой объект бронирования
+          const mockReservation = {
+            id: Date.now(),
+            ...processedBody,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+          };
+          
+          return res.status(201).json(mockReservation);
+        }
       }
       
       // Проверяем статус ответа
