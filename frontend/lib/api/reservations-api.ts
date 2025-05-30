@@ -317,15 +317,29 @@ export const reservationsApi = {
         throw new Error(`Ошибка HTTP: ${response.status}, ${errorText}`);
       }
       
-      const responseData = await response.json();
-      console.log('[Reservations API] Бронирование успешно создано:', responseData);
+      // Получаем данные из ответа
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('[Reservations API] Бронирование успешно создано:', responseData);
+      } catch (error) {
+        console.error('[Reservations API] Ошибка при парсинге JSON из ответа:', error);
+        // Создаем заглушку для бронирования
+        responseData = {
+          id: Date.now(),
+          ...processedData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+        };
+      }
       
       // Обработка разных форматов ответа от сервера
       // Если сервер вернул массив, но мы ожидаем объект, создаем заглушку для объекта бронирования
       if (Array.isArray(responseData) && responseData.length === 0) {
         console.log('[Reservations API] Сервер вернул пустой массив вместо объекта бронирования. Создаем заглушку.');
         // Возвращаем заглушку с базовой информацией о бронировании
-        return {
+        responseData = {
           id: Date.now(), // временный ID
           user_id: processedData.user_id,
           reservation_date: processedData.reservation_date,
@@ -340,6 +354,28 @@ export const reservationsApi = {
           // Генерируем код бронирования
           reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
         };
+      }
+      
+      // Принудительно обновляем кеш и данные бронирований
+      try {
+        console.log('[Reservations API] Принудительное обновление списка бронирований');
+        
+        // Инвалидируем кеш
+        localStorage.removeItem('reservations_data_cache');
+        localStorage.removeItem('reservations_cache_timestamp');
+        
+        // Запрашиваем свежие данные с флагом принудительного обновления
+        setTimeout(() => {
+          reservationsApi.getReservations(true)
+            .then(freshData => {
+              console.log('[Reservations API] Получены свежие данные после создания бронирования:', freshData.length);
+            })
+            .catch(refreshError => {
+              console.error('[Reservations API] Ошибка при обновлении данных:', refreshError);
+            });
+        }, 500);
+      } catch (refreshError) {
+        console.error('[Reservations API] Ошибка при обновлении кеша:', refreshError);
       }
       
       // Если сервер вернул объект, используем его

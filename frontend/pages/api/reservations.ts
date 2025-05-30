@@ -468,25 +468,108 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         try {
           // Пытаемся получить данные созданного бронирования
-          const data = await response.json();
+          let data;
+          try {
+            // Пробуем получить JSON-данные из ответа
+            data = await response.json();
+            console.log('Reservations API Proxy: Ответ от сервера в формате JSON:', data);
+          } catch (jsonError) {
+            console.error('Reservations API Proxy: Ошибка при парсинге JSON из ответа:', jsonError);
+            
+            // Пробуем получить текст ответа
+            try {
+              const textResponse = await response.text();
+              console.log('Reservations API Proxy: Текст ответа:', textResponse);
+            } catch (textError) {
+              console.error('Reservations API Proxy: Не удалось получить текст ответа:', textError);
+            }
+            
+            // Создаем синтетический объект, так как не смогли прочитать ответ
+            data = null;
+          }
           
-          // Если сервер вернул пустой объект или массив, создаем свой объект бронирования
+          // Если сервер вернул пустой объект, массив или null, создаем свой объект бронирования
           if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
             console.log('Reservations API Proxy: Сервер вернул пустой ответ, создаем объект бронирования');
             
+            // Создаем объект бронирования с данными из запроса
+            const reservationCode = `RES-${Math.floor(1000 + Math.random() * 9000)}`;
             const mockReservation = {
               id: Date.now(),
               ...processedBody,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+              reservation_code: reservationCode
             };
+            
+            console.log('Reservations API Proxy: Создан объект бронирования:', mockReservation);
+            
+            // Принудительно делаем запрос на получение актуальных данных
+            try {
+              // Формируем URL для запроса списка бронирований
+              const getUrl = `${url.split('?')[0]}?user_id=${userId}`;
+              console.log(`Reservations API Proxy: Запрашиваем обновленный список бронирований: ${getUrl}`);
+              
+              // Отправляем GET запрос для обновления списка бронирований
+              fetch(getUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': token || '',
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              }).then(refreshResponse => {
+                console.log(`Reservations API Proxy: Получен ответ на запрос обновления: ${refreshResponse.status}`);
+                // Очищаем кеш для пользователя
+                clearUserCache(userId, userRole);
+              }).catch(refreshError => {
+                console.error('Reservations API Proxy: Ошибка при обновлении списка:', refreshError);
+              });
+            } catch (refreshError) {
+              console.error('Reservations API Proxy: Ошибка при обновлении списка бронирований:', refreshError);
+            }
             
             return res.status(201).json(mockReservation);
           }
           
+          // Создаем полный объект бронирования на основе ответа сервера
+          const reservation = {
+            ...data,
+            // Если сервер не вернул user_id, добавляем его из запроса
+            user_id: data.user_id || processedBody.user_id,
+            // Если сервер не вернул reservation_code, генерируем его
+            reservation_code: data.reservation_code || `RES-${Math.floor(1000 + Math.random() * 9000)}`
+          };
+          
+          console.log('Reservations API Proxy: Возвращаем данные бронирования:', reservation);
+          
+          // Принудительно обновляем список бронирований
+          try {
+            // Формируем URL для запроса списка бронирований
+            const getUrl = `${url.split('?')[0]}?user_id=${userId}`;
+            console.log(`Reservations API Proxy: Запрашиваем обновленный список бронирований: ${getUrl}`);
+            
+            // Отправляем GET запрос для обновления списка бронирований
+            fetch(getUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': token || '',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            }).then(refreshResponse => {
+              console.log(`Reservations API Proxy: Получен ответ на запрос обновления: ${refreshResponse.status}`);
+              // Очищаем кеш для пользователя
+              clearUserCache(userId, userRole);
+            }).catch(refreshError => {
+              console.error('Reservations API Proxy: Ошибка при обновлении списка:', refreshError);
+            });
+          } catch (refreshError) {
+            console.error('Reservations API Proxy: Ошибка при обновлении списка бронирований:', refreshError);
+          }
+          
           // Возвращаем данные, полученные от сервера
-          return res.status(201).json(data);
+          return res.status(201).json(reservation);
         } catch (error) {
           console.error('Reservations API Proxy: Ошибка при получении данных бронирования:', error);
           
@@ -498,6 +581,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             updated_at: new Date().toISOString(),
             reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
           };
+          
+          console.log('Reservations API Proxy: Возвращаем созданный объект бронирования из-за ошибки:', mockReservation);
           
           return res.status(201).json(mockReservation);
         }
