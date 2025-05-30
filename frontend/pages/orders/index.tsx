@@ -30,14 +30,26 @@ const OrdersPage: NextPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
 
   useEffect(() => {
-    // Загружаем данные даже если пользователь не авторизован, 
-    // чтобы показать демо-данные
+    // Если пользователь не авторизован, перенаправляем на страницу входа
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+
+    // Загружаем заказы только для авторизованных пользователей
     fetchOrders();
-  }, []);
+  }, [isAuthenticated, router]);
 
   const fetchOrders = async () => {
     setIsLoading(true);
     setError(null);
+    
+    // Проверяем авторизацию
+    if (!isAuthenticated) {
+      setError('Для просмотра заказов необходимо войти в систему');
+      setIsLoading(false);
+      return;
+    }
     
     // Формируем параметры запроса для фильтрации
     const params: any = {};
@@ -48,9 +60,6 @@ const OrdersPage: NextPage = () => {
     console.log('Запрашиваем заказы с параметрами:', params);
     
     try {
-      // Проверяем токен авторизации для вывода информации в интерфейсе
-      const isAuthorized = !!localStorage.getItem('token');
-      
       // Получаем заказы с сервера
       const ordersData = await ordersApi.getAllOrders(params);
       console.log('Получены заказы:', ordersData);
@@ -62,11 +71,6 @@ const OrdersPage: NextPage = () => {
       } else if (ordersData.length === 0) {
         console.log('Получен пустой список заказов');
         setOrders([]);
-        
-        // Показываем разные сообщения в зависимости от авторизации
-        if (!isAuthorized) {
-          setError('Для просмотра ваших заказов необходимо авторизоваться');
-        }
       } else {
         // Сортируем заказы по дате (новые в начале)
         const sortedOrders = [...ordersData].sort((a, b) => {
@@ -77,16 +81,20 @@ const OrdersPage: NextPage = () => {
         });
         
         setOrders(sortedOrders);
-        
-        // Если заказы загружены, но пользователь не авторизован,
-        // показываем уведомление, что это демо-данные
-        if (!isAuthorized && sortedOrders.length > 0) {
-          setError('Вы видите демонстрационные данные. Для просмотра ваших заказов необходимо авторизоваться');
-        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при получении заказов:', error);
-      setError('Не удалось загрузить данные заказов. Пожалуйста, проверьте соединение и повторите попытку.');
+      
+      if (error.message === 'Требуется авторизация') {
+        setError('Для просмотра заказов необходимо войти в систему');
+        // Перенаправляем на страницу входа
+        setTimeout(() => {
+          router.push('/auth/login');
+        }, 2000);
+      } else {
+        setError('Не удалось загрузить данные заказов. Пожалуйста, проверьте соединение и повторите попытку.');
+      }
+      
       setOrders([]);
     } finally {
       setIsLoading(false);
@@ -205,15 +213,6 @@ const OrdersPage: NextPage = () => {
               >
                 Обновить
               </Button>
-              {!localStorage.getItem('token') && (
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  onClick={() => router.push('/auth/login')}
-                >
-                  Войти в систему
-                </Button>
-              )}
             </Box>
           </Paper>
         )}
