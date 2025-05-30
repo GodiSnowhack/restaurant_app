@@ -14,6 +14,7 @@ interface ReservationsState {
   createReservation: (data: any) => Promise<any>;
   clearStore: () => void;
   getReservationById: (id: number) => Reservation | undefined;
+  verifyReservationCode: (code: string) => Promise<boolean>;
 }
 
 const useReservationsStore = create<ReservationsState>()(
@@ -105,6 +106,23 @@ const useReservationsStore = create<ReservationsState>()(
         
         getReservationById: (id: number) => {
           return get().reservations.find(reservation => reservation.id === id);
+        },
+        
+        verifyReservationCode: async (code: string) => {
+          set({ isLoading: true, error: null });
+          
+          try {
+            const result = await reservationsApi.verifyReservationCode(code);
+            set({ isLoading: false });
+            return !!result; // Возвращаем true, если код действителен
+          } catch (error: any) {
+            console.error('Ошибка при проверке кода бронирования:', error);
+            set({ 
+              isLoading: false, 
+              error: error.message || 'Не удалось проверить код бронирования'
+            });
+            return false; // Возвращаем false в случае ошибки
+          }
         }
       }),
       {
