@@ -1,124 +1,6 @@
 import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus } from './types';
 
-// Функция для создания тестовых данных заказов
-const getDemoOrders = (status?: string): Order[] => {
-  // Базовый список заказов для тестирования
-  const demoOrders: Order[] = [
-    {
-      id: 1001,
-      user_id: 1,
-      status: 'pending',
-      payment_status: 'unpaid',
-      payment_method: 'cash',
-      order_type: 'dine_in',
-      table_number: 5,
-      total_amount: 3500,
-      total_price: 3500,
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-      customer_name: 'Иван Петров',
-      customer_phone: '+7 (999) 123-45-67',
-      is_urgent: true,
-      order_code: 'ORD-1001',
-      items: [
-        {
-          id: 1,
-          dish_id: 101,
-          name: 'Борщ',
-          quantity: 2,
-          price: 500,
-          total_price: 1000,
-          special_instructions: 'Без сметаны'
-        },
-        {
-          id: 2,
-          dish_id: 102,
-          name: 'Стейк Рибай',
-          quantity: 1,
-          price: 2500,
-          total_price: 2500
-        }
-      ]
-    },
-    {
-      id: 1002,
-      user_id: 2,
-      status: 'completed',
-      payment_status: 'paid',
-      payment_method: 'card',
-      order_type: 'delivery',
-      total_amount: 1800,
-      total_price: 1800,
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
-      completed_at: new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString(),
-      customer_name: 'Анна Сидорова',
-      customer_phone: '+7 (999) 987-65-43',
-      delivery_address: 'ул. Ленина, д. 10, кв. 5',
-      order_code: 'ORD-1002',
-      items: [
-        {
-          id: 3,
-          dish_id: 103,
-          name: 'Пицца Маргарита',
-          quantity: 1,
-          price: 800,
-          total_price: 800
-        },
-        {
-          id: 4,
-          dish_id: 104,
-          name: 'Тирамису',
-          quantity: 2,
-          price: 500,
-          total_price: 1000
-        }
-      ]
-    },
-    {
-      id: 1003,
-      user_id: 1,
-      status: 'processing',
-      payment_status: 'unpaid',
-      payment_method: 'cash',
-      order_type: 'pickup',
-      total_amount: 2200,
-      total_price: 2200,
-      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
-      customer_name: 'Иван Петров',
-      customer_phone: '+7 (999) 123-45-67',
-      order_code: 'ORD-1003',
-      items: [
-        {
-          id: 5,
-          dish_id: 105,
-          name: 'Суши-сет "Филадельфия"',
-          quantity: 1,
-          price: 1500,
-          total_price: 1500
-        },
-        {
-          id: 6,
-          dish_id: 106,
-          name: 'Мисо-суп',
-          quantity: 2,
-          price: 350,
-          total_price: 700
-        }
-      ]
-    }
-  ];
-
-  // Если указан статус, фильтруем заказы
-  if (status) {
-    return demoOrders.filter(order => order.status === status);
-  }
-
-  return demoOrders;
-};
-
 // API функции для работы с заказами
 export const ordersApi = {
   // Получение всех заказов с возможностью фильтрации
@@ -129,15 +11,6 @@ export const ordersApi = {
     end_date?: string 
   }): Promise<Order[]> => {
     try {
-      // Проверяем демо-режим
-      const isDemoMode = localStorage.getItem('admin_use_demo_data') === 'true';
-      if (isDemoMode) {
-        console.log('Режим демо-данных включен');
-        return getDemoOrders(params?.status);
-      }
-      
-      console.log('Режим демо-данных отключен');
-      
       // Формируем параметры запроса
       let url = '/api/orders';
       const queryParams: string[] = [];
@@ -153,14 +26,11 @@ export const ordersApi = {
         url += `?${queryParams.join('&')}`;
       }
 
-      // Принудительно запрашиваем демо-данные через параметр
-      url += url.includes('?') ? '&force_demo=true' : '?force_demo=true';
-
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('Отсутствует токен авторизации');
-        return getDemoOrders(params?.status);
+        return [];
       }
       
       // Формируем заголовки запроса с добавлением токена
@@ -173,33 +43,30 @@ export const ordersApi = {
       console.log(`Запрос заказов с параметрами:`, params);
       console.log(`URL запроса: ${url}`);
       
-      // Делаем запрос к API через прокси с коротким таймаутом
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-          credentials: 'include',
-          signal: AbortSignal.timeout(5000) // 5 секунд таймаут
-        });
-        
-        // Даже при ошибке ответа пытаемся получить данные
-        const data = await response.json().catch(() => []);
-        
-        // Проверяем, есть ли данные
-        if (Array.isArray(data) && data.length > 0) {
-          console.log('Получены данные с сервера, количество:', data.length);
-          return data;
-        } else {
-          console.log('Сервер вернул пустой массив или некорректные данные, возвращаем демо-данные');
-          return getDemoOrders(params?.status);
-        }
-      } catch (fetchError) {
-        console.error('Ошибка при запросе данных:', fetchError);
-        return getDemoOrders(params?.status);
+      // Делаем запрос к API через прокси
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Проверяем, есть ли данные
+      if (Array.isArray(data)) {
+        console.log('Получены данные с сервера, количество:', data.length);
+        return data;
+      } else {
+        console.error('Сервер вернул неверный формат данных:', data);
+        return [];
       }
     } catch (error: any) {
       console.error('Общая ошибка при получении заказов:', error);
-      return getDemoOrders(params?.status);
+      return [];
     }
   },
   
@@ -258,36 +125,40 @@ export const ordersApi = {
   // Получение заказа по ID
   getOrderById: async (id: number): Promise<Order | null> => {
     try {
-      console.log(`API: Запрос заказа #${id}`);
+      console.log(`Запрос информации о заказе #${id}`);
       
-      // Получаем токен для запроса
+      // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('Отсутствует токен авторизации');
-      }
-
-      // Отправляем запрос через локальный API-прокси
-      const response = await fetch(`/api/orders/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache'
-        }
-      });
-
-      // Если ответ не успешный, возвращаем null
-      if (!response.ok) {
-        console.error(`API: Ошибка при получении заказа ${id}: ${response.status}`);
+        console.error('Отсутствует токен авторизации');
         return null;
       }
-
+      
+      // Формируем URL и заголовки
+      const url = `/api/orders/${id}`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      
+      // Делаем запрос
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
+      }
+      
       const data = await response.json();
-      console.log(`API: Получены данные заказа #${id}:`, data);
+      console.log('Получены данные заказа:', data);
+      
       return data;
-    } catch (error: any) {
-      console.error(`API: Ошибка при получении заказа ${id}:`, error);
+    } catch (error) {
+      console.error(`Ошибка при получении заказа #${id}:`, error);
       return null;
     }
   },

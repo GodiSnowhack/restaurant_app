@@ -10,142 +10,6 @@ const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
 const ORDERS_CACHE_FILE = path.join(CACHE_DIR, 'orders_cache.json');
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут в миллисекундах
 
-// Демо-данные заказов для гарантированного отображения
-const getDemoOrders = () => {
-  const demoDates = [
-    new Date(Date.now() - 2 * 60 * 60 * 1000),
-    new Date(Date.now() - 24 * 60 * 60 * 1000),
-    new Date(Date.now() - 3 * 60 * 60 * 1000),
-    new Date(Date.now() - 48 * 60 * 60 * 1000),
-    new Date(Date.now() - 72 * 60 * 60 * 1000)
-  ];
-  
-  return [
-    {
-      id: 1001,
-      user_id: 1,
-      status: 'PENDING',
-      payment_status: 'UNPAID',
-      payment_method: 'CASH',
-      order_type: 'DINE_IN',
-      table_number: 5,
-      total_amount: 3500,
-      total_price: 3500,
-      created_at: demoDates[0].toISOString(),
-      updated_at: demoDates[0].toISOString(),
-      customer_name: 'Иван Петров',
-      customer_phone: '+7 (999) 123-45-67',
-      is_urgent: true,
-      order_code: 'ORD-1001',
-      items: [
-        {
-          id: 1,
-          dish_id: 101,
-          name: 'Борщ',
-          quantity: 2,
-          price: 500,
-          total_price: 1000,
-          special_instructions: 'Без сметаны'
-        },
-        {
-          id: 2,
-          dish_id: 102,
-          name: 'Стейк Рибай',
-          quantity: 1,
-          price: 2500,
-          total_price: 2500
-        }
-      ]
-    },
-    {
-      id: 1002,
-      user_id: 2,
-      status: 'COMPLETED',
-      payment_status: 'PAID',
-      payment_method: 'CARD',
-      order_type: 'DINE_IN',
-      table_number: 7,
-      total_amount: 4200,
-      total_price: 4200,
-      created_at: demoDates[1].toISOString(),
-      updated_at: demoDates[1].toISOString(),
-      customer_name: 'Мария Сидорова',
-      customer_phone: '+7 (999) 987-65-43',
-      is_urgent: false,
-      order_code: 'ORD-1002',
-      items: [
-        {
-          id: 3,
-          dish_id: 103,
-          name: 'Цезарь с курицей',
-          quantity: 1,
-          price: 700,
-          total_price: 700
-        },
-        {
-          id: 4,
-          dish_id: 104,
-          name: 'Паста Карбонара',
-          quantity: 2,
-          price: 850,
-          total_price: 1700
-        },
-        {
-          id: 5,
-          dish_id: 105,
-          name: 'Тирамису',
-          quantity: 2,
-          price: 450,
-          total_price: 900
-        }
-      ]
-    },
-    {
-      id: 1003,
-      user_id: 1,
-      status: 'PROCESSING',
-      payment_status: 'UNPAID',
-      payment_method: 'CASH',
-      order_type: 'DELIVERY',
-      total_amount: 2700,
-      total_price: 2700,
-      created_at: demoDates[2].toISOString(),
-      updated_at: demoDates[2].toISOString(),
-      customer_name: 'Алексей Иванов',
-      customer_phone: '+7 (999) 111-22-33',
-      delivery_address: 'ул. Пушкина, д. 10, кв. 5',
-      is_urgent: true,
-      order_code: 'ORD-1003',
-      items: [
-        {
-          id: 6,
-          dish_id: 106,
-          name: 'Пицца Маргарита',
-          quantity: 1,
-          price: 950,
-          total_price: 950
-        },
-        {
-          id: 7,
-          dish_id: 107,
-          name: 'Пицца Пепперони',
-          quantity: 1,
-          price: 1100,
-          total_price: 1100
-        },
-        {
-          id: 8,
-          dish_id: 108,
-          name: 'Кока-кола 1л',
-          quantity: 2,
-          price: 190,
-          total_price: 380
-        }
-      ]
-    }
-  ];
-};
-
 // Убедимся, что директория кеша существует
 const ensureCacheDir = () => {
   if (!fs.existsSync(CACHE_DIR)) {
@@ -293,15 +157,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Проверяем, указана ли опция принудительного использования демо-данных
-    const forceDemoData = req.query.force_demo === 'true' || process.env.NEXT_PUBLIC_FORCE_DEMO_DATA === 'true';
-    
-    // В режиме разработки или при флаге forceDemoData сразу возвращаем демо-данные
-    if (process.env.NODE_ENV !== 'production' || forceDemoData) {
-      console.log('API Proxy: Возвращаем демо-данные (режим разработки или принудительные демо-данные)');
-      return res.status(200).json(getDemoOrders());
-    }
-    
     // Получаем параметры запроса
     const { start_date, end_date } = req.query;
     
@@ -335,10 +190,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем токен авторизации
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
-      console.log('API Proxy: Отсутствует токен авторизации, возвращаем демо-данные');
-      const demoOrders = getDemoOrders();
-      saveToCache(cacheKey, demoOrders);
-      return res.status(200).json(demoOrders);
+      return res.status(401).json({
+        success: false,
+        message: 'Отсутствует токен авторизации'
+      });
     }
     
     // Получаем ID и роль пользователя из заголовков
@@ -350,7 +205,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('API Proxy: Базовый URL API:', baseApiUrl);
 
     // Формируем URL для запроса - явно добавляем слеш в конце URL
-    let ordersApiUrl = baseApiUrl + '/orders/';
+    let ordersApiUrl = baseApiUrl + '/api/v1/orders/';
     if (ordersApiUrl.includes('//orders')) {
       ordersApiUrl = ordersApiUrl.replace('//orders', '/orders');
     }
@@ -400,27 +255,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
           resultData = data.data;
         } else {
-          console.warn('API Proxy: Сервер вернул неожиданный формат данных, используем демо-данные');
-          resultData = getDemoOrders();
+          console.warn('API Proxy: Сервер вернул неожиданный формат данных');
+          resultData = [];
         }
         
         saveToCache(cacheKey, resultData);
         return res.status(200).json(resultData);
       } else {
         console.log('API Proxy: Ошибка при запросе к API:', response.status);
-        const demoOrders = getDemoOrders();
-        saveToCache(cacheKey, demoOrders);
-        return res.status(200).json(demoOrders);
+        return res.status(response.status).json({
+          success: false,
+          message: 'Ошибка при получении данных с сервера'
+        });
       }
     } catch (error: any) {
       console.error('API Proxy: Ошибка при запросе к API:', error.message);
-      const demoOrders = getDemoOrders();
-      saveToCache(cacheKey, demoOrders);
-      return res.status(200).json(demoOrders);
+      if (error.response) {
+        return res.status(error.response.status).json({
+          success: false,
+          message: 'Ошибка при получении данных с сервера',
+          error: error.response.data
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Ошибка при получении данных с сервера',
+        error: error.message
+      });
     }
   } catch (error: any) {
     console.error('API Proxy: Общая ошибка:', error.message);
-    const demoOrders = getDemoOrders();
-    return res.status(200).json(demoOrders);
+    return res.status(500).json({
+      success: false,
+      message: 'Внутренняя ошибка сервера',
+      error: error.message
+    });
   }
 } 

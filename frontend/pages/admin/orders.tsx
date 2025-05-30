@@ -47,15 +47,7 @@ const AdminOrdersPage: NextPage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
-  // State для отслеживания режима демо-данных
-  const [useDemoData, setUseDemoData] = useState<boolean>(false);
   
-  // Эффект для загрузки настройки demo-режима из localStorage
-  useEffect(() => {
-    const demoSetting = localStorage?.getItem('admin_use_demo_data') === 'true';
-    setUseDemoData(demoSetting);
-  }, []);
-
   useEffect(() => {
       fetchOrders();
   }, [activeTab, dateRange]);
@@ -64,23 +56,6 @@ const AdminOrdersPage: NextPage = () => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Обрабатываем режим демо-данных
-      if (useDemoData) {
-        try {
-          localStorage.setItem('force_demo_data', 'true');
-          console.log('Включен режим демо-данных');
-        } catch (e) {
-          console.error('Ошибка при включении режима демо-данных:', e);
-        }
-      } else {
-        try {
-          localStorage.removeItem('force_demo_data');
-          console.log('Режим демо-данных отключен');
-        } catch (e) {
-          console.error('Ошибка при отключении режима демо-данных:', e);
-        }
-      }
       
       // Подготавливаем даты для API запроса
       let startDate = dateRange.start;
@@ -419,20 +394,6 @@ const AdminOrdersPage: NextPage = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold dark:text-white">Управление заказами</h1>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const newValue = !useDemoData;
-                localStorage.setItem('admin_use_demo_data', newValue ? 'true' : 'false');
-                setUseDemoData(newValue);
-                alert(`Режим демо-данных ${newValue ? 'включен' : 'выключен'}`);
-                fetchOrders();
-              }}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md flex items-center"
-            >
-              {useDemoData ? 
-                'Использовать реальные данные' : 
-                'Использовать демо-данные'}
-            </button>
             <Link
               href="/admin"
               className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
