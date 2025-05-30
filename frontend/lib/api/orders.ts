@@ -11,62 +11,113 @@ export const ordersApi = {
     end_date?: string 
   }): Promise<Order[]> => {
     try {
-      // Формируем параметры запроса
-      let url = '/api/orders';
-      const queryParams: string[] = [];
+      console.log('🔄 Начинаем запрос заказов с параметрами:', params);
       
-      if (params) {
-        if (params.status) queryParams.push(`status=${params.status}`);
-        if (params.user_id) queryParams.push(`user_id=${params.user_id}`);
-        if (params.start_date) queryParams.push(`start_date=${params.start_date}`);
-        if (params.end_date) queryParams.push(`end_date=${params.end_date}`);
-      }
-      
-      if (queryParams.length > 0) {
-        url += `?${queryParams.join('&')}`;
-      }
-
       // Получаем токен для авторизации
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('Отсутствует токен авторизации');
+        console.error('❌ Ошибка: Отсутствует токен авторизации');
         return [];
       }
       
-      // Формируем заголовки запроса с добавлением токена
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
+      // Строим строку запроса
+      const queryParams = new URLSearchParams();
+      if (params?.status) queryParams.set('status', params.status);
+      if (params?.user_id) queryParams.set('user_id', params.user_id.toString());
+      if (params?.start_date) queryParams.set('start_date', params.start_date);
+      if (params?.end_date) queryParams.set('end_date', params.end_date);
       
-      console.log(`Запрос заказов с параметрами:`, params);
-      console.log(`URL запроса: ${url}`);
+      // Формируем URL для запроса (используем относительный путь)
+      const baseUrl = '/api/v1/orders'; // Используем правильный эндпоинт API
+      const url = queryParams.toString() ? `${baseUrl}?${queryParams.toString()}` : baseUrl;
       
-      // Делаем запрос к API через прокси
+      console.log(`📡 Отправка запроса на: ${url}`);
+      
+      // Отправляем запрос напрямую к бэкенду
       const response = await fetch(url, {
         method: 'GET',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         credentials: 'include'
       });
       
+      // Проверяем статус ответа
       if (!response.ok) {
+        console.error(`❌ Ошибка HTTP: ${response.status} ${response.statusText}`);
         throw new Error(`Ошибка HTTP: ${response.status}`);
       }
       
+      // Получаем данные из ответа
       const data = await response.json();
+      console.log(`✅ Получены данные заказов:`, data);
       
-      // Проверяем, есть ли данные
+      // Проверяем, что получен массив
       if (Array.isArray(data)) {
-        console.log('Получены данные с сервера, количество:', data.length);
+        console.log(`📊 Количество полученных заказов: ${data.length}`);
         return data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
+        console.log(`📊 Количество полученных заказов: ${data.items.length}`);
+        return data.items;
       } else {
-        console.error('Сервер вернул неверный формат данных:', data);
+        console.error('❌ Неверный формат данных:', data);
         return [];
       }
-    } catch (error: any) {
-      console.error('Общая ошибка при получении заказов:', error);
-      return [];
+    } catch (error) {
+      console.error('❌ Ошибка при получении заказов:', error);
+      
+      // Пробуем запасной вариант через прокси
+      try {
+        console.log('🔄 Пробуем запасной вариант через прокси...');
+        
+        // Формируем параметры запроса
+        const queryParams = new URLSearchParams();
+        if (params?.status) queryParams.set('status', params.status);
+        if (params?.user_id) queryParams.set('user_id', params.user_id.toString());
+        if (params?.start_date) queryParams.set('start_date', params.start_date);
+        if (params?.end_date) queryParams.set('end_date', params.end_date);
+        
+        // Формируем URL для запроса (используем прокси)
+        const baseUrl = '/api/orders';
+        const url = queryParams.toString() ? `${baseUrl}?${queryParams.toString()}` : baseUrl;
+        
+        console.log(`📡 Отправка запроса через прокси на: ${url}`);
+        
+        const token = localStorage.getItem('token');
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          console.error(`❌ Ошибка прокси-запроса: ${response.status} ${response.statusText}`);
+          return [];
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Получены данные заказов через прокси:`, data);
+        
+        if (Array.isArray(data)) {
+          console.log(`📊 Количество полученных заказов через прокси: ${data.length}`);
+          return data;
+        } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
+          console.log(`📊 Количество полученных заказов через прокси: ${data.items.length}`);
+          return data.items;
+        } else {
+          console.error('❌ Неверный формат данных через прокси:', data);
+          return [];
+        }
+      } catch (proxyError) {
+        console.error('❌ Ошибка при получении заказов через прокси:', proxyError);
+        return [];
+      }
     }
   },
   

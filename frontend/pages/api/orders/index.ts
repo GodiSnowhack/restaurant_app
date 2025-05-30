@@ -158,56 +158,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Получаем параметры запроса
-    const { start_date, end_date } = req.query;
+    const { status, user_id, start_date, end_date } = req.query;
     
-    // Преобразуем даты в формат YYYY-MM-DD
-    const formatSimpleDate = (dateStr: string | string[] | undefined): string => {
-      if (!dateStr) return '';
-      try {
-        const date = new Date(Array.isArray(dateStr) ? dateStr[0] : dateStr);
-        return date.toISOString().split('T')[0]; // Возвращаем только часть с датой (YYYY-MM-DD)
-      } catch (e) {
-        console.log('API Proxy: Ошибка форматирования даты:', e);
-        return '';
-      }
-    };
+    // Логируем параметры запроса
+    console.log('API Proxy (GET): Параметры запроса заказов:', { status, user_id, start_date, end_date });
     
-    const simpleStartDate = formatSimpleDate(start_date);
-    const simpleEndDate = formatSimpleDate(end_date);
+    // Формируем ключ для кеша на основе параметров
+    const cacheKey = `orders_${status || ''}_${user_id || ''}_${start_date || ''}_${end_date || ''}`;
     
-    console.log('API Proxy: Упрощенные даты:', { start_date: simpleStartDate, end_date: simpleEndDate });
-    
-    // Ключ для кеширования
-    const cacheKey = `orders_${simpleStartDate}_${simpleEndDate}`;
-    
-    // Проверяем наличие данных в кеше
+    // Проверяем наличие данных в кеше (только для GET запросов)
     const cachedData = getFromCache(cacheKey);
     if (cachedData) {
-      console.log('API Proxy: Данные заказов получены из кеша');
+      console.log('API Proxy (GET): Возвращаем данные из кеша');
       return res.status(200).json(cachedData);
     }
 
     // Получаем токен авторизации
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
+      console.error('API Proxy (GET): Отсутствует токен авторизации');
       return res.status(401).json({
         success: false,
         message: 'Отсутствует токен авторизации'
       });
     }
     
-    // Получаем ID и роль пользователя из заголовков
-    const userId = req.headers['x-user-id'] as string || '1';
-    const userRole = (req.headers['x-user-role'] as string || '').toLowerCase();
-
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
-    console.log('API Proxy: Базовый URL API:', baseApiUrl);
-
-    // Формируем URL для запроса - исправляем дублирование путей
-    let ordersApiUrl = `${baseApiUrl}/orders/`;
+    console.log('API Proxy (GET): Базовый URL API:', baseApiUrl);
     
-    // Проверяем правильность URL
+    // Формируем URL для запроса - убираем возможные дублирования путей
+    let ordersApiUrl = `${baseApiUrl}/orders`;
+    
+    // Проверяем и исправляем URL
     if (ordersApiUrl.includes('//orders')) {
       ordersApiUrl = ordersApiUrl.replace('//orders', '/orders');
     }
@@ -217,81 +200,106 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ordersApiUrl = ordersApiUrl.replace('/api/v1/api/v1/', '/api/v1/');
     }
     
-    // Формируем параметры запроса
-    let queryParams = '';
-    if (simpleStartDate && simpleEndDate) {
-      queryParams = `?start_date=${simpleStartDate}&end_date=${simpleEndDate}`;
-    }
+    // Добавляем query-параметры
+    const queryParams = new URLSearchParams();
+    if (status) queryParams.append('status', Array.isArray(status) ? status[0] : status);
+    if (user_id) queryParams.append('user_id', Array.isArray(user_id) ? user_id[0] : user_id);
+    if (start_date) queryParams.append('start_date', Array.isArray(start_date) ? start_date[0] : start_date);
+    if (end_date) queryParams.append('end_date', Array.isArray(end_date) ? end_date[0] : end_date);
     
-    console.log('API Proxy: URL для запроса:', ordersApiUrl + queryParams);
-
+    // Добавляем параметры к URL, если они есть
+    const queryString = queryParams.toString();
+    const fullUrl = queryString ? `${ordersApiUrl}?${queryString}` : ordersApiUrl;
+    
+    console.log('API Proxy (GET): URL для получения заказов:', fullUrl);
+    
     // Заголовки запроса
-    const headers = {
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     };
-
-    // Создаем HTTPS агент для безопасных запросов
+    
+    // Получаем ID и роль пользователя из заголовков
+    const userId = req.headers['x-user-id'] as string;
+    const userRole = req.headers['x-user-role'] as string;
+    
+    if (userId) headers['X-User-ID'] = userId;
+    if (userRole) headers['X-User-Role'] = userRole;
+    
+    // Создаем HTTPS агент для безопасных запросов с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
       rejectUnauthorized: false
     });
-
+    
     try {
-      // Прямой запрос с помощью axios вместо fetch, чтобы избежать проблем с редиректами
-      const response = await axios.get(ordersApiUrl + queryParams, {
+      // Используем axios для запроса с таймаутом и максимальным числом перенаправлений
+      console.log('API Proxy (GET): Отправляем запрос на бэкенд...');
+      
+      const response = await axios.get(fullUrl, {
         headers,
         httpsAgent,
-        timeout: 8000,
-        maxRedirects: 5 // Явно разрешаем редиректы
+        timeout: 10000,
+        maxRedirects: 5
       });
       
-      // Проверяем ответ
-      if (response.status >= 200 && response.status < 300) {
-        const data = response.data;
-        console.log('API Proxy: Получены данные от API:', { 
-          status: response.status, 
-          dataLength: Array.isArray(data) ? data.length : 'не массив' 
-        });
-        
-        let resultData;
-        if (Array.isArray(data)) {
-          resultData = data;
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          resultData = data.items;
-        } else if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
-          resultData = data.data;
+      console.log(`API Proxy (GET): Получен ответ от бэкенда с кодом ${response.status}`);
+      
+      // Обрабатываем ответ
+      const data = response.data;
+      
+      // Сохраняем данные в кеш и возвращаем клиенту
+      let result;
+      
+      if (Array.isArray(data)) {
+        console.log(`API Proxy (GET): Получено ${data.length} заказов`);
+        result = data;
+      } else if (data && typeof data === 'object') {
+        if (Array.isArray(data.items)) {
+          console.log(`API Proxy (GET): Получено ${data.items.length} заказов в формате data.items`);
+          result = data.items;
+        } else if (Array.isArray(data.data)) {
+          console.log(`API Proxy (GET): Получено ${data.data.length} заказов в формате data.data`);
+          result = data.data;
         } else {
-          console.warn('API Proxy: Сервер вернул неожиданный формат данных');
-          resultData = [];
+          console.log('API Proxy (GET): Данные получены в нестандартном формате');
+          result = data;
         }
-        
-        saveToCache(cacheKey, resultData);
-        return res.status(200).json(resultData);
       } else {
-        console.log('API Proxy: Ошибка при запросе к API:', response.status);
-        return res.status(response.status).json({
-          success: false,
-          message: 'Ошибка при получении данных с сервера'
-        });
+        console.error('API Proxy (GET): Неизвестный формат данных');
+        result = [];
       }
+      
+      // Сохраняем результат в кеш
+      saveToCache(cacheKey, result);
+      
+      // Возвращаем данные клиенту
+      return res.status(200).json(result);
+      
     } catch (error: any) {
-      console.error('API Proxy: Ошибка при запросе к API:', error.message);
+      console.error('API Proxy (GET): Ошибка при получении заказов:', error.message);
+      
+      // Если есть ответ от сервера, возвращаем его статус и данные
       if (error.response) {
+        console.error('API Proxy (GET): Статус ошибки:', error.response.status);
+        console.error('API Proxy (GET): Данные ошибки:', error.response.data);
+        
         return res.status(error.response.status).json({
           success: false,
-          message: 'Ошибка при получении данных с сервера',
+          message: 'Ошибка при получении заказов',
           error: error.response.data
         });
       }
+      
+      // Если ошибка в сети или таймаут
       return res.status(500).json({
         success: false,
-        message: 'Ошибка при получении данных с сервера',
+        message: 'Ошибка при получении заказов с сервера',
         error: error.message
       });
     }
   } catch (error: any) {
-    console.error('API Proxy: Общая ошибка:', error.message);
+    console.error('API Proxy (GET): Общая ошибка:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Внутренняя ошибка сервера',

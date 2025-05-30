@@ -14,13 +14,15 @@ import {
   CreditCardIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
+import { Alert, Button, Paper, Typography } from '@mui/material';
 
 const OrdersPage: NextPage = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>('');
   const [dateRange, setDateRange] = useState({
     startDate: new Date(),
     endDate: new Date()
@@ -37,90 +39,44 @@ const OrdersPage: NextPage = () => {
   }, [isAuthenticated, router]);
 
   const fetchOrders = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    // Формируем параметры запроса для фильтрации
+    const params: any = {};
+    if (selectedStatus) params.status = selectedStatus;
+    if (dateRange.startDate) params.start_date = format(dateRange.startDate, 'yyyy-MM-dd');
+    if (dateRange.endDate) params.end_date = format(dateRange.endDate, 'yyyy-MM-dd');
+    
+    console.log('Запрашиваем заказы с параметрами:', params);
+    
     try {
-      setIsLoading(true);
-      setError('');
+      // Получаем заказы с сервера
+      const ordersData = await ordersApi.getAllOrders(params);
+      console.log('Получены заказы:', ordersData);
       
-      // Принудительно отключаем демо-режим перед запросом
-      try {
-        localStorage.removeItem('force_demo_data');
-        console.log('Демо-режим отключен');
-      } catch (e) {
-        console.error('Ошибка при отключении демо-режима:', e);
-      }
-      
-      // Определяем даты для запроса
-      const now = new Date();
-      // По умолчанию запрашиваем данные за последний месяц
-      const defaultStartDate = new Date(now);
-      defaultStartDate.setMonth(now.getMonth() - 1);
-      
-      // Используем установленные даты или значения по умолчанию
-      const startDateStr = dateRange.startDate ? dateRange.startDate.toISOString() : defaultStartDate.toISOString();
-      const endDateStr = dateRange.endDate ? dateRange.endDate.toISOString() : now.toISOString();
-      
-      console.log('Даты для запроса:', { startDate: startDateStr, endDate: endDateStr, now: now.toISOString() });
-      
-      // Используем API клиент с обработкой ошибок
-      const data = await ordersApi.getAllOrders({
-        start_date: startDateStr,
-        end_date: endDateStr
-      });
-      console.log('Полученные заказы:', data);
-      
-      // Проверяем полученные данные
-      if (Array.isArray(data) && data.length > 0) {
-        // Нормализуем данные заказов для уверенности, что все поля имеют правильные значения
-        const normalizedOrders = data.map(order => ({
-          id: order.id || 0,
-          user_id: order.user_id,
-          waiter_id: order.waiter_id,
-          table_number: order.table_number,
-          status: order.status || 'pending',
-          payment_status: order.payment_status || 'pending',
-          payment_method: order.payment_method || 'card',
-          order_type: order.order_type || 'dine-in',
-          total_amount: typeof order.total_amount === 'number' ? order.total_amount : 
-                       (typeof order.total_amount === 'string' ? parseFloat(order.total_amount) : 0),
-          total_price: typeof order.total_price === 'number' ? order.total_price : 
-                      (typeof order.total_price === 'string' ? parseFloat(order.total_price) : 
-                      (typeof order.total_amount === 'number' ? order.total_amount : 0)),
-          created_at: order.created_at || new Date().toISOString(),
-          updated_at: order.updated_at,
-          completed_at: order.completed_at,
-          customer_name: order.customer_name || '',
-          customer_phone: order.customer_phone || '',
-          customer_email: order.customer_email || '',
-          delivery_address: order.delivery_address,
-          order_code: order.order_code,
-          reservation_code: order.reservation_code,
-          is_urgent: order.is_urgent || false,
-          is_group_order: order.is_group_order || false,
-          comment: order.comment || '',
-          // Преобразуем items, чтобы они соответствовали типу OrderItem
-          items: Array.isArray(order.items) ? order.items.map(item => ({
-            dish_id: item.dish_id || 0,
-            quantity: item.quantity || 1,
-            price: typeof item.price === 'number' ? item.price : 
-                  (typeof item.price === 'string' ? parseFloat(item.price) : 0),
-            name: item.name || item.dish_name || 'Неизвестное блюдо',
-            special_instructions: item.special_instructions || '',
-            total_price: typeof item.price === 'number' && typeof item.quantity === 'number' ? 
-                        item.price * item.quantity : 0
-          })) : []
-        }));
-        
-        console.log('Нормализованные заказы:', normalizedOrders);
-        setOrders(normalizedOrders);
-      } else {
-        // Если нет данных или ответ не является массивом
-        console.warn('Получен пустой массив заказов или некорректные данные');
+      if (!Array.isArray(ordersData)) {
+        console.error('Ошибка: данные заказов не являются массивом', ordersData);
+        setError('Данные получены в неверном формате. Пожалуйста, обновите страницу.');
         setOrders([]);
-        setError('Заказы не найдены. Попробуйте изменить параметры фильтрации.');
+      } else if (ordersData.length === 0) {
+        console.log('Получен пустой список заказов');
+        setOrders([]);
+        // Не показываем ошибку для пустого списка
+      } else {
+        // Сортируем заказы по дате (новые в начале)
+        const sortedOrders = [...ordersData].sort((a, b) => {
+          // Используем created_at или любое другое поле с датой
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+        
+        setOrders(sortedOrders);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Ошибка при получении заказов:', error);
-      setError(error?.message || 'Произошла ошибка при загрузке заказов');
+      setError('Не удалось загрузить данные заказов. Пожалуйста, проверьте соединение и повторите попытку.');
       setOrders([]);
     } finally {
       setIsLoading(false);
@@ -208,9 +164,38 @@ const OrdersPage: NextPage = () => {
         <h1 className="text-3xl font-bold mb-6">Мои заказы</h1>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <Alert 
+            severity="error"
+            sx={{ mt: 2, mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={fetchOrders}>
+                Повторить
+              </Button>
+            }
+          >
             {error}
-          </div>
+          </Alert>
+        )}
+
+        {!isLoading && orders.length === 0 && !error && (
+          <Paper sx={{ p: 4, textAlign: 'center', mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Заказы не найдены
+            </Typography>
+            <Typography variant="body1" color="textSecondary">
+              {selectedStatus || dateRange.startDate 
+                ? 'Попробуйте изменить параметры фильтрации'
+                : 'В системе пока нет заказов'}
+            </Typography>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              sx={{ mt: 2 }}
+              onClick={fetchOrders}
+            >
+              Обновить
+            </Button>
+          </Paper>
         )}
 
         {orders.length === 0 ? (
