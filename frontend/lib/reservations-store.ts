@@ -38,7 +38,7 @@ const useReservationsStore = create<ReservationsState>()(
           set({ isLoading: true, error: null });
           
           try {
-            const reservations = await reservationsApi.getReservations();
+            const reservations = await reservationsApi.getReservations(true);
             set({ 
               reservations, 
               isLoading: false, 

@@ -88,6 +88,34 @@ const getUserFromToken = (token: string): { id: string; role: string } | null =>
   }
 };
 
+// Очистка кеша для определенного пользователя
+const clearUserCache = (userId: string | string[] | undefined, userRole: string) => {
+  try {
+    ensureCacheDir();
+    if (!fs.existsSync(RESERVATIONS_CACHE_FILE)) {
+      return;
+    }
+    
+    // Чтение данных кеша
+    const cacheData = JSON.parse(fs.readFileSync(RESERVATIONS_CACHE_FILE, 'utf8'));
+    
+    // Создаем новый объект кеша, исключая записи для данного пользователя
+    const newCacheData: Record<string, any> = {};
+    for (const key in cacheData) {
+      // Проверяем, принадлежит ли запись данному пользователю
+      if (!key.startsWith(`reservations_${userId}_${userRole}_`)) {
+        newCacheData[key] = cacheData[key];
+      }
+    }
+    
+    // Сохраняем обновленный кеш
+    fs.writeFileSync(RESERVATIONS_CACHE_FILE, JSON.stringify(newCacheData, null, 2), 'utf8');
+    console.log(`Reservations API Proxy: Кеш очищен для пользователя ${userId} с ролью ${userRole}`);
+  } catch (error) {
+    console.error('Ошибка при очистке кеша:', error);
+  }
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { method, query, body } = req;
@@ -281,6 +309,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
         };
         
+        // Очищаем кеш для пользователя, чтобы при следующем запросе получить свежие данные
+        clearUserCache(userId, userRole);
+        
         // Возвращаем успешный ответ
         return res.status(201).json(mockReservation);
       }
@@ -305,6 +336,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               updated_at: new Date().toISOString(),
               reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
             };
+            
+            // Очищаем кеш для пользователя
+            clearUserCache(userId, userRole);
             
             // Возвращаем успешный ответ
             return res.status(201).json(mockReservation);
@@ -331,6 +365,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
           };
           
+          // Очищаем кеш для пользователя
+          clearUserCache(userId, userRole);
+          
           return res.status(201).json(mockReservation);
         }
         
@@ -355,6 +392,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           updated_at: new Date().toISOString(),
           reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
         };
+        
+        // Очищаем кеш для пользователя
+        clearUserCache(userId, userRole);
         
         return res.status(201).json(mockReservation);
       }

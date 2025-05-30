@@ -1,5 +1,52 @@
 import { Reservation } from '../../types';
 import { api } from './core';
+import axios from 'axios';
+
+// Интерфейс для кешированных данных
+interface CachedReservations {
+  data: Reservation[];
+  timestamp: number;
+}
+
+// Функция для получения кешированных бронирований
+const getCachedReservations = (): CachedReservations | null => {
+  try {
+    const cacheKey = 'reservations_data_cache';
+    const cacheTimeKey = 'reservations_cache_timestamp';
+    
+    if (typeof window === 'undefined') return null;
+    
+    const cachedData = localStorage.getItem(cacheKey);
+    const cachedTimestamp = localStorage.getItem(cacheTimeKey);
+    
+    if (!cachedData || !cachedTimestamp) return null;
+    
+    return {
+      data: JSON.parse(cachedData),
+      timestamp: parseInt(cachedTimestamp)
+    };
+  } catch (error) {
+    console.error('[Reservations API] Ошибка при получении кеша:', error);
+    return null;
+  }
+};
+
+// Функция для сохранения бронирований в кеш
+const saveReservationsToCache = (data: Reservation[]): void => {
+  try {
+    const cacheKey = 'reservations_data_cache';
+    const cacheTimeKey = 'reservations_cache_timestamp';
+    
+    if (typeof window === 'undefined') return;
+    
+    localStorage.setItem(cacheKey, JSON.stringify(data));
+    localStorage.setItem(cacheTimeKey, Date.now().toString());
+    
+    console.log(`[Reservations API] Данные сохранены в кеш (${data.length} бронирований)`);
+  } catch (error) {
+    console.error('[Reservations API] Ошибка при сохранении в кеш:', error);
+  }
+};
 
 /**
  * API для работы с бронированиями
@@ -7,175 +54,61 @@ import { api } from './core';
  */
 export const reservationsApi = {
   /**
-   * Получение списка бронирований с возможностью фильтрации
-   * @param params Параметры фильтрации (status, date)
+   * Получение списка бронирований
    */
-  getReservations: async (params?: { status?: string; date?: string }): Promise<Reservation[]> => {
-    // Ключи для кэширования
-    const cacheKey = 'reservations_data_cache';
-    const cacheTimeKey = 'reservations_cache_timestamp';
-    
+  getReservations: async (forceRefresh: boolean = false): Promise<Reservation[]> => {
     try {
       console.log('[Reservations API] Начало запроса бронирований');
       
-      // Проверяем наличие кэша и его актуальность
-      const cachedTimestamp = localStorage.getItem(cacheTimeKey);
-      const cachedData = localStorage.getItem(cacheKey);
-      const now = Date.now();
-      const cacheAge = cachedTimestamp ? now - parseInt(cachedTimestamp) : Infinity;
+      // Проверяем наличие данных в кеше
+      const cachedData = getCachedReservations();
+      const cacheAge = cachedData?.timestamp ? (Date.now() - cachedData.timestamp) / 1000 : 0;
       
-      // Используем кэш, если он не старше 5 минут и нет дополнительных параметров
-      if (!params && cachedData && cachedTimestamp && cacheAge < 5 * 60 * 1000) {
-        console.log('[Reservations API] Используем кэшированные данные (возраст кэша:', Math.round(cacheAge/1000), 'сек)');
-        return JSON.parse(cachedData);
+      // Если есть кешированные данные и они не устарели, используем их (если не запрошено принудительное обновление)
+      if (cachedData?.data && cachedData.timestamp && cacheAge < 300 && !forceRefresh) {
+        console.log(`[Reservations API] Используем кэшированные данные (возраст кэша: ${Math.floor(cacheAge)} сек)`);
+        return cachedData.data;
       }
+      
+      console.log('[Reservations API] Загрузка данных с сервера...');
       
       // Получаем токен авторизации
       const token = await getAuthToken();
-      console.log('[Reservations API] Токен авторизации:', token ? 'получен' : 'отсутствует');
       
-      if (!token) {
-        console.error('[Reservations API] Ошибка авторизации: отсутствует токен');
-        // Возвращаем кэшированные данные если есть, иначе пустой массив
-        if (cachedData) {
-          console.log('[Reservations API] Используем кэшированные данные из-за отсутствия токена');
-          return JSON.parse(cachedData);
+      // Проверяем что мы используем правильный URL для прокси
+      const url = '/api/reservations';
+      
+      // Запрашиваем данные с сервера
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-        return [];
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
       
-      // Формируем параметры запроса
-      let queryParams = '';
-      if (params) {
-        const queryParts = [];
-        if (params.status) queryParts.push(`status=${params.status}`);
-        if (params.date) queryParts.push(`date=${params.date}`);
-        
-        if (queryParts.length > 0) {
-          queryParams = `?${queryParts.join('&')}`;
-        }
+      const data = await response.json();
+      
+      // Сохраняем в кеше
+      saveReservationsToCache(data);
+      
+      return data;
+    } catch (error) {
+      console.error('[Reservations API] Ошибка при получении бронирований:', error);
+      
+      // Возвращаем кешированные данные если есть ошибка
+      const cachedData = getCachedReservations();
+      if (cachedData?.data) {
+        console.log('[Reservations API] Возвращаем кешированные данные из-за ошибки');
+        return cachedData.data;
       }
       
-      // Пробуем сначала через API-прокси
-      console.log(`[Reservations API] Отправка запроса на /api/reservations${queryParams}`);
-      
-      // Создаем контроллер для отмены запроса
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
-      
-      try {
-        // Сначала попробуем через прокси API
-        let response = await fetch(`/api/reservations${queryParams}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Если прокси вернул 404, пробуем прямой запрос к бэкенду
-        if (response.status === 404) {
-          console.log('[Reservations API] Прокси вернул 404, пробуем прямой запрос к бэкенду');
-          
-          // Получаем базовый URL API
-          const baseApiUrl = api.defaults.baseURL || '';
-          
-          // Создаем новый контроллер для второго запроса
-          const directController = new AbortController();
-          const directTimeoutId = setTimeout(() => directController.abort(), 10000);
-          
-          try {
-            response = await fetch(`${baseApiUrl}/reservations${queryParams}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              signal: directController.signal
-            });
-            
-            clearTimeout(directTimeoutId);
-          } catch (directError) {
-            clearTimeout(directTimeoutId);
-            console.error('[Reservations API] Ошибка при прямом запросе:', directError);
-            throw directError;
-          }
-        }
-        
-        if (!response.ok) {
-          throw new Error(`Ошибка HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        console.log('[Reservations API] Ответ получен:', {
-          status: response.status,
-          dataLength: Array.isArray(data) ? data.length : 'не массив'
-        });
-        
-        if (Array.isArray(data)) {
-          // Кэшируем результат запроса без фильтров
-          if (!params) {
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify(data));
-              localStorage.setItem(cacheTimeKey, Date.now().toString());
-            } catch (e) {
-              console.error('[Reservations API] Ошибка при кэшировании данных:', e);
-            }
-          }
-          
-          console.log(`[Reservations API] Получено ${data.length} бронирований`);
-          return data;
-        } else if (data && typeof data === 'object' && data.items && Array.isArray(data.items)) {
-          // На случай, если API возвращает данные в формате { items: [] }
-          console.log(`[Reservations API] Получено ${data.items.length} бронирований в формате items`);
-          
-          // Кэшируем
-          if (!params) {
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify(data.items));
-              localStorage.setItem(cacheTimeKey, Date.now().toString());
-            } catch (e) {
-              console.error('[Reservations API] Ошибка при кэшировании данных:', e);
-            }
-          }
-          
-          return data.items;
-        } else {
-          console.warn('[Reservations API] Сервер вернул неожиданный формат данных:', data);
-          // Возвращаем кэшированные данные, если есть
-          if (cachedData) {
-            console.log('[Reservations API] Используем кэшированные данные из-за неожиданного формата');
-            return JSON.parse(cachedData);
-          }
-          return [];
-        }
-      } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
-      }
-    } catch (error: any) {
-      console.error('[Reservations API] Критическая ошибка:', error);
-      
-      // Возвращаем кэшированные данные в случае ошибки
-      if (typeof window !== 'undefined') {
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          console.log('[Reservations API] Используем кэшированные данные из-за ошибки');
-          try {
-            return JSON.parse(cachedData);
-          } catch (e) {
-            console.error('[Reservations API] Ошибка при разборе кэшированных данных');
-          }
-        }
-      }
-      
-      // Если кэшированных данных нет, используем пустой массив
+      // Иначе используем локальные фиктивные данные
       return [];
     }
   },
