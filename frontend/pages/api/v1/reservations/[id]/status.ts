@@ -65,15 +65,16 @@ export default async function updateReservationStatus(req: NextApiRequest, res: 
     };
 
     // Формируем URL для запроса на бэкенд
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const endpoint = `${apiUrl}/reservations/${id}`;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const endpoint = `${apiUrl}/api/v1/reservations/${id}/status`;
     
     console.log(`[API Status] Обновление статуса бронирования #${id} на "${status}"`);
+    console.log(`[API Status] Отправка запроса на ${endpoint}`);
 
     try {
       // Отправляем PATCH-запрос для обновления только статуса
       const response = await axios({
-        method: 'PUT',  // Используем PUT вместо PATCH, так как на бэкенде нет отдельного эндпоинта для PATCH
+        method: 'PATCH',  // Используем PATCH для обновления статуса
         url: endpoint,
         headers: {
           'Content-Type': 'application/json',

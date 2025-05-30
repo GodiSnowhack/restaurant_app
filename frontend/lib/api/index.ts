@@ -197,7 +197,7 @@ export default {
 }; 
 
 const axiosApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app',
+  baseURL: (process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app') + '/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
