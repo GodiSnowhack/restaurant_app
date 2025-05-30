@@ -239,6 +239,25 @@ export const reservationsApi = {
     try {
       console.log('[Reservations API] Создание бронирования с данными:', data);
       
+      // Корректируем данные перед отправкой
+      const processedData = { ...data };
+      
+      // Проверяем формат даты и времени и формируем правильный формат для API
+      if (processedData.reservation_date && processedData.reservation_time) {
+        // Создаем дату в правильном формате
+        const dateStr = processedData.reservation_date;
+        const timeStr = processedData.reservation_time;
+        
+        // Формируем правильный формат даты-времени для API
+        const dateTimeStr = `${dateStr}T${timeStr}:00`;
+        processedData.reservation_time = dateTimeStr;
+      }
+      
+      // Убеждаемся, что table_number передается в нужном формате
+      if (processedData.table_number !== undefined && processedData.table_number !== null) {
+        processedData.table_number = Number(processedData.table_number);
+      }
+      
       // Получаем токен авторизации
       const token = localStorage.getItem('token') || '';
       
@@ -246,6 +265,7 @@ export const reservationsApi = {
       const url = '/api/reservations'; // Используем локальный API прокси
       
       console.log('[Reservations API] Отправка POST запроса на:', url);
+      console.log('[Reservations API] Обработанные данные:', processedData);
       
       // Отправляем запрос через fetch для большего контроля
       const response = await fetch(url, {
@@ -254,9 +274,9 @@ export const reservationsApi = {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-User-ID': data.user_id ? String(data.user_id) : ''
+          'X-User-ID': processedData.user_id ? String(processedData.user_id) : ''
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(processedData)
       });
       
       if (!response.ok) {

@@ -278,10 +278,10 @@ const ReservationsPage: NextPage = () => {
     const reservationData = {
       reservation_date: formData.date,
       reservation_time: formData.time,
-      guests_count: formData.guests,
+      guests_count: Number(formData.guests),
       guest_name: guestInfo.name,
       guest_phone: guestInfo.phone,
-      table_number: selectedTable || formData.tableId || null,
+      table_number: selectedTable ? Number(selectedTable) : (formData.tableId ? Number(formData.tableId) : null),
       comment: formData.comments,
       user_id: user.id,
       status: 'pending'

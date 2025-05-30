@@ -167,6 +167,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         processedBody.user_id = userId;
       }
       
+      // Правильная обработка времени бронирования
+      if (processedBody.reservation_date && processedBody.reservation_time) {
+        // Проверяем формат времени - если это уже ISO формат, оставляем как есть
+        if (!processedBody.reservation_time.includes('T')) {
+          // Если это простой формат времени (HH:MM), преобразуем его в ISO
+          const dateStr = processedBody.reservation_date;
+          const timeStr = processedBody.reservation_time;
+          processedBody.reservation_time = `${dateStr}T${timeStr}:00`;
+        }
+      }
+      
+      // Проверка и преобразование числовых полей
+      if (processedBody.guests_count) {
+        processedBody.guests_count = Number(processedBody.guests_count);
+      }
+      
+      if (processedBody.table_number !== undefined && processedBody.table_number !== null) {
+        processedBody.table_number = Number(processedBody.table_number);
+      }
+      
       console.log('Reservations API Proxy: Обработанные данные для POST запроса:', processedBody);
     }
     
