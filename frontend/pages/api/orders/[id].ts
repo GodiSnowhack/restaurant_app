@@ -109,7 +109,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseApiUrl = getDefaultApiUrl();
     
     // Формируем URL для запроса
-    const url = `${baseApiUrl}/orders/${id}`;
+    let url = `${baseApiUrl}/orders/${id}`;
+    
+    // Убираем возможное дублирование api/v1
+    if (url.includes('/api/v1/api/v1/')) {
+      url = url.replace('/api/v1/api/v1/', '/api/v1/');
+    }
 
     console.log(`API Proxy: Отправка ${req.method} запроса к заказу #${id} на ${url}`);
 

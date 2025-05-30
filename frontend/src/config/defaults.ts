@@ -53,6 +53,15 @@ export const getDefaultApiUrl = (): string => {
     apiUrl = apiUrl.replace('/api/v1/api/', '/api/v1/');
   }
   
+  // Проверка на другие возможные дублирования
+  if (apiUrl.includes('/api/v1/api/v1/')) {
+    apiUrl = apiUrl.replace('/api/v1/api/v1/', '/api/v1/');
+  }
+
+  // Очищаем любые другие дублирования api/v1
+  const basePattern = /\/api\/v1(\/api\/v1)+/g;
+  apiUrl = apiUrl.replace(basePattern, '/api/v1');
+  
   // Нормализация URL: убираем конечные слеши
   return apiUrl.replace(/\/+$/, '');
 };

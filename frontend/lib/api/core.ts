@@ -31,10 +31,26 @@ export const api = axios.create({
 // Фиксируем URL, чтобы избежать проблем с дублированием /api/
 (function fixApiBaseUrl() {
   let baseURL = api.defaults.baseURL;
-  if (baseURL && baseURL.includes('/api/v1/api/')) {
+  if (baseURL) {
     // Исправляем дублирование /api/
-    console.log('[API Core] Обнаружено дублирование /api/ в baseURL, исправляем...');
-    baseURL = baseURL.replace('/api/v1/api/', '/api/v1/');
+    if (baseURL.includes('/api/v1/api/')) {
+      console.log('[API Core] Обнаружено дублирование /api/ в baseURL, исправляем...');
+      baseURL = baseURL.replace('/api/v1/api/', '/api/v1/');
+    }
+    
+    // Проверка на другие возможные дублирования
+    if (baseURL.includes('/api/v1/api/v1/')) {
+      console.log('[API Core] Обнаружено дублирование /api/v1/ в baseURL, исправляем...');
+      baseURL = baseURL.replace('/api/v1/api/v1/', '/api/v1/');
+    }
+    
+    // Очищаем любые другие дублирования api/v1
+    const basePattern = /\/api\/v1(\/api\/v1)+/g;
+    if (basePattern.test(baseURL)) {
+      console.log('[API Core] Обнаружены множественные дублирования в baseURL, исправляем...');
+      baseURL = baseURL.replace(basePattern, '/api/v1');
+    }
+    
     api.defaults.baseURL = baseURL;
   }
   console.log('[API Core] Используется baseURL:', api.defaults.baseURL);
@@ -118,9 +134,25 @@ interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // Проверяем URL на дублирование /api/
-    if (config.url && config.url.includes('/api/v1/api/')) {
-      console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
-      config.url = config.url.replace('/api/v1/api/', '/api/v1/');
+    if (config.url) {
+      // Исправляем дублирование /api/v1/api/
+      if (config.url.includes('/api/v1/api/')) {
+        console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
+        config.url = config.url.replace('/api/v1/api/', '/api/v1/');
+      }
+      
+      // Проверка на другие возможные дублирования
+      if (config.url.includes('/api/v1/api/v1/')) {
+        console.log('[API Interceptor] Обнаружено дублирование /api/v1/ в URL, исправляем...');
+        config.url = config.url.replace('/api/v1/api/v1/', '/api/v1/');
+      }
+      
+      // Очищаем любые другие дублирования api/v1
+      const urlPattern = /\/api\/v1(\/api\/v1)+/g;
+      if (urlPattern.test(config.url)) {
+        console.log('[API Interceptor] Обнаружены множественные дублирования в URL, исправляем...');
+        config.url = config.url.replace(urlPattern, '/api/v1');
+      }
     }
     
     // Получаем токен из всех возможных источников
@@ -183,6 +215,17 @@ api.interceptors.response.use(
       if (config?.url) {
         // Определяем, нужно ли преобразовать URL
         let localProxyUrl = config.url;
+        
+        // Исправляем дублирование путей
+        if (localProxyUrl.includes('/api/v1/api/v1/')) {
+          localProxyUrl = localProxyUrl.replace('/api/v1/api/v1/', '/api/v1/');
+        }
+        
+        // Очищаем любые другие дублирования api/v1
+        const urlPattern = /\/api\/v1(\/api\/v1)+/g;
+        if (urlPattern.test(localProxyUrl)) {
+          localProxyUrl = localProxyUrl.replace(urlPattern, '/api/v1');
+        }
         
         // Если URL содержит /api/v1/, заменяем на /api/
         if (localProxyUrl.includes('/api/v1/')) {

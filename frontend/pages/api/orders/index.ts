@@ -204,10 +204,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseApiUrl = getDefaultApiUrl();
     console.log('API Proxy: Базовый URL API:', baseApiUrl);
 
-    // Формируем URL для запроса - явно добавляем слеш в конце URL
-    let ordersApiUrl = baseApiUrl + '/api/v1/orders/';
+    // Формируем URL для запроса - исправляем дублирование путей
+    let ordersApiUrl = `${baseApiUrl}/orders/`;
+    
+    // Проверяем правильность URL
     if (ordersApiUrl.includes('//orders')) {
       ordersApiUrl = ordersApiUrl.replace('//orders', '/orders');
+    }
+    
+    // Убираем возможное дублирование api/v1
+    if (ordersApiUrl.includes('/api/v1/api/v1/')) {
+      ordersApiUrl = ordersApiUrl.replace('/api/v1/api/v1/', '/api/v1/');
     }
     
     // Формируем параметры запроса
