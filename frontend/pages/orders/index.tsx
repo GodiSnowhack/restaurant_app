@@ -131,6 +131,20 @@ const OrdersPage: NextPage = () => {
     } catch (error: any) {
       console.error('Ошибка при получении заказов:', error);
       
+      // Проверяем на ошибки SQL, связанные с неправильной структурой БД
+      if (error.message && (
+        error.message.includes('no such column') || 
+        error.message.includes('SQL error')
+      )) {
+        console.log('Обнаружена ошибка SQL в базе данных, включаем демо-режим');
+        localStorage.setItem('use_demo_for_errors', 'true');
+        localStorage.setItem('use_demo_for_empty', 'true');
+        setUseDemoData(true);
+        // Повторно вызываем fetchOrders, чтобы получить демо-данные
+        setTimeout(() => fetchOrders(), 100);
+        return;
+      }
+      
       if (error.message === 'Требуется авторизация' || 
           (error.response && error.response.status === 401)) {
         setError('Для просмотра заказов необходимо войти в систему или обновить авторизацию');

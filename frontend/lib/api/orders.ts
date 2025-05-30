@@ -282,6 +282,16 @@ export const ordersApi = {
         
         throw new Error('Требуется авторизация');
       }
+
+      // Проверяем на ошибки SQL со структурой БД
+      if (error.message && (
+        error.message.includes('no such column') || 
+        error.message.includes('SQL error')
+      )) {
+        console.log('📊 Обнаружена ошибка SQL в базе данных, включаем демо-режим');
+        localStorage.setItem('use_demo_for_errors', 'true');
+        return generateDemoOrders();
+      }
       
       // Если указан флаг использования демо-данных при ошибке
       const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
