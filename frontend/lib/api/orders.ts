@@ -30,92 +30,31 @@ export const ordersApi = {
       if (params?.start_date) queryParams.set('start_date', params.start_date);
       if (params?.end_date) queryParams.set('end_date', params.end_date);
       
-      // Приоритетно пробуем получить данные напрямую с бэкенда
+      // Приоритетно используем API-прокси для предотвращения проблем с CORS и Mixed Content
       try {
-        // Получаем базовый URL API из конфигурации
-        const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-        
-        // Формируем URL для прямого запроса к бэкенду
-        const ordersUrl = `${baseApiUrl}/orders`;
-        const url = queryParams.toString() ? `${ordersUrl}?${queryParams.toString()}` : ordersUrl;
-        
-        console.log(`📡 Отправка прямого запроса к бэкенду через axios: ${url}`);
-        
-        // Формируем заголовки с токеном
-        const headers = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
-        
-        // Логируем детали запроса (без полного токена)
-        console.log('Детали запроса:', {
-          url,
-          method: 'GET',
-          headers: {
-            ...headers,
-            'Authorization': 'Bearer ***'
-          }
-        });
-        
-        // Используем axios для запроса
-        const response = await axios.get(url, {
-          headers,
-          timeout: 10000,
-          withCredentials: true,
-          validateStatus: (status) => status < 500 // Принимаем ответы с кодом до 500
-        });
-        
-        console.log(`Ответ от бэкенда: статус ${response.status}`);
-        
-        // Проверяем статус ответа
-        if (response.status !== 200) {
-          throw new Error(`Ошибка при прямом запросе: ${response.status}`);
-        }
-        
-        const data = response.data;
-        console.log(`✅ Получены данные заказов с бэкенда:`, data);
-        
-        if (Array.isArray(data)) {
-          console.log(`📊 Количество полученных заказов: ${data.length}`);
-          return data;
-        } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
-          console.log(`📊 Количество полученных заказов: ${data.items.length}`);
-          return data.items;
-        } else {
-          console.warn('⚠️ Неожиданный формат данных:', data);
-          return [];
-        }
-      } catch (directError) {
-        console.error('❌ Ошибка при прямом запросе к бэкенду:', directError);
-        
-        // В случае ошибки пробуем через прокси
-        console.log('🔄 Пробуем запрос через API-прокси');
-        
         // Формируем URL для запроса через прокси
         const proxyUrl = '/api/orders';
         const url = queryParams.toString() ? `${proxyUrl}?${queryParams.toString()}` : proxyUrl;
         
         console.log(`📡 Отправка запроса через API-прокси: ${url}`);
         
-        const response = await axios.get(url, {
+        const response = await fetch(url, {
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          withCredentials: true,
-          timeout: 10000
+          credentials: 'same-origin'
         });
         
         // Проверяем ответ
-        if (response.status !== 200) {
-          console.error(`❌ Ошибка API-прокси: ${response.status}`);
-          throw new Error(`Ошибка при получении заказов: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Ошибка API-прокси: ${response.status}`);
         }
         
         // Получаем данные
-        const data = response.data;
+        const data = await response.json();
         console.log(`✅ Получены данные заказов через API-прокси:`, data);
         
         // Обрабатываем различные форматы ответа
@@ -129,6 +68,9 @@ export const ordersApi = {
           console.error('❌ Неверный формат данных:', data);
           return [];
         }
+      } catch (error) {
+        console.error('❌ Ошибка при запросе через API-прокси:', error);
+        throw error; // Пробрасываем ошибку для обработки в компоненте
       }
     } catch (error) {
       console.error('❌ Общая ошибка при получении заказов:', error);

@@ -61,6 +61,14 @@ const saveToCache = (key: string, data: any) => {
   }
 };
 
+// Функция для обеспечения HTTPS URL
+const ensureHttpsUrl = (url: string): string => {
+  if (url.startsWith('http://')) {
+    return url.replace('http://', 'https://');
+  }
+  return url;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Настройка CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -89,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Получаем базовый URL API
-      const baseApiUrl = getDefaultApiUrl();
+      const baseApiUrl = ensureHttpsUrl(getDefaultApiUrl());
       console.log('API Proxy (POST): Базовый URL API:', baseApiUrl);
 
       // Формируем URL для запроса
@@ -189,8 +197,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
     
-    // Получаем базовый URL API
-    const baseApiUrl = getDefaultApiUrl();
+    // Получаем базовый URL API и обеспечиваем HTTPS
+    const baseApiUrl = ensureHttpsUrl(getDefaultApiUrl());
     console.log('API Proxy (GET): Базовый URL API:', baseApiUrl);
     
     // Формируем URL для запроса - убираем возможные дублирования путей

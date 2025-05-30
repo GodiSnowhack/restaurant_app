@@ -30,13 +30,13 @@ const OrdersPage: NextPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
 
   useEffect(() => {
-    // Если пользователь не авторизован, перенаправляем на страницу входа
+    // Проверяем статус авторизации при загрузке страницы
     if (!isAuthenticated) {
-      router.push('/auth/login');
+      router.push('/auth/login?redirect=/orders');
       return;
     }
-
-    // Загружаем заказы только для авторизованных пользователей
+    
+    // Загружаем заказы только если пользователь авторизован
     fetchOrders();
   }, [isAuthenticated, router]);
 
@@ -48,6 +48,7 @@ const OrdersPage: NextPage = () => {
     if (!isAuthenticated) {
       setError('Для просмотра заказов необходимо войти в систему');
       setIsLoading(false);
+      router.push('/auth/login?redirect=/orders');
       return;
     }
     
@@ -85,12 +86,13 @@ const OrdersPage: NextPage = () => {
     } catch (error: any) {
       console.error('Ошибка при получении заказов:', error);
       
-      if (error.message === 'Требуется авторизация') {
+      if (error.message === 'Требуется авторизация' || 
+          (error.response && error.response.status === 401)) {
         setError('Для просмотра заказов необходимо войти в систему');
         // Перенаправляем на страницу входа
         setTimeout(() => {
-          router.push('/auth/login');
-        }, 2000);
+          router.push('/auth/login?redirect=/orders');
+        }, 1000);
       } else {
         setError('Не удалось загрузить данные заказов. Пожалуйста, проверьте соединение и повторите попытку.');
       }
