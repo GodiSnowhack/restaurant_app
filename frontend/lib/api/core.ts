@@ -28,6 +28,18 @@ export const api = axios.create({
   }
 });
 
+// Фиксируем URL, чтобы избежать проблем с дублированием /api/
+(function fixApiBaseUrl() {
+  let baseURL = api.defaults.baseURL;
+  if (baseURL && baseURL.includes('/api/v1/api/')) {
+    // Исправляем дублирование /api/
+    console.log('[API Core] Обнаружено дублирование /api/ в baseURL, исправляем...');
+    baseURL = baseURL.replace('/api/v1/api/', '/api/v1/');
+    api.defaults.baseURL = baseURL;
+  }
+  console.log('[API Core] Используется baseURL:', api.defaults.baseURL);
+})();
+
 // Функция повторных попыток для критически важных API-вызовов
 export const retryRequest = async <T>(apiCall: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> => {
   let lastError;
@@ -105,6 +117,12 @@ interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
 // Перехватчик для добавления токена авторизации
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Проверяем URL на дублирование /api/
+    if (config.url && config.url.includes('/api/v1/api/')) {
+      console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
+      config.url = config.url.replace('/api/v1/api/', '/api/v1/');
+    }
+    
     // Получаем токен из всех возможных источников
     const token = getAuthTokenFromAllSources();
     
@@ -157,13 +175,28 @@ api.interceptors.response.use(
                         error.message?.includes('cross-origin') ||
                         error.code === 'ERR_NETWORK' && error.message?.includes('blocked');
     
-    if (isCorsError) {
-      console.warn('[API] Обнаружена CORS ошибка:', error.message);
+    if (isCorsError || error.code === 'ERR_NETWORK') {
+      console.warn('[API] Обнаружена CORS/сетевая ошибка:', error.message);
       console.log('[API] Перенаправляем запрос через локальный API-прокси');
       
       // Если URL начинается с внешнего API, попробуем заменить его на локальный прокси
-      if (config?.url && config.url.includes('/api/v1/')) {
-        const localProxyUrl = config.url.replace('/api/v1/', '/api/');
+      if (config?.url) {
+        // Определяем, нужно ли преобразовать URL
+        let localProxyUrl = config.url;
+        
+        // Если URL содержит /api/v1/, заменяем на /api/
+        if (localProxyUrl.includes('/api/v1/')) {
+          localProxyUrl = localProxyUrl.replace('/api/v1/', '/api/');
+        } 
+        // Если URL не начинается с /api/, добавляем этот префикс
+        else if (!localProxyUrl.startsWith('/api/')) {
+          // Удаляем любые префиксы http(s)://domain.com
+          const endpoint = localProxyUrl.replace(/^https?:\/\/[^\/]+\//, '');
+          // Если endpoint уже начинается с api/, убираем его
+          const cleanEndpoint = endpoint.startsWith('api/') ? endpoint.slice(4) : endpoint;
+          localProxyUrl = `/api/${cleanEndpoint}`;
+        }
+        
         console.log(`[API] Перенаправление запроса с ${config.url} на локальный прокси ${localProxyUrl}`);
         
         try {
@@ -171,6 +204,7 @@ api.interceptors.response.use(
           return axios({
             ...config,
             url: localProxyUrl,
+            baseURL: '', // Обнуляем baseURL для использования относительного пути
             headers: {
               ...config.headers,
               'X-Original-URL': config.url

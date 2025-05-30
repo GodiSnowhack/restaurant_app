@@ -137,10 +137,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Проверяем, содержит ли URL уже /api/v1
-    let apiUrl = baseApiUrl;
+    // Удаляем завершающие слэши
+    const cleanApiUrl = baseApiUrl.replace(/\/+$/, '');
+    
+    // Проверяем, нужно ли добавлять /api/v1
+    let apiUrl = cleanApiUrl;
     if (!apiUrl.includes('/api/v1')) {
-      apiUrl = `${apiUrl.replace(/\/+$/, '')}/api/v1`;
+      apiUrl = `${cleanApiUrl}/api/v1`;
     }
     
     // Обрабатываем данные для POST запроса
@@ -176,8 +179,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Формируем корректный URL для запроса к бэкенду
+    // Важно: URL не должен содержать дублирование /api/
     const queryString = queryParams.toString();
-    const url = `${apiUrl.replace(/\/+$/, '')}/reservations${queryString ? `?${queryString}` : ''}`;
+    const url = `${apiUrl}/reservations${queryString ? `?${queryString}` : ''}`;
 
     console.log('Reservations API Proxy: Отправка запроса на', url);
 

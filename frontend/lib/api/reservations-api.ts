@@ -237,8 +237,32 @@ export const reservationsApi = {
    */
   createReservation: async (data: any): Promise<Reservation> => {
     try {
-      const response = await api.post('/api/reservations', data);
-      return response.data;
+      console.log('[Reservations API] Создание бронирования с данными:', data);
+      
+      // Получаем токен авторизации
+      const token = localStorage.getItem('token') || '';
+      
+      // Отправляем запрос через fetch для большего контроля
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-User-ID': data.user_id ? String(data.user_id) : ''
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Reservations API] Ошибка при создании бронирования. Статус:', response.status, 'Текст:', errorText);
+        throw new Error(`Ошибка HTTP: ${response.status}, ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('[Reservations API] Бронирование успешно создано:', responseData);
+      return responseData;
     } catch (error) {
       console.error('[Reservations API] Ошибка при создании бронирования:', error);
       throw error;

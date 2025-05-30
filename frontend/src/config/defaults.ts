@@ -41,14 +41,20 @@ export const DEFAULT_URLS = {
 // Получение базового URL API
 export const getDefaultApiUrl = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const apiUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
+  let apiUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
   
   // Убедимся, что URL для production всегда HTTPS
   if (isProduction && apiUrl.startsWith('http://')) {
-    return apiUrl.replace('http://', 'https://');
+    apiUrl = apiUrl.replace('http://', 'https://');
   }
   
-  return apiUrl;
+  // Убедимся, что URL не содержит двойной /api
+  if (apiUrl.includes('/api/v1/api/')) {
+    apiUrl = apiUrl.replace('/api/v1/api/', '/api/v1/');
+  }
+  
+  // Нормализация URL: убираем конечные слеши
+  return apiUrl.replace(/\/+$/, '');
 };
 
 // Получение базового URL фронтенда
