@@ -170,11 +170,9 @@ export default function App({ Component, pageProps }: AppProps) {
         if (shouldInitReservations) {
           try {
             const reservationsStore = useReservationsStore.getState();
-            if (typeof reservationsStore.init === 'function') {
-              reservationsStore.init();
-            } else {
-              console.log('Метод init не найден в хранилище бронирований');
-            }
+            // Загружаем бронирования
+            reservationsStore.getReservations();
+            console.log('Инициализация хранилища бронирований выполнена');
           } catch (e: unknown) {
             console.error('Ошибка при инициализации хранилища бронирований:', e);
           }
