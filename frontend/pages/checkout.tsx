@@ -125,9 +125,10 @@ const CheckoutPage: NextPage = () => {
       
       if (result.valid) {
         // Устанавливаем номер стола из бронирования
-        if (result.tableNumber) {
-          setTableNumber(result.tableNumber);
-          console.log(`Установлен номер стола из бронирования: ${result.tableNumber}`);
+        const tableNum = result.reservation?.table_number || result.tableNumber;
+        if (tableNum) {
+          setTableNumber(tableNum);
+          console.log(`Установлен номер стола из бронирования: ${tableNum}`);
         } else {
           console.log('Для бронирования не указан номер стола');
         }

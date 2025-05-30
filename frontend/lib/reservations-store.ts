@@ -3,6 +3,14 @@ import { devtools, persist } from 'zustand/middleware';
 import { Reservation } from '../types';
 import { reservationsApi } from './api/reservations-api';
 
+// Интерфейс для результата проверки кода бронирования
+interface VerifyReservationCodeResult {
+  valid: boolean;
+  message?: string;
+  reservation?: Reservation;
+  tableNumber?: number;
+}
+
 interface ReservationsState {
   reservations: Reservation[];
   isLoading: boolean;
@@ -14,7 +22,7 @@ interface ReservationsState {
   createReservation: (data: any) => Promise<any>;
   clearStore: () => void;
   getReservationById: (id: number) => Reservation | undefined;
-  verifyReservationCode: (code: string) => Promise<boolean>;
+  verifyReservationCode: (code: string) => Promise<VerifyReservationCodeResult>;
 }
 
 const useReservationsStore = create<ReservationsState>()(
@@ -114,14 +122,21 @@ const useReservationsStore = create<ReservationsState>()(
           try {
             const result = await reservationsApi.verifyReservationCode(code);
             set({ isLoading: false });
-            return !!result; // Возвращаем true, если код действителен
+            
+            // Возвращаем полный объект ответа с полем valid и другими свойствами
+            return result as VerifyReservationCodeResult;
           } catch (error: any) {
             console.error('Ошибка при проверке кода бронирования:', error);
             set({ 
               isLoading: false, 
               error: error.message || 'Не удалось проверить код бронирования'
             });
-            return false; // Возвращаем false в случае ошибки
+            
+            // Возвращаем объект с полем valid: false в случае ошибки
+            return { 
+              valid: false,
+              message: error.message || 'Не удалось проверить код бронирования' 
+            };
           }
         }
       }),
