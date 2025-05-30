@@ -69,8 +69,15 @@ export const reservationsApi = {
       const cachedData = getCachedReservations();
       const cacheAge = cachedData?.timestamp ? (Date.now() - cachedData.timestamp) / 1000 : 0;
       
+      // Проверяем роль пользователя (для админа и официанта всегда свежие данные)
+      const userRole = localStorage.getItem('user_role') || '';
+      const isAdminOrWaiter = userRole === 'admin' || userRole === 'waiter';
+      
       // Если есть кешированные данные и они не устарели, используем их (если не запрошено принудительное обновление)
-      if (cachedData?.data && cachedData.timestamp && cacheAge < 300 && !forceRefresh) {
+      // Для админа кеш действует только 60 секунд
+      const cacheTimeout = isAdminOrWaiter ? 60 : 300;
+      
+      if (cachedData?.data && cachedData.timestamp && cacheAge < cacheTimeout && !forceRefresh) {
         console.log(`[Reservations API] Используем кэшированные данные (возраст кэша: ${Math.floor(cacheAge)} сек)`);
         
         // Если переданы параметры фильтрации, применяем их к кешированным данным
@@ -107,7 +114,7 @@ export const reservationsApi = {
       const token = await getAuthToken();
       
       // Формируем URL с учетом параметров фильтрации
-      let url = '/api/reservations';
+      let url = '/api/v1/reservations';
       
       if (typeof options === 'object' && Object.keys(filterParams).length > 0) {
         const queryParams = new URLSearchParams();

@@ -32,10 +32,10 @@ export default async function adminReservationsHandler(req: NextApiRequest, res:
 
   try {
     // Формируем URL для запроса на бэкенд
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
     // Подготавливаем URL запроса
-    let endpoint = `${apiUrl}/reservations`;
+    let endpoint = `${apiUrl}/api/v1/reservations`;
     
     // Добавляем параметры запроса
     const queryParams = new URLSearchParams();
@@ -66,7 +66,7 @@ export default async function adminReservationsHandler(req: NextApiRequest, res:
 
     // Если запрос неудачный и это запрос на получение списка, пробуем альтернативный URL
     if (response.status !== 200 && req.method === 'GET') {
-      const alternativeUrl = `${apiUrl}/admin/reservations`;
+      const alternativeUrl = `${apiUrl}/api/v1/admin/reservations`;
       console.log(`[Admin API] Пробуем альтернативный URL: ${alternativeUrl}`);
       
       const altResponse = await axios({

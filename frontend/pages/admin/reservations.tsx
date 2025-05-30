@@ -113,15 +113,31 @@ const AdminReservationsPage: NextPage = () => {
       console.log('AdminReservations: Запрос бронирований с параметрами:', params);
       
       // Запрашиваем данные с использованием обновленного API
-      const data = await reservationsApi.getReservations(params);
+      // Всегда используем принудительное обновление для админа
+      const forceRefresh = true;
+      const data = await reservationsApi.getReservations(forceRefresh);
       
-      if (!data || !Array.isArray(data)) {
-        console.error('AdminReservations: Получены некорректные данные:', data);
+      // Фильтруем данные после получения
+      let filteredData = [...data];
+      if (params.status) {
+        filteredData = filteredData.filter(r => r.status === params.status);
+      }
+      if (params.date) {
+        filteredData = filteredData.filter(r => {
+          if (r.reservation_time) {
+            return r.reservation_time.startsWith(params.date!);
+          }
+          return false;
+        });
+      }
+      
+      if (!filteredData || !Array.isArray(filteredData)) {
+        console.error('AdminReservations: Получены некорректные данные:', filteredData);
         setFetchWarning('Получены некорректные данные от сервера');
         setReservations([]);
       } else {
         // Обрабатываем и сортируем полученные данные
-        const processedData = processReservations(data);
+        const processedData = processReservations(filteredData);
         setReservations(processedData);
         console.log(`AdminReservations: Успешно загружено ${processedData.length} бронирований`);
         setFetchStatus(`Загружено ${processedData.length} бронирований`);
