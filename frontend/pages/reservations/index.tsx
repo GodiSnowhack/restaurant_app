@@ -297,8 +297,12 @@ const ReservationsPage: NextPage = () => {
         setReservationCode(result.reservation_code);
       }
       
-      await getReservations();
+      // Принудительно запрашиваем обновленный список бронирований
+      console.log('Запрашиваем обновленный список бронирований после создания...');
+      const freshData = await getReservations();
+      console.log(`Получено ${freshData.length} бронирований после создания`);
       
+      // Сбрасываем форму
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
         time: '18:00',
@@ -313,6 +317,12 @@ const ReservationsPage: NextPage = () => {
       setSuccessMessage('Ваша заявка на бронирование успешно отправлена! Мы свяжемся с вами для подтверждения.');
       setError('');
       setSelectedTable(null);
+      
+      // Принудительное обновление интерфейса через небольшую задержку
+      setTimeout(async () => {
+        console.log('Дополнительное обновление списка бронирований...');
+        await getReservations();
+      }, 1000);
     } catch (err: any) {
       console.error('Ошибка при создании бронирования:', err);
       setError(`Не удалось создать бронирование: ${err.message || 'Неизвестная ошибка'}`);

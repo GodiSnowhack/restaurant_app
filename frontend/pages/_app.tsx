@@ -142,10 +142,27 @@ export default function App({ Component, pageProps }: AppProps) {
       const token = getAppToken();
       if (token) {
         console.log('App: Загружаем профиль пользователя');
-        fetchUserProfile();
+        fetchUserProfile().then(() => {
+          console.log('App: Профиль пользователя успешно загружен');
+        }).catch(error => {
+          console.error('App: Ошибка при загрузке профиля пользователя:', error);
+        });
       }
     }
   }, [isClient, isAuthenticated, user, fetchUserProfile]);
+  
+  // Дополнительный эффект для загрузки профиля при изменении маршрута
+  useEffect(() => {
+    if (!isClient) return;
+    
+    // Если пользователь авторизован, загружаем его профиль при переходе на новую страницу
+    if (isAuthenticated && typeof window !== 'undefined') {
+      console.log('App: Обновляем профиль пользователя при смене страницы');
+      fetchUserProfile().catch(error => {
+        console.error('App: Ошибка при обновлении профиля при смене страницы:', error);
+      });
+    }
+  }, [isClient, isAuthenticated, router.pathname]);
   
   // Загрузка профиля и настроек без блокировки UI
   useEffect(() => {

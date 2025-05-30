@@ -330,7 +330,7 @@ export const reservationsApi = {
           ...processedData,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+          reservation_code: generateReservationCode()
         };
       }
       
@@ -352,7 +352,7 @@ export const reservationsApi = {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           // Генерируем код бронирования
-          reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+          reservation_code: generateReservationCode()
         };
       }
       
@@ -660,4 +660,17 @@ async function fetchReservationsFallback(token: string | null, queryParams: stri
 // Функция для получения URL API
 const getApiUrl = () => {
   return api.defaults.baseURL;
-}; 
+};
+
+/**
+ * Генерирует код бронирования в нужном формате (6 символов)
+ */
+function generateReservationCode(): string {
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Исключены похожие символы I, O, 0, 1
+  let result = '';
+  const charactersLength = characters.length;
+  for (let i = 0; i < 6; i++) { // Генерируем ровно 6 символов
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return `RES${result}`; // Формат "RES" + 6 символов
+} 
