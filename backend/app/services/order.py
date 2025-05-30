@@ -277,7 +277,6 @@ def get_orders(
                 "payment_status": "unpaid",
                 "payment_method": "cash",
                 "total_amount": 2500.0,
-                "total_price": 2500.0,
                 "comment": "Тестовый заказ для демонстрации",
                 "special_instructions": "Тестовый заказ для демонстрации",
                 "created_at": datetime.utcnow().isoformat(),

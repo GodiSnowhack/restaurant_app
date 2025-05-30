@@ -4,6 +4,7 @@ from datetime import datetime
 import logging
 from app.schemas.orders import OrderCreate
 from app.models.order import Order, OrderDish
+from app.models.menu import Dish
 from sqlalchemy import and_, or_, func, desc
 
 # Настройка логгера
@@ -93,10 +94,14 @@ def get_orders(
             # Формируем список позиций
             items = []
             for item in order_dishes:
+                # Получаем связанное блюдо, чтобы извлечь его название
+                dish = db.query(Dish).filter(Dish.id == item.dish_id).first()
+                dish_name = dish.name if dish else f"Блюдо #{item.dish_id}"
+                
                 items.append({
                     "id": item.id,
                     "dish_id": item.dish_id,
-                    "name": item.dish_name,
+                    "name": dish_name,
                     "quantity": item.quantity,
                     "price": float(item.price),
                     "total_price": float(item.price * item.quantity),
