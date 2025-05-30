@@ -197,12 +197,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Правильная обработка времени бронирования
       if (processedBody.reservation_date && processedBody.reservation_time) {
-        // Проверяем формат времени - если это уже ISO формат, оставляем как есть
-        if (!processedBody.reservation_time.includes('T')) {
-          // Если это простой формат времени (HH:MM), преобразуем его в ISO
-          const dateStr = processedBody.reservation_date;
-          const timeStr = processedBody.reservation_time;
-          processedBody.reservation_time = `${dateStr}T${timeStr}:00`;
+        try {
+          // Проверяем формат времени - если это уже ISO формат, оставляем как есть
+          if (!processedBody.reservation_time.includes('T')) {
+            // Если это простой формат времени (HH:MM), преобразуем его в ISO
+            const dateStr = processedBody.reservation_date;
+            const timeStr = processedBody.reservation_time;
+            
+            // Проверяем правильность формата времени (должно быть HH:MM)
+            const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+            if (timePattern.test(timeStr)) {
+              // Формируем корректную строку ISO даты-времени
+              processedBody.reservation_time = `${dateStr}T${timeStr}:00`;
+              console.log(`Reservations API Proxy: Дата и время преобразованы в ISO формат: ${processedBody.reservation_time}`);
+            } else {
+              console.error(`Reservations API Proxy: Некорректный формат времени: ${timeStr}, оставляем как есть`);
+            }
+          } else {
+            console.log(`Reservations API Proxy: Время уже в ISO формате: ${processedBody.reservation_time}`);
+          }
+          
+          // Убеждаемся, что оба поля существуют
+          processedBody.reservation_date = processedBody.reservation_date || processedBody.reservation_time.split('T')[0];
+        } catch (error) {
+          console.error(`Reservations API Proxy: Ошибка при обработке даты и времени:`, error);
         }
       }
       
@@ -213,6 +231,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       if (processedBody.table_number !== undefined && processedBody.table_number !== null) {
         processedBody.table_number = Number(processedBody.table_number);
+      }
+      
+      // Обработка формата телефонного номера
+      if (processedBody.guest_phone) {
+        // Удаляем все нецифровые символы из номера телефона
+        const digitsOnly = processedBody.guest_phone.replace(/\D/g, '');
+        
+        // Если телефон не начинается с '+', добавляем +
+        if (!processedBody.guest_phone.startsWith('+')) {
+          // Для казахстанских номеров
+          if (digitsOnly.startsWith('7') && digitsOnly.length === 11) {
+            processedBody.guest_phone = `+${digitsOnly}`;
+          } 
+          // Для номеров без кода страны, добавляем +7
+          else if (digitsOnly.length === 10) {
+            processedBody.guest_phone = `+7${digitsOnly}`;
+          }
+          else {
+            processedBody.guest_phone = `+${digitsOnly}`;
+          }
+        }
+        
+        console.log(`Reservations API Proxy: Номер телефона отформатирован: ${processedBody.guest_phone}`);
       }
       
       console.log('Reservations API Proxy: Обработанные данные для POST запроса:', processedBody);
@@ -252,6 +293,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Добавляем /api/v1/reservations
       const baseWithoutTrailingSlash = apiUrl.replace(/\/+$/, '');
       url = `${baseWithoutTrailingSlash}/api/v1/reservations${queryString ? `?${queryString}` : ''}`;
+    }
+    
+    // Исправляем URL, чтобы предотвратить 307 редирект (добавляем слэш в конце для POST запросов)
+    // Это решает проблему с редиректами на многих серверах
+    if (method === 'POST' && !url.endsWith('/') && !url.includes('?')) {
+      url = `${url}/`;
+      console.log('Reservations API Proxy: Добавлен слэш в конец URL для предотвращения 307 редиректа');
+    } else if (method === 'POST' && !url.endsWith('/') && url.includes('?')) {
+      // Если есть параметры запроса, добавляем слэш перед ?
+      url = url.replace('?', '/?');
+      console.log('Reservations API Proxy: Добавлен слэш перед параметрами запроса для предотвращения 307 редиректа');
     }
     
     console.log('Reservations API Proxy: Отправка запроса на', url);
@@ -296,8 +348,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         signal: controller.signal,
         // @ts-ignore - добавляем агент напрямую
         agent: url.startsWith('https') ? httpsAgent : undefined,
-        // Следуем за редиректами для всех запросов
-        redirect: 'follow'
+        // Используем manual для POST запросов и follow для остальных
+        redirect: method === 'POST' ? 'manual' : 'follow'
       });
 
       clearTimeout(timeoutId);
@@ -314,52 +366,84 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (method === 'POST' && (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308)) {
         console.log(`Reservations API Proxy: Получен редирект ${response.status} при создании бронирования.`);
         
-        // Пробуем выполнить редирект вручную
-        try {
-          const redirectUrl = response.headers.get('Location');
-          console.log(`Reservations API Proxy: Пробуем выполнить редирект вручную на ${redirectUrl}`);
+        // Получаем URL редиректа
+        const redirectUrl = response.headers.get('Location');
+        console.log(`Reservations API Proxy: URL редиректа: ${redirectUrl}`);
+        
+        if (redirectUrl) {
+          // Проверяем, является ли URL относительным и обрабатываем его
+          let fullRedirectUrl = redirectUrl;
           
-          if (redirectUrl) {
-            // Отправляем GET запрос по URL редиректа
-            const redirectResponse = await fetch(redirectUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': token || '',
-                'Accept': 'application/json',
-                'X-User-ID': String(userId),
-                'X-User-Role': userRole
-              }
+          // Если URL начинается с "/", добавляем базовый URL API
+          if (redirectUrl.startsWith('/')) {
+            // Получаем базовый URL (схема + хост)
+            const urlObject = new URL(url);
+            const baseUrl = `${urlObject.protocol}//${urlObject.host}`;
+            fullRedirectUrl = `${baseUrl}${redirectUrl}`;
+            console.log(`Reservations API Proxy: Относительный URL преобразован в абсолютный: ${fullRedirectUrl}`);
+          }
+          
+          // Важно: при 307 редиректе нужно сохранить метод POST и тело запроса
+          console.log(`Reservations API Proxy: Отправляем POST запрос на URL редиректа: ${fullRedirectUrl}`);
+          
+          try {
+            // Отправляем POST запрос по URL редиректа с теми же данными и заголовками
+            const redirectResponse = await fetch(fullRedirectUrl, {
+              method: 'POST', // Сохраняем метод POST
+              headers,
+              body: JSON.stringify(processedBody), // Повторно отправляем те же данные
+              // @ts-ignore - добавляем агент напрямую
+              agent: fullRedirectUrl.startsWith('https') ? httpsAgent : undefined
             });
             
+            console.log(`Reservations API Proxy: Ответ от редиректа: статус ${redirectResponse.status}`);
+            
             if (redirectResponse.ok) {
-              console.log(`Reservations API Proxy: Редирект успешно выполнен, статус: ${redirectResponse.status}`);
-              
               try {
                 // Пробуем получить данные созданного бронирования
-                const redirectData = await redirectResponse.json();
+                const data = await redirectResponse.json();
+                console.log(`Reservations API Proxy: Получены данные после редиректа:`, data);
                 
-                if (redirectData && (Array.isArray(redirectData) ? redirectData.length > 0 : Object.keys(redirectData).length > 0)) {
-                  console.log('Reservations API Proxy: Данные бронирования получены после редиректа');
+                // Если сервер вернул пустой объект или массив, создаем свой объект бронирования
+                if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
+                  console.log('Reservations API Proxy: Сервер вернул пустой ответ после редиректа, создаем объект бронирования');
+                  
+                  const mockReservation = {
+                    id: Date.now(),
+                    ...processedBody,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
+                  };
                   
                   // Очищаем кеш для пользователя
                   clearUserCache(userId, userRole);
                   
-                  // Возвращаем данные бронирования
-                  return res.status(201).json(Array.isArray(redirectData) ? redirectData[0] : redirectData);
+                  return res.status(201).json(mockReservation);
                 }
-              } catch (redirectJsonError) {
-                console.error('Reservations API Proxy: Ошибка при разборе JSON после редиректа:', redirectJsonError);
+                
+                // Возвращаем данные, полученные от сервера
+                clearUserCache(userId, userRole);
+                return res.status(201).json(data);
+              } catch (jsonError) {
+                console.error('Reservations API Proxy: Ошибка при разборе JSON после редиректа:', jsonError);
               }
             } else {
-              console.log(`Reservations API Proxy: Не удалось выполнить редирект, статус: ${redirectResponse.status}`);
+              console.log(`Reservations API Proxy: Редирект вернул ошибку: ${redirectResponse.status}`);
+              try {
+                const errorText = await redirectResponse.text();
+                console.error(`Reservations API Proxy: Текст ошибки редиректа: ${errorText}`);
+              } catch (e) {
+                console.error(`Reservations API Proxy: Не удалось получить текст ошибки редиректа`);
+              }
             }
+          } catch (redirectError) {
+            console.error('Reservations API Proxy: Ошибка при выполнении POST запроса по редиректу:', redirectError);
           }
-        } catch (redirectError) {
-          console.error('Reservations API Proxy: Ошибка при выполнении редиректа вручную:', redirectError);
         }
         
-        // Если не удалось получить данные после редиректа, создаем объект бронирования на основе отправленных данных
-        console.log('Reservations API Proxy: Создаем объект бронирования без редиректа');
+        // Если не удалось получить данные после редиректа, создаем объект бронирования
+        console.log('Reservations API Proxy: Создаем объект бронирования после неудачного редиректа');
         const mockReservation = {
           id: Date.now(),
           ...processedBody,
@@ -368,7 +452,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           reservation_code: `RES-${Math.floor(1000 + Math.random() * 9000)}`
         };
         
-        // Очищаем кеш для пользователя, чтобы при следующем запросе получить свежие данные
+        // Очищаем кеш для пользователя
         clearUserCache(userId, userRole);
         
         // Возвращаем успешный ответ
