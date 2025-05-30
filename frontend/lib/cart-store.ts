@@ -15,12 +15,14 @@ interface CartStore {
   items: CartItem[];
   totalPrice: number;
   reservationCode: string | null;
+  reservationCodeError: string;
   addItem: (item: Omit<CartItem, 'id'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getTotal: () => number;
   setReservationCode: (code: string | null) => void;
+  setReservationCodeError: (error: string) => void;
 }
 
 type CartPersist = (
@@ -34,6 +36,7 @@ const useCartStore = create<CartStore>(
       items: [],
       totalPrice: 0,
       reservationCode: null,
+      reservationCodeError: '',
       
       addItem: (item: Omit<CartItem, 'id'>) => {
         const items = get().items;
@@ -67,6 +70,8 @@ const useCartStore = create<CartStore>(
       },
 
       setReservationCode: (code: string | null) => set({ reservationCode: code }),
+      
+      setReservationCodeError: (error: string) => set({ reservationCodeError: error }),
     }),
     {
       name: 'cart-storage',

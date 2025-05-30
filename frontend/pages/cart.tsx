@@ -21,7 +21,7 @@ import {
 import { formatPrice } from '../utils/priceFormatter';
 
 const CartPage: NextPage = () => {
-  const { items, totalPrice, updateQuantity, removeItem, clearCart, reservationCode, setReservationCode } = useCartStore();
+  const { items, totalPrice, updateQuantity, removeItem, clearCart, reservationCode, setReservationCode, reservationCodeError, setReservationCodeError } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const { verifyReservationCode } = useReservationsStore();
   const [comment, setComment] = useState('');
@@ -48,12 +48,20 @@ const CartPage: NextPage = () => {
     
     setIsVerifyingCode(true);
     setIsReservationCodeValid(null);
+    setReservationCodeError('');
     
     try {
-      const isValid = await verifyReservationCode(code);
-      setIsReservationCodeValid(isValid);
+      const result = await verifyReservationCode(code);
+      setIsReservationCodeValid(result.valid);
+      
+      if (!result.valid && result.message) {
+        setReservationCodeError(result.message);
+      } else {
+        setReservationCodeError('');
+      }
     } catch (error) {
       setIsReservationCodeValid(false);
+      setReservationCodeError('Ошибка при проверке кода бронирования');
       console.error('Ошибка при проверке кода бронирования:', error);
     } finally {
       setIsVerifyingCode(false);
@@ -262,7 +270,7 @@ const CartPage: NextPage = () => {
                     {isReservationCodeValid === false && (
                       <p className="mt-2 text-sm text-red-600 flex items-center">
                         <ExclamationCircleIcon className="h-4 w-4 mr-1" />
-                        Недействительный код
+                        {reservationCodeError || 'Недействительный код'}
                       </p>
                     )}
                     <p className="mt-1 text-xs text-gray-500 font-medium">
