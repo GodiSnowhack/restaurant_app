@@ -15,7 +15,7 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
-import { Alert, Button, Paper, Typography, Box } from '@mui/material';
+import { Alert, Button, Paper, Typography, Box, Switch, FormControlLabel, Divider } from '@mui/material';
 
 const OrdersPage: NextPage = () => {
   const router = useRouter();
@@ -29,6 +29,30 @@ const OrdersPage: NextPage = () => {
   });
   const [selectedStatus, setSelectedStatus] = useState('');
   const [attemptCount, setAttemptCount] = useState(0);
+  const [showDemoDataControls, setShowDemoDataControls] = useState(false);
+  const [useDemoData, setUseDemoData] = useState(false);
+
+  // Эффект для отслеживания и установки настроек демо-данных
+  useEffect(() => {
+    const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
+    setUseDemoData(useDemoForErrors);
+  }, []);
+
+  // Переключение режима демо-данных
+  const handleToggleDemoData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    setUseDemoData(isChecked);
+    localStorage.setItem('use_demo_for_errors', isChecked ? 'true' : 'false');
+    localStorage.setItem('use_demo_for_empty', isChecked ? 'true' : 'false');
+    
+    // Перезапрос данных с новыми настройками
+    setAttemptCount(prev => prev + 1);
+  };
+
+  // Показать/скрыть панель управления демо-данными (по тройному клику на заголовок)
+  const handleTripleClick = () => {
+    setShowDemoDataControls(!showDemoDataControls);
+  };
 
   useEffect(() => {
     // Проверяем статус авторизации при загрузке страницы
@@ -129,7 +153,7 @@ const OrdersPage: NextPage = () => {
           router.push('/auth/login?redirect=/orders');
         }, 1000);
       } else {
-        setError('Не удалось загрузить данные заказов. Пожалуйста, проверьте соединение и повторите попытку.');
+        setError('Не удалось загрузить данные заказов. Возможна ошибка в структуре базы данных или проблемы с подключением.');
       }
       
       setOrders([]);
@@ -227,7 +251,50 @@ const OrdersPage: NextPage = () => {
   return (
     <Layout title="Мои заказы">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">Мои заказы</h1>
+        <h1 className="text-3xl font-bold mb-6" onClick={handleTripleClick}>Мои заказы</h1>
+
+        {showDemoDataControls && (
+          <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
+            <Typography variant="subtitle1" gutterBottom>
+              Панель отладки
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <FormControlLabel 
+              control={
+                <Switch 
+                  checked={useDemoData} 
+                  onChange={handleToggleDemoData}
+                  color="primary"
+                />
+              } 
+              label="Использовать демо-данные при ошибках" 
+            />
+            <Box sx={{ mt: 1 }}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                onClick={() => {
+                  localStorage.setItem('force_demo_data', 'true');
+                  setAttemptCount(prev => prev + 1);
+                }}
+                sx={{ mr: 1 }}
+              >
+                Показать только демо
+              </Button>
+              <Button 
+                variant="outlined" 
+                size="small"
+                color="secondary" 
+                onClick={() => {
+                  localStorage.removeItem('force_demo_data');
+                  setAttemptCount(prev => prev + 1);
+                }}
+              >
+                Сбросить
+              </Button>
+            </Box>
+          </Paper>
+        )}
 
         {error && (
           <Alert 
@@ -261,6 +328,18 @@ const OrdersPage: NextPage = () => {
               >
                 Обновить
               </Button>
+              {showDemoDataControls && (
+                <Button 
+                  variant="outlined" 
+                  color="secondary" 
+                  onClick={() => {
+                    localStorage.setItem('force_demo_data', 'true');
+                    setAttemptCount(prev => prev + 1);
+                  }}
+                >
+                  Показать демо-данные
+                </Button>
+              )}
             </Box>
           </Paper>
         )}

@@ -34,8 +34,8 @@ export const api = axios.create({
   if (baseURL) {
     // Исправляем дублирование /api/
     if (baseURL.includes('/api/v1/api/')) {
-      console.log('[API Core] Обнаружено дублирование /api/ в baseURL, исправляем...');
-      baseURL = baseURL.replace('/api/v1/api/', '/api/v1/');
+    console.log('[API Core] Обнаружено дублирование /api/ в baseURL, исправляем...');
+    baseURL = baseURL.replace('/api/v1/api/', '/api/v1/');
     }
     
     // Проверка на другие возможные дублирования
@@ -137,8 +137,8 @@ api.interceptors.request.use(
     if (config.url) {
       // Исправляем дублирование /api/v1/api/
       if (config.url.includes('/api/v1/api/')) {
-        console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
-        config.url = config.url.replace('/api/v1/api/', '/api/v1/');
+      console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
+      config.url = config.url.replace('/api/v1/api/', '/api/v1/');
       }
       
       // Проверка на другие возможные дублирования

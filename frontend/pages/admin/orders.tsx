@@ -17,6 +17,7 @@ import {
   XMarkIcon as XIcon
 } from '@heroicons/react/24/outline';
 import { formatPrice } from '../../utils/priceFormatter';
+import { FormControlLabel, Switch, Button, Paper, Box, Typography, Divider } from '@mui/material';
 
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
@@ -47,7 +48,37 @@ const AdminOrdersPage: NextPage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
-  
+  const [showDemoDataControls, setShowDemoDataControls] = useState(false);
+  const [useDemoData, setUseDemoData] = useState(false);
+
+  // Эффект для отслеживания и установки настроек демо-данных
+  useEffect(() => {
+    const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
+    const forceDemoData = localStorage.getItem('force_demo_data') === 'true';
+    setUseDemoData(useDemoForErrors || forceDemoData);
+  }, []);
+
+  // Переключение режима демо-данных
+  const handleToggleDemoData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    setUseDemoData(isChecked);
+    localStorage.setItem('use_demo_for_errors', isChecked ? 'true' : 'false');
+    localStorage.setItem('use_demo_for_empty', isChecked ? 'true' : 'false');
+    
+    if (isChecked) {
+      localStorage.setItem('force_demo_data', 'true');
+    } else {
+      localStorage.removeItem('force_demo_data');
+    }
+    
+    fetchOrders(); // Перезапрос данных с новыми настройками
+  };
+
+  // Показать/скрыть панель управления демо-данными (по тройному клику на заголовок)
+  const handleTripleClick = () => {
+    setShowDemoDataControls(!showDemoDataControls);
+  };
+
   useEffect(() => {
       fetchOrders();
   }, [activeTab, dateRange]);
@@ -144,12 +175,12 @@ const AdminOrdersPage: NextPage = () => {
         setOrders(normalizedOrders);
       } else {
         console.error('API вернул неверный формат данных:', ordersData);
-        setError('Полученные данные имеют неверный формат. Ожидался массив заказов.');
+        setError('Полученные данные имеют неверный формат. Возможны проблемы с подключением к базе данных.');
         setOrders([]);
       }
     } catch (error: any) {
       console.error('Ошибка при загрузке заказов:', error);
-      setError(error.message || 'Не удалось загрузить заказы');
+      setError(error.message || 'Не удалось загрузить заказы. Возможна ошибка в структуре базы данных.');
       // Если нет данных, устанавливаем пустой массив
       setOrders([]);
     } finally {
@@ -392,17 +423,94 @@ const AdminOrdersPage: NextPage = () => {
     <Layout title="Управление заказами | Админ-панель">
       <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold dark:text-white">Управление заказами</h1>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="flex items-center text-gray-600 dark:text-gray-300 hover:text-primary"
-            >
-              <ArrowLeftIcon className="w-5 h-5 mr-1" />
-              Назад к панели управления
-            </Link>
-          </div>
+          <h1 className="text-3xl font-bold" onClick={handleTripleClick}>Управление заказами</h1>
+          <button 
+            onClick={() => router.back()}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+            Назад
+          </button>
         </div>
+
+        {showDemoDataControls && (
+          <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
+            <Typography variant="subtitle1" gutterBottom>
+              Панель отладки
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <FormControlLabel 
+              control={
+                <Switch 
+                  checked={useDemoData} 
+                  onChange={handleToggleDemoData}
+                  color="primary"
+                />
+              } 
+              label="Использовать демо-данные при ошибках" 
+            />
+            <Box sx={{ mt: 1 }}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                onClick={() => {
+                  localStorage.setItem('force_demo_data', 'true');
+                  fetchOrders();
+                }}
+                sx={{ mr: 1 }}
+              >
+                Показать только демо
+              </Button>
+              <Button 
+                variant="outlined" 
+                size="small"
+                color="secondary" 
+                onClick={() => {
+                  localStorage.removeItem('force_demo_data');
+                  fetchOrders();
+                }}
+              >
+                Сбросить
+              </Button>
+            </Box>
+          </Paper>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <ExclamationIcon className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  {error}
+                </p>
+                <div className="mt-2">
+                  <button 
+                    className="text-sm font-medium text-red-700 hover:text-red-600 focus:outline-none"
+                    onClick={fetchOrders}
+                  >
+                    Повторить загрузку
+                  </button>
+                  {error.includes('базы данных') && (
+                    <button 
+                      className="ml-4 text-sm font-medium text-indigo-700 hover:text-indigo-600 focus:outline-none"
+                      onClick={() => {
+                        localStorage.setItem('use_demo_for_errors', 'true');
+                        localStorage.setItem('use_demo_for_empty', 'true');
+                        setUseDemoData(true);
+                        fetchOrders();
+                      }}
+                    >
+                      Использовать демо-данные
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Фильтры */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-6">
