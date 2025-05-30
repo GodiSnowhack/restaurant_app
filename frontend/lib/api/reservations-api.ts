@@ -242,8 +242,13 @@ export const reservationsApi = {
       // Получаем токен авторизации
       const token = localStorage.getItem('token') || '';
       
+      // Проверяем что мы используем правильный URL для прокси
+      const url = '/api/reservations'; // Используем локальный API прокси
+      
+      console.log('[Reservations API] Отправка POST запроса на:', url);
+      
       // Отправляем запрос через fetch для большего контроля
-      const response = await fetch('/api/reservations', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

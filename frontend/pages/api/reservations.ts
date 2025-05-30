@@ -139,11 +139,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Удаляем завершающие слэши
     const cleanApiUrl = baseApiUrl.replace(/\/+$/, '');
+    console.log('Reservations API Proxy: Базовый URL API:', cleanApiUrl);
     
     // Проверяем, нужно ли добавлять /api/v1
     let apiUrl = cleanApiUrl;
     if (!apiUrl.includes('/api/v1')) {
       apiUrl = `${cleanApiUrl}/api/v1`;
+      console.log('Reservations API Proxy: Добавлен /api/v1 к URL:', apiUrl);
+    } else {
+      console.log('Reservations API Proxy: URL уже содержит /api/v1:', apiUrl);
+    }
+    
+    // Проверяем и исправляем дублирование /api/
+    if (apiUrl.includes('/api/v1/api/')) {
+      console.log('Reservations API Proxy: Обнаружено дублирование /api/ в URL, исправляем...');
+      apiUrl = apiUrl.replace('/api/v1/api/', '/api/v1/');
     }
     
     // Обрабатываем данные для POST запроса
@@ -181,8 +191,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Формируем корректный URL для запроса к бэкенду
     // Важно: URL не должен содержать дублирование /api/
     const queryString = queryParams.toString();
-    const url = `${apiUrl}/reservations${queryString ? `?${queryString}` : ''}`;
-
+    
+    // Формируем URL без дублирования /api/
+    let url = '';
+    
+    // Удаляем все /api/v1/ из URL, чтобы добавить его в правильном формате
+    if (apiUrl.endsWith('/api/v1') || apiUrl.endsWith('/api/v1/')) {
+      // URL уже заканчивается на /api/v1, просто добавляем reservations
+      const baseWithoutTrailingSlash = apiUrl.replace(/\/+$/, '');
+      url = `${baseWithoutTrailingSlash}/reservations${queryString ? `?${queryString}` : ''}`;
+    } else {
+      // Добавляем /api/v1/reservations
+      const baseWithoutTrailingSlash = apiUrl.replace(/\/+$/, '');
+      url = `${baseWithoutTrailingSlash}/api/v1/reservations${queryString ? `?${queryString}` : ''}`;
+    }
+    
     console.log('Reservations API Proxy: Отправка запроса на', url);
 
     // Формируем заголовки запроса
@@ -222,6 +245,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       clearTimeout(timeoutId);
+      
+      // Проверяем статус ответа
+      if (!response.ok) {
+        console.error(`Reservations API Proxy: Ошибка от сервера. Статус: ${response.status}`);
+        // Если сервер вернул ошибку, пробуем логировать текст ошибки
+        try {
+          const errorText = await response.text();
+          console.error(`Reservations API Proxy: Текст ошибки: ${errorText}`);
+        } catch (e) {
+          console.error(`Reservations API Proxy: Не удалось получить текст ошибки`);
+        }
+      }
 
       // Получаем данные ответа
       const data = await response.json();

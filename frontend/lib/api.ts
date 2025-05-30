@@ -30,9 +30,17 @@ export interface User {
 
 // Функция для определения правильного baseURL для API
 export const getApiBaseUrl = () => {
-  const baseUrl = getSecureApiUrl();
+  let baseUrl = getSecureApiUrl();
   // Всегда проверяем и обеспечиваем HTTPS
-  return baseUrl.startsWith('https://') ? baseUrl : baseUrl.replace('http://', 'https://');
+  baseUrl = baseUrl.startsWith('https://') ? baseUrl : baseUrl.replace('http://', 'https://');
+  
+  // Проверяем и исправляем дублирование /api/
+  if (baseUrl.includes('/api/v1/api/')) {
+    console.log('[API] Обнаружено дублирование /api/ в baseURL, исправляем...');
+    baseUrl = baseUrl.replace('/api/v1/api/', '/api/v1/');
+  }
+  
+  return baseUrl;
 };
 
 const baseURL = getApiBaseUrl();
@@ -128,9 +136,22 @@ api.interceptors.request.use(
     // Убеждаемся, что все URL используют HTTPS
     if (config.url) {
       config.url = config.url.replace('http://', 'https://');
+      
+      // Проверяем на дублирование /api/ в URL
+      if (config.url.includes('/api/v1/api/')) {
+        console.log('[API Interceptor] Обнаружено дублирование /api/ в URL, исправляем...');
+        config.url = config.url.replace('/api/v1/api/', '/api/v1/');
+      }
     }
+    
     if (config.baseURL) {
       config.baseURL = config.baseURL.replace('http://', 'https://');
+      
+      // Проверяем на дублирование /api/ в baseURL
+      if (config.baseURL.includes('/api/v1/api/')) {
+        console.log('[API Interceptor] Обнаружено дублирование /api/ в baseURL, исправляем...');
+        config.baseURL = config.baseURL.replace('/api/v1/api/', '/api/v1/');
+      }
     }
 
     const token = getAuthToken();
