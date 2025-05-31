@@ -64,12 +64,12 @@ def get_orders(
             detail=f"Ошибка при получении заказов: {str(e)}"
         )
 
-@router.post("/", response_model=OrderOut)
+@router.post("/", response_model=None)
 def create_order(
     order_req: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Any:
+) -> Dict[str, Any]:
     """
     Создание нового заказа с обработкой различных форматов данных.
     Номер стола получается автоматически из кода бронирования.
@@ -86,49 +86,21 @@ def create_order(
         if order_req.get("reservation_code"):
             order_data["reservation_code"] = order_req["reservation_code"]
         
-        # Обработка блюд
-        dishes = order_req.get("dishes", [])
-        items = []
-        
-        if dishes:
-            # Проверяем формат dishes
-            if dishes and isinstance(dishes, list):
-                if all(isinstance(d, int) for d in dishes):
-                    # Простой массив ID блюд
-                    order_data["dishes"] = dishes
-                elif all(isinstance(d, dict) for d in dishes):
-                    # Формат объектов с dish_id и quantity
-                    for dish in dishes:
-                        items.append(OrderDishItem(
-                            dish_id=dish["dish_id"],
-                            quantity=dish.get("quantity", 1),
-                            special_instructions=dish.get("special_instructions", "")
-                        ))
-        
-        # Если определены items напрямую, используем их
-        if order_req.get("items") and isinstance(order_req["items"], list):
-            for item in order_req["items"]:
-                items.append(OrderDishItem(
-                    dish_id=item["dish_id"],
-                    quantity=item.get("quantity", 1),
-                    special_instructions=item.get("special_instructions", "")
-                ))
-        
-        # Если есть обработанные items, добавляем их к данным заказа
-        if items:
-            order_data["items"] = items
-            
-        # Проверяем, что есть хотя бы один источник блюд
-        if not order_data.get("dishes") and not order_data.get("items"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="В заказе должны быть указаны блюда (dishes или items)"
-            )
+        # Обработка блюд - просто передаем данные как есть
+        if order_req.get("dishes"):
+            order_data["dishes"] = order_req["dishes"]
         
         # Создаем заказ через сервисный слой
         try:
-            order = create_order_service(db, current_user.id, OrderCreate(**order_data))
-            return order
+            order_result = create_order_service(db, current_user.id, OrderCreate(**order_data))
+            
+            # Возвращаем результат прямо, без валидации Pydantic
+            return {
+                "success": True,
+                "message": "Заказ успешно создан",
+                "data": order_result
+            }
+            
         except Exception as e:
             print(f"Ошибка при создании заказа в сервисе: {str(e)}")
             raise HTTPException(

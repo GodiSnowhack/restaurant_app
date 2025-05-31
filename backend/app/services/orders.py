@@ -11,7 +11,7 @@ import uuid
 # Настройка логгера
 logger = logging.getLogger(__name__)
 
-def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
+def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Dict[str, Any]:
     """
     Создание нового заказа в базе данных
     
@@ -21,7 +21,7 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
         order_in: Данные заказа
         
     Returns:
-        Созданный заказ
+        Созданный заказ в виде словаря
     """
     try:
         logger.info(f"Создание нового заказа для пользователя {user_id}")
@@ -63,6 +63,7 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
         
         # Вычисляем общую сумму заказа
         total_amount = 0.0
+        processed_dishes = []
         
         # Обрабатываем обычные dishes (только ID блюд)
         if order_in.dishes:
@@ -83,6 +84,17 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
                     
                     # Добавляем стоимость блюда к общей сумме
                     total_amount += float(dish.price)
+                    
+                    # Добавляем информацию о блюде в список обработанных
+                    processed_dishes.append({
+                        "id": dish.id,
+                        "dish_id": dish.id,
+                        "name": dish.name,
+                        "price": float(dish.price),
+                        "quantity": 1,
+                        "special_instructions": "",
+                        "total_price": float(dish.price)
+                    })
         
         # Обрабатываем items (объекты с dish_id и quantity)
         if order_in.items:
@@ -104,6 +116,17 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
                     # Добавляем стоимость блюда * количество к общей сумме
                     item_total = float(dish.price) * item.quantity
                     total_amount += item_total
+                    
+                    # Добавляем информацию о блюде в список обработанных
+                    processed_dishes.append({
+                        "id": dish.id,
+                        "dish_id": dish.id,
+                        "name": dish.name,
+                        "price": float(dish.price),
+                        "quantity": item.quantity,
+                        "special_instructions": item.special_instructions or "",
+                        "total_price": item_total
+                    })
         
         # Обновляем общую сумму заказа
         db_order.total_amount = total_amount
@@ -114,7 +137,31 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
         db.refresh(db_order)
         
         logger.info(f"Заказ успешно создан, ID: {db_order.id}")
-        return db_order
+        
+        # Форматируем ответ в виде словаря для правильной сериализации
+        result = {
+            "id": db_order.id,
+            "user_id": db_order.user_id,
+            "waiter_id": db_order.waiter_id,
+            "table_number": db_order.table_number,
+            "status": db_order.status,
+            "payment_status": db_order.payment_status,
+            "payment_method": db_order.payment_method,
+            "total_amount": float(db_order.total_amount),
+            "comment": db_order.comment,
+            "special_instructions": db_order.comment,
+            "created_at": db_order.created_at.isoformat() if db_order.created_at else datetime.utcnow().isoformat(),
+            "updated_at": db_order.updated_at.isoformat() if db_order.updated_at else None,
+            "completed_at": db_order.completed_at.isoformat() if db_order.completed_at else None,
+            "customer_name": db_order.customer_name,
+            "customer_phone": db_order.customer_phone,
+            "order_code": db_order.order_code,
+            "is_urgent": db_order.is_urgent or False,
+            "is_group_order": db_order.is_group_order or False,
+            "items": processed_dishes
+        }
+        
+        return result
         
     except Exception as e:
         db.rollback()
