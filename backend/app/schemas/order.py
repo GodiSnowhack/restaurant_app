@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
@@ -71,9 +71,25 @@ class OrderBase(BaseModel):
     customer_age_group: Optional[str] = None
 
 
-class OrderCreate(OrderBase):
+class OrderCreate(BaseModel):
+    user_id: Optional[int] = None
+    waiter_id: Optional[int] = None
+    table_number: Optional[int] = None
+    status: Optional[str] = "pending"
+    payment_status: Optional[PaymentStatus] = PaymentStatus.PENDING
+    payment_method: Optional[str] = None
+    total_amount: Optional[float] = 0.0
+    comment: Optional[str] = None
+    is_urgent: Optional[bool] = False
+    is_group_order: Optional[bool] = False
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    reservation_code: Optional[str] = None
+    order_code: Optional[str] = None
+    customer_age_group: Optional[str] = None
+    # Поддержка разных форматов запросов
     items: Optional[List[OrderDishCreate]] = []
-    dishes: Optional[List[OrderDishCreate]] = []
+    dishes: Optional[Union[List[OrderDishCreate], List[int]]] = []
 
 
 class OrderUpdate(OrderBase):

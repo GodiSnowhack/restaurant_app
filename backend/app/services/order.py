@@ -499,207 +499,75 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         Созданный заказ в виде словаря
     """
     try:
-        logger.info(f"Создание нового заказа с данными: {order_data}")
+        logger.info(f"Создание нового заказа")
+        logger.debug(f"Данные заказа: {order_data}")
         
-        # ВАЖНО: Если есть код бронирования с фронта, сохраним его отдельно, чтобы гарантировано использовать
-        original_reservation_code = order_data.get('reservation_code')
-        
-        # Проверка на идемпотентность (ключ идемпотентности для предотвращения дублирования заказов)
-        idempotency_key = order_data.pop('idempotency_key', None)
-        if idempotency_key:
-            logger.info(f"Получен ключ идемпотентности: {idempotency_key}")
-            # Проверяем, существуют ли уже заказы с таким ключом (используем комментарий для хранения)
-            existing_orders = db.query(Order).filter(Order.comment.like(f"%idempotency_key:{idempotency_key}%")).all()
-            if existing_orders:
-                logger.warning(f"Найден существующий заказ с ключом идемпотентности {idempotency_key}")
-                # Возвращаем первый найденный заказ
-                existing_order = format_order_for_response(db, existing_orders[0])
-                # Добавляем информацию о том, что это повторный запрос
-                existing_order["is_duplicate"] = True
-                existing_order["duplicate_message"] = "Заказ был создан ранее с тем же ключом идемпотентности"
-                return existing_order
-        
-        # Проверяем наличие кода бронирования
-        reservation_code = order_data.get('reservation_code')
-        if reservation_code:
-            logger.info(f"Получен код бронирования: {reservation_code}")
-            # Ищем бронирование по коду
-            reservation = get_reservation_by_code(db, reservation_code)
-            if reservation:
-                logger.info(f"Найдено бронирование с ID {reservation.id} по коду {reservation_code}")
-                # Заполняем данные из бронирования, если они не указаны в заказе
-                if not order_data.get('customer_name') and reservation.guest_name:
-                    order_data['customer_name'] = reservation.guest_name
-                    logger.info(f"Использовано имя клиента из бронирования: {reservation.guest_name}")
-                if not order_data.get('customer_phone') and reservation.guest_phone:
-                    order_data['customer_phone'] = reservation.guest_phone
-                    logger.info(f"Использован телефон клиента из бронирования: {reservation.guest_phone}")
-                if not order_data.get('table_number') and reservation.table_number:
-                    order_data['table_number'] = reservation.table_number
-                    logger.info(f"Использован номер стола из бронирования: {reservation.table_number}")
-                
-                # ВАЖНО: Не генерируем новый код бронирования, используем тот, что пришел с фронтенда
-                # Гарантируем, что reservation_code не будет изменен
-            else:
-                logger.warning(f"Бронирование с кодом {reservation_code} не найдено")
-        
-        # Проверяем наличие кода официанта в параметрах запроса
-        waiter_code = None
-        if 'waiter_code' in order_data:
-            waiter_code = order_data.pop('waiter_code')
-            logger.info(f"Найден waiter_code в данных запроса: {waiter_code}")
-        
-        # Проверяем, передан ли уже готовый код заказа
-        # Если есть уже готовый код заказа, используем его
-        if 'order_code' in order_data and order_data['order_code']:
-            order_code = order_data['order_code']
-            logger.info(f"Используем уже существующий order_code из данных: {order_code}")
-        # Иначе, если есть код официанта, используем его
-        elif waiter_code:
-            order_code = waiter_code
-            order_data['order_code'] = order_code
-            logger.info(f"Устанавливаем код официанта {waiter_code} в качестве кода заказа")
+        # Устанавливаем значения по умолчанию
+        if 'table_number' not in order_data or order_data['table_number'] is None:
+            order_data['table_number'] = 1
+            logger.info("Установлено значение table_number по умолчанию: 1")
             
-            # Попытка найти соответствующего официанта по коду
-            try:
-                from app.models.order_code import OrderCode
-                from app.models.user import User, UserRole
-                
-                # Ищем сначала в таблице order_codes
-                order_code_record = db.query(OrderCode).filter(OrderCode.code == waiter_code).first()
-                
-                if order_code_record and order_code_record.waiter_id:
-                    logger.info(f"Найден официант с ID {order_code_record.waiter_id} для кода {waiter_code}")
-                    order_data['waiter_id'] = order_code_record.waiter_id
-                else:
-                    # Пробуем найти любого официанта для демо
-                    waiter = db.query(User).filter(User.role == UserRole.WAITER.value).first()
-                    if waiter:
-                        order_data['waiter_id'] = waiter.id
-                        logger.info(f"Для демо назначен официант с ID {waiter.id}")
-            except Exception as e:
-                logger.warning(f"Не удалось найти или привязать официанта по коду: {str(e)}")
-        else:
-            # Только если нет ни кода заказа, ни кода официанта - генерируем новый код
-            # ВАЖНО: Этот код ТОЛЬКО для заказа (order_code), а не для бронирования (reservation_code)
-            # Никогда не перезаписываем reservation_code из order_code
+        if 'status' not in order_data or not order_data['status']:
+            order_data['status'] = OrderStatus.PENDING.value
+            logger.info("Установлено значение status по умолчанию: pending")
+            
+        if 'payment_status' not in order_data or not order_data['payment_status']:
+            order_data['payment_status'] = PaymentStatus.PENDING.value
+            logger.info("Установлено значение payment_status по умолчанию: pending")
+        
+        # Получаем items из order_data
+        items = []
+        
+        # Вариант 1: Из items
+        if 'items' in order_data and order_data['items']:
+            items = order_data.pop('items')
+            logger.info(f"Получены элементы из items: {len(items)}")
+            
+        # Вариант 2: Из dishes
+        elif 'dishes' in order_data and order_data['dishes']:
+            dishes = order_data.pop('dishes')
+            logger.info(f"Получены элементы из dishes: {len(dishes)}")
+            
+            # Обрабатываем разные форматы dishes
+            for dish in dishes:
+                if isinstance(dish, dict) and 'dish_id' in dish:
+                    # Формат: {"dish_id": 1, "quantity": 2}
+                    items.append({
+                        'dish_id': dish['dish_id'],
+                        'quantity': dish.get('quantity', 1),
+                        'special_instructions': dish.get('special_instructions', '')
+                    })
+                elif isinstance(dish, int):
+                    # Формат: просто идентификатор блюда
+                    items.append({
+                        'dish_id': dish,
+                        'quantity': 1,
+                        'special_instructions': ''
+                    })
+        
+        # Генерируем уникальный код заказа, если его нет
+        if 'order_code' not in order_data or not order_data['order_code']:
             order_code = generate_order_code()
             order_data['order_code'] = order_code
             logger.info(f"Сгенерирован новый код заказа: {order_code}")
         
-        # Устанавливаем статусы по умолчанию, если они не указаны
-        if 'status' not in order_data:
-            order_data['status'] = OrderStatus.PENDING.value
-        else:
-            # Если статус есть, проверяем, что это строка и конвертируем в enum
-            if isinstance(order_data['status'], str):
-                enum_status = safe_enum_value(OrderStatus, order_data['status'])
-                if enum_status:
-                    order_data['status'] = enum_status
-                else:
-                    order_data['status'] = OrderStatus.PENDING
-
-        if 'payment_status' not in order_data:
-            order_data['payment_status'] = PaymentStatus.PENDING.value
-        else:
-            # Если статус платежа есть, проверяем, что это строка и конвертируем в enum
-            if isinstance(order_data['payment_status'], str):
-                enum_payment_status = safe_enum_value(PaymentStatus, order_data['payment_status'])
-                if enum_payment_status:
-                    order_data['payment_status'] = enum_payment_status
-                else:
-                    order_data['payment_status'] = PaymentStatus.PENDING
-
-        # Обработка payment_method, если он есть
-        if 'payment_method' in order_data and isinstance(order_data['payment_method'], str):
-            enum_payment_method = safe_enum_value(PaymentMethod, order_data['payment_method'])
-            if enum_payment_method:
-                order_data['payment_method'] = enum_payment_method
-            else:
-                # Если не удалось сконвертировать, удаляем поле, чтобы использовалось значение по умолчанию
-                logger.warning(f"Не удалось преобразовать payment_method '{order_data['payment_method']}' в enum, удаляем поле")
-                order_data.pop('payment_method', None)
-
-        # Логируем обработанные данные заказа
-        logger.info(f"Обработанные данные заказа перед созданием: status={order_data.get('status')}, payment_status={order_data.get('payment_status')}, payment_method={order_data.get('payment_method')}")
-        
-        # Проверяем наличие waiter_id в запросе
-        if 'waiter_id' in order_data and order_data['waiter_id']:
-            logger.info(f"Найден waiter_id в запросе: {order_data['waiter_id']}")
-            # Проверяем, существует ли официант с указанным ID
-            try:
-                from app.models.user import User, UserRole
-                waiter = db.query(User).filter(User.id == order_data['waiter_id']).first()
-                if waiter:
-                    if waiter.role == UserRole.WAITER.value:
-                        logger.info(f"Найден официант с ID {waiter.id}, роль: {waiter.role}")
-                    else:
-                        logger.warning(f"Пользователь с ID {waiter.id} не является официантом (роль: {waiter.role})")
-                        # Если пользователь не является официантом, все равно сохраняем его ID,
-                        # так как это может быть администратор, создающий заказ
-                else:
-                    logger.warning(f"Не найден пользователь с ID {order_data['waiter_id']}")
-            except Exception as e:
-                logger.warning(f"Ошибка при проверке официанта: {str(e)}")
-        else:
-            # Если waiter_id не был передан, попробуем найти подходящего официанта
-            try:
-                from app.models.user import User, UserRole
-                # Пробуем найти любого официанта для демо
-                waiter = db.query(User).filter(User.role == UserRole.WAITER.value).first()
-                if waiter:
-                    order_data['waiter_id'] = waiter.id
-                    logger.info(f"Автоматически назначен официант с ID {waiter.id}")
-            except Exception as e:
-                logger.warning(f"Не удалось автоматически назначить официанта: {str(e)}")
-        
-        # Подготавливаем данные заказа
-        items = order_data.pop('items', [])
-        
-        # Проверяем есть ли dishes в запросе (формат с фронтенда)
-        if 'dishes' in order_data:
-            dishes = order_data.pop('dishes')
-            if dishes and isinstance(dishes, list):
-                logger.info(f"Найдено {len(dishes)} блюд в поле dishes, преобразуем в items")
-                for dish in dishes:
-                    if isinstance(dish, dict) and 'dish_id' in dish and 'quantity' in dish:
-                        items.append({
-                            'dish_id': dish['dish_id'],
-                            'quantity': dish['quantity'],
-                            'special_instructions': dish.get('special_instructions', '')
-                        })
-                    else:
-                        logger.warning(f"Некорректный формат блюда в dishes: {dish}")
-                logger.info(f"После преобразования dishes в items: {items}")
-        
-        # Удаляем поле order_type, если оно есть, т.к. в таблице orders такого поля нет
-        if 'order_type' in order_data:
-            order_data.pop('order_type')
-        
-        # Удаляем поля customer_email и delivery_address, если они есть, т.к. в таблице orders таких полей нет
-        if 'customer_email' in order_data:
-            order_data.pop('customer_email')
-        if 'delivery_address' in order_data:
-            order_data.pop('delivery_address')
+        # Удаляем поля, которых нет в модели Order
+        fields_to_remove = ['order_type', 'customer_email', 'delivery_address', 'waiter_code']
+        for field in fields_to_remove:
+            if field in order_data:
+                order_data.pop(field)
         
         # Создаем новый заказ
-        # Если есть ключ идемпотентности, сохраняем его в комментарии
-        if idempotency_key and 'comment' in order_data:
-            order_data['comment'] = f"{order_data['comment']} [idempotency_key:{idempotency_key}]"
-        elif idempotency_key:
-            order_data['comment'] = f"[idempotency_key:{idempotency_key}]"
-        
-        # ВАЖНО: Гарантируем, что original_reservation_code сохранится в order_data
-        if original_reservation_code:
-            order_data['reservation_code'] = original_reservation_code
-            logger.info(f"Используем код бронирования с фронтенда: {original_reservation_code}")
-        
         db_order = Order(**order_data)
         db.add(db_order)
         db.flush()  # Сохраняем заказ для получения ID
         
         # Добавляем блюда к заказу
         total_amount = Decimal('0')
+        
+        if not items:
+            logger.warning("Заказ создается без блюд!")
+        
         for item in items:
             if 'dish_id' not in item:
                 logger.error("Отсутствует dish_id в элементе заказа")
@@ -735,16 +603,16 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         # Фиксируем изменения
         try:
             db.commit()
-            logger.info(f"Заказ {db_order.id} успешно обновлен")
+            logger.info(f"Заказ {db_order.id} успешно создан")
         except Exception as commit_error:
             db.rollback()
-            logger.error(f"Ошибка при коммите изменений заказа {db_order.id}: {str(commit_error)}")
+            logger.error(f"Ошибка при коммите изменений заказа: {str(commit_error)}")
             raise
         
         # Форматируем заказ для ответа
         result = format_order_for_response(db, db_order)
         
-        logger.info(f"Заказ успешно создан: ID={db_order.id}, Код={order_code}")
+        logger.info(f"Заказ успешно создан: ID={db_order.id}, Код={db_order.order_code}")
         return result
         
     except HTTPException as he:

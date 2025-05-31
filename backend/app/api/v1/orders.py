@@ -1,5 +1,5 @@
 from typing import List, Any, Optional, Dict
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body, Request
 from sqlalchemy.orm import Session
 import logging
 from sqlalchemy.sql import text
@@ -92,21 +92,38 @@ def read_orders(
 
 
 @router.post("/", response_model=OrderResponse)
-def create_order(
-    order_in: OrderCreate,
+async def create_order(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Создание нового заказа
+    Создание нового заказа с поддержкой разных форматов входных данных
     """
     try:
-        # Преобразуем входные данные в словарь и добавляем user_id
-        order_data = order_in.dict()
-        order_data["user_id"] = current_user.id
+        # Получаем данные из тела запроса напрямую для максимальной гибкости
+        request_data = await request.json()
+        logger.info(f"Получены данные для создания заказа: {request_data}")
+        
+        # Подготавливаем данные заказа
+        order_data = {
+            "user_id": current_user.id,
+            "payment_method": request_data.get("payment_method"),
+            "customer_name": request_data.get("customer_name"),
+            "customer_phone": request_data.get("customer_phone"),
+            "reservation_code": request_data.get("reservation_code"),
+            "comment": request_data.get("comment"),
+            "is_urgent": request_data.get("is_urgent", False),
+            "is_group_order": request_data.get("is_group_order", False),
+            "status": request_data.get("status", "pending"),
+        }
+        
+        # Обработка table_number
+        if "table_number" in request_data and request_data["table_number"] is not None:
+            order_data["table_number"] = request_data["table_number"]
         
         # Проверяем наличие reservation_code и отсутствие table_number
-        if order_data.get('reservation_code') and not order_data.get('table_number'):
+        if order_data.get('reservation_code') and "table_number" not in order_data:
             from app.services.reservation import get_reservation_by_code
             
             # Ищем бронирование по коду
@@ -116,16 +133,66 @@ def create_order(
                 order_data['table_number'] = reservation.table_number
                 logger.info(f"Использован номер стола {reservation.table_number} из бронирования")
         
-        # Если всё ещё нет table_number, используем значение по умолчанию
-        if not order_data.get('table_number'):
-            order_data['table_number'] = 1
+        # Если все еще нет table_number, устанавливаем значение по умолчанию
+        if "table_number" not in order_data:
+            order_data["table_number"] = 1
             logger.info("Установлен номер стола по умолчанию: 1")
         
-        # Создаем заказ и возвращаем результат
+        # Обработка блюд в заказе (поддерживаем разные форматы)
+        items = []
+        
+        # Вариант 1: dishes в виде массива объектов с dish_id и quantity
+        if "dishes" in request_data and isinstance(request_data["dishes"], list):
+            dishes = request_data["dishes"]
+            logger.info(f"Обнаружено поле dishes, количество элементов: {len(dishes)}")
+            
+            for dish in dishes:
+                if isinstance(dish, dict) and "dish_id" in dish and "quantity" in dish:
+                    # Формат: {"dish_id": 1, "quantity": 2}
+                    items.append({
+                        "dish_id": dish["dish_id"],
+                        "quantity": dish["quantity"],
+                        "special_instructions": dish.get("special_instructions", "")
+                    })
+                elif isinstance(dish, int):
+                    # Формат: [1, 2, 3] - просто идентификаторы блюд
+                    items.append({
+                        "dish_id": dish,
+                        "quantity": 1,
+                        "special_instructions": ""
+                    })
+                else:
+                    logger.warning(f"Некорректный формат блюда в dishes: {dish}")
+        
+        # Вариант 2: items в виде массива объектов
+        if "items" in request_data and isinstance(request_data["items"], list) and not items:
+            logger.info(f"Обнаружено поле items, количество элементов: {len(request_data['items'])}")
+            for item in request_data["items"]:
+                if isinstance(item, dict) and "dish_id" in item:
+                    items.append({
+                        "dish_id": item["dish_id"],
+                        "quantity": item.get("quantity", 1),
+                        "special_instructions": item.get("special_instructions", "")
+                    })
+        
+        # Добавляем подготовленные блюда к данным заказа
+        if items:
+            order_data["items"] = items
+            logger.info(f"Добавлено {len(items)} блюд к заказу")
+        else:
+            logger.warning("Не найдено блюд для заказа")
+            order_data["items"] = []
+        
+        # Создаем заказ
+        logger.info(f"Отправка данных для создания заказа: {order_data}")
         result = order_service.create_order(db, order_data)
         return result
+    except ValueError as ve:
+        logger.error(f"Ошибка валидации данных: {str(ve)}")
+        raise HTTPException(status_code=422, detail=f"Ошибка валидации данных: {str(ve)}")
     except Exception as e:
         logger.error(f"Ошибка при создании заказа: {str(e)}")
+        logger.exception(e)
         raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
 
 
