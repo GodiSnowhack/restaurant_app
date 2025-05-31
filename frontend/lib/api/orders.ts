@@ -400,11 +400,8 @@ export const ordersApi = {
   // Создание нового заказа
   createOrder: async (orderData: any): Promise<Order> => {
     try {
-      // Получаем блюда с количеством из items
-      const orderItems = orderData.items.map((item: any) => ({
-        dish_id: item.dish_id,
-        quantity: item.quantity || 1
-      }));
+      // Получаем только ID блюд для dishes
+      const dishIds = orderData.items.map((item: any) => item.dish_id);
       
       // Формируем запрос в соответствии со структурой БД
       const requestPayload: any = {
@@ -413,14 +410,9 @@ export const ordersApi = {
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
         
-        // Блюда в заказе с количеством - используем dishes как ожидает API
-        dishes: orderItems
+        // Блюда в заказе - только массив ID блюд
+        dishes: dishIds
       };
-      
-      // Добавляем номер стола только если он явно указан (не используем значение по умолчанию)
-      if (orderData.table_number) {
-        requestPayload.table_number = orderData.table_number;
-      }
       
       // Добавляем код бронирования, если есть
       if (orderData.reservation_code) {

@@ -56,7 +56,7 @@ class OrderDish(OrderDishBase):
 class OrderBase(BaseModel):
     user_id: Optional[int] = None
     waiter_id: Optional[int] = None
-    table_number: int
+    table_number: Optional[int] = None
     status: Optional[str] = "pending"
     payment_status: Optional[PaymentStatus] = PaymentStatus.PENDING
     payment_method: Optional[str] = None
