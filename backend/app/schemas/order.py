@@ -72,7 +72,8 @@ class OrderBase(BaseModel):
 
 
 class OrderCreate(OrderBase):
-    items: List[OrderDishCreate]
+    items: Optional[List[OrderDishCreate]] = []
+    dishes: Optional[List[OrderDishCreate]] = []
 
 
 class OrderUpdate(OrderBase):
