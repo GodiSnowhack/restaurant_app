@@ -1,5 +1,5 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.schemas.orders import OrderCreate, OrderOut
@@ -52,22 +52,90 @@ def get_orders(
         )
 
 @router.post("/", response_model=OrderOut)
-def create_order(
-    order_in: OrderCreate,
+async def create_order(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Создание нового заказа.
+    Создание нового заказа с обработкой различных форматов данных.
+    Номер стола получается автоматически из кода бронирования.
     """
-    # Создаем заказ
     try:
-        order = create_order(db, current_user.id, order_in)
-        return order
+        # Получаем данные из запроса
+        try:
+            request_data = await request.json()
+            print(f"Получены данные заказа: {request_data}")
+        except Exception as e:
+            print(f"Ошибка при чтении JSON: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Некорректный формат данных в запросе"
+            )
+        
+        # Базовые данные заказа
+        order_data = {
+            "status": "pending"
+        }
+        
+        # Код бронирования (если есть)
+        if request_data.get("reservation_code"):
+            order_data["reservation_code"] = request_data["reservation_code"]
+        
+        # Обработка блюд
+        dishes = request_data.get("dishes", [])
+        items = []
+        
+        if dishes:
+            # Проверяем формат dishes
+            if dishes and isinstance(dishes[0], dict):
+                # Формат объектов с dish_id и quantity
+                for dish in dishes:
+                    items.append({
+                        "dish_id": dish["dish_id"],
+                        "quantity": dish.get("quantity", 1),
+                        "special_instructions": dish.get("special_instructions", "")
+                    })
+            else:
+                # Простой массив ID блюд
+                order_data["dishes"] = dishes
+                
+        # Если определены items напрямую, используем их
+        if request_data.get("items"):
+            for item in request_data["items"]:
+                items.append({
+                    "dish_id": item["dish_id"],
+                    "quantity": item.get("quantity", 1),
+                    "special_instructions": item.get("special_instructions", "")
+                })
+        
+        # Если есть обработанные items, добавляем их к данным заказа
+        if items:
+            order_data["items"] = items
+            
+        # Проверяем, что есть хотя бы один источник блюд
+        if not order_data.get("dishes") and not order_data.get("items"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="В заказе должны быть указаны блюда (dishes или items)"
+            )
+        
+        # Создаем заказ через сервисный слой
+        try:
+            order = create_order(db, current_user.id, OrderCreate(**order_data))
+            return order
+        except Exception as e:
+            print(f"Ошибка при создании заказа: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при создании заказа: {str(e)}"
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         # Логгируем ошибку и возвращаем описательный ответ
-        print(f"Ошибка при создании заказа: {str(e)}")
+        print(f"Общая ошибка при создании заказа: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ошибка при создании заказа: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Непредвиденная ошибка при создании заказа: {str(e)}"
         ) 

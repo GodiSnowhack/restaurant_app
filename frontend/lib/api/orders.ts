@@ -400,8 +400,12 @@ export const ordersApi = {
   // Создание нового заказа
   createOrder: async (orderData: any): Promise<Order> => {
     try {
-      // Получаем только ID блюд для dishes
-      const dishIds = orderData.items.map((item: any) => item.dish_id);
+      // Подготавливаем блюда для заказа в правильном формате
+      const dishes = orderData.items?.map((item: any) => ({
+        dish_id: item.dish_id,
+        quantity: item.quantity || 1,
+        special_instructions: item.special_instructions || ""
+      })) || [];
       
       // Формируем запрос в соответствии со структурой БД
       const requestPayload: any = {
@@ -410,8 +414,8 @@ export const ordersApi = {
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
         
-        // Блюда в заказе - только массив ID блюд
-        dishes: dishIds
+        // Блюда в заказе - объекты с dish_id и quantity
+        dishes: dishes
       };
       
       // Добавляем код бронирования, если есть

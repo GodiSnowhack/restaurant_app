@@ -3,11 +3,17 @@ from datetime import datetime
 from typing import List, Optional, Any, Dict
 
 class OrderBase(BaseModel):
-    table_number: int
     status: str = "pending"
 
+class OrderDishItem(BaseModel):
+    dish_id: int
+    quantity: int = 1
+    special_instructions: Optional[str] = None
+
 class OrderCreate(OrderBase):
-    dishes: List[int]  # список ID блюд
+    dishes: Optional[List[int]] = []  # простой список ID блюд
+    items: Optional[List[OrderDishItem]] = []  # список объектов с dish_id и quantity
+    reservation_code: Optional[str] = None  # код бронирования для получения номера стола
 
 class OrderOut(BaseModel):
     id: int

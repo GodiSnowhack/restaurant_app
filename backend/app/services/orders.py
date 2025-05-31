@@ -6,22 +6,120 @@ from app.schemas.orders import OrderCreate
 from app.models.order import Order, OrderDish
 from app.models.menu import Dish
 from sqlalchemy import and_, or_, func, desc
+import uuid
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
 
 def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Order:
     """
-    Создание нового заказа
+    Создание нового заказа в базе данных
+    
+    Args:
+        db: Сессия базы данных
+        user_id: ID пользователя, создающего заказ
+        order_in: Данные заказа
+        
+    Returns:
+        Созданный заказ
     """
-    # Временная заглушка для тестирования
-    return Order(
-        id=1,
-        user_id=user_id,
-        table_number=order_in.table_number,
-        status=order_in.status,
-        total_amount=100.0
-    )
+    try:
+        logger.info(f"Создание нового заказа для пользователя {user_id}")
+        logger.debug(f"Данные заказа: {order_in.dict()}")
+        
+        # Генерируем уникальный код заказа
+        order_code = str(uuid.uuid4())[:6].upper()
+        
+        # Определяем номер стола
+        table_number = None
+        
+        # Если есть код бронирования, получаем номер стола из таблицы reservations
+        if order_in.reservation_code:
+            from app.services.reservation import get_reservation_by_code
+            reservation = get_reservation_by_code(db, order_in.reservation_code)
+            if reservation:
+                table_number = reservation.table_number
+                logger.info(f"Получен номер стола {table_number} из бронирования {order_in.reservation_code}")
+        
+        # Если номер стола не найден, используем значение по умолчанию
+        if table_number is None:
+            table_number = 1
+            logger.info(f"Номер стола не найден, используем значение по умолчанию: {table_number}")
+        
+        # Создаем объект заказа
+        db_order = Order(
+            user_id=user_id,
+            table_number=table_number,
+            status=order_in.status,
+            payment_status="pending",
+            payment_method="cash",  # Значение по умолчанию
+            total_amount=0.0,
+            order_code=order_code,
+            reservation_code=order_in.reservation_code
+        )
+        
+        db.add(db_order)
+        db.flush()  # Для получения ID заказа
+        
+        # Вычисляем общую сумму заказа
+        total_amount = 0.0
+        
+        # Обрабатываем обычные dishes (только ID блюд)
+        if order_in.dishes:
+            logger.info(f"Обработка блюд из dishes: {order_in.dishes}")
+            for dish_id in order_in.dishes:
+                # Получаем блюдо из базы данных
+                dish = db.query(Dish).filter(Dish.id == dish_id).first()
+                if dish:
+                    # Создаем связь между заказом и блюдом (количество = 1 по умолчанию)
+                    order_dish = OrderDish(
+                        order_id=db_order.id,
+                        dish_id=dish_id,
+                        quantity=1,  # По умолчанию 1
+                        price=dish.price,  # Цена из блюда
+                        special_instructions=""
+                    )
+                    db.add(order_dish)
+                    
+                    # Добавляем стоимость блюда к общей сумме
+                    total_amount += float(dish.price)
+        
+        # Обрабатываем items (объекты с dish_id и quantity)
+        if order_in.items:
+            logger.info(f"Обработка блюд из items: {[item.dict() for item in order_in.items]}")
+            for item in order_in.items:
+                # Получаем блюдо из базы данных
+                dish = db.query(Dish).filter(Dish.id == item.dish_id).first()
+                if dish:
+                    # Создаем связь между заказом и блюдом с указанным количеством
+                    order_dish = OrderDish(
+                        order_id=db_order.id,
+                        dish_id=item.dish_id,
+                        quantity=item.quantity,
+                        price=dish.price,  # Цена из блюда
+                        special_instructions=item.special_instructions or ""
+                    )
+                    db.add(order_dish)
+                    
+                    # Добавляем стоимость блюда * количество к общей сумме
+                    item_total = float(dish.price) * item.quantity
+                    total_amount += item_total
+        
+        # Обновляем общую сумму заказа
+        db_order.total_amount = total_amount
+        logger.info(f"Общая сумма заказа: {total_amount}")
+        
+        # Сохраняем изменения
+        db.commit()
+        db.refresh(db_order)
+        
+        logger.info(f"Заказ успешно создан, ID: {db_order.id}")
+        return db_order
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Ошибка при создании заказа: {str(e)}")
+        raise
 
 def get_orders(
     db: Session,
