@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseApiUrl = getDefaultApiUrl();
     
     // Формируем URL для запроса
-    const url = `${baseApiUrl}/orders/${id}/payment-status`;
+    const url = `${baseApiUrl}/api/v1/orders/${id}/payment-status`;
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({

@@ -73,7 +73,7 @@ export default async function orderStatusProxy(req: NextApiRequest, res: NextApi
     
     // Формируем URL для запроса к бэкенду
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const backendUrl = `${apiUrl}/orders/${id}`;
+    const backendUrl = `${apiUrl}/orders/${id}/status`;
     
     console.log(`API Proxy - Отправка запроса на обновление статуса заказа ${id} на ${normalizedStatus}`);
     

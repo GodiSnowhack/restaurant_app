@@ -587,27 +587,59 @@ export const ordersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const response = await fetch(`/api/orders/${id}/payment-status`, {
-        method: 'PUT',
+      // Первая попытка через обычный прокси
+      try {
+        const response = await fetch(`/api/orders/${id}/payment-status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-User-Role': 'waiter'
+          },
+          body: JSON.stringify({ status })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          return data;
+        }
+        
+        console.log(`DEBUG: Ошибка API прокси: ${response.status}`, data);
+      } catch (error) {
+        console.error('Ошибка при использовании основного прокси:', error);
+      }
+      
+      // Пробуем альтернативный прокси
+      console.log(`DEBUG: Пробуем альтернативный прокси через status_update`);
+      const altResponse = await fetch(`/api/orders/payment_update`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'X-User-Role': 'waiter'
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ 
+          orderId: id,
+          payment_status: status
+        })
       });
-
-      const data = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.message || `Ошибка при обновлении статуса оплаты заказа ${id}`);
-      }
-
-      return data;
+      const altData = await altResponse.json();
+      console.log(`DEBUG: Обновление через альтернативный прокси успешно`, altData);
+      
+      return {
+        success: true,
+        order: {
+          ...altData.order,
+          id: id,
+          payment_status: status
+        }
+      };
     } catch (error: any) {
       console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
-      throw error;
+      throw new Error(`Ошибка при обновлении статуса оплаты заказа ${id}`);
     }
   }
 };

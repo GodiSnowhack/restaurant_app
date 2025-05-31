@@ -385,15 +385,6 @@ const WaiterOrdersPage: NextPage = () => {
                           
                           {order.status === 'ready' && (
                             <button
-                              onClick={() => handleStatusChange(order.id, 'delivered')}
-                              className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm"
-                            >
-                              Доставлен
-                            </button>
-                          )}
-                          
-                          {order.status === 'delivered' && (
-                            <button
                               onClick={() => handleStatusChange(order.id, 'completed')}
                               className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm"
                             >
