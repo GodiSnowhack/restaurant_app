@@ -55,7 +55,12 @@ def create_order(db: Session, user_id: int, order_in: OrderCreate) -> Dict[str, 
             payment_method="cash",  # Значение по умолчанию
             total_amount=0.0,
             order_code=order_code,
-            reservation_code=order_in.reservation_code
+            reservation_code=order_in.reservation_code,
+            customer_name=order_in.customer_name,
+            customer_phone=order_in.customer_phone,
+            comment=order_in.comment,
+            is_urgent=order_in.is_urgent,
+            is_group_order=order_in.is_group_order
         )
         
         db.add(db_order)

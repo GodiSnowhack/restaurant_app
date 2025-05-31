@@ -90,6 +90,28 @@ def create_order(
         if order_req.get("dishes"):
             order_data["dishes"] = order_req["dishes"]
         
+        # Добавляем данные о клиенте
+        if order_req.get("customer_name"):
+            order_data["customer_name"] = order_req["customer_name"]
+        else:
+            order_data["customer_name"] = current_user.full_name
+            
+        if order_req.get("customer_phone"):
+            order_data["customer_phone"] = order_req["customer_phone"]
+        else:
+            order_data["customer_phone"] = current_user.phone
+            
+        # Добавляем комментарий, если есть
+        if order_req.get("comment"):
+            order_data["comment"] = order_req["comment"]
+            
+        # Добавляем флаги срочности и группового заказа, если есть
+        if order_req.get("is_urgent") is not None:
+            order_data["is_urgent"] = order_req["is_urgent"]
+            
+        if order_req.get("is_group_order") is not None:
+            order_data["is_group_order"] = order_req["is_group_order"]
+        
         # Создаем заказ через сервисный слой
         try:
             order_result = create_order_service(db, current_user.id, OrderCreate(**order_data))

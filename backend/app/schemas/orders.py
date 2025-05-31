@@ -14,6 +14,11 @@ class OrderCreate(OrderBase):
     dishes: Optional[List[int]] = []  # простой список ID блюд
     items: Optional[List[OrderDishItem]] = []  # список объектов с dish_id и quantity
     reservation_code: Optional[str] = None  # код бронирования для получения номера стола
+    customer_name: Optional[str] = None  # имя клиента
+    customer_phone: Optional[str] = None  # телефон клиента
+    comment: Optional[str] = None  # комментарий к заказу
+    is_urgent: Optional[bool] = False  # срочный заказ
+    is_group_order: Optional[bool] = False  # групповой заказ
 
 class OrderOut(BaseModel):
     id: int
