@@ -62,12 +62,6 @@ export const waiterApi = {
     try {
       console.log('waiterApi.getWaiterOrders - Начало запроса');
       
-      // Проверяем, нужно ли использовать демо-данные
-      if (shouldUseDemoData()) {
-        console.log('waiterApi.getWaiterOrders - Используем демо-данные');
-        return demoWaiterOrders;
-      }
-      
       // Получаем информацию о пользователе
       const userInfo = getUserInfo();
       const token = getAuthToken();
@@ -76,8 +70,7 @@ export const waiterApi = {
 
       if (!userInfo || !token) {
         console.error('waiterApi.getWaiterOrders - Отсутствуют данные пользователя или токен авторизации');
-        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за отсутствия авторизации');
-        return demoWaiterOrders;
+        throw new Error('Необходима авторизация');
       }
 
       // Получаем ID пользователя и его роль
@@ -89,42 +82,11 @@ export const waiterApi = {
       
       if (!userId) {
         console.error('waiterApi.getWaiterOrders - Не удалось определить ID пользователя');
-        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за отсутствия ID пользователя');
-        return demoWaiterOrders;
+        throw new Error('Не удалось определить ID пользователя');
       }
 
-      // Пробуем сначала получить заказы через специальное API для официантов
-      try {
-        const apiUrl = '/waiter/simple-orders';
-        console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
-        
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-User-Role': userRole,
-          'X-User-ID': userId ? String(userId) : ''
-        };
-        
-        const response = await api.get(apiUrl, { headers });
-        
-        if (response.status === 200) {
-          const data = response.data;
-          console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
-          
-          if (Array.isArray(data) && data.length > 0) {
-            return data;
-          }
-        }
-        
-        // Если не получилось или нет данных, пробуем основной API
-        console.log('waiterApi.getWaiterOrders - Переход к основному API заказов...');
-      } catch (error) {
-        console.warn('waiterApi.getWaiterOrders - Ошибка с simple-orders API, пробуем основной API:', error);
-      }
-
-      // Формируем URL запроса к обычному API
-      const apiUrl = '/waiter/orders';
+      // Формируем URL запроса к API
+      const apiUrl = '/api/v1/waiter/orders';
       
       console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
 
@@ -137,46 +99,26 @@ export const waiterApi = {
         'X-User-ID': userId ? String(userId) : ''
       };
 
-      try {
-        // Выполняем запрос через axios instance
-        const response = await api.get(apiUrl, { headers });
+      // Выполняем запрос через axios instance
+      const response = await api.get(apiUrl, { headers });
 
-        if (response.status !== 200) {
-          console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}`);
-          
-          // Если ошибка 401 (не авторизован) или 403 (доступ запрещен), возвращаем демо-данные
-          if (response.status === 401 || response.status === 403) {
-            console.log('waiterApi.getWaiterOrders - Ошибка авторизации, используем демо-данные');
-            return demoWaiterOrders;
-          }
-          
-          throw new Error(`Ошибка запроса: ${response.status}`);
-        }
-
-        const data = response.data;
-        console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
-        
-        if (!Array.isArray(data)) {
-          console.warn('waiterApi.getWaiterOrders - Получены данные не в формате массива:', data);
-          return data && typeof data === 'object' ? [data] : demoWaiterOrders;
-        }
-        
-        // Если массив пустой, возвращаем демо-данные
-        if (data.length === 0) {
-          console.log('waiterApi.getWaiterOrders - Получен пустой массив, используем демо-данные');
-          return demoWaiterOrders;
-        }
-        
-        return data;
-      } catch (fetchError) {
-        console.error('waiterApi.getWaiterOrders - Ошибка при выполнении запроса:', fetchError);
-        console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за ошибки запроса');
-        return demoWaiterOrders;
+      if (response.status !== 200) {
+        console.error(`waiterApi.getWaiterOrders - Ошибка ${response.status}`);
+        throw new Error(`Ошибка запроса: ${response.status}`);
       }
+
+      const data = response.data;
+      console.log(`waiterApi.getWaiterOrders - Получено заказов: ${Array.isArray(data) ? data.length : 'не массив'}`);
+      
+      if (!Array.isArray(data)) {
+        console.warn('waiterApi.getWaiterOrders - Получены данные не в формате массива:', data);
+        return data && typeof data === 'object' ? [data] : [];
+      }
+      
+      return data;
     } catch (error) {
       console.error('waiterApi.getWaiterOrders - Критическая ошибка:', error);
-      console.log('waiterApi.getWaiterOrders - Используем демо-данные из-за критической ошибки');
-      return demoWaiterOrders;
+      throw error;
     }
   },
 
