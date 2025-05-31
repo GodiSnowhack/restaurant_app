@@ -1,14 +1,27 @@
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Any, List, Dict, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from sqlalchemy.orm import Session
+import json
+from pydantic import BaseModel
 
-from app.schemas.orders import OrderCreate, OrderOut
-from app.services.orders import create_order, get_orders as get_orders_service
+from app.schemas.orders import OrderCreate, OrderOut, OrderDishItem
+from app.services.orders import create_order as create_order_service, get_orders as get_orders_service
 from app.models.user import User
 from app.database.session import get_db
 from app.core.auth import get_current_user
 
 router = APIRouter()
+
+class OrderCreateRequest(BaseModel):
+    payment_method: Optional[str] = "cash"
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    dishes: Optional[List[int]] = None
+    items: Optional[List[Dict[str, Any]]] = None
+    reservation_code: Optional[str] = None
+    is_urgent: Optional[bool] = False
+    is_group_order: Optional[bool] = False
+    comment: Optional[str] = None
 
 @router.get("/", response_model=List[OrderOut])
 def get_orders(
@@ -52,8 +65,8 @@ def get_orders(
         )
 
 @router.post("/", response_model=OrderOut)
-async def create_order(
-    request: Request,
+def create_order(
+    order_req: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -62,16 +75,7 @@ async def create_order(
     Номер стола получается автоматически из кода бронирования.
     """
     try:
-        # Получаем данные из запроса
-        try:
-            request_data = await request.json()
-            print(f"Получены данные заказа: {request_data}")
-        except Exception as e:
-            print(f"Ошибка при чтении JSON: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Некорректный формат данных в запросе"
-            )
+        print(f"Получены данные заказа: {order_req}")
         
         # Базовые данные заказа
         order_data = {
@@ -79,35 +83,36 @@ async def create_order(
         }
         
         # Код бронирования (если есть)
-        if request_data.get("reservation_code"):
-            order_data["reservation_code"] = request_data["reservation_code"]
+        if order_req.get("reservation_code"):
+            order_data["reservation_code"] = order_req["reservation_code"]
         
         # Обработка блюд
-        dishes = request_data.get("dishes", [])
+        dishes = order_req.get("dishes", [])
         items = []
         
         if dishes:
             # Проверяем формат dishes
-            if dishes and isinstance(dishes[0], dict):
-                # Формат объектов с dish_id и quantity
-                for dish in dishes:
-                    items.append({
-                        "dish_id": dish["dish_id"],
-                        "quantity": dish.get("quantity", 1),
-                        "special_instructions": dish.get("special_instructions", "")
-                    })
-            else:
-                # Простой массив ID блюд
-                order_data["dishes"] = dishes
-                
+            if dishes and isinstance(dishes, list):
+                if all(isinstance(d, int) for d in dishes):
+                    # Простой массив ID блюд
+                    order_data["dishes"] = dishes
+                elif all(isinstance(d, dict) for d in dishes):
+                    # Формат объектов с dish_id и quantity
+                    for dish in dishes:
+                        items.append(OrderDishItem(
+                            dish_id=dish["dish_id"],
+                            quantity=dish.get("quantity", 1),
+                            special_instructions=dish.get("special_instructions", "")
+                        ))
+        
         # Если определены items напрямую, используем их
-        if request_data.get("items"):
-            for item in request_data["items"]:
-                items.append({
-                    "dish_id": item["dish_id"],
-                    "quantity": item.get("quantity", 1),
-                    "special_instructions": item.get("special_instructions", "")
-                })
+        if order_req.get("items") and isinstance(order_req["items"], list):
+            for item in order_req["items"]:
+                items.append(OrderDishItem(
+                    dish_id=item["dish_id"],
+                    quantity=item.get("quantity", 1),
+                    special_instructions=item.get("special_instructions", "")
+                ))
         
         # Если есть обработанные items, добавляем их к данным заказа
         if items:
@@ -122,10 +127,10 @@ async def create_order(
         
         # Создаем заказ через сервисный слой
         try:
-            order = create_order(db, current_user.id, OrderCreate(**order_data))
+            order = create_order_service(db, current_user.id, OrderCreate(**order_data))
             return order
         except Exception as e:
-            print(f"Ошибка при создании заказа: {str(e)}")
+            print(f"Ошибка при создании заказа в сервисе: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Ошибка при создании заказа: {str(e)}"
