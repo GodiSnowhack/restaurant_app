@@ -400,69 +400,27 @@ export const ordersApi = {
   // Создание нового заказа
   createOrder: async (orderData: any): Promise<Order> => {
     try {
-      // Создаем объект запроса, соответствующий ожиданиям бэкенда
-      const orderRequest: any = {
-        // Обязательные поля
+      // Гарантируем что есть номер стола
+      const table_number = orderData.table_number || 1;
+      
+      // Прямое формирование запроса в формате, который точно ожидает сервер
+      const requestPayload: any = {
+        dishes: orderData.items.map((item: any) => ({
+          dish_id: item.dish_id,
+          quantity: item.quantity
+        })),
+        table_number: table_number,
         payment_method: orderData.payment_method,
-        table_number: orderData.table_number || 1, // По умолчанию стол 1, если не указан
-        
-        // Переименовываем items в dishes, как ожидает сервер
-        dishes: orderData.items.map((item: any) => {
-          // Создаем объект элемента заказа только с обязательными полями
-          const orderItem: any = {
-            dish_id: item.dish_id,
-            quantity: item.quantity
-          };
-          
-          // Добавляем special_instructions только если они НЕ пустые
-          if (item.special_instructions && item.special_instructions.trim() !== '') {
-            orderItem.special_instructions = item.special_instructions;
-          }
-          
-          return orderItem;
-        })
+        customer_name: orderData.customer_name,
+        customer_phone: orderData.customer_phone
       };
       
-      // Сохраняем копию items для обратной совместимости
-      orderRequest.items = orderRequest.dishes;
-      
-      // Добавляем булевы поля только если они true
-      if (orderData.is_urgent === true) {
-        orderRequest.is_urgent = true;
+      // Добавляем код бронирования если есть
+      if (orderData.reservation_code) {
+        requestPayload.reservation_code = orderData.reservation_code;
       }
       
-      if (orderData.is_group_order === true) {
-        orderRequest.is_group_order = true;
-      }
-      
-      // Добавляем контактные данные, если они предоставлены и не пустые
-      if (orderData.customer_name && orderData.customer_name.trim() !== '') {
-        orderRequest.customer_name = orderData.customer_name.trim();
-      }
-      
-      if (orderData.customer_phone && orderData.customer_phone.trim() !== '') {
-        orderRequest.customer_phone = orderData.customer_phone.trim();
-      }
-      
-      // Добавляем комментарий к заказу, только если он не пустой
-      if (orderData.comment && orderData.comment.trim() !== '') {
-        orderRequest.comment = orderData.comment.trim();
-      }
-      
-      // Добавляем опциональные поля, если они есть и не пустые
-      if (orderData.reservation_code && orderData.reservation_code.trim() !== '') {
-        orderRequest.reservation_code = orderData.reservation_code.trim();
-      }
-      
-      if (orderData.order_code && orderData.order_code.trim() !== '') {
-        orderRequest.order_code = orderData.order_code.trim();
-      }
-      
-      if (orderData.waiter_code && orderData.waiter_code.trim() !== '') {
-        orderRequest.waiter_code = orderData.waiter_code.trim();
-      }
-      
-      console.log('API: Создание заказа с данными:', JSON.stringify(orderRequest, null, 2));
+      console.log('API: Финальный запрос на создание заказа:', JSON.stringify(requestPayload, null, 2));
       
       // Получаем токен для запроса
       const token = localStorage.getItem('token');
@@ -470,49 +428,26 @@ export const ordersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
       
-      // Пробуем сначала через локальный API-прокси
-      try {
-        const response = await fetch('/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(orderRequest)
-        });
-        
-        // Пытаемся получить детали ошибки, если есть
-        if (!response.ok) {
-          let errorDetails = 'Неизвестная ошибка';
-          try {
-            const errorData = await response.json();
-            errorDetails = JSON.stringify(errorData, null, 2);
-            console.error('API: Детали ошибки от сервера:', errorDetails);
-          } catch (e) {
-            console.error('API: Не удалось получить детали ошибки', e);
-          }
-          throw new Error(`Ошибка HTTP: ${response.status}. Детали: ${errorDetails}`);
-        }
-        
-        const data = await response.json();
-        console.log('API: Заказ успешно создан через API-прокси, ID:', data.id);
-        return data;
-      } catch (proxyError: any) {
-        console.error('API: Ошибка при создании заказа через API-прокси:', proxyError.message);
-        console.log('API: Пробуем создать заказ через основной API...');
-        
-        // Если прокси не сработал, пробуем через основной API
-        try {
-          const response = await api.post('/orders', orderRequest);
-          console.log('API: Заказ успешно создан через основной API, ID:', response.data.id);
-          return response.data;
-        } catch (apiError: any) {
-          console.error('API: Детали ошибки от основного API:', 
-            apiError.response?.data ? JSON.stringify(apiError.response.data, null, 2) : 'Нет данных');
-          throw apiError;
-        }
+      // Отправляем запрос напрямую через fetch
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API: Ошибка от сервера:', errorText);
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
+      
+      const data = await response.json();
+      console.log('API: Заказ успешно создан, ID:', data.id);
+      return data;
     } catch (error) {
       console.error('API: Ошибка при создании заказа:', error);
       throw error;
