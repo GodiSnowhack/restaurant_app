@@ -100,13 +100,33 @@ def create_order(
     """
     Создание нового заказа
     """
-    # Преобразуем входные данные в словарь и добавляем user_id
-    order_data = order_in.dict()
-    order_data["user_id"] = current_user.id
-    
-    # Создаем заказ и возвращаем результат
-    result = order_service.create_order(db, order_data)
-    return result
+    try:
+        # Преобразуем входные данные в словарь и добавляем user_id
+        order_data = order_in.dict()
+        order_data["user_id"] = current_user.id
+        
+        # Проверяем наличие reservation_code и отсутствие table_number
+        if order_data.get('reservation_code') and not order_data.get('table_number'):
+            from app.services.reservation import get_reservation_by_code
+            
+            # Ищем бронирование по коду
+            reservation = get_reservation_by_code(db, order_data['reservation_code'])
+            if reservation and reservation.table_number:
+                # Если бронирование найдено, берем из него номер стола
+                order_data['table_number'] = reservation.table_number
+                logger.info(f"Использован номер стола {reservation.table_number} из бронирования")
+        
+        # Если всё ещё нет table_number, используем значение по умолчанию
+        if not order_data.get('table_number'):
+            order_data['table_number'] = 1
+            logger.info("Установлен номер стола по умолчанию: 1")
+        
+        # Создаем заказ и возвращаем результат
+        result = order_service.create_order(db, order_data)
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка при создании заказа: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
 
 
 @router.get("/{order_id}", response_model=OrderSchema)

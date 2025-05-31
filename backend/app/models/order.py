@@ -61,7 +61,7 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     waiter_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    table_number = Column(Integer)
+    table_number = Column(Integer, nullable=True)
     
     # Дополнительные поля для интеграции с фронтендом
     payment_method = Column(Enum(PaymentMethod), nullable=True)

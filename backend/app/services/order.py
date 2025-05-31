@@ -656,6 +656,22 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         # Подготавливаем данные заказа
         items = order_data.pop('items', [])
         
+        # Проверяем есть ли dishes в запросе (формат с фронтенда)
+        if 'dishes' in order_data:
+            dishes = order_data.pop('dishes')
+            if dishes and isinstance(dishes, list):
+                logger.info(f"Найдено {len(dishes)} блюд в поле dishes, преобразуем в items")
+                for dish in dishes:
+                    if isinstance(dish, dict) and 'dish_id' in dish and 'quantity' in dish:
+                        items.append({
+                            'dish_id': dish['dish_id'],
+                            'quantity': dish['quantity'],
+                            'special_instructions': dish.get('special_instructions', '')
+                        })
+                    else:
+                        logger.warning(f"Некорректный формат блюда в dishes: {dish}")
+                logger.info(f"После преобразования dishes в items: {items}")
+        
         # Удаляем поле order_type, если оно есть, т.к. в таблице orders такого поля нет
         if 'order_type' in order_data:
             order_data.pop('order_type')
