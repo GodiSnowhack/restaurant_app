@@ -108,8 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Формируем URL для запроса
-    let url = `${baseApiUrl}/orders/${id}`;
+    // Формируем URL для запроса с прямым обращением к Railway
+    let url = `https://backend-production-1a78.up.railway.app/api/v1/orders/${id}`;
     
     // Убираем возможное дублирование api/v1
     if (url.includes('/api/v1/api/v1/')) {
