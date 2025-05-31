@@ -523,26 +523,6 @@ const OrderDetailPage: NextPage = () => {
                     )}
                   </button>
                 )}
-                
-                {user?.role === 'admin' && (
-                  <button 
-                    className="px-4 py-2 bg-purple-500 text-white rounded-md flex items-center hover:bg-purple-600 disabled:bg-purple-300 disabled:cursor-not-allowed"
-                    onClick={fetchDebugData}
-                    disabled={isLoadingDebug}
-                  >
-                    {isLoadingDebug ? (
-                      <>
-                        <div className="w-4 h-4 border-t-2 border-white rounded-full animate-spin mr-2"></div>
-                        Загрузка...
-                      </>
-                    ) : (
-                      <>
-                        <BugAntIcon className="h-5 w-5 mr-1" />
-                        Отладка
-                      </>
-                    )}
-                  </button>
-                )}
               </div>
             </div>
             

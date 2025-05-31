@@ -103,7 +103,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* О ресторане */}
           <div>
-            <h3 className="text-xl font-bold mb-4">{settings.restaurant_name}</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">{settings.restaurant_name}</h3>
             <p className="mb-4 text-gray-300 dark:text-gray-300">
               Система поддержки принятия решений для управления рестораном.
               Насладитесь изысканными блюдами в атмосфере уюта и комфорта.
@@ -126,7 +126,7 @@ const Footer = () => {
 
           {/* Контакты */}
           <div>
-            <h3 className="text-xl font-bold mb-4">Контакты</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">Контакты</h3>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <LocationMarkerIcon className="h-5 w-5 mr-2 mt-0.5 text-primary" />
@@ -155,7 +155,7 @@ const Footer = () => {
 
           {/* Быстрые ссылки */}
           <div>
-            <h3 className="text-xl font-bold mb-4">Навигация</h3>
+            <h3 className="text-xl font-bold mb-4 text-white">Навигация</h3>
             <nav className="grid grid-cols-2 gap-y-4 sm:grid-cols-4 gap-x-6 mt-8">
               <Link href="/" className="text-base text-gray-300 hover:text-white dark:text-gray-300 dark:hover:text-white" onClick={handleHomeClick}>
                 Главная

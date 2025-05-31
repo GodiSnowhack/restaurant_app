@@ -45,7 +45,7 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
   // Функция для получения стиля стола на основе его статуса и доступности
   const getTableStyle = (table: RestaurantTable) => {
     // Базовые стили
-    const baseStyle = 'absolute transform -translate-x-1/2 -translate-y-1/2 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-md';
+    const baseStyle = 'absolute transform -translate-x-1/2 -translate-y-1/2 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-200 shadow-md hover:scale-105';
     
     // Размеры стола в зависимости от вместимости
     const widthPx = table.capacity <= 2 ? 80 * tableScaleFactor :
@@ -176,10 +176,6 @@ const FloorPlan: React.FC<FloorPlanProps> = ({
               <div className="flex items-center">
                 <div className={`w-4 h-4 rounded ${isDark ? 'bg-red-900/50 border-red-700' : 'bg-red-200 border-red-400'} border mr-2`}></div>
                 <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Занято</span>
-              </div>
-              <div className="flex items-center">
-                <div className={`w-4 h-4 rounded ${isDark ? 'bg-yellow-900/50 border-yellow-700' : 'bg-yellow-200 border-yellow-400'} border mr-2`}></div>
-                <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Недостаточно мест</span>
               </div>
             </div>
           </div>

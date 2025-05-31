@@ -143,30 +143,11 @@ export const DishCard: React.FC<DishCardProps> = ({
                 🥬
               </span>
             )}
-            {calories !== null && calories !== undefined && (
-              <span 
-                className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
-                title="Калории"
-              >
-                {calories} ккал
-              </span>
-            )}
-            {cooking_time !== null && cooking_time !== undefined && (
-              <span 
-                className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
-                title="Время приготовления"
-              >
-                ⏱️ {cooking_time} мин
-              </span>
-            )}
           </div>
-          <div className="flex justify-between items-center mt-auto">
-            <span className={`
-              font-bold whitespace-nowrap
-              ${isDark ? 'text-primary-400' : 'text-primary'}
-            `}>
+          <div className="flex justify-between items-center">
+            <div className="font-semibold text-lg">
               {typeof price === 'number' ? price.toLocaleString() : price} {settings?.currency_symbol || '₸'}
-            </span>
+            </div>
             <div className="cart-controls">
               {cartItem ? (
                 <div className="flex items-center space-x-2">
