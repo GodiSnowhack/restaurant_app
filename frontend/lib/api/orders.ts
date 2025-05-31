@@ -401,8 +401,13 @@ export const ordersApi = {
   createOrder: async (orderData: any): Promise<Order> => {
     try {
       // Создаем объект запроса, соответствующий ожиданиям бэкенда
-      const orderRequest: OrderCreateRequest = {
-        items: orderData.items.map((item: any) => {
+      const orderRequest: any = {
+        // Обязательные поля
+        payment_method: orderData.payment_method,
+        table_number: orderData.table_number || 1, // По умолчанию стол 1, если не указан
+        
+        // Переименовываем items в dishes, как ожидает сервер
+        dishes: orderData.items.map((item: any) => {
           // Создаем объект элемента заказа только с обязательными полями
           const orderItem: any = {
             dish_id: item.dish_id,
@@ -415,9 +420,11 @@ export const ordersApi = {
           }
           
           return orderItem;
-        }),
-        payment_method: orderData.payment_method
+        })
       };
+      
+      // Сохраняем копию items для обратной совместимости
+      orderRequest.items = orderRequest.dishes;
       
       // Добавляем булевы поля только если они true
       if (orderData.is_urgent === true) {
@@ -443,10 +450,6 @@ export const ordersApi = {
       }
       
       // Добавляем опциональные поля, если они есть и не пустые
-      if (orderData.table_number && orderData.table_number > 0) {
-        orderRequest.table_number = orderData.table_number;
-      }
-      
       if (orderData.reservation_code && orderData.reservation_code.trim() !== '') {
         orderRequest.reservation_code = orderData.reservation_code.trim();
       }

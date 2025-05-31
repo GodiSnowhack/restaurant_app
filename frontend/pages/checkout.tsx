@@ -197,6 +197,9 @@ const CheckoutPage: NextPage = () => {
         }
       }
       
+      // Получаем номер стола (либо выбранный, либо из бронирования, либо по умолчанию)
+      const effectiveTableNumber = tableNumber || 1; // По умолчанию стол 1, если не выбран
+      
       // Собираем данные заказа, исключая пустые поля
       const orderData: any = {
         items: items.map(item => {
@@ -212,7 +215,9 @@ const CheckoutPage: NextPage = () => {
           
           return orderItem;
         }),
-        payment_method: formData.payment_method
+        payment_method: formData.payment_method,
+        // Всегда добавляем номер стола
+        table_number: effectiveTableNumber
       };
       
       // Добавляем булевы поля только если они true
@@ -249,12 +254,6 @@ const CheckoutPage: NextPage = () => {
       // Если предзаказ с бронированием, добавляем код бронирования
       if (!isGuestPresent && reservationCode) {
         orderData.reservation_code = reservationCode.trim();
-      }
-      
-      // Добавляем номер столика, если он выбран или получен из бронирования
-      if (tableNumber && tableNumber > 0) {
-        orderData.table_number = tableNumber;
-        console.log(`Добавляем номер столика в заказ: ${tableNumber}`);
       }
       
       // Отправляем заказ на сервер
