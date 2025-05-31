@@ -369,7 +369,7 @@ export const ordersApi = {
       }
       
       // Формируем URL и заголовки
-      const url = `/api/orders/${id}`;
+      const url = `/api/v1/orders/${id}`;
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

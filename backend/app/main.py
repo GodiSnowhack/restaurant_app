@@ -10,6 +10,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.database.session import SessionLocal, create_tables
 from app.core.init_db import init_db
+from app.api.v1.endpoints import orders
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -77,6 +78,9 @@ app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 # Регистрируем маршруты API
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Добавляем альтернативный маршрут для запросов без /v1/
+app.include_router(orders.router, prefix="/api/orders", tags=["orders"])
 
 # Корневой маршрут для проверки работоспособности API
 @app.get("/")
