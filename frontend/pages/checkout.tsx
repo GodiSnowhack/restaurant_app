@@ -188,7 +188,8 @@ const CheckoutPage: NextPage = () => {
         items: items.map(item => ({
           dish_id: item.dish_id,
           quantity: item.quantity,
-          special_instructions: item.comment
+          // Комментарий к блюду добавляем только если он есть
+          ...(item.comment ? { special_instructions: item.comment } : {})
         })),
         payment_method: formData.payment_method,
         table_number: tableNumber || 1,
@@ -201,9 +202,10 @@ const CheckoutPage: NextPage = () => {
         orderData.reservation_code = reservationCode;
       }
       
-      // Добавляем комментарий к заказу, если есть
-      if (comment || comments) {
-        orderData.comment = comment || comments;
+      // Добавляем комментарий к заказу, только если он не пустой
+      const commentText = (comment || comments || '').trim();
+      if (commentText) {
+        orderData.comment = commentText;
       }
       
       // Добавляем другие важные флаги

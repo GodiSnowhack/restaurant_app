@@ -414,8 +414,8 @@ export const ordersApi = {
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
         
-        // Блюда в заказе с количеством
-        order_items: orderItems
+        // Блюда в заказе с количеством - используем dishes как ожидает API
+        dishes: orderItems
       };
       
       // Добавляем опциональные поля
@@ -431,8 +431,9 @@ export const ordersApi = {
         requestPayload.is_group_order = true;
       }
       
-      if (orderData.comment) {
-        requestPayload.comment = orderData.comment;
+      // Комментарий необязательный, добавляем только если он есть
+      if (orderData.comment && orderData.comment.trim()) {
+        requestPayload.comment = orderData.comment.trim();
       }
       
       console.log('API: Финальный запрос на создание заказа:', JSON.stringify(requestPayload, null, 2));
