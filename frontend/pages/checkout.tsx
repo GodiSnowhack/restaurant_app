@@ -184,9 +184,11 @@ const CheckoutPage: NextPage = () => {
     try {
       // Базовые обязательные данные для заказа
       const orderData: any = {
+        // Включаем все данные о блюдах с их количеством
         items: items.map(item => ({
           dish_id: item.dish_id,
-          quantity: item.quantity
+          quantity: item.quantity,
+          special_instructions: item.comment
         })),
         payment_method: formData.payment_method,
         table_number: tableNumber || 1,
@@ -197,6 +199,20 @@ const CheckoutPage: NextPage = () => {
       // Добавляем код бронирования, если есть
       if (reservationCode) {
         orderData.reservation_code = reservationCode;
+      }
+      
+      // Добавляем комментарий к заказу, если есть
+      if (comment || comments) {
+        orderData.comment = comment || comments;
+      }
+      
+      // Добавляем другие важные флаги
+      if (urgent) {
+        orderData.is_urgent = true;
+      }
+      
+      if (isGroupOrder) {
+        orderData.is_group_order = true;
       }
       
       console.log('Отправка заказа с данными:', JSON.stringify(orderData, null, 2));

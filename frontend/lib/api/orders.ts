@@ -400,24 +400,39 @@ export const ordersApi = {
   // Создание нового заказа
   createOrder: async (orderData: any): Promise<Order> => {
     try {
-      // Гарантируем что есть номер стола
-      const table_number = orderData.table_number || 1;
+      // Получаем блюда с количеством из items
+      const orderItems = orderData.items.map((item: any) => ({
+        dish_id: item.dish_id,
+        quantity: item.quantity || 1
+      }));
       
-      // Прямое формирование запроса в формате, который точно ожидает сервер
+      // Формируем запрос в соответствии со структурой БД
       const requestPayload: any = {
-        dishes: orderData.items.map((item: any) => ({
-          dish_id: item.dish_id,
-          quantity: item.quantity
-        })),
-        table_number: table_number,
-        payment_method: orderData.payment_method,
+        // Основные данные заказа
+        table_number: orderData.table_number || 1,
+        payment_method: orderData.payment_method || 'cash',
         customer_name: orderData.customer_name,
-        customer_phone: orderData.customer_phone
+        customer_phone: orderData.customer_phone,
+        
+        // Блюда в заказе с количеством
+        order_items: orderItems
       };
       
-      // Добавляем код бронирования если есть
+      // Добавляем опциональные поля
       if (orderData.reservation_code) {
         requestPayload.reservation_code = orderData.reservation_code;
+      }
+      
+      if (orderData.is_urgent) {
+        requestPayload.is_urgent = true;
+      }
+      
+      if (orderData.is_group_order) {
+        requestPayload.is_group_order = true;
+      }
+      
+      if (orderData.comment) {
+        requestPayload.comment = orderData.comment;
       }
       
       console.log('API: Финальный запрос на создание заказа:', JSON.stringify(requestPayload, null, 2));
@@ -440,9 +455,20 @@ export const ordersApi = {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API: Ошибка от сервера:', errorText);
-        throw new Error(`Ошибка HTTP: ${response.status}`);
+        let errorMessage = 'Ошибка при создании заказа';
+        try {
+          const errorData = await response.json();
+          console.error('API: Детали ошибки от сервера:', JSON.stringify(errorData, null, 2));
+          if (errorData && errorData.error && errorData.error.detail) {
+            errorMessage = `Ошибка: ${JSON.stringify(errorData.error.detail)}`;
+          } else if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          const errorText = await response.text().catch(() => '');
+          console.error('API: Ошибка от сервера (текст):', errorText);
+        }
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
