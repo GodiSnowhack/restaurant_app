@@ -402,24 +402,44 @@ export const ordersApi = {
     try {
       // Создаем объект запроса, соответствующий ожиданиям бэкенда
       const orderRequest: OrderCreateRequest = {
-        items: orderData.items.map((item: any) => ({
-          dish_id: item.dish_id,
-          quantity: item.quantity,
-          special_instructions: item.special_instructions
-        })),
-        comment: orderData.comment,
+        items: orderData.items.map((item: any) => {
+          // Создаем объект элемента заказа без пустых полей
+          const orderItem: any = {
+            dish_id: item.dish_id,
+            quantity: item.quantity
+          };
+          
+          // Добавляем special_instructions только если они не пустые
+          if (item.special_instructions && item.special_instructions.trim() !== '') {
+            orderItem.special_instructions = item.special_instructions;
+          }
+          
+          return orderItem;
+        }),
         payment_method: orderData.payment_method,
-        is_urgent: orderData.is_urgent,
-        is_group_order: orderData.is_group_order,
-        customer_name: orderData.customer_name,
-        customer_phone: orderData.customer_phone
+        is_urgent: orderData.is_urgent || false,
+        is_group_order: orderData.is_group_order || false
       };
       
-      // Добавляем опциональные поля, если они есть
+      // Добавляем контактные данные, если они предоставлены
+      if (orderData.customer_name && orderData.customer_name.trim() !== '') {
+        orderRequest.customer_name = orderData.customer_name;
+      }
+      
+      if (orderData.customer_phone && orderData.customer_phone.trim() !== '') {
+        orderRequest.customer_phone = orderData.customer_phone;
+      }
+      
+      // Добавляем комментарий к заказу, только если он не пустой
+      if (orderData.comment && orderData.comment.trim() !== '') {
+        orderRequest.comment = orderData.comment;
+      }
+      
+      // Добавляем опциональные поля, если они есть и не пустые
       if (orderData.table_number) orderRequest.table_number = orderData.table_number;
-      if (orderData.reservation_code) orderRequest.reservation_code = orderData.reservation_code;
-      if (orderData.order_code) orderRequest.order_code = orderData.order_code;
-      if (orderData.waiter_code) orderRequest.waiter_code = orderData.waiter_code;
+      if (orderData.reservation_code && orderData.reservation_code.trim() !== '') orderRequest.reservation_code = orderData.reservation_code;
+      if (orderData.order_code && orderData.order_code.trim() !== '') orderRequest.order_code = orderData.order_code;
+      if (orderData.waiter_code && orderData.waiter_code.trim() !== '') orderRequest.waiter_code = orderData.waiter_code;
       
       console.log('API: Создание заказа с данными:', orderRequest);
       
@@ -442,6 +462,8 @@ export const ordersApi = {
         });
         
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API: Детали ошибки от сервера:', errorData);
           throw new Error(`Ошибка HTTP: ${response.status}`);
         }
         

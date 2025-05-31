@@ -204,7 +204,7 @@ const CheckoutPage: NextPage = () => {
           quantity: item.quantity,
           special_instructions: item.comment || ''
         })),
-        comment: comments || '',
+        comment: comments || comment || '', // Используем либо comments, либо comment, смотря что заполнено
         payment_method: formData.payment_method,
         is_urgent: urgent,
         is_group_order: isGroupOrder,
@@ -802,8 +802,12 @@ const CheckoutPage: NextPage = () => {
                     rows={3}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
                     placeholder="Дополнительные пожелания к заказу"
-                    value={comment || ''}
-                    onChange={(e) => setComment(e.target.value)}
+                    value={comments || comment}
+                    onChange={(e) => {
+                      // Обновляем оба поля для обратной совместимости
+                      setComment(e.target.value);
+                      setComments(e.target.value);
+                    }}
                   />
                 </div>
               </div>
