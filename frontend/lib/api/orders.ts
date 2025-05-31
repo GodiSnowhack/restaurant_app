@@ -409,7 +409,6 @@ export const ordersApi = {
       // Формируем запрос в соответствии со структурой БД
       const requestPayload: any = {
         // Основные данные заказа
-        table_number: orderData.table_number || 1,
         payment_method: orderData.payment_method || 'cash',
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
@@ -418,7 +417,12 @@ export const ordersApi = {
         dishes: orderItems
       };
       
-      // Добавляем опциональные поля
+      // Добавляем номер стола только если он явно указан (не используем значение по умолчанию)
+      if (orderData.table_number) {
+        requestPayload.table_number = orderData.table_number;
+      }
+      
+      // Добавляем код бронирования, если есть
       if (orderData.reservation_code) {
         requestPayload.reservation_code = orderData.reservation_code;
       }

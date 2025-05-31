@@ -192,10 +192,14 @@ const CheckoutPage: NextPage = () => {
           ...(item.comment ? { special_instructions: item.comment } : {})
         })),
         payment_method: formData.payment_method,
-        table_number: tableNumber || 1,
         customer_name: formData.name,
         customer_phone: formData.phone
       };
+      
+      // Добавляем номер стола только если он выбран (не устанавливаем значение по умолчанию)
+      if (tableNumber) {
+        orderData.table_number = tableNumber;
+      }
       
       // Добавляем код бронирования, если есть
       if (reservationCode) {
