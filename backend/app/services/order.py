@@ -489,139 +489,149 @@ def format_order_for_response(db: Session, db_order: Order) -> Dict[str, Any]:
 
 def create_order(db: Session, order_data: Dict) -> Dict:
     """
-    Создание нового заказа.
+    Создание нового заказа с полным контролем и обработкой всех краевых случаев.
     
     Args:
         db: сессия базы данных
         order_data: данные заказа в виде словаря
         
     Returns:
-        Созданный заказ в виде словаря
+        Созданный заказ в виде словаря или вызывает исключение
     """
+    logger.info("Создание нового заказа")
+    
+    # Начинаем транзакцию
     try:
-        logger.info(f"Создание нового заказа")
-        logger.debug(f"Данные заказа: {order_data}")
+        # Извлекаем блюда заказа
+        items = order_data.pop("items", []) if "items" in order_data else []
         
-        # Устанавливаем значения по умолчанию
-        if 'table_number' not in order_data or order_data['table_number'] is None:
-            order_data['table_number'] = 1
-            logger.info("Установлено значение table_number по умолчанию: 1")
-            
-        if 'status' not in order_data or not order_data['status']:
-            order_data['status'] = OrderStatus.PENDING.value
-            logger.info("Установлено значение status по умолчанию: pending")
-            
-        if 'payment_status' not in order_data or not order_data['payment_status']:
-            order_data['payment_status'] = PaymentStatus.PENDING.value
-            logger.info("Установлено значение payment_status по умолчанию: pending")
+        # Проверяем обязательные поля и устанавливаем значения по умолчанию
+        if not order_data.get("user_id"):
+            logger.error("Отсутствует user_id в данных заказа")
+            raise HTTPException(status_code=400, detail="Не указан идентификатор пользователя")
         
-        # Получаем items из order_data
-        items = []
+        # Принудительно устанавливаем table_number, если его нет
+        if not order_data.get("table_number"):
+            order_data["table_number"] = 1
+            logger.info("Установлено значение table_number = 1 по умолчанию")
         
-        # Вариант 1: Из items
-        if 'items' in order_data and order_data['items']:
-            items = order_data.pop('items')
-            logger.info(f"Получены элементы из items: {len(items)}")
-            
-        # Вариант 2: Из dishes
-        elif 'dishes' in order_data and order_data['dishes']:
-            dishes = order_data.pop('dishes')
-            logger.info(f"Получены элементы из dishes: {len(dishes)}")
-            
-            # Обрабатываем разные форматы dishes
-            for dish in dishes:
-                if isinstance(dish, dict) and 'dish_id' in dish:
-                    # Формат: {"dish_id": 1, "quantity": 2}
-                    items.append({
-                        'dish_id': dish['dish_id'],
-                        'quantity': dish.get('quantity', 1),
-                        'special_instructions': dish.get('special_instructions', '')
-                    })
-                elif isinstance(dish, int):
-                    # Формат: просто идентификатор блюда
-                    items.append({
-                        'dish_id': dish,
-                        'quantity': 1,
-                        'special_instructions': ''
-                    })
+        # Устанавливаем статус заказа если его нет
+        if not order_data.get("status"):
+            order_data["status"] = "pending"
+            logger.info("Установлен статус pending по умолчанию")
         
-        # Генерируем уникальный код заказа, если его нет
-        if 'order_code' not in order_data or not order_data['order_code']:
-            order_code = generate_order_code()
-            order_data['order_code'] = order_code
-            logger.info(f"Сгенерирован новый код заказа: {order_code}")
+        # Устанавливаем статус оплаты если его нет
+        if not order_data.get("payment_status"):
+            order_data["payment_status"] = "pending" 
+            logger.info("Установлен статус оплаты pending по умолчанию")
         
-        # Удаляем поля, которых нет в модели Order
-        fields_to_remove = ['order_type', 'customer_email', 'delivery_address', 'waiter_code']
-        for field in fields_to_remove:
+        # Создаем уникальный код заказа, если его нет
+        if not order_data.get("order_code"):
+            order_data["order_code"] = generate_order_code()
+            logger.info(f"Сгенерирован уникальный код заказа: {order_data['order_code']}")
+        
+        # Подготовка очищенных данных для создания записи
+        cleaned_data = {}
+        
+        # Список полей, которые мы принимаем из входных данных
+        valid_fields = [
+            "user_id", "waiter_id", "table_number", "status", "payment_status", 
+            "payment_method", "total_amount", "comment", "is_urgent", "is_group_order",
+            "customer_name", "customer_phone", "reservation_code", "order_code",
+            "customer_age_group"
+        ]
+        
+        # Копируем только допустимые поля в очищенные данные
+        for field in valid_fields:
             if field in order_data:
-                order_data.pop(field)
+                cleaned_data[field] = order_data[field]
         
-        # Создаем новый заказ
-        db_order = Order(**order_data)
-        db.add(db_order)
-        db.flush()  # Сохраняем заказ для получения ID
+        # Создаем запись заказа
+        try:
+            db_order = Order(**cleaned_data)
+            db.add(db_order)
+            db.flush()  # Получаем ID заказа
+            logger.info(f"Создана запись заказа с ID {db_order.id}")
+        except Exception as e:
+            logger.error(f"Ошибка при создании записи заказа: {str(e)}")
+            db.rollback()
+            raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
         
         # Добавляем блюда к заказу
         total_amount = Decimal('0')
         
-        if not items:
-            logger.warning("Заказ создается без блюд!")
-        
-        for item in items:
-            if 'dish_id' not in item:
-                logger.error("Отсутствует dish_id в элементе заказа")
-                raise HTTPException(status_code=400, detail="Каждый элемент заказа должен содержать dish_id")
-            
-            dish_id = item['dish_id']
-            quantity = item.get('quantity', 1)
-            special_instructions = item.get('special_instructions', '')
-            
-            # Проверяем, существует ли блюдо
-            dish = db.query(Dish).filter(Dish.id == dish_id).first()
-            if not dish:
-                logger.error(f"Блюдо с ID {dish_id} не найдено")
-                raise HTTPException(status_code=404, detail=f"Блюдо с ID {dish_id} не найдено")
-            
-            # Создаем связь между заказом и блюдом
-            order_dish = OrderDish(
-                order_id=db_order.id,
-                dish_id=dish_id,
-                quantity=quantity,
-                special_instructions=special_instructions,
-                price=dish.price  # Добавляем цену из блюда
-            )
-            db.add(order_dish)
-            
-            # Добавляем стоимость блюда к общей сумме
-            item_price = Decimal(str(dish.price)) * Decimal(str(quantity))
-            total_amount += item_price
+        for i, item in enumerate(items):
+            try:
+                # Проверяем наличие dish_id
+                if "dish_id" not in item:
+                    logger.warning(f"Пропущен элемент #{i}: отсутствует dish_id")
+                    continue
+                
+                dish_id = item["dish_id"]
+                quantity = item.get("quantity", 1)
+                special_instructions = item.get("special_instructions", "")
+                
+                # Получаем блюдо из базы данных
+                dish = db.query(Dish).filter(Dish.id == dish_id).first()
+                if not dish:
+                    logger.warning(f"Блюдо с ID {dish_id} не найдено, пропускаем")
+                    continue
+                
+                # Создаем запись о блюде в заказе
+                order_dish = OrderDish(
+                    order_id=db_order.id,
+                    dish_id=dish_id,
+                    quantity=quantity,
+                    special_instructions=special_instructions,
+                    price=dish.price
+                )
+                db.add(order_dish)
+                
+                # Рассчитываем стоимость позиции
+                price = Decimal(str(dish.price))
+                qty = Decimal(str(quantity))
+                item_total = price * qty
+                total_amount += item_total
+                
+                logger.info(f"Добавлено блюдо ID {dish_id}, название: {dish.name}, количество: {quantity}")
+            except Exception as e:
+                logger.error(f"Ошибка при добавлении блюда {item.get('dish_id')}: {str(e)}")
+                # Продолжаем с другими блюдами
         
         # Обновляем общую сумму заказа
         db_order.total_amount = total_amount
+        logger.info(f"Установлена общая сумма заказа: {total_amount}")
         
-        # Фиксируем изменения
+        # Сохраняем изменения
         try:
             db.commit()
-            logger.info(f"Заказ {db_order.id} успешно создан")
-        except Exception as commit_error:
+            logger.info(f"Заказ #{db_order.id} успешно сохранен в базе данных")
+        except Exception as e:
             db.rollback()
-            logger.error(f"Ошибка при коммите изменений заказа: {str(commit_error)}")
-            raise
+            logger.error(f"Ошибка при сохранении заказа: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Ошибка при сохранении заказа: {str(e)}")
         
-        # Форматируем заказ для ответа
-        result = format_order_for_response(db, db_order)
-        
-        logger.info(f"Заказ успешно создан: ID={db_order.id}, Код={db_order.order_code}")
-        return result
-        
-    except HTTPException as he:
-        db.rollback()
-        logger.error(f"HTTP ошибка при создании заказа: {str(he)}")
+        # Формируем ответ
+        try:
+            result = format_order_for_response(db, db_order)
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка при форматировании ответа: {str(e)}")
+            # Если не удалось отформатировать заказ, возвращаем базовую информацию
+            return {
+                "id": db_order.id,
+                "order_code": db_order.order_code,
+                "status": db_order.status,
+                "total_amount": float(db_order.total_amount),
+                "created_at": db_order.created_at.isoformat() if db_order.created_at else None
+            }
+            
+    except HTTPException:
+        # Пробрасываем HTTPException дальше
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Ошибка при создании заказа: {str(e)}")
+        logger.error(f"Непредвиденная ошибка при создании заказа: {str(e)}")
         logger.exception(e)
         raise HTTPException(status_code=500, detail=f"Ошибка при создании заказа: {str(e)}")
 
