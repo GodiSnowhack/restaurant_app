@@ -197,20 +197,42 @@ const CheckoutPage: NextPage = () => {
         }
       }
       
-      // Собираем данные заказа - только те поля, которые ожидает бэкенд
+      // Собираем данные заказа, исключая пустые поля
       const orderData: any = {
-        items: items.map(item => ({
-          dish_id: item.dish_id,
-          quantity: item.quantity,
-          special_instructions: item.comment || ''
-        })),
-        comment: comments || comment || '', // Используем либо comments, либо comment, смотря что заполнено
-        payment_method: formData.payment_method,
-        is_urgent: urgent,
-        is_group_order: isGroupOrder,
-        customer_name: formData.name,
-        customer_phone: formData.phone
+        items: items.map(item => {
+          const orderItem: any = {
+            dish_id: item.dish_id,
+            quantity: item.quantity
+          };
+          
+          // Добавляем комментарий к блюду только если он не пустой
+          if (item.comment && item.comment.trim() !== '') {
+            orderItem.special_instructions = item.comment.trim();
+          }
+          
+          return orderItem;
+        }),
+        payment_method: formData.payment_method
       };
+      
+      // Добавляем булевы поля только если они true
+      if (urgent) orderData.is_urgent = true;
+      if (isGroupOrder) orderData.is_group_order = true;
+      
+      // Добавляем комментарий к заказу, только если он не пустой
+      const orderComment = comments || comment || '';
+      if (orderComment.trim() !== '') {
+        orderData.comment = orderComment.trim();
+      }
+      
+      // Добавляем контактные данные только если они не пустые
+      if (formData.name && formData.name.trim() !== '') {
+        orderData.customer_name = formData.name.trim();
+      }
+      
+      if (formData.phone && formData.phone.trim() !== '') {
+        orderData.customer_phone = formData.phone.trim();
+      }
       
       // Если указан код официанта, всегда используем его как код заказа
       if (waiterCode.trim()) {
@@ -221,48 +243,60 @@ const CheckoutPage: NextPage = () => {
       }
       // Иначе, если заказ в ресторане и гость присутствует и у нас есть код заказа, используем его
       else if (orderType === 'dine-in' && isGuestPresent && orderCode) {
-        orderData.order_code = orderCode;
+        orderData.order_code = orderCode.trim();
       }
       
       // Если предзаказ с бронированием, добавляем код бронирования
       if (!isGuestPresent && reservationCode) {
-        orderData.reservation_code = reservationCode;
+        orderData.reservation_code = reservationCode.trim();
       }
       
       // Добавляем номер столика, если он выбран или получен из бронирования
-      if (tableNumber) {
+      if (tableNumber && tableNumber > 0) {
         orderData.table_number = tableNumber;
         console.log(`Добавляем номер столика в заказ: ${tableNumber}`);
       }
       
       // Отправляем заказ на сервер
-      console.log('Отправляемые данные заказа:', orderData);
-      // Отдельно проверим код официанта и код заказа перед отправкой
-      console.log('Проверка код официанта (waiter_code):', orderData.waiter_code);
-      console.log('Проверка код заказа (order_code):', orderData.order_code);
+      console.log('Отправляемые данные заказа:', JSON.stringify(orderData, null, 2));
       
-      const createdOrder = await ordersApi.createOrder(orderData);
-      console.log('Ответ от сервера после создания заказа:', createdOrder);
-      
-      // Очищаем корзину после успешного создания заказа
-      clearCart();
-      
-      // Если указан код официанта и тип заказа "в зале"
-      if (orderType === 'dine-in' && waiterCode.trim()) {
-        // Сохраняем код официанта в localStorage для отображения на странице заказа
-        try {
-          localStorage.setItem(`order_${createdOrder.id}_waiter_code`, waiterCode);
-          console.log('Код официанта сохранен в localStorage:', waiterCode);
-        } catch (e) {
-          console.error('Ошибка при сохранении кода официанта в localStorage', e);
+      try {
+        const createdOrder = await ordersApi.createOrder(orderData);
+        console.log('Ответ от сервера после создания заказа:', createdOrder);
+        
+        // Очищаем корзину после успешного создания заказа
+        clearCart();
+        
+        // Если указан код официанта и тип заказа "в зале"
+        if (orderType === 'dine-in' && waiterCode.trim()) {
+          // Сохраняем код официанта в localStorage для отображения на странице заказа
+          try {
+            localStorage.setItem(`order_${createdOrder.id}_waiter_code`, waiterCode);
+            console.log('Код официанта сохранен в localStorage:', waiterCode);
+          } catch (e) {
+            console.error('Ошибка при сохранении кода официанта в localStorage', e);
+          }
         }
+        
+        // Редирект на страницу успешного заказа
+        router.push(`/orders/${createdOrder.id}?success=true`);
+      } catch (apiError: any) {
+        let errorMessage = 'Произошла ошибка при оформлении заказа';
+        
+        // Пытаемся извлечь сообщение об ошибке из разных источников
+        if (apiError.response?.data?.detail) {
+          errorMessage = apiError.response.data.detail;
+        } else if (apiError.message) {
+          errorMessage = apiError.message;
+        }
+        
+        console.error('Ошибка при оформлении заказа:', apiError);
+        setError(errorMessage);
+        setProcessing(false);
       }
-      
-      // Редирект на страницу успешного заказа
-      router.push(`/orders/${createdOrder.id}?success=true`);
     } catch (err: any) {
-      console.error('Ошибка при оформлении заказа:', err);
-      setError(err.response?.data?.detail || 'Произошла ошибка при оформлении заказа');
+      console.error('Общая ошибка при оформлении заказа:', err);
+      setError(err.message || 'Произошла неизвестная ошибка');
       setProcessing(false);
     }
   };

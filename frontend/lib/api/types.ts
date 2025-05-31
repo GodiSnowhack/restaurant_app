@@ -175,7 +175,6 @@ export interface OrderCreateRequest {
     quantity: number;
     special_instructions?: string;
   }[];
-  comment?: string;
   payment_method: string;
   is_urgent?: boolean;
   is_group_order?: boolean;
@@ -185,4 +184,5 @@ export interface OrderCreateRequest {
   order_code?: string;
   waiter_code?: string;
   table_number?: number;
+  comment?: string;
 } 
