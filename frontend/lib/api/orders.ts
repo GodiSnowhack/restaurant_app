@@ -1,5 +1,5 @@
 import { api } from './core';
-import { Order, AssignOrderResponse, PaymentStatus } from './types';
+import { Order, AssignOrderResponse, PaymentStatus, OrderCreateRequest } from './types';
 import axios from 'axios';
 
 // Функция для генерации демо-заказов
@@ -398,9 +398,30 @@ export const ordersApi = {
   },
   
   // Создание нового заказа
-  createOrder: async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> => {
+  createOrder: async (orderData: any): Promise<Order> => {
     try {
-      console.log('API: Создание заказа с данными:', order);
+      // Создаем объект запроса, соответствующий ожиданиям бэкенда
+      const orderRequest: OrderCreateRequest = {
+        items: orderData.items.map((item: any) => ({
+          dish_id: item.dish_id,
+          quantity: item.quantity,
+          special_instructions: item.special_instructions
+        })),
+        comment: orderData.comment,
+        payment_method: orderData.payment_method,
+        is_urgent: orderData.is_urgent,
+        is_group_order: orderData.is_group_order,
+        customer_name: orderData.customer_name,
+        customer_phone: orderData.customer_phone
+      };
+      
+      // Добавляем опциональные поля, если они есть
+      if (orderData.table_number) orderRequest.table_number = orderData.table_number;
+      if (orderData.reservation_code) orderRequest.reservation_code = orderData.reservation_code;
+      if (orderData.order_code) orderRequest.order_code = orderData.order_code;
+      if (orderData.waiter_code) orderRequest.waiter_code = orderData.waiter_code;
+      
+      console.log('API: Создание заказа с данными:', orderRequest);
       
       // Получаем токен для запроса
       const token = localStorage.getItem('token');
@@ -417,7 +438,7 @@ export const ordersApi = {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(order)
+          body: JSON.stringify(orderRequest)
         });
         
         if (!response.ok) {
@@ -432,7 +453,7 @@ export const ordersApi = {
         console.log('API: Пробуем создать заказ через основной API...');
         
         // Если прокси не сработал, пробуем через основной API
-        const response = await api.post('/orders', order);
+        const response = await api.post('/orders', orderRequest);
         console.log('API: Заказ успешно создан через основной API, ID:', response.data.id);
         return response.data;
       }

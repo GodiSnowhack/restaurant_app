@@ -197,14 +197,14 @@ const CheckoutPage: NextPage = () => {
         }
       }
       
-      // Собираем данные заказа
+      // Собираем данные заказа - только те поля, которые ожидает бэкенд
       const orderData: any = {
         items: items.map(item => ({
           dish_id: item.dish_id,
           quantity: item.quantity,
-          comment: item.comment || ''
+          special_instructions: item.comment || ''
         })),
-        comments: comments || '',
+        comment: comments || '',
         payment_method: formData.payment_method,
         is_urgent: urgent,
         is_group_order: isGroupOrder,

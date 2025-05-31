@@ -167,4 +167,22 @@ export interface AssignOrderResponse {
   orderId?: number;
   orderNumber?: number;
   message?: string;
+}
+
+export interface OrderCreateRequest {
+  items: {
+    dish_id: number;
+    quantity: number;
+    special_instructions?: string;
+  }[];
+  comment?: string;
+  payment_method: string;
+  is_urgent?: boolean;
+  is_group_order?: boolean;
+  customer_name?: string;
+  customer_phone?: string;
+  reservation_code?: string;
+  order_code?: string;
+  waiter_code?: string;
+  table_number?: number;
 } 
