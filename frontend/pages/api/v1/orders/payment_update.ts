@@ -80,10 +80,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       // Основной метод - прямой запрос к специальному эндпоинту
-      console.log(`Payment API: Отправка запроса на ${baseApiUrl}/api/v1/orders/${orderId}/payment-status`);
+      console.log(`Payment API: Отправка запроса на ${baseApiUrl}/orders/${orderId}/payment-status`);
+      
+      // Формируем URL без дублирования /api/v1, если baseApiUrl уже содержит этот путь
+      const url = baseApiUrl.endsWith('/api/v1') || baseApiUrl.includes('/api/v1/') 
+        ? `${baseApiUrl.replace(/\/api\/v1\/?$/, '')}/orders/${orderId}/payment-status`
+        : `${baseApiUrl}/orders/${orderId}/payment-status`;
+        
+      console.log(`Payment API: Итоговый URL: ${url}`);
       
       const response = await axios.put(
-        `${baseApiUrl}/orders/${orderId}/payment-status`,
+        url,
         { status: normalizedStatus },
         { 
           headers,

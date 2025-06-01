@@ -45,14 +45,20 @@ export const DEFAULT_URLS = {
 export function getDefaultApiUrl(): string {
   // Сначала пробуем получить URL из переменных окружения
   if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
-    console.log(`Config: Используем API URL из переменной окружения: ${process.env.NEXT_PUBLIC_API_URL}`);
-    return process.env.NEXT_PUBLIC_API_URL;
+    const url = process.env.NEXT_PUBLIC_API_URL;
+    console.log(`Config: Используем API URL из переменной окружения: ${url}`);
+    
+    // Убираем слеш в конце, если он есть
+    return url.endsWith('/') ? url.slice(0, -1) : url;
   }
   
   // Затем проверяем window (в браузере)
   if (typeof window !== 'undefined' && (window as any).API_URL) {
-    console.log(`Config: Используем API URL из window: ${(window as any).API_URL}`);
-    return (window as any).API_URL;
+    const url = (window as any).API_URL;
+    console.log(`Config: Используем API URL из window: ${url}`);
+    
+    // Убираем слеш в конце, если он есть
+    return url.endsWith('/') ? url.slice(0, -1) : url;
   }
   
   // Определяем URL по умолчанию в зависимости от окружения
@@ -62,7 +68,9 @@ export function getDefaultApiUrl(): string {
     : 'http://localhost:8000/api/v1';
   
   console.log(`Config: Используем стандартный API URL для ${isProduction ? 'production' : 'development'}: ${defaultUrl}`);
-  return defaultUrl;
+  
+  // Убираем слеш в конце, если он есть
+  return defaultUrl.endsWith('/') ? defaultUrl.slice(0, -1) : defaultUrl;
 }
 
 // Получение базового URL фронтенда
