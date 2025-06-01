@@ -38,33 +38,24 @@ export const DEFAULT_URLS = {
   }
 };
 
-// Получение базового URL API
-export const getDefaultApiUrl = (): string => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  let apiUrl = isProduction ? DEFAULT_URLS.production.api : DEFAULT_URLS.development.api;
-  
-  // Убедимся, что URL для production всегда HTTPS
-  if (isProduction && apiUrl.startsWith('http://')) {
-    apiUrl = apiUrl.replace('http://', 'https://');
+/**
+ * Возвращает базовый URL API
+ * @returns строка с базовым URL API
+ */
+export function getDefaultApiUrl(): string {
+  // Сначала пробуем получить URL из переменных окружения
+  if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // Убедимся, что URL не содержит двойной /api
-  if (apiUrl.includes('/api/v1/api/')) {
-    apiUrl = apiUrl.replace('/api/v1/api/', '/api/v1/');
+  // Затем проверяем window (в браузере)
+  if (typeof window !== 'undefined' && (window as any).API_URL) {
+    return (window as any).API_URL;
   }
   
-  // Проверка на другие возможные дублирования
-  if (apiUrl.includes('/api/v1/api/v1/')) {
-    apiUrl = apiUrl.replace('/api/v1/api/v1/', '/api/v1/');
-  }
-
-  // Очищаем любые другие дублирования api/v1
-  const basePattern = /\/api\/v1(\/api\/v1)+/g;
-  apiUrl = apiUrl.replace(basePattern, '/api/v1');
-  
-  // Нормализация URL: убираем конечные слеши
-  return apiUrl.replace(/\/+$/, '');
-};
+  // Если ничего не нашли, возвращаем URL по умолчанию
+  return 'http://localhost:8000';
+}
 
 // Получение базового URL фронтенда
 export const getDefaultFrontendUrl = (): string => {

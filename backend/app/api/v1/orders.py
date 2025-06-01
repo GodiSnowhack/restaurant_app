@@ -182,7 +182,7 @@ async def create_order(
         
         # Вызываем сервис для создания заказа
         logger.info(f"Отправка данных для создания заказа: {order_data}")
-        result = order_service.create_order(db, order_data)
+    result = order_service.create_order(db, order_data)
         
         # Обрабатываем результат
         if result:
