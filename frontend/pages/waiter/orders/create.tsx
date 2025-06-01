@@ -101,8 +101,8 @@ const CreateOrderPage: React.FC = () => {
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
         >
           <option value="">Выберите способ оплаты</option>
-          <option value="cash">Наличные</option>
-          <option value="card">Карта</option>
+          <option value="CASH">Наличные</option>
+          <option value="CARD">Карта</option>
         </select>
       </div>
 

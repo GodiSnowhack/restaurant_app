@@ -96,55 +96,71 @@ def read_root():
         "version": "1.0.0"
     }
 
-# Добавляем прямой эндпоинт для обновления статуса заказа
-@app.put("/api/v1/orders/{order_id}/direct-status-update", include_in_schema=True)
-async def direct_status_update(
+# Добавляем новый простой эндпоинт для обновления статуса заказа
+@app.post("/api/direct/order-status/{order_id}", include_in_schema=True)
+async def simple_order_status_update(
     order_id: int,
     status_data: dict,
     db: Session = Depends(get_db)
 ):
     """
-    Простой эндпоинт для прямого обновления статуса заказа без сложной валидации.
+    Максимально простой эндпоинт для обновления статуса заказа без сложной валидации.
     
     - **order_id**: ID заказа
-    - **status_data**: Словарь с ключом 'status' для обновления статуса заказа
-      или 'payment_status' для обновления статуса оплаты
+    - **status_data**: Словарь с ключом 'status' или 'payment_status'
     """
     try:
-        # Ищем заказ в БД
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if not order:
-            return JSONResponse(
-                status_code=404,
-                content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
-            )
+        logger.info(f"Запрос на прямое обновление заказа {order_id}: {status_data}")
         
-        is_modified = False
+        # Простой SQL-запрос для обновления заказа
+        sql_query = "UPDATE orders SET "
+        params = {"order_id": order_id}
+        update_parts = []
         
         # Обновляем статус заказа
-        if "status" in status_data:
+        if "status" in status_data and status_data["status"]:
             new_status = status_data["status"].upper()
-            order.status = new_status
-            is_modified = True
+            update_parts.append("status = :status")
+            params["status"] = new_status
+            logger.info(f"Обновление status на {new_status}")
             
             # Если статус COMPLETED, устанавливаем время завершения
-            if new_status == "COMPLETED" and not order.completed_at:
-                order.completed_at = datetime.utcnow()
+            if new_status == "COMPLETED":
+                update_parts.append("completed_at = CURRENT_TIMESTAMP")
                 
-            logger.info(f"Прямое обновление статуса заказа {order_id} на {new_status}")
-        
         # Обновляем статус оплаты
-        if "payment_status" in status_data:
+        if "payment_status" in status_data and status_data["payment_status"]:
             new_payment_status = status_data["payment_status"].upper()
-            order.payment_status = new_payment_status
-            is_modified = True
-            logger.info(f"Прямое обновление статуса оплаты заказа {order_id} на {new_payment_status}")
+            update_parts.append("payment_status = :payment_status")
+            params["payment_status"] = new_payment_status
+            logger.info(f"Обновление payment_status на {new_payment_status}")
         
-        # Если что-то изменилось, сохраняем
-        if is_modified:
-            order.updated_at = datetime.utcnow()
+        # Обновляем время изменения
+        update_parts.append("updated_at = CURRENT_TIMESTAMP")
+        
+        # Собираем и выполняем запрос
+        if not update_parts:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Не указаны данные для обновления"}
+            )
+            
+        sql_query += ", ".join(update_parts) + " WHERE id = :order_id"
+        logger.info(f"SQL запрос: {sql_query} с параметрами {params}")
+        
+        try:
+            from sqlalchemy.sql import text
+            result = db.execute(text(sql_query), params)
             db.commit()
-            db.refresh(order)
+            
+            if result.rowcount == 0:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
+                )
+                
+            # Получаем обновленные данные заказа
+            updated_order = db.query(Order).filter(Order.id == order_id).first()
             
             return JSONResponse(
                 status_code=200,
@@ -152,43 +168,209 @@ async def direct_status_update(
                     "success": True,
                     "message": "Статус заказа успешно обновлен",
                     "order": {
-                        "id": order.id,
-                        "status": order.status,
-                        "payment_status": order.payment_status,
-                        "updated_at": order.updated_at.isoformat() if order.updated_at else None
+                        "id": updated_order.id,
+                        "status": updated_order.status,
+                        "payment_status": updated_order.payment_status,
+                        "updated_at": updated_order.updated_at.isoformat() if updated_order.updated_at else None
                     }
                 }
             )
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Не указаны поля 'status' или 'payment_status'"}
-            )
+        except Exception as e:
+            logger.error(f"Ошибка SQL: {str(e)}")
+            db.rollback()
+            
+            # Аварийная попытка с простым запросом
+            try:
+                emergency_update = "UPDATE orders SET updated_at = CURRENT_TIMESTAMP"
+                if "status" in params:
+                    emergency_update += ", status = :status"
+                if "payment_status" in params:
+                    emergency_update += ", payment_status = :payment_status"
+                emergency_update += " WHERE id = :order_id"
+                
+                db.execute(text(emergency_update), params)
+                db.commit()
+                return JSONResponse(
+                    status_code=200,
+                    content={"success": True, "message": "Статус обновлен (аварийный режим)"}
+                )
+            except Exception as e2:
+                logger.error(f"Критическая ошибка: {str(e2)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "message": f"Ошибка при обновлении: {str(e)}"}
+                )
+            
     except Exception as e:
-        logger.exception(f"Ошибка при прямом обновлении статуса заказа {order_id}: {str(e)}")
-        db.rollback()
+        logger.exception(f"Необработанная ошибка: {str(e)}")
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": f"Ошибка при обновлении: {str(e)}"}
+            content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
         )
 
-# Добавляем прямой эндпоинт для обновления статуса заказа методом POST
-@app.post("/api/v1/orders/{order_id}/direct-status-update", include_in_schema=True)
-async def direct_status_update_post(order_id: int, status_data: dict, db: Session = Depends(get_db)):
-    """POST версия прямого обновления статуса заказа"""
-    return await direct_status_update(order_id, status_data, db)
+# Также регистрируем PUT метод для этого же пути
+@app.put("/api/direct/order-status/{order_id}", include_in_schema=True)
+async def simple_order_status_update_put(order_id: int, status_data: dict, db: Session = Depends(get_db)):
+    """PUT версия прямого обновления статуса заказа"""
+    return await simple_order_status_update(order_id, status_data, db)
 
-# Добавляем прямой эндпоинт для обновления статуса заказа (альтернативный путь)
-@app.put("/api/v1/direct/orders/{order_id}/status", include_in_schema=True)
-async def direct_status_update_alt(order_id: int, status_data: dict, db: Session = Depends(get_db)):
-    """Альтернативный путь для прямого обновления статуса заказа"""
-    return await direct_status_update(order_id, status_data, db)
+# Альтернативный путь для совместимости
+@app.post("/api/v1/direct/order-status/{order_id}", include_in_schema=True)
+async def simple_order_status_update_v1(order_id: int, status_data: dict, db: Session = Depends(get_db)):
+    """API v1 версия прямого обновления статуса заказа"""
+    return await simple_order_status_update(order_id, status_data, db)
 
-# Добавляем прямой эндпоинт для обновления статуса заказа методом POST (альтернативный путь)
-@app.post("/api/v1/direct/orders/{order_id}/status", include_in_schema=True)
-async def direct_status_update_alt_post(order_id: int, status_data: dict, db: Session = Depends(get_db)):
-    """POST версия альтернативного пути для прямого обновления статуса заказа"""
-    return await direct_status_update(order_id, status_data, db)
+@app.put("/api/v1/direct/order-status/{order_id}", include_in_schema=True)
+async def simple_order_status_update_v1_put(order_id: int, status_data: dict, db: Session = Depends(get_db)):
+    """API v1 PUT версия прямого обновления статуса заказа"""
+    return await simple_order_status_update(order_id, status_data, db)
+
+# Сверхпростой эндпоинт для обновления статуса
+@app.post("/api/simple-update/{order_id}", include_in_schema=True)
+async def ultra_simple_update(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Ультра-простой эндпоинт для обновления статуса заказа без валидации.
+    Принимает только id заказа и JSON со статусом:
+    
+    {"status": "COMPLETED"} или {"payment_status": "PAID"}
+    """
+    try:
+        # Получаем данные запроса
+        try:
+            data = await request.json()
+            logger.info(f"Простое обновление заказа {order_id}: {data}")
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Некорректный JSON"}
+            )
+        
+        # Прямой SQL-запрос для максимальной надежности
+        sql_parts = []
+        params = {"order_id": order_id}
+        
+        # Обрабатываем статус заказа
+        if "status" in data and data["status"]:
+            status = data["status"].upper()
+            sql_parts.append("status = :status")
+            params["status"] = status
+            
+            # Обновляем время завершения для COMPLETED
+            if status == "COMPLETED":
+                sql_parts.append("completed_at = CURRENT_TIMESTAMP")
+        
+        # Обрабатываем статус оплаты
+        if "payment_status" in data and data["payment_status"]:
+            payment_status = data["payment_status"].upper()
+            sql_parts.append("payment_status = :payment_status")
+            params["payment_status"] = payment_status
+        
+        # Всегда обновляем updated_at
+        sql_parts.append("updated_at = CURRENT_TIMESTAMP")
+        
+        # Если нет данных для обновления
+        if len(sql_parts) < 2:  # только updated_at
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Не указаны данные для обновления"}
+            )
+        
+        # Строим и выполняем запрос
+        from sqlalchemy.sql import text
+        sql = f"UPDATE orders SET {', '.join(sql_parts)} WHERE id = :order_id"
+        logger.info(f"SQL запрос: {sql}, параметры: {params}")
+        
+        try:
+            result = db.execute(text(sql), params)
+            db.commit()
+            
+            if result.rowcount == 0:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
+                )
+            
+            # Получаем обновленный заказ
+            check_sql = "SELECT id, status, payment_status, updated_at FROM orders WHERE id = :order_id"
+            check_result = db.execute(text(check_sql), {"order_id": order_id})
+            order_data = check_result.fetchone()
+            
+            if not order_data:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "message": "Не удалось получить данные заказа после обновления"}
+                )
+            
+            # Преобразуем результат в словарь
+            order_dict = {
+                "id": order_data[0],
+                "status": order_data[1],
+                "payment_status": order_data[2],
+                "updated_at": order_data[3].isoformat() if order_data[3] else None
+            }
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "Статус заказа успешно обновлен",
+                    "order": order_dict
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка SQL: {str(e)}")
+            db.rollback()
+            
+            # Аварийная попытка
+            emergency_sql = "UPDATE orders SET updated_at = CURRENT_TIMESTAMP"
+            if "status" in params:
+                emergency_sql += ", status = :status"
+            if "payment_status" in params:
+                emergency_sql += ", payment_status = :payment_status"
+            emergency_sql += " WHERE id = :order_id"
+            
+            try:
+                db.execute(text(emergency_sql), params)
+                db.commit()
+                return JSONResponse(
+                    status_code=200,
+                    content={"success": True, "message": "Статус обновлен (аварийный режим)"}
+                )
+            except Exception as e2:
+                logger.error(f"Критическая ошибка: {str(e2)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "message": f"Ошибка при обновлении: {str(e)}"}
+                )
+    
+    except Exception as e:
+        logger.exception(f"Необработанная ошибка: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
+        )
+
+# PUT версия для совместимости
+@app.put("/api/simple-update/{order_id}", include_in_schema=True)
+async def ultra_simple_update_put(order_id: int, request: Request, db: Session = Depends(get_db)):
+    """PUT версия ультра-простого обновления"""
+    return await ultra_simple_update(order_id, request, db)
+
+# v1 версия для совместимости
+@app.post("/api/v1/simple-update/{order_id}", include_in_schema=True)
+async def ultra_simple_update_v1(order_id: int, request: Request, db: Session = Depends(get_db)):
+    """API v1 версия ультра-простого обновления"""
+    return await ultra_simple_update(order_id, request, db)
+
+@app.put("/api/v1/simple-update/{order_id}", include_in_schema=True)
+async def ultra_simple_update_v1_put(order_id: int, request: Request, db: Session = Depends(get_db)):
+    """API v1 PUT версия ультра-простого обновления"""
+    return await ultra_simple_update(order_id, request, db)
 
 if __name__ == "__main__":
     uvicorn.run(
