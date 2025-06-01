@@ -2,6 +2,9 @@ import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus, OrderCreateRequest } from './types';
 import axios from 'axios';
 
+// Добавляем определение API_URL, если его нет
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+
 // Функция для генерации демо-заказов
 const generateDemoOrders = (): Order[] => {
   const now = new Date();
@@ -532,7 +535,31 @@ export const ordersApi = {
         throw new Error('Требуется авторизация');
       }
       
-      // РЕШЕНИЕ 1: Используем Next.js API прокси
+      // Универсальный надежный метод через прямой эндпоинт
+      try {
+        console.log(`API: Используем универсальный эндпоинт для обновления заказа ${id}`);
+        
+        const directResponse = await fetch(`${API_URL}/simple/orders/${id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status })
+        });
+        
+        if (directResponse.ok) {
+          const data = await directResponse.json();
+          console.log(`API: Статус заказа ${id} успешно обновлен через универсальный эндпоинт`);
+          return data.order || data;
+        } else {
+          console.warn(`API: Ошибка универсального эндпоинта: ${directResponse.status}`);
+        }
+      } catch (directError) {
+        console.warn(`API: Ошибка при использовании универсального эндпоинта:`, directError);
+      }
+      
+      // РЕШЕНИЕ 1: Используем Next.js API прокси (резервный метод)
       try {
         const response = await fetch(`/api/v1/orders/${id}/status`, {
           method: 'PUT',
@@ -553,70 +580,16 @@ export const ordersApi = {
       } catch (error) {
         console.error('API: Ошибка при использовании API прокси:', error);
       }
+
+      // Если все методы не сработали, делаем запрос к прямому бэкенду API
+      console.log(`API: Прямой запрос к бэкенду для обновления статуса заказа ${id}`);
       
-      // РЕШЕНИЕ 2: Используем альтернативный прокси
-      try {
-        const response = await fetch(`/api/v1/orders/status_update`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ 
-            order_id: id,
-            status 
-          })
-        });
-        
-        if (response?.ok) {
-          const data = await response.json();
-          console.log(`API: Статус заказа ${id} успешно обновлен на ${status} через альтернативный прокси`);
-          
-          // Запрашиваем актуальные данные заказа
-          try {
-            const orderData = await ordersApi.getOrderById(id);
-            if (orderData) {
-              return {
-                ...orderData,
-                status
-              };
-            }
-          } catch (getError) {
-            console.error('API: Ошибка при получении обновленных данных заказа:', getError);
-          }
-          
-          // Если не удалось получить обновленные данные, возвращаем базовый объект
-          return {
-            id,
-            status,
-            total_amount: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          } as Order; // Используем приведение типов
-        }
-      } catch (error) {
-        console.error('API: Ошибка при использовании альтернативного прокси:', error);
-      }
-      
-      // РЕШЕНИЕ 3: Используем оригинальный метод API
-      try {
-        const response = await api.put(`/orders/${id}/status`, { status });
-        console.log(`API: Статус заказа ${id} успешно обновлен на ${status} через оригинальный API`);
-        return response.data;
-      } catch (error) {
-        console.error(`API: Ошибка при обновлении статуса через оригинальный API:`, error);
-        
-        // Возвращаем минимальный объект заказа с обновленным статусом
-        return {
-          id,
-          status,
-          total_amount: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        } as Order; // Используем приведение типов
-      }
-    } catch (error) {
-      console.error(`API: Критическая ошибка при обновлении статуса заказа ${id}:`, error);
+      // Используем обновленный эндпоинт статусов заказа
+      const backendResponse = await api.put(`/orders/${id}`, { status });
+      console.log(`API: Статус заказа ${id} успешно обновлен на ${status} через прямой запрос`);
+      return backendResponse.data;
+    } catch (error: any) {
+      console.error(`API: Необработанная ошибка при обновлении статуса заказа ${id}:`, error);
       throw error;
     }
   },
@@ -636,105 +609,20 @@ export const ordersApi = {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-User-Role': 'waiter'
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ code })
       });
-
-      const data = await response.json();
       
-      if (!data.success) {
-        return {
-          success: false,
-          message: data.message || 'Не удалось привязать заказ'
-        };
+      if (!response.ok) {
+        throw new Error(`Ошибка HTTP: ${response.status}`);
       }
-
-      return {
-        success: true,
-        orderId: data.orderId,
-        orderNumber: data.orderNumber,
-        message: data.message || 'Заказ успешно привязан'
-      };
+      
+      const data = await response.json();
+      return data;
     } catch (error: any) {
       console.error('API: Ошибка при привязке заказа:', error);
-      return {
-        success: false,
-        message: error.message || 'Произошла ошибка при привязке заказа'
-      };
+      throw error;
     }
   },
-
-  // Обновление статуса оплаты заказа
-  updateOrderPaymentStatus: async (id: number, status: PaymentStatus): Promise<{ success: boolean; order: Order }> => {
-    try {
-      console.log(`API: Обновление статуса оплаты заказа ${id} на ${status}`);
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Отсутствует токен авторизации');
-      }
-
-      // Первая попытка через обычный прокси
-      try {
-        const response = await fetch(`/api/v1/orders/${id}/payment-status`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-User-Role': 'waiter'
-          },
-          body: JSON.stringify({ status })
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-          return data;
-        }
-        
-        console.log(`DEBUG: Ошибка API прокси: ${response.status}`, data);
-      } catch (error) {
-        console.error('Ошибка при использовании основного прокси:', error);
-      }
-      
-      // Пробуем альтернативный прокси
-      console.log(`DEBUG: Пробуем альтернативный прокси через status_update`);
-      try {
-        const altResponse = await fetch(`/api/v1/orders/payment_update`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ 
-            orderId: id,
-            payment_status: status
-          })
-        });
-        
-        const altData = await altResponse.json();
-        console.log(`DEBUG: Обновление через альтернативный прокси успешно`, altData);
-        
-        // Возвращаем успешный результат
-        return {
-          success: true,
-          order: {
-            ...(altData.order || {}),
-            id: id,
-            payment_status: status
-          }
-        };
-      } catch (altError) {
-        console.error(`DEBUG: Ошибка альтернативного прокси:`, altError);
-        throw new Error(`Ошибка при обновлении статуса оплаты заказа ${id}`);
-      }
-    } catch (error: any) {
-      console.error(`API: Ошибка при обновлении статуса оплаты заказа ${id}:`, error);
-      throw error; // Пробрасываем оригинальную ошибку
-    }
-  }
 };

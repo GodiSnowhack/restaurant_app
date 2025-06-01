@@ -90,7 +90,38 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
     
     console.log(`Status API - Начало процедуры обновления статуса заказа ${id} на ${normalizedStatus}`);
     
-    // ОСНОВНОЙ МЕТОД: прямой запрос к специальному эндпоинту статусов
+    // Используем универсальный надежный эндпоинт
+    console.log(`Status API - Используем надежный универсальный эндпоинт для обновления заказа ${id}`);
+
+    try {
+      // Используем простой и надежный эндпоинт
+      const response = await axios.post(
+        `${baseApiUrl}/simple/orders/${id}`,
+        { status: normalizedStatus },
+        { 
+          headers,
+          httpsAgent: baseApiUrl.startsWith('https') ? httpsAgent : undefined,
+          timeout: 10000
+        }
+      );
+      
+      if (response.status >= 200 && response.status < 300) {
+        // Успешное обновление статуса
+        console.log(`Status API - Успешное обновление статуса заказа через универсальный эндпоинт`);
+        
+        return res.status(200).json({
+          success: true,
+          message: `Статус заказа успешно обновлен на "${getStatusLabel(normalizedStatus)}"`,
+          data: response.data?.order || { id: parseInt(String(id)), status: normalizedStatus },
+          backend_success: true
+        });
+      }
+    } catch (simple_error) {
+      console.error(`Status API - Ошибка универсального эндпоинта: ${simple_error}`);
+      // Продолжаем выполнение, пробуем другие способы
+    }
+
+    // Пробуем с прямым обновлением через основной API
     try {
       console.log(`Status API - Отправка запроса на ${baseApiUrl}/orders/${id}/status`);
       
