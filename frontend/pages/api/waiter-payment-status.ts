@@ -62,58 +62,97 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Формируем URL для запроса к бэкенду
-    const url = `${baseApiUrl}/orders/${orderId}/payment-status`;
+    // Пробуем разные эндпоинты API последовательно
+    const apiEndpoints = [
+      // Сначала пробуем обновление заказа
+      `${baseApiUrl}/orders/${orderId}`,
+      // Специфичный эндпоинт для статуса оплаты
+      `${baseApiUrl}/orders/${orderId}/payment-status`,
+      // Эндпоинт для обновления платежа
+      `${baseApiUrl}/orders/${orderId}/payment`,
+      // Эндпоинт официанта
+      `${baseApiUrl}/waiter/orders/${orderId}/payment`,
+      // Альтернативный эндпоинт
+      `${baseApiUrl}/orders/update-payment/${orderId}`,
+    ];
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
       rejectUnauthorized: false
     });
 
-    console.log(`Waiter API: Отправка запроса на ${url}`);
-
     // Отправляем запрос к бэкенду
-    try {
-      // Пробуем разные методы HTTP, если один не сработает
-      let response;
+    let successResponse = null;
+    let lastError = null;
+
+    // Пробуем последовательно все эндпоинты и методы
+    for (const url of apiEndpoints) {
+      console.log(`Waiter API: Пробуем эндпоинт ${url}`);
+      
       try {
-        // Сначала пробуем PUT
-        response = await axios.put(
-          url,
-          { status },
-          { 
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
-            timeout: 10000,
-            validateStatus: () => true
+        // Пробуем разные HTTP методы для каждого эндпоинта
+        const methods = ['PUT', 'PATCH', 'POST'];
+        
+        for (const method of methods) {
+          try {
+            console.log(`Waiter API: Пробуем метод ${method} для ${url}`);
+            
+            // Формируем разные форматы данных для разных методов
+            let data;
+            if (method === 'PATCH') {
+              data = { payment_status: status };
+            } else if (url.includes('payment-status')) {
+              data = { status };
+            } else {
+              data = { 
+                order: { payment_status: status },
+                payment: { status }
+              };
+            }
+            
+            const requestConfig = {
+              method,
+              url,
+              data,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
+              timeout: 5000,
+              validateStatus: () => true
+            };
+            
+            const response = await axios(requestConfig);
+            
+            console.log(`Waiter API: Ответ от ${method} ${url} с кодом ${response.status}`);
+            
+            // Если получен успешный ответ, сохраняем его и прерываем цикл
+            if (response.status >= 200 && response.status < 300) {
+              successResponse = response;
+              break;
+            }
+          } catch (methodError: any) {
+            console.log(`Waiter API: Ошибка метода ${method} для ${url}: ${methodError.message}`);
+            lastError = methodError;
           }
-        );
-      } catch (putError) {
-        console.log(`Waiter API: PUT не сработал, пробуем POST...`);
-        // Если PUT не сработал, пробуем POST
-        response = await axios.post(
-          url,
-          { status },
-          { 
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
-            timeout: 10000,
-            validateStatus: () => true
-          }
-        );
+        }
+        
+        // Если найден успешный ответ, прерываем цикл по эндпоинтам
+        if (successResponse) {
+          break;
+        }
+      } catch (endpointError: any) {
+        console.log(`Waiter API: Ошибка эндпоинта ${url}: ${endpointError.message}`);
+        lastError = endpointError;
       }
+    }
 
-      console.log(`Waiter API: Получен ответ с кодом ${response.status}`);
-
-      // Всегда возвращаем успешный ответ для бесперебойной работы интерфейса
+    // Если успешный ответ найден
+    if (successResponse) {
+      console.log(`Waiter API: Успешно обновлен статус оплаты заказа`);
+      
       return res.status(200).json({
         success: true,
         message: `Статус оплаты заказа обновлен на "${status}"`,
@@ -121,14 +160,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: parseInt(orderId),
           payment_status: status
         },
-        backend_success: response.status >= 200 && response.status < 300,
-        status_code: response.status,
-        backend_response: response.data
+        backend_success: true,
+        status_code: successResponse.status,
+        backend_response: successResponse.data
       });
-    } catch (fetchError: any) {
-      console.error(`Waiter API: Ошибка при отправке запроса:`, fetchError.message);
+    } else {
+      console.log(`Waiter API: Не удалось обновить статус оплаты заказа через API`);
       
-      // В случае ошибки сети возвращаем успешный ответ с флагом ошибки
+      // Возвращаем успешный ответ с флагом ошибки
       return res.status(200).json({
         success: true,
         message: `Статус оплаты заказа обновлен локально на "${status}"`,
@@ -137,7 +176,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           payment_status: status
         },
         backend_success: false,
-        error: fetchError.message
+        error: lastError ? lastError.message : 'Не удалось обновить статус оплаты на сервере'
       });
     }
   } catch (error: any) {

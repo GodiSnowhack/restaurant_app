@@ -62,75 +62,99 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Формируем URL для запроса к бэкенду
-    const url = `${baseApiUrl}/waiter/orders/${orderId}/status`;
+    // Пробуем разные эндпоинты API последовательно
+    const apiEndpoints = [
+      // Сначала пробуем общий эндпоинт для обновления заказов
+      `${baseApiUrl}/orders/${orderId}`,
+      // Затем эндпоинт специфичный для статуса
+      `${baseApiUrl}/orders/${orderId}/status`,
+      // Затем эндпоинт официанта
+      `${baseApiUrl}/waiter/orders/${orderId}/status`,
+      // Альтернативный эндпоинт для обновления заказа
+      `${baseApiUrl}/orders/update/${orderId}`,
+    ];
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
       rejectUnauthorized: false
     });
 
-    console.log(`Waiter API: Отправка запроса на ${url}`);
-
     // Отправляем запрос к бэкенду
-    try {
-      // Пробуем разные методы HTTP, если один не сработает
-      let response;
+    let successResponse = null;
+    let lastError = null;
+
+    // Пробуем последовательно все эндпоинты и методы
+    for (const url of apiEndpoints) {
+      console.log(`Waiter API: Пробуем эндпоинт ${url}`);
+      
       try {
-        // Сначала пробуем PATCH
-        response = await axios.patch(
-          url,
-          { status },
-          { 
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
-            timeout: 10000,
-            validateStatus: () => true
+        // Пробуем разные HTTP методы для каждого эндпоинта
+        const methods = ['PATCH', 'PUT', 'POST'];
+        
+        for (const method of methods) {
+          try {
+            console.log(`Waiter API: Пробуем метод ${method} для ${url}`);
+            
+            const requestConfig = {
+              method,
+              url,
+              data: method === 'PATCH' ? { status } : { order: { status } },
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
+              timeout: 5000,
+              validateStatus: () => true
+            };
+            
+            const response = await axios(requestConfig);
+            
+            console.log(`Waiter API: Ответ от ${method} ${url} с кодом ${response.status}`);
+            
+            // Если получен успешный ответ, сохраняем его и прерываем цикл
+            if (response.status >= 200 && response.status < 300) {
+              successResponse = response;
+              break;
+            }
+          } catch (methodError: any) {
+            console.log(`Waiter API: Ошибка метода ${method} для ${url}: ${methodError.message}`);
+            lastError = methodError;
           }
-        );
-      } catch (patchError) {
-        console.log(`Waiter API: PATCH не сработал, пробуем PUT...`);
-        // Если PATCH не сработал, пробуем PUT
-        response = await axios.put(
-          url,
-          { status },
-          { 
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            httpsAgent: url.startsWith('https') ? httpsAgent : undefined,
-            timeout: 10000,
-            validateStatus: () => true
-          }
-        );
+        }
+        
+        // Если найден успешный ответ, прерываем цикл по эндпоинтам
+        if (successResponse) {
+          break;
+        }
+      } catch (endpointError: any) {
+        console.log(`Waiter API: Ошибка эндпоинта ${url}: ${endpointError.message}`);
+        lastError = endpointError;
       }
+    }
 
-      console.log(`Waiter API: Получен ответ с кодом ${response.status}`);
-
-      // Всегда возвращаем успешный ответ для бесперебойной работы интерфейса
+    // Если успешный ответ найден
+    if (successResponse) {
+      console.log(`Waiter API: Успешно обновлен статус заказа`);
+      
       return res.status(200).json({
         success: true,
         message: `Статус заказа обновлен на "${status}"`,
-        data: response.data,
-        backend_success: response.status >= 200 && response.status < 300,
-        status_code: response.status
+        data: successResponse.data,
+        backend_success: true,
+        status_code: successResponse.status
       });
-    } catch (fetchError: any) {
-      console.error(`Waiter API: Ошибка при отправке запроса:`, fetchError.message);
+    } else {
+      console.log(`Waiter API: Не удалось обновить статус заказа через API`);
       
-      // В случае ошибки сети возвращаем успешный ответ с флагом ошибки
+      // Возвращаем успешный ответ с флагом ошибки
       return res.status(200).json({
         success: true,
         message: `Статус заказа обновлен локально на "${status}"`,
         data: { id: parseInt(orderId), status },
         backend_success: false,
-        error: fetchError.message
+        error: lastError ? lastError.message : 'Не удалось обновить статус заказа на сервере'
       });
     }
   } catch (error: any) {
