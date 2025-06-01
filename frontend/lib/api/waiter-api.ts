@@ -86,7 +86,7 @@ export const waiterApi = {
       }
 
       // Формируем URL запроса к API
-      const apiUrl = '/api/v1/waiter/orders';
+      const apiUrl = '/v1/waiter/orders';
       
       console.log(`waiterApi.getWaiterOrders - Отправка запроса на: ${apiUrl}`);
 

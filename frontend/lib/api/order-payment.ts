@@ -28,10 +28,10 @@ export async function updateOrderPaymentStatus(orderId: number | string, payment
     
     if (userRole === 'waiter') {
       // Используем эндпоинт для официанта
-      url = `/api/v1/waiter/orders/${orderId}/confirm-payment`;
+      url = `/v1/waiter/orders/${orderId}/confirm-payment`;
     } else {
       // Используем эндпоинт для клиента
-      url = `/api/v1/orders/${orderId}/confirm-payment`;
+      url = `/v1/orders/${orderId}/confirm-payment`;
     }
     
     // Отправляем запрос с изменением payment_status на "paid"
