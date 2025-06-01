@@ -300,49 +300,37 @@ async def ultra_simple_update(
                     status_code=404,
                     content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
                 )
-            
-            # Получаем обновленный заказ
-            check_sql = "SELECT id, status, payment_status, updated_at FROM orders WHERE id = :order_id"
-            check_result = db.execute(text(check_sql), {"order_id": order_id})
-            order_data = check_result.fetchone()
-            
-            if not order_data:
-                return JSONResponse(
-                    status_code=404,
-                    content={"success": False, "message": "Не удалось получить данные заказа после обновления"}
-                )
-            
-            # Преобразуем результат в словарь
-            order_dict = {
-                "id": order_data[0],
-                "status": order_data[1],
-                "payment_status": order_data[2],
-                "updated_at": order_data[3].isoformat() if order_data[3] else None
-            }
+                
+            # Получаем обновленные данные заказа
+            updated_order = db.query(Order).filter(Order.id == order_id).first()
             
             return JSONResponse(
                 status_code=200,
                 content={
                     "success": True,
                     "message": "Статус заказа успешно обновлен",
-                    "order": order_dict
+                    "order": {
+                        "id": updated_order.id,
+                        "status": updated_order.status,
+                        "payment_status": updated_order.payment_status,
+                        "updated_at": updated_order.updated_at.isoformat() if updated_order.updated_at else None
+                    }
                 }
             )
-            
         except Exception as e:
             logger.error(f"Ошибка SQL: {str(e)}")
             db.rollback()
             
-            # Аварийная попытка
-            emergency_sql = "UPDATE orders SET updated_at = CURRENT_TIMESTAMP"
-            if "status" in params:
-                emergency_sql += ", status = :status"
-            if "payment_status" in params:
-                emergency_sql += ", payment_status = :payment_status"
-            emergency_sql += " WHERE id = :order_id"
-            
+            # Аварийная попытка с простым запросом
             try:
-                db.execute(text(emergency_sql), params)
+                emergency_update = "UPDATE orders SET updated_at = CURRENT_TIMESTAMP"
+                if "status" in params:
+                    emergency_update += ", status = :status"
+                if "payment_status" in params:
+                    emergency_update += ", payment_status = :payment_status"
+                emergency_update += " WHERE id = :order_id"
+                
+                db.execute(text(emergency_update), params)
                 db.commit()
                 return JSONResponse(
                     status_code=200,
@@ -354,7 +342,7 @@ async def ultra_simple_update(
                     status_code=500,
                     content={"success": False, "message": f"Ошибка при обновлении: {str(e)}"}
                 )
-    
+            
     except Exception as e:
         logger.exception(f"Необработанная ошибка: {str(e)}")
         return JSONResponse(
@@ -362,22 +350,133 @@ async def ultra_simple_update(
             content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
         )
 
-# PUT версия для совместимости
-@app.put("/api/simple-update/{order_id}", include_in_schema=True)
-async def ultra_simple_update_put(order_id: int, request: Request, db: Session = Depends(get_db)):
-    """PUT версия ультра-простого обновления"""
-    return await ultra_simple_update(order_id, request, db)
+# Сверхнадежные пути для обновления статуса оплаты (которые пытается использовать фронтенд)
+@app.put("/api/v1/orders/{order_id}/payment", include_in_schema=True)
+@app.patch("/api/v1/orders/{order_id}/payment", include_in_schema=True)
+@app.post("/api/v1/orders/{order_id}/payment", include_in_schema=True)
+@app.put("/api/v1/orders/{order_id}/payment-status", include_in_schema=True)
+@app.patch("/api/v1/orders/{order_id}/payment-status", include_in_schema=True)
+@app.post("/api/v1/orders/{order_id}/payment-status", include_in_schema=True)
+@app.put("/api/v1/orders/update-payment/{order_id}", include_in_schema=True)
+@app.patch("/api/v1/orders/update-payment/{order_id}", include_in_schema=True)
+@app.post("/api/v1/orders/update-payment/{order_id}", include_in_schema=True)
+async def update_payment_status(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Универсальный эндпоинт для обновления статуса оплаты заказа.
+    Принимает любой JSON с payment_status или status для совместимости со всеми форматами запросов.
+    """
+    try:
+        # Получаем данные запроса
+        try:
+            data = await request.json()
+            logger.info(f"Обновление статуса оплаты заказа {order_id}: {data}")
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Некорректный JSON"}
+            )
+        
+        # Извлекаем статус оплаты из разных возможных форматов данных
+        payment_status = None
+        
+        # Проверяем все возможные варианты расположения статуса оплаты в JSON
+        if "payment_status" in data:
+            payment_status = data["payment_status"]
+        elif "status" in data and data.get("type") == "payment":
+            payment_status = data["status"]
+        elif "new_payment_status" in data:
+            payment_status = data["new_payment_status"]
+        elif "status" in data and isinstance(data["status"], dict) and "payment_status" in data["status"]:
+            payment_status = data["status"]["payment_status"]
+        
+        # Если статус не найден, пробуем использовать весь объект как статус
+        if not payment_status and len(data) == 1 and isinstance(list(data.values())[0], str):
+            payment_status = list(data.values())[0]
+        
+        # Если статус всё ещё не найден
+        if not payment_status:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Не указан статус оплаты в запросе"}
+            )
+        
+        # Приводим к верхнему регистру
+        payment_status = payment_status.upper()
+        
+        # Прямой SQL-запрос для обновления
+        sql = "UPDATE orders SET payment_status = :payment_status, updated_at = CURRENT_TIMESTAMP WHERE id = :order_id"
+        params = {"order_id": order_id, "payment_status": payment_status}
+        
+        logger.info(f"SQL запрос: {sql}, параметры: {params}")
+        
+        try:
+            result = db.execute(text(sql), params)
+            db.commit()
+            
+            if result.rowcount == 0:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
+                )
+                
+            # Получаем обновленные данные заказа
+            updated_order = db.query(Order).filter(Order.id == order_id).first()
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "Статус оплаты заказа успешно обновлен",
+                    "order": {
+                        "id": updated_order.id,
+                        "status": updated_order.status,
+                        "payment_status": updated_order.payment_status,
+                        "updated_at": updated_order.updated_at.isoformat() if updated_order.updated_at else None
+                    }
+                }
+            )
+        except Exception as e:
+            logger.error(f"Ошибка SQL при обновлении статуса оплаты: {str(e)}")
+            db.rollback()
+            
+            # Аварийная попытка с максимально простым запросом
+            try:
+                emergency_sql = f"UPDATE orders SET payment_status = '{payment_status}' WHERE id = {order_id}"
+                db.execute(emergency_sql)
+                db.commit()
+                return JSONResponse(
+                    status_code=200,
+                    content={"success": True, "message": "Статус оплаты обновлен (аварийный режим)"}
+                )
+            except Exception as e2:
+                logger.error(f"Критическая ошибка при обновлении статуса оплаты: {str(e2)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "message": f"Ошибка при обновлении статуса оплаты: {str(e)}"}
+                )
+            
+    except Exception as e:
+        logger.exception(f"Необработанная ошибка при обновлении статуса оплаты: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
+        )
 
-# v1 версия для совместимости
-@app.post("/api/v1/simple-update/{order_id}", include_in_schema=True)
-async def ultra_simple_update_v1(order_id: int, request: Request, db: Session = Depends(get_db)):
-    """API v1 версия ультра-простого обновления"""
-    return await ultra_simple_update(order_id, request, db)
-
-@app.put("/api/v1/simple-update/{order_id}", include_in_schema=True)
-async def ultra_simple_update_v1_put(order_id: int, request: Request, db: Session = Depends(get_db)):
-    """API v1 PUT версия ультра-простого обновления"""
-    return await ultra_simple_update(order_id, request, db)
+# Также добавляем пути для обновления через /waiter/ префикс
+@app.put("/api/v1/waiter/orders/{order_id}/payment", include_in_schema=True)
+@app.patch("/api/v1/waiter/orders/{order_id}/payment", include_in_schema=True)
+@app.post("/api/v1/waiter/orders/{order_id}/payment", include_in_schema=True)
+async def waiter_update_payment_status(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Версия для официантов"""
+    return await update_payment_status(order_id, request, db)
 
 # Максимально простой эндпоинт для обновления любого заказа
 @app.put("/api/simple/orders/{order_id}", include_in_schema=True)
