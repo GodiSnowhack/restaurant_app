@@ -421,7 +421,8 @@ def get_financial_metrics(
             .join(OrderItem, Order.id == OrderItem.order_id)
             .join(Dish, OrderItem.dish_id == Dish.id)
             .join(Category, Dish.category_id == Category.id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу - берем все заказы
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
         # Добавляем фильтр по категории, если указан
@@ -429,11 +430,30 @@ def get_financial_metrics(
             query = query.filter(Category.id == category_id)
             
         orders_data = query.all()
-        print(f"Получено {len(orders_data)} записей о позициях заказов из БД")
+        print(f"Получено {len(orders_data)} записей о позициях заказов из БД (без фильтра статуса)")
         
         # Если данные не найдены, возвращаем пустые структуры
         if not orders_data:
             print("В БД нет данных о заказах.")
+            # Попробуем узнать, есть ли вообще заказы в базе
+            orders_count = db.query(func.count(Order.id)).scalar() or 0
+            order_items_count = db.query(func.count(OrderItem.id)).scalar() or 0
+            print(f"Всего в БД: заказов - {orders_count}, позиций заказов - {order_items_count}")
+            
+            # Если заказы есть, но запрос не вернул результатов, попробуем понять почему
+            if orders_count > 0:
+                # Проверим статусы заказов
+                statuses = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+                print(f"Статусы заказов в БД: {statuses}")
+                
+                # Проверим связь заказов с блюдами
+                orders_with_items = db.query(func.count(func.distinct(OrderItem.order_id))).scalar() or 0
+                print(f"Заказов с позициями: {orders_with_items}")
+                
+                # Проверим связь блюд с категориями
+                dishes_with_categories = db.query(func.count(Dish.id)).filter(Dish.category_id.isnot(None)).scalar() or 0
+                print(f"Блюд с категориями: {dishes_with_categories} из {db.query(func.count(Dish.id)).scalar() or 0}")
+                
             return {
                 "totalRevenue": 0,
                 "totalCost": 0,
@@ -719,6 +739,17 @@ def get_menu_metrics(
     print(f"Запрошенный период для метрик меню: {display_start_date} - {display_end_date}")
     
     try:
+        # Проверка наличия данных
+        dishes_count = db.query(func.count(Dish.id)).scalar() or 0
+        orders_count = db.query(func.count(Order.id)).scalar() or 0
+        order_items_count = db.query(func.count(OrderItem.id)).scalar() or 0
+        
+        print(f"В БД: блюд - {dishes_count}, заказов - {orders_count}, позиций заказов - {order_items_count}")
+        
+        # Проверим статусы заказов
+        statuses = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        print(f"Статусы заказов в БД: {statuses}")
+        
         # Запрос на получение данных по топ продаваемым блюдам (без фильтрации по датам)
         top_selling_query = (
             db.query(
@@ -732,7 +763,8 @@ def get_menu_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .join(Category, Category.id == Dish.category_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
         # Фильтр по категории, если указана
@@ -803,7 +835,8 @@ def get_menu_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .join(Category, Category.id == Dish.category_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
         # Применяем те же фильтры
@@ -858,7 +891,8 @@ def get_menu_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .join(Category, Category.id == Dish.category_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
         # Применяем те же фильтры
@@ -901,7 +935,8 @@ def get_menu_metrics(
             .join(Dish, Dish.category_id == Category.id)
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
             .group_by(Category.id)
             .all()
         )
@@ -925,7 +960,8 @@ def get_menu_metrics(
                 )
                 .join(OrderItem, Order.id == OrderItem.order_id)
                 .filter(OrderItem.dish_id == dish_id)
-                .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+                # Убираем фильтр по статусу
+                # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
                 .group_by(func.date(Order.created_at))
                 .order_by(func.date(Order.created_at))
                 .all()
@@ -953,7 +989,8 @@ def get_menu_metrics(
                 .join(OrderItem, Order.id == OrderItem.order_id)
                 .join(Dish, OrderItem.dish_id == Dish.id)
                 .filter(Dish.category_id == int(category_id))
-                .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+                # Убираем фильтр по статусу
+                # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
                 .filter(Order.total_amount > 0)
                 .first()
             )
@@ -1071,6 +1108,14 @@ def get_customer_metrics(
     print(f"Запрошенный период для метрик клиентов: {display_start_date} - {display_end_date}")
     
     try:
+        # Проверка наличия данных в БД
+        orders_count = db.query(func.count(Order.id)).scalar() or 0
+        print(f"Всего заказов в БД: {orders_count}")
+        
+        # Проверим статусы заказов
+        statuses = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        print(f"Статусы заказов в БД: {statuses}")
+        
         # Получение общего количества клиентов (пользователей, сделавших заказы)
         total_customers_query = (
             db.query(func.count(func.distinct(Order.user_id)))
@@ -1597,13 +1642,20 @@ def get_operational_metrics(
                 
             print(f"Реальный диапазон дат в БД: {min_date} - {max_date}")
         
+        # Проверка наличия данных в БД
+        orders_count = db.query(func.count(Order.id)).scalar() or 0
+        print(f"Всего заказов в БД: {orders_count}")
+        
+        # Проверим статусы заказов
+        statuses = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        print(f"Статусы заказов в БД: {statuses}")
+        
         # Получение данных о среднем времени приготовления заказов
         avg_preparation_time_query = (
             db.query(func.avg(func.julianday(Order.completed_at) - func.julianday(Order.created_at)) * 24 * 60)
-            .filter(
-                Order.completed_at.isnot(None),
-                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
-            )
+            .filter(Order.completed_at.isnot(None))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
         avg_preparation_time = avg_preparation_time_query.scalar() or 0
@@ -1614,8 +1666,9 @@ def get_operational_metrics(
             db.query(func.avg(func.julianday(Order.completed_at) - func.julianday(Order.created_at)) * 24 * 60)
             .filter(
                 Order.completed_at.isnot(None),
-                Order.table_number.isnot(None),
-                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
+                Order.table_number.isnot(None)
+                # Убираем фильтр по статусу
+                # Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
             )
         )
         
@@ -1712,8 +1765,9 @@ def get_operational_metrics(
             .join(Order, Order.waiter_id == User.id)
             .outerjoin(Review, Review.order_id == Order.id)
             .filter(
-                User.role == 'waiter',
-                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
+                User.role == 'waiter'
+                # Убираем фильтр по статусу
+                # Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
             )
             .group_by(User.id)
             .order_by(func.count(Order.id).desc())
@@ -1838,6 +1892,14 @@ def get_predictive_metrics(
     print(f"Период прогноза: {display_start_date} - {display_end_date}")
     
     try:
+        # Проверка наличия данных в БД
+        orders_count = db.query(func.count(Order.id)).scalar() or 0
+        print(f"Всего заказов в БД: {orders_count}")
+        
+        # Проверим статусы заказов
+        statuses = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        print(f"Статусы заказов в БД: {statuses}")
+        
         # Получение последних реальных данных о продажах для обучения прогноза
         past_sales_query = (
             db.query(
@@ -1845,7 +1907,8 @@ def get_predictive_metrics(
                 func.count(Order.id).label("orders_count"),
                 func.sum(Order.total_amount).label("total_amount")
             )
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
             .group_by(func.date(Order.created_at))
             .order_by(func.date(Order.created_at).desc())
             .limit(30)  # Берем данные за последние 30 дней
@@ -1933,7 +1996,8 @@ def get_predictive_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .join(Category, Category.id == Dish.category_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
             .group_by(Dish.id, Category.id)
             .order_by(func.sum(OrderItem.quantity).desc())
             .limit(5)
@@ -2030,7 +2094,8 @@ def get_predictive_metrics(
             )
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
-            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            # Убираем фильтр по статусу
+            # .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
             .group_by(Dish.id)
             .order_by(func.sum(OrderItem.quantity).asc())
             .limit(5)
@@ -2049,7 +2114,8 @@ def get_predictive_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .filter(
-                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]),
+                # Убираем фильтр по статусу
+                # Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]),
                 Dish.cost_price.isnot(None),
                 Dish.cost_price > 0
             )
