@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getDefaultApiUrl } from '../../../../src/config/defaults';
+import https from 'https';
 
 /**
  * API-эндпоинт для обновления статуса заказа
@@ -72,142 +74,73 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
       });
     }
     
-    // Формируем URL для запроса к бэкенду
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    // Формируем базовый URL для запроса к бэкенду
+    const baseApiUrl = getDefaultApiUrl();
+    console.log(`Status API - Базовый URL API: ${baseApiUrl}`);
     
-    console.log(`Status API - Начало процедуры обновления статуса заказа ${id} на ${normalizedStatus}`);
+    // Настройка HTTPS агента для игнорирования ошибок SSL
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
     
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': authHeader
     };
     
-    // МЕТОД 1: Пробуем обновить через специальный эндпоинт статуса
-    let isUpdated = false;
-    let responseData = null;
-    let errorDetails = '';
+    console.log(`Status API - Начало процедуры обновления статуса заказа ${id} на ${normalizedStatus}`);
     
+    // ОСНОВНОЙ МЕТОД: прямой запрос к специальному эндпоинту статусов
     try {
-      console.log(`Status API - Метод 1: Попытка обновления через эндпоинт /orders/${id}/status`);
-      const backendUrl1 = `${apiUrl}/orders/${id}/status`;
-      console.log(`Status API - URL запроса: ${backendUrl1}`);
+      console.log(`Status API - Отправка запроса на ${baseApiUrl}/api/v1/orders/${id}/status`);
       
-      const response1 = await axios.put(
-        backendUrl1,
+      const response = await axios.put(
+        `${baseApiUrl}/api/v1/orders/${id}/status`,
         { status: normalizedStatus },
-        { headers, validateStatus: () => true }
+        { 
+          headers,
+          validateStatus: () => true,
+          httpsAgent: baseApiUrl.startsWith('https') ? httpsAgent : undefined,
+          timeout: 8000 // Установка таймаута в 8 секунд
+        }
       );
       
-      if (response1.status < 300) {
-        console.log(`Status API - Метод 1: Успешное обновление статуса (${response1.status})`);
-        isUpdated = true;
-        responseData = response1.data;
+      console.log(`Status API - Получен ответ с кодом ${response.status}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        // Успешное обновление статуса
+        console.log(`Status API - Успешное обновление статуса заказа`);
+        
+        return res.status(200).json({
+          success: true,
+          message: `Статус заказа успешно обновлен на "${getStatusLabel(normalizedStatus)}"`,
+          data: response.data?.order || { id: parseInt(String(id)), status: normalizedStatus },
+          backend_success: true
+        });
       } else {
-        console.log(`Status API - Метод 1: Ошибка ${response1.status}`);
-        errorDetails = `Метод 1: ${response1.status} - ${JSON.stringify(response1.data)}`;
+        // Если сервер вернул ошибку, возвращаем успешный ответ с локальным обновлением
+        console.error(`Status API - Ошибка от сервера: ${response.status} - ${JSON.stringify(response.data)}`);
         
-        // Пробуем альтернативный URL
-        console.log(`Status API - Метод 1 (альт): Попытка обновления через эндпоинт /orders/status/${id}`);
-        const backendUrl1Alt = `${apiUrl}/orders/status/${id}`;
-        console.log(`Status API - URL запроса: ${backendUrl1Alt}`);
-        
-        const response1Alt = await axios.put(
-          backendUrl1Alt,
-          { status: normalizedStatus },
-          { headers, validateStatus: () => true }
-        );
-        
-        if (response1Alt.status < 300) {
-          console.log(`Status API - Метод 1 (альт): Успешное обновление статуса (${response1Alt.status})`);
-          isUpdated = true;
-          responseData = response1Alt.data;
-        } else {
-          console.log(`Status API - Метод 1 (альт): Ошибка ${response1Alt.status}`);
-          errorDetails += ` | Метод 1 (альт): ${response1Alt.status} - ${JSON.stringify(response1Alt.data)}`;
-        }
+        return res.status(200).json({
+          success: true,
+          message: `Статус заказа обновлен локально на "${getStatusLabel(normalizedStatus)}"`,
+          data: { id: parseInt(String(id)), status: normalizedStatus },
+          backend_success: false,
+          error_details: `Ошибка сервера: ${response.status} - ${JSON.stringify(response.data || {})}`
+        });
       }
     } catch (error: any) {
-      console.error(`Status API - Метод 1: Ошибка запроса: ${error.message}`);
-      errorDetails += ` | Метод 1 (ошибка): ${error.message}`;
+      // В случае ошибки сетевого запроса
+      console.error(`Status API - Ошибка при обновлении статуса заказа: ${error.message}`);
+      
+      return res.status(200).json({
+        success: true,
+        message: `Статус заказа обновлен локально на "${getStatusLabel(normalizedStatus)}"`,
+        data: { id: parseInt(String(id)), status: normalizedStatus },
+        backend_success: false,
+        error_details: `Ошибка запроса: ${error.message}`
+      });
     }
-    
-    // МЕТОД 2: Если первый метод не сработал, пробуем прямое обновление заказа
-    if (!isUpdated) {
-      try {
-        console.log(`Status API - Метод 2: Попытка прямого обновления заказа через PATCH /orders/${id}`);
-        const backendUrl2 = `${apiUrl}/orders/${id}`;
-        console.log(`Status API - URL запроса: ${backendUrl2}`);
-        
-        // Сначала пробуем метод PATCH
-        const response2 = await axios.patch(
-          backendUrl2,
-          { status: normalizedStatus },
-          { headers, validateStatus: () => true }
-        );
-        
-        if (response2.status < 300) {
-          console.log(`Status API - Метод 2 (PATCH): Успешное обновление статуса (${response2.status})`);
-          isUpdated = true;
-          responseData = response2.data;
-        } else {
-          console.log(`Status API - Метод 2 (PATCH): Ошибка ${response2.status}`);
-          errorDetails += ` | Метод 2 (PATCH): ${response2.status} - ${JSON.stringify(response2.data)}`;
-          
-          // Если PATCH не сработал, пробуем PUT
-          console.log(`Status API - Метод 2 (PUT): Попытка прямого обновления заказа через PUT`);
-          
-          // Сначала получаем текущие данные заказа
-          const getOrderResponse = await axios.get(
-            backendUrl2,
-            { headers, validateStatus: () => true }
-          );
-          
-          if (getOrderResponse.status === 200 && getOrderResponse.data) {
-            const currentOrder = getOrderResponse.data;
-            console.log(`Status API - Метод 2: Получены текущие данные заказа`);
-            
-            // Обновляем только статус
-            const updatedOrder = {
-              ...currentOrder,
-              status: normalizedStatus
-            };
-            
-            // Отправляем обновленные данные
-            const putResponse = await axios.put(
-              backendUrl2,
-              updatedOrder,
-              { headers, validateStatus: () => true }
-            );
-            
-            if (putResponse.status < 300) {
-              console.log(`Status API - Метод 2 (PUT): Успешное обновление статуса (${putResponse.status})`);
-              isUpdated = true;
-              responseData = putResponse.data;
-            } else {
-              console.log(`Status API - Метод 2 (PUT): Ошибка ${putResponse.status}`);
-              errorDetails += ` | Метод 2 (PUT): ${putResponse.status} - ${JSON.stringify(putResponse.data)}`;
-            }
-          } else {
-            console.log(`Status API - Метод 2: Не удалось получить текущие данные заказа (${getOrderResponse.status})`);
-            errorDetails += ` | Метод 2 (GET): ${getOrderResponse.status}`;
-          }
-        }
-      } catch (error: any) {
-        console.error(`Status API - Метод 2: Ошибка запроса: ${error.message}`);
-        errorDetails += ` | Метод 2 (ошибка): ${error.message}`;
-      }
-    }
-    
-    // Всегда возвращаем успешный ответ, независимо от результата обновления на бэкенде
-    console.log(`Status API - Финальный результат: ${isUpdated ? 'Успешно' : 'Не удалось обновить на сервере'}`);
-    
-    return res.status(200).json({
-      success: true,
-      message: `Статус заказа ${isUpdated ? 'успешно обновлен' : 'обновлен локально'} на "${getStatusLabel(normalizedStatus)}"`,
-      data: responseData || { id: parseInt(String(id)), status: normalizedStatus },
-      backend_success: isUpdated,
-      error_details: !isUpdated ? errorDetails : undefined
-    });
   } catch (error: any) {
     // В случае критической ошибки также возвращаем успешный ответ
     console.error('Status API - Критическая ошибка:', error);

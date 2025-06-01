@@ -182,7 +182,7 @@ async def create_order(
         
         # Вызываем сервис для создания заказа
         logger.info(f"Отправка данных для создания заказа: {order_data}")
-    result = order_service.create_order(db, order_data)
+        result = order_service.create_order(db, order_data)
         
         # Обрабатываем результат
         if result:
@@ -193,7 +193,6 @@ async def create_order(
             }
         else:
             raise HTTPException(status_code=500, detail="Не удалось создать заказ")
-            
     except HTTPException as he:
         # Пробрасываем HTTP исключения дальше
         raise
@@ -1020,3 +1019,137 @@ def confirm_order_payment(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при подтверждении оплаты: {str(e)}"
         ) 
+
+
+@router.put("/{order_id}/payment-status", response_model=Dict[str, Any])
+def update_order_payment_status(
+    order_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Обновляет статус оплаты заказа.
+    
+    Args:
+        order_id: ID заказа
+        payment_data: Новый статус оплаты (поле status)
+        db: Сессия базы данных
+        current_user: Текущий пользователь
+        
+    Returns:
+        Обновленный заказ
+    """
+    try:
+        # Логируем начало процесса обновления
+        logger.info(f"Обновление статуса оплаты заказа {order_id} на {payment_data.get('status')}")
+        logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}, email={current_user.email}")
+        
+        # Проверка прав доступа
+        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+            logger.warning(f"Пользователь {current_user.id} с ролью {current_user.role} попытался обновить статус оплаты заказа {order_id}")
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Недостаточно прав для обновления статуса оплаты заказа"
+            )
+            
+        # Проверяем существование заказа
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            logger.warning(f"Заказ с ID {order_id} не найден при попытке обновить статус оплаты")
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Заказ с id {order_id} не найден"
+            )
+        
+        # Получаем новый статус из входных данных
+        new_status = payment_data.get('status')
+        if not new_status:
+            logger.warning(f"Не указан статус оплаты для заказа {order_id}")
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="Не указан статус оплаты"
+            )
+        
+        # Нормализуем статус к нижнему регистру
+        normalized_status = str(new_status).lower()
+        
+        # Валидация статуса оплаты
+        valid_statuses = ["pending", "paid", "failed", "refunded"]
+        if normalized_status not in valid_statuses:
+            logger.warning(f"Недопустимый статус оплаты: {new_status} (нормализованный: {normalized_status})")
+            logger.warning(f"Разрешенные статусы: {', '.join(valid_statuses)}")
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"Недопустимый статус оплаты: {new_status}. Разрешены: {', '.join(valid_statuses)}"
+            )
+        
+        # Обновляем статус оплаты заказа
+        order.payment_status = normalized_status
+        db.commit()
+        db.refresh(order)
+        
+        logger.info(f"Статус оплаты заказа {order_id} успешно обновлен на {normalized_status}")
+        
+        # Получаем детальную информацию о заказе для ответа
+        updated_order = order_service.get_order_detailed(db, order_id)
+        
+        # Формируем ответ
+        result = {
+            "success": True,
+            "message": f"Статус оплаты заказа успешно обновлен на {normalized_status}",
+            "order": updated_order
+        }
+        
+        return result
+    except HTTPException as he:
+        # Пробрасываем HTTP-исключения дальше
+        logger.error(f"HTTP ошибка при обновлении статуса оплаты заказа {order_id}: {he.detail}")
+        raise
+    except Exception as e:
+        # Логируем и обрабатываем общие исключения
+        logger.exception(f"Непредвиденная ошибка при обновлении статуса оплаты заказа {order_id}: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера при обновлении статуса оплаты заказа: {str(e)}"
+        ) 
+
+
+# Альтернативный эндпоинт для обновления статуса заказа, соответствующий ожиданиям фронтенда
+@router.put("/{order_id}/status", response_model=Dict[str, Any])
+def update_order_status_alternative(
+    order_id: int,
+    status_update: OrderStatusUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Альтернативный эндпоинт для обновления статуса заказа.
+    Просто перенаправляет запрос на основной метод update_order_status.
+    """
+    # Логируем информацию о запросе
+    logger.info(f"Запрос на обновление статуса заказа через альтернативный эндпоинт /{order_id}/status")
+    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
+    
+    # Вызываем основной метод
+    return update_order_status(order_id, status_update, db, current_user) 
+
+
+# Альтернативный эндпоинт для обновления статуса оплаты заказа
+@router.put("/payment-status/{order_id}", response_model=Dict[str, Any])
+def update_order_payment_status_alternative(
+    order_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Альтернативный эндпоинт для обновления статуса оплаты заказа.
+    Просто перенаправляет запрос на основной метод update_order_payment_status.
+    """
+    # Логируем информацию о запросе
+    logger.info(f"Запрос на обновление статуса оплаты заказа через альтернативный эндпоинт /payment-status/{order_id}")
+    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
+    
+    # Вызываем основной метод
+    return update_order_payment_status(order_id, payment_data, db, current_user) 
