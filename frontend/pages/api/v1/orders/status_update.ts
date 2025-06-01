@@ -94,10 +94,8 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
     try {
       console.log(`Status API - Отправка запроса на ${baseApiUrl}/orders/${id}/status`);
       
-      // Формируем URL без дублирования /api/v1, если baseApiUrl уже содержит этот путь
-      const url = baseApiUrl.endsWith('/api/v1') || baseApiUrl.includes('/api/v1/') 
-        ? `${baseApiUrl.replace(/\/api\/v1\/?$/, '')}/orders/${id}/status`
-        : `${baseApiUrl}/orders/${id}/status`;
+      // Формируем URL с правильным префиксом
+      const url = `${baseApiUrl.replace(/\/api\/v1\/?$/, '')}/api/v1/orders/${id}/status`;
         
       console.log(`Status API - Итоговый URL: ${url}`);
       
