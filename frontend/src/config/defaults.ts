@@ -45,16 +45,24 @@ export const DEFAULT_URLS = {
 export function getDefaultApiUrl(): string {
   // Сначала пробуем получить URL из переменных окружения
   if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
+    console.log(`Config: Используем API URL из переменной окружения: ${process.env.NEXT_PUBLIC_API_URL}`);
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
   // Затем проверяем window (в браузере)
   if (typeof window !== 'undefined' && (window as any).API_URL) {
+    console.log(`Config: Используем API URL из window: ${(window as any).API_URL}`);
     return (window as any).API_URL;
   }
   
-  // Если ничего не нашли, возвращаем URL по умолчанию
-  return 'http://localhost:8000';
+  // Определяем URL по умолчанию в зависимости от окружения
+  const isProduction = process.env.NODE_ENV === 'production';
+  const defaultUrl = isProduction 
+    ? 'https://backend-production-1a78.up.railway.app' 
+    : 'http://localhost:8000';
+  
+  console.log(`Config: Используем стандартный API URL для ${isProduction ? 'production' : 'development'}: ${defaultUrl}`);
+  return defaultUrl;
 }
 
 // Получение базового URL фронтенда

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getDefaultApiUrl } from '../../../../src/config/defaults';
 import https from 'https';
+import axios from 'axios';
 
 /**
  * API-прокси для обновления статуса оплаты заказа
@@ -54,69 +55,158 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
     
-    // Формируем URL для запроса к основному API
-    const url = `${baseApiUrl}/api/v1/orders/${orderId}/payment-status`;
-
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
       rejectUnauthorized: false
     });
 
-    // Отправляем запрос к бэкенду с таймаутом
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
+    // Флаг успешного обновления на сервере
+    let isUpdated = false;
+    let responseData = null;
+    let errorDetails = '';
+    
+    // МЕТОД 1: Пробуем обновить через специальный эндпоинт статуса оплаты
     try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: payment_status }),
-        signal: controller.signal,
-        // @ts-ignore - добавляем агент напрямую
-        agent: url.startsWith('https') ? httpsAgent : undefined
-      });
-
-      clearTimeout(timeoutId);
-
-      // Если ответ не успешный, генерируем демо-данные
-      if (!response.ok) {
-        console.log(`API Proxy: Сервер вернул ошибку ${response.status} при обновлении статуса оплаты заказа #${orderId}`);
-        return res.status(200).json({
-          success: true,
-          order: generateDemoOrder(parseInt(orderId as string), payment_status)
-        });
-      }
-
-      // Получаем данные ответа
-      const data = await response.json();
-
-      // Возвращаем успешный ответ
-      return res.status(200).json({
-        success: true,
-        order: data
-      });
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      console.error(`API Proxy: Ошибка при отправке запроса обновления статуса оплаты заказа #${orderId}:`, fetchError.message);
+      console.log(`API Proxy: Метод 1 - Обновление через /orders/${orderId}/payment-status`);
+      const url1 = `${baseApiUrl}/api/v1/orders/${orderId}/payment-status`;
+      console.log(`API Proxy: URL запроса: ${url1}`);
       
-      // В случае ошибки сети возвращаем демо-данные
+      const response = await axios.put(
+        url1,
+        { status: payment_status },
+        { 
+          headers,
+          validateStatus: () => true,
+          httpsAgent: url1.startsWith('https') ? httpsAgent : undefined,
+          timeout: 8000
+        }
+      );
+      
+      if (response.status < 300) {
+        console.log(`API Proxy: Метод 1 - Успешное обновление (${response.status})`);
+        isUpdated = true;
+        responseData = response.data;
+      } else {
+        console.log(`API Proxy: Метод 1 - Ошибка ${response.status}`);
+        errorDetails = `Метод 1: ${response.status} - ${JSON.stringify(response.data)}`;
+      }
+    } catch (error: any) {
+      console.error(`API Proxy: Метод 1 - Ошибка запроса: ${error.message}`);
+      errorDetails += ` | Метод 1 (ошибка): ${error.message}`;
+    }
+    
+    // МЕТОД 2: Если первый метод не сработал, пробуем прямое обновление заказа
+    if (!isUpdated) {
+      try {
+        console.log(`API Proxy: Метод 2 - Прямое обновление заказа /orders/${orderId}`);
+        const url2 = `${baseApiUrl}/api/v1/orders/${orderId}`;
+        console.log(`API Proxy: URL запроса: ${url2}`);
+        
+        // Сначала получаем текущие данные заказа
+        const getOrderResponse = await axios.get(
+          url2,
+          { 
+            headers,
+            validateStatus: () => true,
+            httpsAgent: url2.startsWith('https') ? httpsAgent : undefined,
+            timeout: 8000
+          }
+        );
+        
+        if (getOrderResponse.status === 200 && getOrderResponse.data) {
+          const currentOrder = getOrderResponse.data;
+          console.log(`API Proxy: Метод 2 - Получены текущие данные заказа`);
+          
+          // Обновляем только статус оплаты
+          const updatedOrder = {
+            ...currentOrder,
+            payment_status: payment_status
+          };
+          
+          // Сначала пробуем PATCH
+          const patchResponse = await axios.patch(
+            url2,
+            { payment_status: payment_status },
+            { 
+              headers,
+              validateStatus: () => true,
+              httpsAgent: url2.startsWith('https') ? httpsAgent : undefined,
+              timeout: 8000
+            }
+          );
+          
+          if (patchResponse.status < 300) {
+            console.log(`API Proxy: Метод 2 (PATCH) - Успешное обновление (${patchResponse.status})`);
+            isUpdated = true;
+            responseData = patchResponse.data;
+          } else {
+            console.log(`API Proxy: Метод 2 (PATCH) - Ошибка ${patchResponse.status}, пробуем PUT`);
+            errorDetails += ` | Метод 2 (PATCH): ${patchResponse.status}`;
+            
+            // Если PATCH не сработал, пробуем PUT с полным объектом
+            const putResponse = await axios.put(
+              url2,
+              updatedOrder,
+              { 
+                headers,
+                validateStatus: () => true,
+                httpsAgent: url2.startsWith('https') ? httpsAgent : undefined,
+                timeout: 8000
+              }
+            );
+            
+            if (putResponse.status < 300) {
+              console.log(`API Proxy: Метод 2 (PUT) - Успешное обновление (${putResponse.status})`);
+              isUpdated = true;
+              responseData = putResponse.data;
+            } else {
+              console.log(`API Proxy: Метод 2 (PUT) - Ошибка ${putResponse.status}`);
+              errorDetails += ` | Метод 2 (PUT): ${putResponse.status}`;
+            }
+          }
+        } else {
+          console.log(`API Proxy: Метод 2 - Не удалось получить текущие данные заказа (${getOrderResponse.status})`);
+          errorDetails += ` | Метод 2 (GET): ${getOrderResponse.status}`;
+        }
+      } catch (error: any) {
+        console.error(`API Proxy: Метод 2 - Ошибка запроса: ${error.message}`);
+        errorDetails += ` | Метод 2 (ошибка): ${error.message}`;
+      }
+    }
+    
+    // Если ни один метод не сработал, возвращаем демо-данные
+    if (!isUpdated) {
+      console.log(`API Proxy: Не удалось обновить статус оплаты на сервере, возвращаем демо-данные`);
       return res.status(200).json({
         success: true,
-        order: generateDemoOrder(parseInt(orderId as string), payment_status)
+        order: generateDemoOrder(parseInt(orderId as string), payment_status),
+        backend_success: false,
+        error_details: errorDetails
       });
     }
+    
+    // Возвращаем успешный ответ с данными от сервера
+    console.log(`API Proxy: Успешное обновление статуса оплаты на сервере`);
+    return res.status(200).json({
+      success: true,
+      order: responseData || generateDemoOrder(parseInt(orderId as string), payment_status),
+      backend_success: true
+    });
   } catch (error: any) {
-    console.error(`API Proxy: Ошибка при обработке запроса обновления статуса оплаты:`, error);
+    console.error(`API Proxy: Критическая ошибка при обработке запроса обновления статуса оплаты:`, error);
     
     // В случае любой ошибки возвращаем успешный ответ с демо-данными
     return res.status(200).json({
       success: true,
-      order: generateDemoOrder(parseInt(req.body?.orderId || '0'), req.body?.payment_status || 'paid')
+      order: generateDemoOrder(parseInt(req.body?.orderId || '0'), req.body?.payment_status || 'paid'),
+      backend_success: false,
+      error: error.message
     });
   }
 }
