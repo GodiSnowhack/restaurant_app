@@ -70,7 +70,7 @@ const waiterApi = {
       }
 
       // Делаем запрос к API
-      const response = await api.get('/api/v1/waiter/orders', {
+      const response = await api.get('/v1/waiter/orders', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-User-Role': userRole,
@@ -106,7 +106,7 @@ const waiterApi = {
       }
       
       // Обновляем статус заказа
-      const response = await api.put(`/api/v1/waiter/orders/${orderId}`, { status });
+      const response = await api.put(`/v1/waiter/orders/${orderId}`, { status });
       console.log(`API updateWaiterOrder - Заказ ${orderId} успешно обновлен до статуса "${status}"`);
       return response.data;
     } catch (error) {
