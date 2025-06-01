@@ -876,15 +876,43 @@ async def simplest_order_update(
             content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
         )
 
-# Эндпоинт для привязки заказа к официанту по коду заказа
+# Эндпоинт для привязки заказа к официанту по коду заказа - API v1 путь
 @app.post("/api/v1/waiter/assign-order-by-code", include_in_schema=True)
-async def assign_order_by_code(
+@app.post("/api/v1/orders/by-code/assign", include_in_schema=True)
+async def assign_order_by_code_api_v1(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Привязка заказа к официанту по коду заказа.
+    Привязка заказа к официанту по коду заказа (API v1 путь).
+    
+    Принимает JSON: {"code": "ORDER_CODE"}
+    """
+    return await assign_order_by_code_handler(request, db, current_user)
+
+# Эндпоинт для привязки заказа к официанту по коду заказа - прямой путь для фронтенда
+@app.post("/waiter/assign-order-by-code", include_in_schema=True)
+async def assign_order_by_code_direct(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Привязка заказа к официанту по коду заказа (прямой путь).
+    
+    Принимает JSON: {"code": "ORDER_CODE"}
+    """
+    return await assign_order_by_code_handler(request, db, current_user)
+
+# Обработчик для привязки заказа к официанту по коду
+async def assign_order_by_code_handler(
+    request: Request,
+    db: Session,
+    current_user: User
+):
+    """
+    Обработчик привязки заказа к официанту по коду заказа.
     
     Принимает JSON: {"code": "ORDER_CODE"}
     """
@@ -910,8 +938,8 @@ async def assign_order_by_code(
                 content={"success": False, "message": "Некорректный JSON"}
             )
         
-        # Получаем код заказа
-        order_code = data.get("code")
+        # Получаем код заказа (поддерживаем оба варианта: code и order_code)
+        order_code = data.get("code") or data.get("order_code")
         if not order_code:
             logger.warning("Код заказа не указан в запросе")
             return JSONResponse(
@@ -1074,6 +1102,62 @@ async def assign_order_by_code(
             status_code=500,
             content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
         )
+
+# Добавляем прямой эндпоинт для привязки заказа по коду без префикса API
+@app.post("/waiter/assign-order", include_in_schema=True)
+async def assign_order_direct(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Прямой эндпоинт для привязки заказа к официанту по коду.
+    
+    Принимает JSON: {"code": "ORDER_CODE"} или {"order_code": "ORDER_CODE"}
+    """
+    return await assign_order_by_code_handler(request, db, current_user)
+
+# Добавляем прямой эндпоинт для совместимости с фронтендом
+@app.post("/api/waiter/assign-order", include_in_schema=True)
+async def api_assign_order_direct(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Прямой эндпоинт для привязки заказа к официанту по коду через /api/.
+    
+    Принимает JSON: {"code": "ORDER_CODE"} или {"order_code": "ORDER_CODE"}
+    """
+    return await assign_order_by_code_handler(request, db, current_user)
+
+# Добавляем путь для прямой привязки по коду в URL
+@app.post("/api/v1/orders/by-code/{code}/assign", include_in_schema=True)
+async def assign_order_by_code_in_url(
+    code: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Привязка заказа к официанту по коду заказа, указанному в URL.
+    
+    Код заказа передается в URL.
+    """
+    # Создаем модифицированный запрос с кодом заказа в теле
+    class ModifiedRequest:
+        async def json(self):
+            return {"code": code}
+    
+    # Создаем объект с методом json, который вернет нужные данные
+    modified_request = ModifiedRequest()
+    
+    # Копируем остальные атрибуты из оригинального запроса
+    for attr in dir(request):
+        if not attr.startswith('_') and attr != 'json':
+            setattr(modified_request, attr, getattr(request, attr))
+    
+    return await assign_order_by_code_handler(modified_request, db, current_user)
 
 if __name__ == "__main__":
     uvicorn.run(
