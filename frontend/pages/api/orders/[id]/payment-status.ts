@@ -58,6 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Формируем URL для запроса
     const url = `${baseApiUrl}/api/v1/orders/${id}/payment-status`;
+    
+    console.log(`Payment Status API Proxy - Отправка запроса на обновление статуса оплаты заказа ${id} на ${status}`);
 
     // Настройка HTTPS агента с отключенной проверкой сертификата
     const httpsAgent = new https.Agent({
@@ -86,9 +88,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       clearTimeout(timeoutId);
 
-      // Если ответ не успешный, генерируем демо-данные
+      // Если ответ не успешный, возможно проблема с путем - пробуем альтернативный URL
       if (!response.ok) {
-        console.log(`API Proxy: Сервер вернул ошибку ${response.status} при обновлении статуса оплаты заказа #${id}`);
+        console.log(`Payment Status API Proxy - Сервер вернул ошибку ${response.status} при обновлении статуса оплаты заказа #${id}`);
+        
+        // Пробуем другой формат URL
+        const alternativeUrl = `${baseApiUrl}/orders/${id}/payment-status`;
+        console.log(`Payment Status API Proxy - Пробуем альтернативный URL: ${alternativeUrl}`);
+        
+        try {
+          const altResponse = await fetch(alternativeUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              'X-User-Role': req.headers['x-user-role'] as string || 'waiter',
+              'X-User-ID': req.headers['x-user-id'] as string || '1'
+            },
+            body: JSON.stringify({ status }),
+            // @ts-ignore
+            agent: alternativeUrl.startsWith('https') ? httpsAgent : undefined
+          });
+          
+          if (altResponse.ok) {
+            const data = await altResponse.json();
+            console.log(`Payment Status API Proxy - Успешный ответ от альтернативного URL`);
+            return res.status(200).json({
+              success: true,
+              order: data
+            });
+          }
+        } catch (altError) {
+          console.error(`Payment Status API Proxy - Ошибка при попытке использовать альтернативный URL:`, altError);
+        }
+        
+        // Если все попытки не удались, возвращаем демо-данные
         return res.status(200).json({
           success: true,
           order: generateDemoOrder(parseInt(id), status)

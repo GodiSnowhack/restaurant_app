@@ -218,4 +218,116 @@ def create_order(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Непредвиденная ошибка при создании заказа: {str(e)}"
+        )
+
+@router.put("/{order_id}/payment-status", response_model=Dict[str, Any])
+def update_order_payment_status(
+    order_id: int,
+    payment_update: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Обновление статуса оплаты заказа
+    """
+    try:
+        # Проверяем наличие заказа в базе данных
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Заказ с ID {order_id} не найден"
+            )
+        
+        # Проверка прав доступа
+        if current_user.role not in ["admin", "waiter"] and order.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="У вас нет прав на изменение этого заказа"
+            )
+        
+        # Получаем новый статус оплаты
+        new_status = payment_update.get("status")
+        if not new_status:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Не указан статус оплаты"
+            )
+        
+        # Валидируем статус
+        valid_statuses = ["pending", "paid", "failed", "refunded"]
+        if new_status.lower() not in valid_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Недопустимый статус оплаты. Допустимые значения: {', '.join(valid_statuses)}"
+            )
+        
+        # Обновляем статус оплаты
+        order.payment_status = new_status.lower()
+        
+        # Если заказ был оплачен, обновляем соответствующие поля
+        if new_status.lower() == "paid":
+            from datetime import datetime
+            order.updated_at = datetime.utcnow()
+            
+            # Если заказ был в статусе "ready" и оплачен, автоматически меняем на "completed"
+            if order.status == "ready":
+                order.status = "completed"
+                order.completed_at = datetime.utcnow()
+        
+        # Сохраняем изменения
+        db.commit()
+        
+        # Получаем обновленный заказ
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        # Получаем позиции заказа для ответа
+        order_dishes = db.query(OrderDish).filter(OrderDish.order_id == order_id).all()
+        
+        # Формируем список позиций
+        items = []
+        for item in order_dishes:
+            # Получаем связанное блюдо
+            dish = db.query(Dish).filter(Dish.id == item.dish_id).first()
+            dish_name = dish.name if dish else f"Блюдо #{item.dish_id}"
+            
+            items.append({
+                "id": item.id,
+                "dish_id": item.dish_id,
+                "name": dish_name,
+                "quantity": item.quantity,
+                "price": float(item.price),
+                "total_price": float(item.price * item.quantity),
+                "special_instructions": item.special_instructions or ""
+            })
+        
+        # Формируем ответ
+        return {
+            "id": order.id,
+            "user_id": order.user_id,
+            "waiter_id": order.waiter_id,
+            "table_number": order.table_number,
+            "status": order.status,
+            "payment_status": order.payment_status,
+            "payment_method": order.payment_method,
+            "total_amount": float(order.total_amount),
+            "comment": order.comment,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+            "completed_at": order.completed_at.isoformat() if order.completed_at else None,
+            "customer_name": order.customer_name or "",
+            "customer_phone": order.customer_phone or "",
+            "order_code": order.order_code or "",
+            "is_urgent": order.is_urgent or False,
+            "is_group_order": order.is_group_order or False,
+            "items": items
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении статуса оплаты заказа: {str(e)}"
         ) 

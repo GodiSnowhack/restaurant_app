@@ -552,7 +552,7 @@ def create_order(db: Session, order_data: Dict) -> Dict:
             db.add(db_order)
             db.flush()  # Получаем ID заказа
             logger.info(f"Создана запись заказа с ID {db_order.id}")
-        except Exception as e:
+            except Exception as e:
             logger.error(f"Ошибка при создании записи заказа: {str(e)}")
             db.rollback()
             raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
@@ -572,21 +572,21 @@ def create_order(db: Session, order_data: Dict) -> Dict:
                 special_instructions = item.get("special_instructions", "")
                 
                 # Получаем блюдо из базы данных
-                dish = db.query(Dish).filter(Dish.id == dish_id).first()
-                if not dish:
+            dish = db.query(Dish).filter(Dish.id == dish_id).first()
+            if not dish:
                     logger.warning(f"Блюдо с ID {dish_id} не найдено, пропускаем")
                     continue
-                
+            
                 # Создаем запись о блюде в заказе
-                order_dish = OrderDish(
-                    order_id=db_order.id,
-                    dish_id=dish_id,
-                    quantity=quantity,
-                    special_instructions=special_instructions,
+            order_dish = OrderDish(
+                order_id=db_order.id,
+                dish_id=dish_id,
+                quantity=quantity,
+                special_instructions=special_instructions,
                     price=dish.price
-                )
-                db.add(order_dish)
-                
+            )
+            db.add(order_dish)
+            
                 # Рассчитываем стоимость позиции
                 price = Decimal(str(dish.price))
                 qty = Decimal(str(quantity))
@@ -613,8 +613,8 @@ def create_order(db: Session, order_data: Dict) -> Dict:
         
         # Формируем ответ
         try:
-            result = format_order_for_response(db, db_order)
-            return result
+        result = format_order_for_response(db, db_order)
+        return result
         except Exception as e:
             logger.error(f"Ошибка при форматировании ответа: {str(e)}")
             # Если не удалось отформатировать заказ, возвращаем базовую информацию

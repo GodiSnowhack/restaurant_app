@@ -1,0 +1,227 @@
+from typing import List, Any, Optional, Dict
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body, Request
+from sqlalchemy.orm import Session
+import logging
+from sqlalchemy.sql import text
+from sqlalchemy import exc
+from datetime import datetime
+
+from app.database.session import get_db
+from app.models.user import User, UserRole
+from app.models.order import OrderStatus, OrderDish, Order, PaymentMethod
+from app.models.menu import Dish
+from app.schemas.order import (
+    Order as OrderSchema,
+    OrderCreate, OrderUpdate,
+    Feedback as FeedbackSchema,
+    FeedbackCreate,
+    OrderResponse,
+    OrderReadSchema,
+    OrderUpdateSchema,
+    OrderStatusUpdateSchema
+)
+from app.services import order as order_service
+from app.core.security import get_current_active_user, check_admin_permission, check_waiter_permission
+from app.services.auth import get_current_user
+from fastapi import status as http_status
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+# Эндпоинты для заказов
+@router.get("/", response_model=List[Any])
+def read_orders(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+    status: str = None,
+    user_id: int = None,
+    start_date: str = None,
+    end_date: str = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Получение списка заказов
+    
+    Параметры:
+    - status: фильтр по статусу заказа
+    - user_id: фильтр по ID пользователя
+    - start_date: начальная дата для выборки (формат ISO, например "2025-04-08T19:00:00.000Z")
+    - end_date: конечная дата для выборки (формат ISO)
+    """
+    try:
+        logger.info(f"Запрос списка заказов. Пользователь: {current_user.id}, роль: {current_user.role}")
+        logger.info(f"Параметры: status={status}, user_id={user_id}, start_date={start_date}, end_date={end_date}")
+        
+        # Проверяем права доступа: обычный пользователь видит только свои заказы
+        # Администраторы и официанты видят все заказы
+        if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
+            user_id = current_user.id
+            logger.info(f"Фильтрация заказов по user_id={user_id} (обычный пользователь)")
+
+        try:
+            # Используем сервисную функцию вместо прямого запроса
+            orders_data = order_service.get_orders(
+                db=db, 
+                skip=skip, 
+                limit=limit, 
+                status=status, 
+                user_id=user_id
+            )
+            
+            logger.info(f"Успешно получено {len(orders_data)} заказов для ответа")
+            return orders_data
+                
+        except Exception as e:
+            logger.error(f"Ошибка при получении заказов: {str(e)}")
+            logger.exception(e)
+            raise HTTPException(
+                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при получении заказов: {str(e)}"
+            )
+            
+    except Exception as e:
+        logger.exception(f"Ошибка при получении списка заказов: {str(e)}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.post("/", response_model=Dict[str, Any])
+async def create_order(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Создание нового заказа без использования Pydantic-моделей для максимальной гибкости.
+    Напрямую обрабатывает JSON из запроса.
+    """
+    try:
+        # Получаем данные из запроса
+        try:
+            request_data = await request.json()
+            logger.info(f"Получены данные для создания заказа: {request_data}")
+        except Exception as e:
+            logger.error(f"Ошибка при чтении данных запроса: {str(e)}")
+            raise HTTPException(status_code=400, detail="Некорректный формат JSON в запросе")
+        
+        # Формируем базовые данные заказа
+        order_data = {
+            "user_id": current_user.id,
+            "status": "pending",
+            "payment_status": "pending",
+            "table_number": 1  # Устанавливаем значение по умолчанию
+        }
+        
+        # Добавляем данные из запроса
+        for field in ["payment_method", "customer_name", "customer_phone", 
+                      "reservation_code", "comment", "is_urgent", "is_group_order"]:
+            if field in request_data and request_data[field] is not None:
+                order_data[field] = request_data[field]
+        
+        # Если указан table_number в запросе, используем его
+        if "table_number" in request_data and request_data["table_number"] is not None:
+            order_data["table_number"] = request_data["table_number"]
+        
+        # Если указан код бронирования, пытаемся получить номер стола
+        if "reservation_code" in order_data and order_data["reservation_code"]:
+            try:
+                from app.services.reservation import get_reservation_by_code
+                reservation = get_reservation_by_code(db, order_data["reservation_code"])
+                if reservation and reservation.table_number:
+                    order_data["table_number"] = reservation.table_number
+                    logger.info(f"Использован номер стола {reservation.table_number} из бронирования")
+            except Exception as e:
+                logger.error(f"Ошибка при получении номера стола из бронирования: {str(e)}")
+        
+        # Обрабатываем блюда
+        items = []
+        
+        # Вариант 1: dishes в виде массива объектов
+        if "dishes" in request_data and isinstance(request_data["dishes"], list):
+            dishes = request_data["dishes"]
+            logger.info(f"Обнаружено поле dishes, количество элементов: {len(dishes)}")
+            
+            for dish in dishes:
+                if isinstance(dish, dict) and "dish_id" in dish:
+                    items.append({
+                        "dish_id": dish["dish_id"],
+                        "quantity": dish.get("quantity", 1),
+                        "special_instructions": dish.get("special_instructions", "")
+                    })
+                elif isinstance(dish, int) or (isinstance(dish, str) and dish.isdigit()):
+                    # Преобразуем строковые ID в числа
+                    dish_id = int(dish)
+                    items.append({
+                        "dish_id": dish_id,
+                        "quantity": 1,
+                        "special_instructions": ""
+                    })
+        
+        # Вариант 2: items в виде массива объектов
+        if "items" in request_data and isinstance(request_data["items"], list) and not items:
+            for item in request_data["items"]:
+                if isinstance(item, dict) and "dish_id" in item:
+                    items.append({
+                        "dish_id": item["dish_id"],
+                        "quantity": item.get("quantity", 1),
+                        "special_instructions": item.get("special_instructions", "")
+                    })
+        
+        # Проверяем, что есть хотя бы одно блюдо
+        if not items:
+            logger.warning("В заказе отсутствуют блюда")
+        
+        # Добавляем блюда к данным заказа
+        order_data["items"] = items
+        
+        # Вызываем сервис для создания заказа
+        logger.info(f"Отправка данных для создания заказа: {order_data}")
+        result = order_service.create_order(db, order_data)
+        
+        # Обрабатываем результат
+        if result:
+            return {
+                "success": True,
+                "message": "Заказ успешно создан",
+                "data": result
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось создать заказ")
+            
+    except HTTPException as he:
+        # Пробрасываем HTTP исключения дальше
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании заказа: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
+
+
+@router.get("/{order_id}", response_model=OrderSchema)
+def read_order(
+    *,
+    db: Session = Depends(get_db),
+    order_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Получить информацию о конкретном заказе
+    """
+    order = order_service.get_order_detailed(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Проверяем права доступа
+    if current_user.role not in [UserRole.ADMIN, UserRole.WAITER] and order.get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="У вас нет прав для просмотра этого заказа"
+        )
+        
+    return order 
