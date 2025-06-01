@@ -42,6 +42,16 @@ def get_order(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
             logger.warning(f"Заказ с ID {order_id} не найден")
             return None
         
+        # Безопасно обрабатываем payment_method
+        payment_method = None
+        if db_order.payment_method:
+            if isinstance(db_order.payment_method, str):
+                # Для строковых значений приводим к верхнему регистру
+                payment_method = db_order.payment_method.upper()
+            else:
+                # Для enum берем значение
+                payment_method = db_order.payment_method.value
+        
         # Базовые данные заказа
         order_dict = {
             "id": db_order.id,
@@ -50,7 +60,7 @@ def get_order(db: Session, order_id: int) -> Optional[Dict[str, Any]]:
             "table_number": db_order.table_number,
             "status": db_order.status.value if db_order.status else "",
             "payment_status": db_order.payment_status.value if db_order.payment_status else "",
-            "payment_method": db_order.payment_method.value if db_order.payment_method else "",
+            "payment_method": payment_method,
             "comment": db_order.comment or "",
             "special_instructions": db_order.comment or "",
             "is_urgent": db_order.is_urgent or False,
@@ -142,128 +152,100 @@ def get_orders(
     try:
         logger.info(f"Получение заказов с параметрами: skip={skip}, limit={limit}, status={status}, user_id={user_id}, waiter_id={waiter_id}, search={search}")
         
-        # Используем чистый SQL запрос для получения заказов, чтобы обойти проблему с enum
-        query = """
-            SELECT 
-                o.id, o.user_id, o.waiter_id, o.table_number, 
-                o.status, o.payment_status, o.payment_method,
-                o.created_at, o.updated_at, o.total_amount,
-                o.comment, o.customer_name, o.customer_phone,
-                o.customer_age_group,
-                o.order_code, o.reservation_code,
-                o.is_urgent, o.is_group_order, o.completed_at
-            FROM orders o
-            WHERE 1=1
-        """
+        # Создаем базовый запрос
+        query = db.query(Order)
         
-        params = {}
-        
-        # Добавляем фильтры, если они указаны
+        # Применяем фильтры, если они указаны
         if status:
-            query += " AND o.status = :status"
-            params["status"] = status
-            
+            query = query.filter(Order.status == status)
         if user_id:
-            query += " AND o.user_id = :user_id"
-            params["user_id"] = user_id
-            
+            query = query.filter(Order.user_id == user_id)
         if waiter_id:
-            query += " AND o.waiter_id = :waiter_id"
-            params["waiter_id"] = waiter_id
-            
+            query = query.filter(Order.waiter_id == waiter_id)
         if search:
+            # Поиск по имени клиента, номеру телефона или комментарию
             search_pattern = f"%{search}%"
-            query += " AND (o.order_code LIKE :search OR o.customer_name LIKE :search OR o.customer_phone LIKE :search)"
-            params["search"] = search_pattern
-            
-        # Добавляем сортировку и пагинацию
-        query += " ORDER BY o.created_at DESC LIMIT :limit OFFSET :skip"
-        params["limit"] = limit
-        params["skip"] = skip
+            query = query.filter(
+                or_(
+                    Order.customer_name.like(search_pattern),
+                    Order.customer_phone.like(search_pattern),
+                    Order.comment.like(search_pattern)
+                )
+            )
         
-        # Выполняем запрос с параметрами
-        result = db.execute(text(query), params).fetchall()
+        # Сортируем по времени создания (сначала новые)
+        query = query.order_by(desc(Order.created_at))
         
-        logger.info(f"Найдено заказов: {len(result)}")
+        # Применяем пагинацию
+        query = query.offset(skip).limit(limit)
+        
+        # Выполняем запрос
+        orders = query.all()
+        
+        logger.info(f"Получено {len(orders)} заказов из БД")
         
         # Форматируем результаты
         formatted_orders = []
-        for row in result:
-            try:
-                # Преобразуем строку результата в словарь
-                order_dict = {}
-                column_names = row._mapping.keys()
+        for order in orders:
+            # Получаем информацию о блюдах в заказе
+            order_dishes = db.query(OrderDish).filter(OrderDish.order_id == order.id).all()
+            
+            # Форматируем данные о блюдах
+            items = []
+            for order_dish in order_dishes:
+                # Получаем информацию о блюде
+                dish = db.query(Dish).filter(Dish.id == order_dish.dish_id).first()
                 
-                for key in column_names:
-                    value = row._mapping[key]
-                    # Преобразуем datetime объекты в строки ISO для JSON
-                    if isinstance(value, datetime):
-                        order_dict[key] = value.isoformat()
-                    else:
-                        order_dict[key] = value
-                
-                # Получаем блюда для этого заказа
-                dishes_query = """
-                    SELECT 
-                        d.id, d.name, d.price, d.description, d.image_url, d.category_id,
-                        od.quantity, od.special_instructions
-                    FROM order_dish od
-                    JOIN dishes d ON od.dish_id = d.id
-                    WHERE od.order_id = :order_id
-                """
-                dishes_result = db.execute(text(dishes_query), {"order_id": order_dict["id"]}).fetchall()
-                
-                # Формируем список блюд для заказа
-                items = []
-                for dish_row in dishes_result:
-                    dish_dict = {}
-                    dish_column_names = dish_row._mapping.keys()
-                    
-                    for key in dish_column_names:
-                        dish_dict[key] = dish_row._mapping[key]
-                    
-                    # Вычисляем общую стоимость блюда
-                    price = float(dish_dict["price"]) if dish_dict["price"] is not None else 0.0
-                    quantity = dish_dict["quantity"] or 1
-                    
-                    items.append({
-                        "id": dish_dict["id"],
-                        "dish_id": dish_dict["id"],
-                        "name": dish_dict["name"],
-                        "dish_name": dish_dict["name"],
-                        "price": price,
-                        "quantity": quantity,
-                        "special_instructions": dish_dict.get("special_instructions") or "",
-                        "category_id": dish_dict.get("category_id"),
-                        "image_url": dish_dict.get("image_url") or "",
-                        "dish_image": dish_dict.get("image_url") or "",
-                        "description": dish_dict.get("description") or "",
-                        "total_price": price * quantity,
-                        "order_id": order_dict["id"],
-                        "created_at": order_dict.get("created_at")
-                    })
-                
-                # Добавляем блюда в заказ
-                order_dict["items"] = items
-                
-                # Добавляем обязательные поля, которые могут отсутствовать в результате запроса
-                if "total_amount" not in order_dict:
-                    order_dict["total_amount"] = 0.0
-                
-                # Преобразуем ключи enum в их строковые значения
-                for key in ["status", "payment_status", "payment_method"]:
-                    if key in order_dict and order_dict[key] and hasattr(order_dict[key], "value"):
-                        order_dict[key] = order_dict[key].value
-                        
-                # Преобразуем datetime в строки для JSON
-                for key in ["created_at", "updated_at", "completed_at"]:
-                    if key in order_dict and order_dict[key] and isinstance(order_dict[key], datetime):
-                        order_dict[key] = order_dict[key].isoformat()
-                
-                formatted_orders.append(order_dict)
-            except Exception as e:
-                logger.error(f"Ошибка при обработке заказа: {str(e)}")
-                logger.exception(e)
+                # Формируем данные о блюде в заказе
+                if dish:
+                    dish_data = {
+                        "id": order_dish.id,
+                        "dish_id": dish.id,
+                        "name": dish.name,
+                        "price": float(order_dish.price),
+                        "quantity": order_dish.quantity,
+                        "special_instructions": order_dish.special_instructions,
+                        "total_price": float(order_dish.price * order_dish.quantity),
+                        "category_id": dish.category_id,
+                        "image_url": dish.image_url,
+                        "description": dish.description
+                    }
+                    items.append(dish_data)
+            
+            # Безопасно обрабатываем payment_method
+            payment_method = None
+            if order.payment_method:
+                if isinstance(order.payment_method, str):
+                    # Для строковых значений приводим к верхнему регистру
+                    payment_method = order.payment_method.upper()
+                else:
+                    # Для enum берем значение
+                    payment_method = order.payment_method.value
+            
+            # Форматируем данные заказа
+            order_data = {
+                "id": order.id,
+                "user_id": order.user_id,
+                "waiter_id": order.waiter_id,
+                "table_number": order.table_number,
+                "status": order.status,
+                "payment_status": order.payment_status,
+                "payment_method": payment_method,
+                "total_amount": float(order.total_amount) if order.total_amount is not None else sum(item["total_price"] for item in items),
+                "comment": order.comment,
+                "special_instructions": order.comment,
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+                "completed_at": order.completed_at.isoformat() if order.completed_at else None,
+                "customer_name": order.customer_name or "",
+                "customer_phone": order.customer_phone or "",
+                "order_code": order.order_code or "",
+                "is_urgent": order.is_urgent or False,
+                "is_group_order": order.is_group_order or False,
+                "items": items
+            }
+            
+            formatted_orders.append(order_data)
         
         # Если не удалось получить ни одного заказа, возвращаем тестовый заказ
         if not formatted_orders:
@@ -343,70 +325,42 @@ def generate_order_code() -> str:
     return str(uuid.uuid4())[:6].upper()
 
 
-def safe_enum_value(enum_class: Type[T], value: Optional[str]) -> Optional[T]:
+def safe_enum_value(enum_class: Type[T], value: Any) -> Optional[T]:
     """
-    Безопасно преобразует строку в значение перечисления.
-    Возвращает None, если преобразование невозможно.
+    Безопасно преобразует значение в enum.
     
     Args:
-        enum_class: Класс перечисления
-        value: Строковое значение для преобразования
+        enum_class: Класс Enum
+        value: Значение для преобразования
         
     Returns:
-        Значение перечисления или None, если преобразование не удалось
+        Значение Enum или None, если преобразование невозможно
     """
     if value is None:
         return None
-    
-    # Добавляем больше логирования для диагностики
-    logger.debug(f"Преобразование строки '{value}' в перечисление {enum_class.__name__}")
-    
-    # Приводим входное значение к строке для надежности
-    value_str = str(value).strip()
-    
+        
     try:
-        # Пытаемся получить значение напрямую
-        logger.debug(f"Попытка прямого преобразования '{value_str}'")
-        return enum_class(value_str)
-    except (ValueError, KeyError) as e:
-        logger.debug(f"Прямое преобразование не удалось: {str(e)}")
-        try:
-            # Пытаемся получить значение по строке в верхнем регистре
-            logger.debug(f"Попытка преобразования в верхнем регистре '{value_str.upper()}'")
-            return enum_class(value_str.upper())
-        except (ValueError, KeyError) as e:
-            logger.debug(f"Преобразование с верхним регистром не удалось: {str(e)}")
+        if isinstance(value, str):
+            # Пробуем сначала точное соответствие
             try:
-                # Пытаемся получить значение по строке в нижнем регистре
-                logger.debug(f"Попытка преобразования в нижнем регистре '{value_str.lower()}'")
-                return enum_class(value_str.lower())
-            except (ValueError, KeyError) as e:
-                logger.debug(f"Преобразование с нижним регистром не удалось: {str(e)}")
-                
-                # Ищем значение с точным совпадением без учета регистра
-                for enum_value in enum_class:
-                    if enum_value.name.lower() == value_str.lower() or enum_value.value.lower() == value_str.lower():
-                        logger.info(f"Найдено совпадение для '{value_str}': {enum_value.name} = {enum_value.value}")
-                        return enum_value
-                
-                # Ищем по частичному совпадению
-                for enum_value in enum_class:
-                    if value_str.lower() in enum_value.name.lower() or value_str.lower() in enum_value.value.lower():
-                        logger.info(f"Найдено частичное совпадение для '{value_str}': {enum_value.name} = {enum_value.value}")
-                        return enum_value
-                
-                # Если не нашли подходящее значение
-                logger.warning(f"Значение '{value_str}' не найдено в перечислении {enum_class.__name__}. "
-                               f"Доступные значения: {[f'{e.name}={e.value}' for e in enum_class]}")
-                
-                # Возвращаем значение по умолчанию, если оно есть
+                return enum_class(value)
+            except ValueError:
+                # Пробуем преобразовать к верхнему регистру
                 try:
-                    default_value = next(iter(enum_class))
-                    logger.info(f"Используем значение по умолчанию: {default_value.name} = {default_value.value}")
-                    return default_value
-                except StopIteration:
-                    logger.error(f"Не удалось получить значение по умолчанию для перечисления {enum_class.__name__}")
-                return None
+                    return enum_class(value.upper())
+                except ValueError:
+                    # Перебираем все варианты
+                    for enum_value in enum_class:
+                        if enum_value.value.lower() == value.lower():
+                            return enum_value
+                    return None
+        elif isinstance(value, enum_class):
+            return value
+        else:
+            return None
+    except Exception as e:
+        logger.error(f"Ошибка при преобразовании '{value}' в {enum_class.__name__}: {str(e)}")
+        return None
 
 
 def format_order_for_response(db: Session, db_order: Order) -> Dict[str, Any]:
@@ -489,151 +443,120 @@ def format_order_for_response(db: Session, db_order: Order) -> Dict[str, Any]:
 
 def create_order(db: Session, order_data: Dict) -> Dict:
     """
-    Создание нового заказа с полным контролем и обработкой всех краевых случаев.
+    Создание нового заказа
     
     Args:
-        db: сессия базы данных
-        order_data: данные заказа в виде словаря
+        db: Сессия базы данных
+        order_data: Словарь с данными заказа
         
     Returns:
-        Созданный заказ в виде словаря или вызывает исключение
+        Словарь с данными созданного заказа
     """
-    logger.info("Создание нового заказа")
-        
-    # Начинаем транзакцию
+    # Проверяем обязательные поля
+    if 'items' not in order_data or not order_data['items']:
+        logger.warning("Попытка создания заказа без блюд")
+        raise ValueError("Для создания заказа необходимо указать хотя бы одно блюдо")
+    
     try:
-        # Извлекаем блюда заказа
-        items = order_data.pop("items", []) if "items" in order_data else []
+        logger.info(f"Создание нового заказа: {order_data}")
         
-        # Проверяем обязательные поля и устанавливаем значения по умолчанию
-        if not order_data.get("user_id"):
-            logger.error("Отсутствует user_id в данных заказа")
-            raise HTTPException(status_code=400, detail="Не указан идентификатор пользователя")
+        # Статус и статус оплаты по умолчанию
+        if 'status' not in order_data or not order_data['status']:
+            order_data['status'] = OrderStatus.PENDING
+        else:
+            # Безопасно преобразуем строку в OrderStatus
+            order_data['status'] = safe_enum_value(OrderStatus, order_data['status'])
         
-        # Принудительно устанавливаем table_number, если его нет
-        if not order_data.get("table_number"):
-            order_data["table_number"] = 1
-            logger.info("Установлено значение table_number = 1 по умолчанию")
+        if 'payment_status' not in order_data or not order_data['payment_status']:
+            order_data['payment_status'] = PaymentStatus.PENDING
+        else:
+            # Безопасно преобразуем строку в PaymentStatus
+            order_data['payment_status'] = safe_enum_value(PaymentStatus, order_data['payment_status'])
         
-        # Устанавливаем статус заказа если его нет
-        if not order_data.get("status"):
-            order_data["status"] = "pending"
-            logger.info("Установлен статус pending по умолчанию")
+        # Обработка payment_method, если он есть
+        if 'payment_method' in order_data and order_data['payment_method']:
+            payment_method = safe_enum_value(PaymentMethod, order_data['payment_method'])
+            if payment_method:
+                order_data['payment_method'] = payment_method
+            else:
+                # Если не удалось сконвертировать, удаляем поле, чтобы использовалось значение по умолчанию
+                logger.warning(f"Не удалось преобразовать payment_method '{order_data['payment_method']}' в enum, удаляем поле")
+                order_data.pop('payment_method', None)
         
-        # Устанавливаем статус оплаты если его нет
-        if not order_data.get("payment_status"):
-            order_data["payment_status"] = "pending" 
-            logger.info("Установлен статус оплаты pending по умолчанию")
+        # Создаем объект заказа
+        new_order = Order(
+            user_id=order_data.get('user_id'),
+            waiter_id=order_data.get('waiter_id'),
+            table_number=order_data.get('table_number'),
+            status=order_data['status'],
+            payment_status=order_data['payment_status'],
+            payment_method=order_data.get('payment_method'),
+            comment=order_data.get('comment'),
+            customer_name=order_data.get('customer_name'),
+            customer_phone=order_data.get('customer_phone'),
+            reservation_code=order_data.get('reservation_code'),
+            order_code=order_data.get('order_code'),
+            is_urgent=order_data.get('is_urgent', False),
+            is_group_order=order_data.get('is_group_order', False),
+            customer_age_group=order_data.get('customer_age_group'),
+            created_at=datetime.utcnow()
+        )
         
-        # Создаем уникальный код заказа, если его нет
-        if not order_data.get("order_code"):
-            order_data["order_code"] = generate_order_code()
-            logger.info(f"Сгенерирован уникальный код заказа: {order_data['order_code']}")
+        # Сохраняем заказ в базе данных
+        db.add(new_order)
+        db.flush()  # Получаем ID нового заказа
         
-        # Подготовка очищенных данных для создания записи
-        cleaned_data = {}
-        
-        # Список полей, которые мы принимаем из входных данных
-        valid_fields = [
-            "user_id", "waiter_id", "table_number", "status", "payment_status", 
-            "payment_method", "total_amount", "comment", "is_urgent", "is_group_order",
-            "customer_name", "customer_phone", "reservation_code", "order_code",
-            "customer_age_group"
-        ]
-        
-        # Копируем только допустимые поля в очищенные данные
-        for field in valid_fields:
-            if field in order_data:
-                cleaned_data[field] = order_data[field]
-        
-        # Создаем запись заказа
-        try:
-            db_order = Order(**cleaned_data)
-            db.add(db_order)
-            db.flush()  # Получаем ID заказа
-            logger.info(f"Создана запись заказа с ID {db_order.id}")
-        except Exception as e:
-            logger.error(f"Ошибка при создании записи заказа: {str(e)}")
-            db.rollback()
-            raise HTTPException(status_code=422, detail=f"Ошибка при создании заказа: {str(e)}")
+        logger.info(f"Создан новый заказ с ID {new_order.id}")
         
         # Добавляем блюда к заказу
-        total_amount = Decimal('0')
+        total_amount = 0.0
         
-        for i, item in enumerate(items):
-            try:
-                # Проверяем наличие dish_id
-                if "dish_id" not in item:
-                    logger.warning(f"Пропущен элемент #{i}: отсутствует dish_id")
-                    continue
-            
-                dish_id = item["dish_id"]
-                quantity = item.get("quantity", 1)
-                special_instructions = item.get("special_instructions", "")
-            
-                # Получаем блюдо из базы данных
-                dish = db.query(Dish).filter(Dish.id == dish_id).first()
-                if not dish:
-                    logger.warning(f"Блюдо с ID {dish_id} не найдено, пропускаем")
-                    continue
-            
-                # Создаем запись о блюде в заказе
-                order_dish = OrderDish(
-                    order_id=db_order.id,
-                    dish_id=dish_id,
-                    quantity=quantity,
-                    special_instructions=special_instructions,
-                    price=dish.price
-                )
-                db.add(order_dish)
-            
-                # Рассчитываем стоимость позиции
-                price = Decimal(str(dish.price))
-                qty = Decimal(str(quantity))
-                item_total = price * qty
-                total_amount += item_total
+        for item_data in order_data['items']:
+            # Получаем информацию о блюде
+            dish_id = item_data.get('dish_id')
+            if not dish_id:
+                logger.warning(f"Пропускаем блюдо без dish_id: {item_data}")
+                continue
                 
-                logger.info(f"Добавлено блюдо ID {dish_id}, название: {dish.name}, количество: {quantity}")
-            except Exception as e:
-                logger.error(f"Ошибка при добавлении блюда {item.get('dish_id')}: {str(e)}")
-                # Продолжаем с другими блюдами
+            dish = db.query(Dish).filter(Dish.id == dish_id).first()
+            if not dish:
+                logger.warning(f"Блюдо с ID {dish_id} не найдено, пропускаем")
+                continue
+                
+            quantity = item_data.get('quantity', 1)
+            special_instructions = item_data.get('special_instructions', '')
+            
+            # Создаем запись в order_dish
+            order_dish = OrderDish(
+                order_id=new_order.id,
+                dish_id=dish.id,
+                quantity=quantity,
+                special_instructions=special_instructions,
+                price=dish.price  # Сохраняем текущую цену блюда
+            )
+            
+            db.add(order_dish)
+            
+            # Увеличиваем общую сумму заказа
+            total_amount += float(dish.price) * quantity
         
         # Обновляем общую сумму заказа
-        db_order.total_amount = total_amount
-        logger.info(f"Установлена общая сумма заказа: {total_amount}")
+        new_order.total_amount = total_amount
         
-        # Сохраняем изменения
-        try:
-            db.commit()
-            logger.info(f"Заказ #{db_order.id} успешно сохранен в базе данных")
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Ошибка при сохранении заказа: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Ошибка при сохранении заказа: {str(e)}")
+        # Фиксируем изменения в базе данных
+        db.commit()
+        db.refresh(new_order)
         
-        # Формируем ответ
-        try:
-            result = format_order_for_response(db, db_order)
-            return result
-        except Exception as e:
-            logger.error(f"Ошибка при форматировании ответа: {str(e)}")
-            # Если не удалось отформатировать заказ, возвращаем базовую информацию
-            return {
-                "id": db_order.id,
-                "order_code": db_order.order_code,
-                "status": db_order.status,
-                "total_amount": float(db_order.total_amount),
-                "created_at": db_order.created_at.isoformat() if db_order.created_at else None
-            }
-            
-    except HTTPException:
-        # Пробрасываем HTTPException дальше
-        raise
+        # Преобразуем объект заказа в словарь
+        result = get_order_detailed(db, new_order.id)
+        
+        return result
+        
     except Exception as e:
         db.rollback()
-        logger.error(f"Непредвиденная ошибка при создании заказа: {str(e)}")
+        logger.error(f"Ошибка при создании заказа: {str(e)}")
         logger.exception(e)
-        raise HTTPException(status_code=500, detail=f"Ошибка при создании заказа: {str(e)}")
+        raise e
 
 
 def update_order(db: Session, order_id: int, order_update: Union[OrderUpdate, OrderUpdateSchema, Dict[str, Any]]) -> Optional[Dict]:
@@ -867,33 +790,49 @@ def get_feedbacks_by_user(db: Session, user_id: int, skip: int = 0, limit: int =
 def fix_payment_method_case(db: Session) -> int:
     """
     Исправляет регистр в поле payment_method для всех заказов в базе данных.
-    Возвращает количество исправленных записей.
+    Преобразует все значения к верхнему регистру и удаляет ONLINE.
+    
+    Args:
+        db: Сессия базы данных
+        
+    Returns:
+        Количество обновленных записей
     """
     try:
-        # Получаем все заказы с "проблемными" значениями payment_method, используя ORM
-        affected_count = 0
+        logger.info("Начало исправления значений payment_method в базе данных")
         
-        # Находим все заказы с payment_method в нижнем регистре
-        orders_to_fix = db.query(Order).filter(
-            Order.payment_method.in_(['cash', 'card', 'online'])
-        ).all()
+        # Ищем записи с payment_method в нижнем регистре
+        from sqlalchemy.sql import text
         
-        # Обновляем payment_method для каждого найденного заказа
-        for db_order in orders_to_fix:
-            original_value = db_order.payment_method
-            if original_value:
-                # Преобразуем в верхний регистр и безопасно конвертируем в Enum
-                uppercase_value = original_value.upper()
-                db_order.payment_method = safe_enum_value(PaymentMethod, uppercase_value)
-                affected_count += 1
+        # Обновляем значения 'cash' -> 'CASH'
+        cash_query = text("UPDATE orders SET payment_method = 'CASH' WHERE payment_method IN ('cash', 'Cash')")
+        cash_result = db.execute(cash_query)
+        cash_count = cash_result.rowcount
+        logger.info(f"Обновлено {cash_count} записей 'cash' -> 'CASH'")
         
-        # Сохраняем изменения в базе данных
+        # Обновляем значения 'card' -> 'CARD'
+        card_query = text("UPDATE orders SET payment_method = 'CARD' WHERE payment_method IN ('card', 'Card')")
+        card_result = db.execute(card_query)
+        card_count = card_result.rowcount
+        logger.info(f"Обновлено {card_count} записей 'card' -> 'CARD'")
+        
+        # Обновляем значения 'online' -> 'CARD' (замена ONLINE на CARD)
+        online_query = text("UPDATE orders SET payment_method = 'CARD' WHERE payment_method IN ('online', 'Online', 'ONLINE')")
+        online_result = db.execute(online_query)
+        online_count = online_result.rowcount
+        logger.info(f"Обновлено {online_count} записей 'online' -> 'CARD'")
+        
+        # Фиксируем изменения
         db.commit()
         
-        return affected_count
+        total_updated = cash_count + card_count + online_count
+        logger.info(f"Всего обновлено {total_updated} записей payment_method")
+        
+        return total_updated
     except Exception as e:
         db.rollback()
-        logger.error(f"Ошибка при исправлении регистра в payment_method: {str(e)}")
+        logger.error(f"Ошибка при исправлении значений payment_method: {str(e)}")
+        logger.exception(e)
         return 0
 
 

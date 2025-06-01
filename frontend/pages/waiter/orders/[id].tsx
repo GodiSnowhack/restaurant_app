@@ -485,8 +485,6 @@ const WaiterOrderDetailPage: NextPage = () => {
       return 'Картой';
     } else if (['cash', 'наличные', 'наличными', 'кэш', 'налик', 'нал'].includes(normalizedMethod)) {
       return 'Наличными';
-    } else if (['online', 'онлайн', 'online_payment', 'web', 'веб', 'электронный платеж', 'electronic', 'электронно'].includes(normalizedMethod)) {
-      return 'Онлайн-оплата';
     } else if (['transfer', 'перевод', 'bank_transfer', 'банковский_перевод', 'wire', 'банк'].includes(normalizedMethod)) {
       return 'Банковский перевод';
     } else if (['qr', 'qr_code', 'qr код', 'киукод', 'код', 'qrcode', 'sberbank_qr', 'сбп', 'sbp'].includes(normalizedMethod)) {

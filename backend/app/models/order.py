@@ -31,7 +31,16 @@ class PaymentStatus(str, PyEnum):
 class PaymentMethod(str, PyEnum):
     CASH = "CASH"
     CARD = "CARD"
-    ONLINE = "ONLINE"
+    
+    @classmethod
+    def _missing_(cls, value):
+        # Поддержка значений в нижнем регистре
+        if isinstance(value, str):
+            upper_value = value.upper()
+            for member in cls:
+                if member.value == upper_value:
+                    return member
+        return None
 
 
 class OrderType(str, PyEnum):
@@ -64,7 +73,7 @@ class Order(Base):
     table_number = Column(Integer, nullable=True)
     
     # Дополнительные поля для интеграции с фронтендом
-    payment_method = Column(Enum(PaymentMethod), nullable=True)
+    payment_method = Column(String, nullable=True)  # Теперь строковое поле вместо Enum
     customer_name = Column(String, nullable=True)
     customer_phone = Column(String, nullable=True)
     reservation_code = Column(String, nullable=True)

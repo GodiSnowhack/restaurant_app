@@ -213,11 +213,10 @@ const getItemsText = (count: number): string => {
 };
 
 const getPaymentMethodName = (method: string): string => {
-  switch (method) {
+  switch (method?.toLowerCase()) {
     case 'card': return 'Картой';
     case 'cash': return 'Наличными';
-    case 'online': return 'Онлайн';
-    default: return method;
+    default: return method || 'Не указано';
   }
 };
 

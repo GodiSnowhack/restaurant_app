@@ -14,7 +14,6 @@ class PaymentMethod(str, Enum):
     """Методы оплаты"""
     CASH = "cash"
     CARD = "card"
-    ONLINE = "online"
 
 class PaymentBase(BaseModel):
     """Базовая схема для платежа"""

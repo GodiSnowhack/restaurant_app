@@ -34,6 +34,14 @@ db = SessionLocal()
 try:
     logger.info("Инициализация базы данных...")
     init_db(db)
+    
+    # Исправляем значения payment_method
+    try:
+        from app.services.order import fix_payment_method_case
+        updated_count = fix_payment_method_case(db)
+        logger.info(f"Исправлено {updated_count} записей payment_method в базе данных")
+    except Exception as e:
+        logger.error(f"Ошибка при исправлении payment_method: {e}")
 except Exception as e:
     logger.error(f"Ошибка при инициализации базы данных: {e}")
 finally:
