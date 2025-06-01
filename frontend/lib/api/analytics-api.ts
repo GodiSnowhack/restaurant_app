@@ -140,6 +140,40 @@ const validateDateRange = (filters?: AnalyticsFilters): AnalyticsFilters => {
     result.endDate = temp;
   }
   
+  // Проверяем, не указаны ли будущие даты
+  const now = new Date();
+  
+  if (result.endDate) {
+    const endDate = new Date(result.endDate);
+    
+    if (endDate > now) {
+      console.warn('Указана будущая дата окончания, корректируем на текущую дату');
+      
+      // Вычисляем длительность периода в днях
+      if (result.startDate) {
+        const startDate = new Date(result.startDate);
+        const periodLength = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Устанавливаем конец периода на текущую дату
+        result.endDate = now.toISOString().split('T')[0];
+        
+        // Устанавливаем начало периода, сохраняя длительность
+        const newStartDate = new Date(now);
+        newStartDate.setDate(now.getDate() - periodLength);
+        result.startDate = newStartDate.toISOString().split('T')[0];
+        
+        console.log(`Скорректированный период: ${result.startDate} - ${result.endDate}`);
+      } else {
+        // Если дата начала не указана, просто устанавливаем конец на текущую дату
+        result.endDate = now.toISOString().split('T')[0];
+        // И начало на 30 дней назад
+        const newStartDate = new Date(now);
+        newStartDate.setDate(now.getDate() - 30);
+        result.startDate = newStartDate.toISOString().split('T')[0];
+      }
+    }
+  }
+  
   return result;
 };
 
@@ -157,12 +191,21 @@ async function fetchAnalytics<T>(endpoint: string, filters?: AnalyticsFilters): 
     new Date(validatedFilters.endDate).toISOString().split('T')[0] : 
     getDefaultDateRange().endDate;
   
+  // Проверяем, запрашиваются ли будущие даты
+  const now = new Date();
+  const requestedEndDate = new Date(endDate);
+  const isFuturePeriod = requestedEndDate > now;
+  
   // Создаем новый объект фильтров с правильным форматом дат
   const formattedFilters = {
     ...validatedFilters,
     startDate,
-    endDate
+    endDate,
+    // Всегда запрашиваем мок-данные для будущих дат
+    useMockData: validatedFilters.useMockData || isFuturePeriod
   };
+  
+  console.log(`Запрос аналитики: ${endpoint}, период: ${startDate} - ${endDate}, мок-данные: ${formattedFilters.useMockData}`);
   
   const queryParams = buildQueryParams(formattedFilters);
   

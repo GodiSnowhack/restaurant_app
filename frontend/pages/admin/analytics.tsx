@@ -349,36 +349,59 @@ const AdminAnalyticsPage: NextPage = () => {
 
   // Вспомогательная функция для получения диапазона дат на основе выбранного периода
   const getDateRangeFromTimeRangeFixed = (range: TimeRange) => {
-    let endDate = new Date();
-    let startDate = new Date();
+    // Возвращаем строки в формате YYYY-MM-DD для API
+    const formatDateForApi = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
     
-    // Устанавливаем конечную дату на сегодня, но не в будущем
     const today = new Date();
-    if (endDate > today) {
-      endDate = today;
-    }
+    // Устанавливаем конечную дату на сегодня
+    const endDate = today;
+    let startDate = new Date(today);
+    
+    // Для всех периодов конечная дата = сегодня
     
     switch (range) {
       case 'today':
+        // Начало дня
         startDate.setHours(0, 0, 0, 0);
         break;
       case 'week':
+        // 7 дней назад
         startDate.setDate(startDate.getDate() - 7);
         break;
       case 'month':
+        // 30 дней назад
         startDate.setMonth(startDate.getMonth() - 1);
         break;
       case 'quarter':
+        // 90 дней назад
         startDate.setMonth(startDate.getMonth() - 3);
         break;
       case 'custom':
         if (customStartDate && customEndDate) {
           startDate = new Date(customStartDate);
-          endDate = new Date(customEndDate);
+          const requestedEndDate = new Date(customEndDate);
           
           // Проверка, что конечная дата не в будущем
-          if (endDate > today) {
-            endDate = today;
+          if (requestedEndDate > today) {
+            // Если запрошена будущая дата, сохраняем длительность периода
+            const periodLength = (requestedEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+            // Устанавливаем конец на сегодня
+            const newEndDate = today;
+            // Устанавливаем начало, сохраняя длительность
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - periodLength);
+            
+            // Обновляем кастомные даты в состоянии
+            setCustomStartDate(formatDateForApi(startDate));
+            setCustomEndDate(formatDateForApi(newEndDate));
+            
+            // Выводим сообщение
+            console.log(`Скорректирован запрос будущего периода: ${formatDateForApi(startDate)} - ${formatDateForApi(newEndDate)}`);
           }
         }
         break;
@@ -395,14 +418,6 @@ const AdminAnalyticsPage: NextPage = () => {
     } else {
       setDateRangeText(`${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}`);
     }
-    
-    // Возвращаем строки в формате YYYY-MM-DD для API
-    const formatDateForApi = (date: Date): string => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
     
     return {
       startDate: formatDateForApi(startDate),
