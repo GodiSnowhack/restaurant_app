@@ -315,79 +315,84 @@ def update_order_status(
         Обновленный заказ
     """
     try:
-        # Логируем начало процесса обновления и все входные данные для отладки
-        logger.info(f"Обновление статуса заказа {order_id} на {status_update.status}")
-        logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}, email={current_user.email}")
-        logger.info(f"Полные данные обновления: {status_update.dict()}")
-        
         # Проверка прав доступа
         if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
-            logger.warning(f"Пользователь {current_user.id} с ролью {current_user.role} попытался обновить статус заказа {order_id}")
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления статуса заказа"
             )
             
         # Проверяем, существует ли заказ
-        existing_order = order_service.get_order_detailed(db, order_id)
-        if not existing_order:
-            logger.warning(f"Заказ с ID {order_id} не найден при попытке обновить статус")
+        db_order = db.query(Order).filter(Order.id == order_id).first()
+        if not db_order:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Заказ с id {order_id} не найден"
             )
         
-        # Валидируем статус - принимаем как верхний, так и нижний регистр
-        valid_statuses = ["pending", "confirmed", "preparing", "ready", "completed", "cancelled"]
-        valid_statuses_upper = [s.upper() for s in valid_statuses]
+        # Получаем статус в ВЕРХНЕМ регистре
+        status = status_update.status.upper()
         
-        # Нормализуем статус к нижнему регистру для обработки
-        normalized_status = status_update.status.lower()
+        # Обновляем статус заказа
+        db_order.status = status
+        db_order.updated_at = datetime.utcnow()
         
-        # Проверяем соответствие допустимым статусам (регистр не имеет значения)
-        if normalized_status not in valid_statuses:
-            logger.warning(f"Недопустимый статус заказа: {status_update.status} (нормализованный: {normalized_status})")
-            logger.warning(f"Разрешенные статусы: {', '.join(valid_statuses)}")
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Недопустимый статус заказа: {status_update.status}. Разрешены: {', '.join(valid_statuses)}"
-            )
+        # Если статус "COMPLETED", устанавливаем время завершения
+        if status == "COMPLETED":
+            db_order.completed_at = datetime.utcnow()
         
-        # Создаем объект обновления с только статусом (всегда в нижнем регистре)
-        update_data = {"status": normalized_status}
-        logger.info(f"Данные для обновления заказа {order_id}: {update_data}")
+        # Сохраняем изменения
+        db.commit()
+        db.refresh(db_order)
         
-        # Обновление статуса заказа
-        updated_order = order_service.update_order(db, order_id, update_data)
-        
-        if not updated_order:
-            logger.error(f"Не удалось обновить статус заказа {order_id}")
-            raise HTTPException(
-                status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Не удалось обновить статус заказа"
-            )
-            
-        logger.info(f"Статус заказа {order_id} успешно обновлен на {normalized_status} пользователем {current_user.email}")
-        
-        # Добавляем информацию об успехе
-        result = {
+        # Возвращаем успешный результат
+        return {
             "success": True,
-            "message": f"Статус заказа успешно обновлен на {normalized_status}",
-            "order": updated_order
+            "message": f"Статус заказа успешно обновлен на {status}",
+            "order": db_order
         }
-        
-        return result
-    except HTTPException as he:
-        # Пробрасываем HTTP-исключения дальше
-        logger.error(f"HTTP ошибка при обновлении статуса заказа {order_id}: {he.detail}")
-        raise
     except Exception as e:
-        # Логируем и обрабатываем общие исключения
-        logger.exception(f"Непредвиденная ошибка при обновлении статуса заказа {order_id}: {str(e)}")
+        db.rollback()
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Внутренняя ошибка сервера при обновлении статуса заказа: {str(e)}"
+            detail=f"Ошибка при обновлении статуса заказа: {str(e)}"
         )
+
+
+# Добавляем POST метод для обновления статуса заказа (более REST-friendly)
+@router.post("/status/{order_id}", response_model=Dict[str, Any])
+def update_order_status_post(
+    order_id: int,
+    status_update: OrderStatusUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """POST метод для обновления статуса заказа."""
+    return update_order_status(order_id, status_update, db, current_user)
+
+
+# Новый эндпоинт с более удобным путем
+@router.put("/{order_id}/status", response_model=Dict[str, Any])
+def update_order_status_alt(
+    order_id: int,
+    status_update: OrderStatusUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Альтернативный метод для обновления статуса заказа."""
+    return update_order_status(order_id, status_update, db, current_user)
+
+
+# POST метод для альтернативного пути
+@router.post("/{order_id}/status", response_model=Dict[str, Any])
+def update_order_status_alt_post(
+    order_id: int,
+    status_update: OrderStatusUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """POST метод для альтернативного пути обновления статуса заказа."""
+    return update_order_status(order_id, status_update, db, current_user)
 
 
 @router.delete("/{order_id}", status_code=204)
@@ -1021,7 +1026,7 @@ def confirm_order_payment(
         ) 
 
 
-# Основной метод для обновления статуса оплаты
+# Упрощенный метод для обновления статуса оплаты
 @router.put("/{order_id}/payment-status", response_model=Dict[str, Any])
 def update_order_payment_status(
     order_id: int,
@@ -1037,120 +1042,96 @@ def update_order_payment_status(
         payment_data: Новый статус оплаты (поле status)
         db: Сессия базы данных
         current_user: Текущий пользователь
-        
-    Returns:
-        Обновленный заказ
     """
     try:
-        # Логируем начало процесса обновления
-        logger.info(f"Обновление статуса оплаты заказа {order_id} на {payment_data.get('status')}")
-        logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}, email={current_user.email}")
-        logger.info(f"Данные запроса: {payment_data}")
-        
         # Проверка прав доступа
         if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
-            logger.warning(f"Пользователь {current_user.id} с ролью {current_user.role} попытался обновить статус оплаты заказа {order_id}")
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления статуса оплаты заказа"
             )
             
         # Проверяем существование заказа
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if not order:
-            logger.warning(f"Заказ с ID {order_id} не найден при попытке обновить статус оплаты")
+        db_order = db.query(Order).filter(Order.id == order_id).first()
+        if not db_order:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Заказ с id {order_id} не найден"
             )
         
-        # Получаем новый статус из входных данных
-        new_status = payment_data.get('status')
-        if not new_status:
-            logger.warning(f"Не указан статус оплаты для заказа {order_id}")
+        # Получаем статус оплаты из запроса
+        if 'status' not in payment_data:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="Не указан статус оплаты"
+                detail="Отсутствует поле 'status' в запросе"
             )
         
-        # Нормализуем статус к нижнему регистру
-        normalized_status = str(new_status).lower()
+        # Получаем статус в ВЕРХНЕМ регистре
+        status = payment_data['status'].upper()
         
-        # Валидация статуса оплаты
-        valid_statuses = ["pending", "paid", "failed", "refunded"]
-        if normalized_status not in valid_statuses:
-            logger.warning(f"Недопустимый статус оплаты: {new_status} (нормализованный: {normalized_status})")
-            logger.warning(f"Разрешенные статусы: {', '.join(valid_statuses)}")
+        # Проверяем допустимость статуса
+        valid_statuses = ["PENDING", "PAID", "FAILED", "REFUNDED"]
+        if status not in valid_statuses:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Недопустимый статус оплаты: {new_status}. Разрешены: {', '.join(valid_statuses)}"
+                detail=f"Недопустимый статус оплаты: {status}. Допустимые статусы: {', '.join(valid_statuses)}"
             )
         
-        # Обновляем статус оплаты заказа
-        order.payment_status = normalized_status
+        # Обновляем статус оплаты
+        db_order.payment_status = status
+        db_order.updated_at = datetime.utcnow()
+        
+        # Сохраняем изменения
         db.commit()
-        db.refresh(order)
+        db.refresh(db_order)
         
-        logger.info(f"Статус оплаты заказа {order_id} успешно обновлен на {normalized_status}")
-        
-        # Получаем детальную информацию о заказе для ответа
-        updated_order = order_service.get_order_detailed(db, order_id)
-        
-        # Формируем ответ
-        result = {
+        # Возвращаем успешный результат
+        return {
             "success": True,
-            "message": f"Статус оплаты заказа успешно обновлен на {normalized_status}",
-            "order": updated_order
+            "message": f"Статус оплаты заказа успешно обновлен на {status}",
+            "order": db_order
         }
-        
-        return result
     except HTTPException as he:
-        # Пробрасываем HTTP-исключения дальше
-        logger.error(f"HTTP ошибка при обновлении статуса оплаты заказа {order_id}: {he.detail}")
-        raise
+        raise he
     except Exception as e:
-        # Логируем и обрабатываем общие исключения
-        logger.exception(f"Непредвиденная ошибка при обновлении статуса оплаты заказа {order_id}: {str(e)}")
+        db.rollback()
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Внутренняя ошибка сервера при обновлении статуса оплаты заказа: {str(e)}"
+            detail=f"Ошибка при обновлении статуса оплаты заказа: {str(e)}"
         )
 
-# Альтернативный эндпоинт для обновления статуса оплаты заказа
-@router.put("/payment-status/{order_id}", response_model=Dict[str, Any])
-def update_order_payment_status_alternative(
+
+# POST метод для обновления статуса оплаты
+@router.post("/{order_id}/payment-status", response_model=Dict[str, Any])
+def update_order_payment_status_post(
     order_id: int,
     payment_data: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Альтернативный эндпоинт для обновления статуса оплаты заказа.
-    Просто перенаправляет запрос на основной метод update_order_payment_status.
-    """
-    # Логируем информацию о запросе
-    logger.info(f"Запрос на обновление статуса оплаты заказа через альтернативный эндпоинт /payment-status/{order_id}")
-    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
-    
-    # Вызываем основной метод
+    """POST метод для обновления статуса оплаты заказа."""
     return update_order_payment_status(order_id, payment_data, db, current_user)
 
 
-# Альтернативный эндпоинт для обновления статуса заказа, соответствующий ожиданиям фронтенда
-@router.put("/{order_id}/status", response_model=Dict[str, Any])
-def update_order_status_alternative(
+# Альтернативный путь для обновления статуса оплаты
+@router.put("/payment-status/{order_id}", response_model=Dict[str, Any])
+def update_order_payment_status_alt(
     order_id: int,
-    status_update: OrderStatusUpdateSchema,
+    payment_data: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Альтернативный эндпоинт для обновления статуса заказа.
-    Просто перенаправляет запрос на основной метод update_order_status.
-    """
-    # Логируем информацию о запросе
-    logger.info(f"Запрос на обновление статуса заказа через альтернативный эндпоинт /{order_id}/status")
-    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
-    
-    # Вызываем основной метод
-    return update_order_status(order_id, status_update, db, current_user) 
+    """Альтернативный метод для обновления статуса оплаты заказа."""
+    return update_order_payment_status(order_id, payment_data, db, current_user)
+
+
+# POST метод для альтернативного пути обновления статуса оплаты
+@router.post("/payment-status/{order_id}", response_model=Dict[str, Any])
+def update_order_payment_status_alt_post(
+    order_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """POST метод для альтернативного пути обновления статуса оплаты заказа."""
+    return update_order_payment_status(order_id, payment_data, db, current_user) 

@@ -9,35 +9,35 @@ from app.database.session import Base
 
 
 class OrderStatus(str, PyEnum):
-    PENDING = "pending"
-    NEW = "new"
-    CONFIRMED = "confirmed"
-    COOKING = "cooking"
-    PREPARING = "preparing"
-    IN_PROGRESS = "in_progress"
-    READY = "ready"
-    DELIVERED = "delivered"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    NEW = "NEW"
+    CONFIRMED = "CONFIRMED"
+    COOKING = "COOKING"
+    PREPARING = "PREPARING"
+    IN_PROGRESS = "IN_PROGRESS"
+    READY = "READY"
+    DELIVERED = "DELIVERED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class PaymentStatus(str, PyEnum):
-    PENDING = "pending"
-    PAID = "paid"
-    FAILED = "failed"
-    REFUNDED = "refunded"
+    PENDING = "PENDING"
+    PAID = "PAID"
+    FAILED = "FAILED"
+    REFUNDED = "REFUNDED"
 
 
 class PaymentMethod(str, PyEnum):
-    CASH = "cash"
-    CARD = "card"
-    ONLINE = "online"
+    CASH = "CASH"
+    CARD = "CARD"
+    ONLINE = "ONLINE"
 
 
 class OrderType(str, PyEnum):
-    DINE_IN = "dine_in"
-    TAKEAWAY = "takeaway"
-    DELIVERY = "delivery"
+    DINE_IN = "DINE_IN"
+    TAKEAWAY = "TAKEAWAY"
+    DELIVERY = "DELIVERY"
 
 
 class OrderDish(Base):
@@ -70,8 +70,9 @@ class Order(Base):
     reservation_code = Column(String, nullable=True)
     order_code = Column(String, nullable=True)
     
-    status = Column(String, default="pending")
-    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    # Используем String для максимальной гибкости - теперь поддерживает верхний регистр
+    status = Column(String, default="PENDING")
+    payment_status = Column(String, default="PENDING")
     total_amount = Column(Float, default=0.0)
     comment = Column(Text, nullable=True)
     is_urgent = Column(Boolean, default=False)
