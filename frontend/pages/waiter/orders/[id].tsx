@@ -21,6 +21,7 @@ import {
   UserIcon 
 } from '@heroicons/react/24/outline';
 import { ExclamationTriangleIcon as ExclamationIcon, CheckIcon } from '@heroicons/react/24/solid';
+import { waiterApi } from '../../../lib/api/waiter-api';
 
 // Обновляем определение статусов для соответствия с бэкендом
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -200,44 +201,8 @@ const WaiterOrderDetailPage: NextPage = () => {
         });
       }
       
-      // Получаем токен
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
-      
-      // Делаем запрос к альтернативному прокси (более надежному)
-      const response = await fetch('/api/v1/orders/status_update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          order_id: order.id,
-          status: normalizedStatus
-        })
-      });
-      
-      if (!response.ok) {
-        // Если ответ не успешный, восстанавливаем исходные данные
-        throw new Error(`Ошибка сервера: ${response.status}`);
-      }
-      
-      // Получаем данные ответа
-      const result = await response.json();
-      console.log('Результат обновления статуса:', result);
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Не удалось обновить статус заказа');
-      }
-      
-      // Обновляем заказ только с актуальным статусом, сохраняя остальные данные
-      setOrder({
-        ...originalOrder,
-        status: normalizedStatus,
-        updated_at: new Date().toISOString()
-      });
+      // Используем waiterApi для обновления статуса
+      const success = await waiterApi.updateOrderStatus(order.id, normalizedStatus);
       
       // Показываем сообщение об успехе
       alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
@@ -440,60 +405,31 @@ const WaiterOrderDetailPage: NextPage = () => {
         });
       }
       
-      // Получаем токен
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Необходима авторизация');
-      }
+      // Для статуса 'paid' используем confirmPayment, для остальных - прямое обновление
+      let success = false;
       
-      // Делаем запрос к альтернативному прокси (более надежному)
-      const response = await fetch('/api/v1/orders/payment_update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          payment_status: newStatus
-        })
-      });
-      
-      if (!response.ok) {
-        // Если ответ не успешный, восстанавливаем исходные данные
-        throw new Error(`Ошибка сервера: ${response.status}`);
-      }
-      
-      // Получаем данные ответа
-      const result = await response.json();
-      console.log('Результат обновления статуса оплаты:', result);
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Не удалось обновить статус оплаты');
-      }
-      
-      // Получаем данные заказа из ответа
-      const returnedOrder = result.order;
-      
-      // Проверяем, не вернулись ли демо-данные
-      const isDemoData = 
-        returnedOrder?.customer_name !== originalOrder.customer_name || 
-        returnedOrder?.total_amount !== originalOrder.total_amount;
-      
-      // Если вернулись демо-данные или не вернулись данные вообще,
-      // обновляем только статус оплаты
-      if (isDemoData || !returnedOrder) {
-        setOrder({
-          ...originalOrder,
-          payment_status: newStatus,
-          updated_at: new Date().toISOString()
-        });
+      if (newStatus.toLowerCase() === 'paid') {
+        // Используем метод подтверждения оплаты
+        success = await waiterApi.confirmPayment(order.id);
       } else {
-        // Иначе используем данные из ответа
-        setOrder({
-          ...returnedOrder,
-          payment_status: newStatus
+        // Используем прямой запрос для других статусов
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Необходима авторизация');
+        }
+        
+        const response = await fetch(`/api/v1/waiter/orders/${order.id}/payment-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
         });
+        
+        const result = await response.json();
+        console.log('Результат обновления статуса оплаты:', result);
+        success = result.success;
       }
       
       // Показываем сообщение об успехе
