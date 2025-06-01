@@ -171,9 +171,9 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Используем новый эндпоинт
+      // Используем правильный эндпоинт и метод HTTP
       const response = await fetch(`/api/v1/waiter/orders/${orderId}/status`, {
-        method: 'PUT',
+        method: 'PATCH', // Используем PATCH вместо PUT
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -209,13 +209,14 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Используем новый эндпоинт
-      const response = await fetch(`/api/v1/waiter/orders/${orderId}/payment`, {
+      // Используем правильный эндпоинт
+      const response = await fetch(`/api/v1/waiter/orders/${orderId}/payment-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ status: 'paid' })
       });
       
       const data = await response.json();
