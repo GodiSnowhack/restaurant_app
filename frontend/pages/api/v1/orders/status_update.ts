@@ -92,10 +92,10 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
     
     // ОСНОВНОЙ МЕТОД: прямой запрос к специальному эндпоинту статусов
     try {
-      console.log(`Status API - Отправка запроса на ${baseApiUrl}/api/v1/orders/${id}/status`);
+      console.log(`Status API - Отправка запроса на ${baseApiUrl}/orders/${id}/status`);
       
       const response = await axios.put(
-        `${baseApiUrl}/api/v1/orders/${id}/status`,
+        `${baseApiUrl}/orders/${id}/status`,
         { status: normalizedStatus },
         { 
           headers,

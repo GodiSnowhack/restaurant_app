@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`Payment API: Отправка запроса на ${baseApiUrl}/api/v1/orders/${orderId}/payment-status`);
       
       const response = await axios.put(
-        `${baseApiUrl}/api/v1/orders/${orderId}/payment-status`,
+        `${baseApiUrl}/orders/${orderId}/payment-status`,
         { status: normalizedStatus },
         { 
           headers,

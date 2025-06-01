@@ -58,8 +58,8 @@ export function getDefaultApiUrl(): string {
   // Определяем URL по умолчанию в зависимости от окружения
   const isProduction = process.env.NODE_ENV === 'production';
   const defaultUrl = isProduction 
-    ? 'https://backend-production-1a78.up.railway.app' 
-    : 'http://localhost:8000';
+    ? 'https://backend-production-1a78.up.railway.app/api/v1' 
+    : 'http://localhost:8000/api/v1';
   
   console.log(`Config: Используем стандартный API URL для ${isProduction ? 'production' : 'development'}: ${defaultUrl}`);
   return defaultUrl;

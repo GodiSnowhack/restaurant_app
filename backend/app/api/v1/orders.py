@@ -1021,6 +1021,7 @@ def confirm_order_payment(
         ) 
 
 
+# Основной метод для обновления статуса оплаты
 @router.put("/{order_id}/payment-status", response_model=Dict[str, Any])
 def update_order_payment_status(
     order_id: int,
@@ -1044,6 +1045,7 @@ def update_order_payment_status(
         # Логируем начало процесса обновления
         logger.info(f"Обновление статуса оплаты заказа {order_id} на {payment_data.get('status')}")
         logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}, email={current_user.email}")
+        logger.info(f"Данные запроса: {payment_data}")
         
         # Проверка прав доступа
         if current_user.role not in [UserRole.ADMIN, UserRole.WAITER]:
@@ -1112,7 +1114,26 @@ def update_order_payment_status(
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Внутренняя ошибка сервера при обновлении статуса оплаты заказа: {str(e)}"
-        ) 
+        )
+
+# Альтернативный эндпоинт для обновления статуса оплаты заказа
+@router.put("/payment-status/{order_id}", response_model=Dict[str, Any])
+def update_order_payment_status_alternative(
+    order_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Альтернативный эндпоинт для обновления статуса оплаты заказа.
+    Просто перенаправляет запрос на основной метод update_order_payment_status.
+    """
+    # Логируем информацию о запросе
+    logger.info(f"Запрос на обновление статуса оплаты заказа через альтернативный эндпоинт /payment-status/{order_id}")
+    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
+    
+    # Вызываем основной метод
+    return update_order_payment_status(order_id, payment_data, db, current_user)
 
 
 # Альтернативный эндпоинт для обновления статуса заказа, соответствующий ожиданиям фронтенда
@@ -1133,23 +1154,3 @@ def update_order_status_alternative(
     
     # Вызываем основной метод
     return update_order_status(order_id, status_update, db, current_user) 
-
-
-# Альтернативный эндпоинт для обновления статуса оплаты заказа
-@router.put("/payment-status/{order_id}", response_model=Dict[str, Any])
-def update_order_payment_status_alternative(
-    order_id: int,
-    payment_data: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    Альтернативный эндпоинт для обновления статуса оплаты заказа.
-    Просто перенаправляет запрос на основной метод update_order_payment_status.
-    """
-    # Логируем информацию о запросе
-    logger.info(f"Запрос на обновление статуса оплаты заказа через альтернативный эндпоинт /payment-status/{order_id}")
-    logger.info(f"Пользователь: ID={current_user.id}, роль={current_user.role}")
-    
-    # Вызываем основной метод
-    return update_order_payment_status(order_id, payment_data, db, current_user) 
