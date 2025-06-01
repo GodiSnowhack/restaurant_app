@@ -95,7 +95,7 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
       console.log(`Status API - Отправка запроса на ${baseApiUrl}/orders/${id}/status`);
       
       // Формируем URL с правильным префиксом
-      const url = `${baseApiUrl.replace(/\/api\/v1\/?$/, '')}/api/v1/orders/${id}/status`;
+      const url = `${baseApiUrl}/orders/${id}/status`;
         
       console.log(`Status API - Итоговый URL: ${url}`);
       

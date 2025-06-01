@@ -192,11 +192,13 @@ const WaiterOrderDetailPage: NextPage = () => {
     
     try {
       // Сначала обновляем UI оптимистично
-      setOrder({
-        ...order,
-        status: normalizedStatus,
-        updated_at: new Date().toISOString()
-      });
+      if (order) {
+        setOrder({
+          ...order,
+          status: normalizedStatus,
+          updated_at: new Date().toISOString()
+        });
+      }
       
       // Получаем токен
       const token = localStorage.getItem('token');
@@ -430,11 +432,13 @@ const WaiterOrderDetailPage: NextPage = () => {
     
     try {
       // Сначала обновляем UI оптимистично
-      setOrder({
-        ...order,
-        payment_status: newStatus,
-        updated_at: new Date().toISOString()
-      });
+      if (order) {
+        setOrder({
+          ...order,
+          payment_status: newStatus,
+          updated_at: new Date().toISOString()
+        });
+      }
       
       // Получаем токен
       const token = localStorage.getItem('token');
