@@ -17,6 +17,8 @@ from app.database.session import SessionLocal, create_tables, get_db
 from app.core.init_db import init_db
 from app.api.v1.endpoints import orders
 from app.models.order import Order
+from app.models.user import User
+from app.services.auth import get_current_user
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -300,7 +302,7 @@ async def ultra_simple_update(
                     status_code=404,
                     content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
                 )
-                
+            
             # Получаем обновленные данные заказа
             updated_order = db.query(Order).filter(Order.id == order_id).first()
             
@@ -342,7 +344,7 @@ async def ultra_simple_update(
                     status_code=500,
                     content={"success": False, "message": f"Ошибка при обновлении: {str(e)}"}
                 )
-            
+    
     except Exception as e:
         logger.exception(f"Необработанная ошибка: {str(e)}")
         return JSONResponse(
@@ -776,7 +778,7 @@ async def simplest_order_update(
                 status_code=404,
                 content={"success": False, "message": f"Заказ с ID {order_id} не найден"}
             )
-            
+        
         # Подготовка SQL запроса для обновления
         update_parts = []
         params = {"order_id": order_id}
@@ -869,6 +871,205 @@ async def simplest_order_update(
                 )
     except Exception as e:
         logger.exception(f"Необработанная ошибка в простом методе обновления: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
+        )
+
+# Эндпоинт для привязки заказа к официанту по коду заказа
+@app.post("/api/v1/waiter/assign-order-by-code", include_in_schema=True)
+async def assign_order_by_code(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Привязка заказа к официанту по коду заказа.
+    
+    Принимает JSON: {"code": "ORDER_CODE"}
+    """
+    try:
+        logger.info(f"Запрос на привязку заказа к официанту по коду. User: {current_user.id}, role: {current_user.role}")
+        
+        # Проверка прав доступа
+        if current_user.role not in ["waiter", "admin"]:
+            logger.warning(f"Попытка привязать заказ пользователем с недостаточными правами: {current_user.role}")
+            return JSONResponse(
+                status_code=403,
+                content={"success": False, "message": "Недостаточно прав для привязки заказа"}
+            )
+        
+        # Получаем данные из запроса
+        try:
+            data = await request.json()
+            logger.info(f"Получены данные для привязки заказа: {data}")
+        except Exception as e:
+            logger.error(f"Ошибка при разборе JSON: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Некорректный JSON"}
+            )
+        
+        # Получаем код заказа
+        order_code = data.get("code")
+        if not order_code:
+            logger.warning("Код заказа не указан в запросе")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Код заказа не указан"}
+            )
+        
+        logger.info(f"Привязка заказа с кодом {order_code} к официанту {current_user.id}")
+        
+        # Ищем заказ по коду
+        order_query = text("""
+            SELECT id, status, waiter_id 
+            FROM orders 
+            WHERE order_code = :code
+        """)
+        
+        result = db.execute(order_query, {"code": order_code})
+        order_data = result.fetchone()
+        
+        if not order_data:
+            logger.warning(f"Заказ с кодом {order_code} не найден")
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"Заказ с кодом {order_code} не найден"}
+            )
+        
+        order_id = order_data[0]
+        order_status = order_data[1]
+        previous_waiter_id = order_data[2]
+        
+        logger.info(f"Найден заказ: ID={order_id}, статус={order_status}, текущий waiter_id={previous_waiter_id}")
+        
+        # Проверяем, завершен ли заказ
+        if order_status in ["COMPLETED", "CANCELLED"]:
+            logger.warning(f"Невозможно привязать заказ #{order_id} со статусом {order_status}")
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": f"Невозможно привязать завершенный заказ"}
+            )
+        
+        # Проверяем, привязан ли заказ к другому официанту
+        if previous_waiter_id and previous_waiter_id != current_user.id:
+            # Получаем имя официанта
+            waiter_query = text("SELECT full_name FROM users WHERE id = :waiter_id")
+            waiter_result = db.execute(waiter_query, {"waiter_id": previous_waiter_id})
+            waiter_data = waiter_result.fetchone()
+            waiter_name = waiter_data[0] if waiter_data else "Другой официант"
+            
+            logger.warning(f"Заказ #{order_id} уже привязан к официанту {waiter_name} (ID: {previous_waiter_id})")
+            
+            if current_user.role == "admin":
+                logger.info(f"Администратор {current_user.id} переназначает заказ с другого официанта")
+            else:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": f"Заказ уже привязан к другому официанту"}
+                )
+        
+        # Определяем новый статус
+        new_status = "CONFIRMED" if order_status.upper() == "PENDING" else order_status
+        
+        # Обновляем заказ через прямой SQL запрос
+        update_query = text("""
+            UPDATE orders 
+            SET waiter_id = :waiter_id, 
+                status = :status, 
+                updated_at = datetime('now')
+            WHERE id = :order_id
+        """)
+        
+        update_params = {
+            "waiter_id": current_user.id,
+            "status": new_status,
+            "order_id": order_id
+        }
+        
+        try:
+            logger.info(f"Выполнение SQL запроса для привязки заказа: {update_params}")
+            result = db.execute(update_query, update_params)
+            db.commit()
+            
+            # Проверяем успешность обновления
+            verify_query = text("SELECT waiter_id FROM orders WHERE id = :order_id")
+            verify_result = db.execute(verify_query, {"order_id": order_id})
+            verify_data = verify_result.fetchone()
+            
+            if verify_data and verify_data[0] == current_user.id:
+                logger.info(f"Заказ {order_id} успешно привязан к официанту {current_user.id}")
+                
+                # Получаем детали заказа
+                order_details_query = text("""
+                    SELECT id, status, waiter_id, payment_status, updated_at
+                    FROM orders
+                    WHERE id = :order_id
+                """)
+                order_details = db.execute(order_details_query, {"order_id": order_id}).fetchone()
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": "Заказ успешно привязан к официанту",
+                        "order": {
+                            "id": order_details[0],
+                            "status": order_details[1],
+                            "waiter_id": order_details[2],
+                            "payment_status": order_details[3],
+                            "updated_at": order_details[4]
+                        }
+                    }
+                )
+            else:
+                current_value = verify_data[0] if verify_data else None
+                logger.error(f"Ошибка привязки заказа! Текущее значение waiter_id = {current_value}")
+                
+                # Экстренная привязка
+                emergency_query = f"""
+                    UPDATE orders
+                    SET waiter_id = {current_user.id}
+                    WHERE id = {order_id}
+                """
+                db.execute(emergency_query)
+                db.commit()
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": "Заказ привязан (аварийный режим)",
+                        "order_id": order_id
+                    }
+                )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Ошибка при обновлении заказа: {str(e)}")
+            
+            # Последняя попытка привязки
+            try:
+                super_emergency_query = f"UPDATE orders SET waiter_id = {current_user.id} WHERE id = {order_id}"
+                db.execute(super_emergency_query)
+                db.commit()
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": "Заказ привязан (экстренный режим)",
+                        "order_id": order_id
+                    }
+                )
+            except Exception as final_error:
+                logger.critical(f"Критическая ошибка при привязке заказа: {str(final_error)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "message": f"Не удалось привязать заказ: {str(e)}"}
+                )
+    except Exception as e:
+        logger.exception(f"Необработанная ошибка при привязке заказа: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"Внутренняя ошибка сервера: {str(e)}"}
