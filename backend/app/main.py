@@ -1131,6 +1131,21 @@ async def api_assign_order_direct(
     """
     return await assign_order_by_code_handler(request, db, current_user)
 
+# Добавляем эндпоинт точно соответствующий запросу от фронтенда
+@app.post("/api/waiter/assign-order-by-code", include_in_schema=True)
+async def api_assign_order_by_code_direct(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Точный эндпоинт для привязки заказа к официанту по коду для совместимости с фронтендом.
+    
+    Принимает JSON: {"code": "ORDER_CODE"} или {"order_code": "ORDER_CODE"}
+    """
+    logger.info("Вызван эндпоинт /api/waiter/assign-order-by-code")
+    return await assign_order_by_code_handler(request, db, current_user)
+
 # Добавляем путь для прямой привязки по коду в URL
 @app.post("/api/v1/orders/by-code/{code}/assign", include_in_schema=True)
 async def assign_order_by_code_in_url(
