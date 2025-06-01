@@ -285,7 +285,7 @@ const CreateOrderPage: NextPage = () => {
         table_number: tableNumberToSend,
         items: formattedItems,
         status: "pending",
-        payment_status: "PENDING",
+        payment_status: "pending",
         payment_method: "cash",
         order_type: "dine_in",
         total_amount: Number(totalAmount.toFixed(2)),
@@ -295,12 +295,22 @@ const CreateOrderPage: NextPage = () => {
         waiter_id: user?.id ? Number(user.id) : undefined
       };
       
+      // Получаем токен авторизации
+      const token = localStorage.getItem('token');
+      
+      // Формируем заголовки с токеном авторизации
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       // Отправляем заказ на сервер
       const response = await fetch('/api/orders/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(orderData),
       });
       
@@ -310,6 +320,20 @@ const CreateOrderPage: NextPage = () => {
       }
       
       const responseData = await response.json();
+      
+      // Проверяем, был ли заказ создан локально (без связи с бэкендом)
+      if (responseData.local_only) {
+        console.log('Заказ создан локально без связи с бэкендом:', responseData.data);
+        // Сохраняем локально созданный заказ в localStorage для последующей синхронизации
+        try {
+          const localOrders = JSON.parse(localStorage.getItem('offline_orders') || '[]');
+          localOrders.push(responseData.data);
+          localStorage.setItem('offline_orders', JSON.stringify(localOrders));
+          console.log('Заказ сохранен локально для последующей синхронизации');
+        } catch (e) {
+          console.error('Ошибка при сохранении заказа локально:', e);
+        }
+      }
       
       // Генерируем данные для создания пользователя
       const { email, password } = generateUserCredentials();
