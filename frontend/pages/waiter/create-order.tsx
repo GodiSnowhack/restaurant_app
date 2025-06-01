@@ -287,7 +287,6 @@ const CreateOrderPage: NextPage = () => {
         status: "pending",
         payment_status: "pending",
         payment_method: "cash",
-        order_type: "dine_in",
         total_amount: Number(totalAmount.toFixed(2)),
         customer_name: customerName.trim(),
         customer_phone: customerPhone ? customerPhone.trim() : undefined,
@@ -307,19 +306,24 @@ const CreateOrderPage: NextPage = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      // Отправляем заказ на сервер
+      console.log('Отправка заказа:', orderData);
+      
+      // Отправляем заказ на сервер с использованием fetch вместо axios
       const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers,
         body: JSON.stringify(orderData),
+        // Используем более длительный таймаут для стабильности
+        // и указываем обработку ошибок при неполадках сети
+        signal: AbortSignal.timeout(30000) // 30 секунд на выполнение запроса
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Ошибка при создании заказа');
-      }
-      
       const responseData = await response.json();
+      
+      // Проверяем успешность запроса по полю success в ответе
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Ошибка при создании заказа');
+      }
       
       // Проверяем, был ли заказ создан локально (без связи с бэкендом)
       if (responseData.local_only) {
