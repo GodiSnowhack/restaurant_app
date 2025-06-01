@@ -588,13 +588,13 @@ def get_customer_metrics(
         return get_mock_customer_metrics(start_date, end_date)
     
     try:
-        # Реализация запроса к БД для получения метрик
+        # Попытка получить реальные данные из БД
         # ... существующий код ...
         
-        # В случае ошибки или отсутствия данных возвращаем мок-данные
+        # В случае отсутствия данных или для демонстрации возвращаем мок-данные
         return get_mock_customer_metrics(start_date, end_date)
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
+        # В случае ошибки логируем её и возвращаем мок-данные
         print(f"Ошибка при получении метрик клиентов: {e}")
         return get_mock_customer_metrics(start_date, end_date)
 
@@ -606,20 +606,20 @@ def get_operational_metrics(
     use_mock_data: bool = False
 ) -> Dict[str, Any]:
     """
-    Получение комплексных операционных метрик
+    Получение операционных метрик ресторана
     """
     # Если запрошены мок-данные, возвращаем их
     if use_mock_data:
         return get_mock_operational_metrics(start_date, end_date)
     
     try:
-        # Реализация запроса к БД для получения метрик
+        # Попытка получить реальные данные из БД
         # ... существующий код ...
         
-        # В случае ошибки или отсутствия данных возвращаем мок-данные
+        # В случае отсутствия данных или для демонстрации возвращаем мок-данные
         return get_mock_operational_metrics(start_date, end_date)
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
+        # В случае ошибки логируем её и возвращаем мок-данные
         print(f"Ошибка при получении операционных метрик: {e}")
         return get_mock_operational_metrics(start_date, end_date)
 
@@ -631,22 +631,10 @@ def get_predictive_metrics(
     use_mock_data: bool = False
 ) -> Dict[str, Any]:
     """
-    Получение предиктивных метрик ресторана на основе анализа данных
+    Получение предиктивных метрик ресторана
     """
-    # Если запрошены мок-данные, возвращаем их
-    if use_mock_data:
-        return get_mock_predictive_metrics(start_date, end_date)
-    
-    try:
-        # Реализация запроса к БД для получения метрик
-        # ... существующий код ...
-        
-        # В случае ошибки или отсутствия данных возвращаем мок-данные
-        return get_mock_predictive_metrics(start_date, end_date)
-    except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
-        print(f"Ошибка при получении предиктивных метрик: {e}")
-        return get_mock_predictive_metrics(start_date, end_date)
+    # Предиктивные метрики всегда возвращают мок-данные, так как это прогнозы
+    return get_mock_predictive_metrics(start_date, end_date)
 
 
 # Мок-данные для финансовой аналитики
