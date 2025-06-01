@@ -646,12 +646,50 @@ def get_mock_financial_metrics(start_date: datetime, end_date: datetime) -> Dict
         "profitMargin": 40,
         "averageOrderValue": 3500,
         "orderCount": 357,
+        # Дополнительные поля для сравнения с предыдущим периодом
+        "revenueChange": 8.5,
+        "profitChange": 12.2,
+        "averageOrderValueChange": 5.1,
+        "orderCountChange": 7.8,
+        "previousRevenue": 1150000,
+        "previousProfit": 445000,
+        "previousAverageOrderValue": 3330,
+        "previousOrderCount": 331,
+        # Данные по месяцам
+        "revenueByMonth": {
+            "01": 950000,
+            "02": 1050000,
+            "03": 1100000,
+            "04": 1150000,
+            "05": 1250000,
+            "06": 1350000,
+            "07": 1400000,
+            "08": 1450000,
+            "09": 1200000,
+            "10": 1100000,
+            "11": 1150000,
+            "12": 1300000
+        },
+        "expensesByMonth": {
+            "01": 570000,
+            "02": 630000,
+            "03": 660000,
+            "04": 690000,
+            "05": 750000,
+            "06": 810000,
+            "07": 840000,
+            "08": 870000,
+            "09": 720000,
+            "10": 660000,
+            "11": 690000,
+            "12": 780000
+        },
         "revenueByCategory": {
-            1: 350000,
-            2: 280000,
-            3: 210000,
-            4: 170000,
-            5: 140000
+            "1": 350000,
+            "2": 280000,
+            "3": 210000,
+            "4": 170000,
+            "5": 140000
         },
         "revenueByTimeOfDay": {
             '12-14': 280000,
@@ -684,45 +722,57 @@ def get_mock_financial_metrics(start_date: datetime, end_date: datetime) -> Dict
 def get_mock_menu_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
     return {
         "topSellingDishes": [
-            {"dishId": 1, "dishName": "Стейк Рибай", "salesCount": 105, "revenue": 210000, "percentage": 25.2},
-            {"dishId": 2, "dishName": "Цезарь с курицей", "salesCount": 89, "revenue": 133500, "percentage": 16.1},
-            {"dishId": 3, "dishName": "Паста Карбонара", "salesCount": 76, "revenue": 95000, "percentage": 11.4},
-            {"dishId": 4, "dishName": "Борщ", "salesCount": 70, "revenue": 84000, "percentage": 10.1},
-            {"dishId": 5, "dishName": "Тирамису", "salesCount": 68, "revenue": 74800, "percentage": 9.0}
+            {"dishId": 1, "dishName": "Стейк Рибай", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 105, "revenue": 210000, "percentage": 25.2},
+            {"dishId": 2, "dishName": "Цезарь с курицей", "categoryId": 3, "categoryName": "Салаты", "salesCount": 89, "revenue": 133500, "percentage": 16.1},
+            {"dishId": 3, "dishName": "Паста Карбонара", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 76, "revenue": 95000, "percentage": 11.4},
+            {"dishId": 4, "dishName": "Борщ", "categoryId": 1, "categoryName": "Супы", "salesCount": 70, "revenue": 84000, "percentage": 10.1},
+            {"dishId": 5, "dishName": "Тирамису", "categoryId": 4, "categoryName": "Десерты", "salesCount": 68, "revenue": 74800, "percentage": 9.0}
         ],
         "mostProfitableDishes": [
-            {"dishId": 1, "dishName": "Стейк Рибай", "salesCount": 105, "revenue": 210000, "percentage": 25.2, "costPrice": 100000, "profit": 110000, "profitMargin": 52.4},
-            {"dishId": 6, "dishName": "Лосось на гриле", "salesCount": 60, "revenue": 120000, "percentage": 14.5, "costPrice": 60000, "profit": 60000, "profitMargin": 50.0},
-            {"dishId": 2, "dishName": "Цезарь с курицей", "salesCount": 89, "revenue": 133500, "percentage": 16.1, "costPrice": 67000, "profit": 66500, "profitMargin": 49.8},
-            {"dishId": 7, "dishName": "Утиная грудка", "salesCount": 45, "revenue": 135000, "percentage": 16.3, "costPrice": 70000, "profit": 65000, "profitMargin": 48.1},
-            {"dishId": 8, "dishName": "Говядина Веллингтон", "salesCount": 35, "revenue": 122500, "percentage": 14.8, "costPrice": 65000, "profit": 57500, "profitMargin": 46.9}
+            {"dishId": 1, "dishName": "Стейк Рибай", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 105, "revenue": 210000, "percentage": 25.2, "costPrice": 100000, "profit": 110000, "profitMargin": 52.4},
+            {"dishId": 6, "dishName": "Лосось на гриле", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 60, "revenue": 120000, "percentage": 14.5, "costPrice": 60000, "profit": 60000, "profitMargin": 50.0},
+            {"dishId": 2, "dishName": "Цезарь с курицей", "categoryId": 3, "categoryName": "Салаты", "salesCount": 89, "revenue": 133500, "percentage": 16.1, "costPrice": 67000, "profit": 66500, "profitMargin": 49.8},
+            {"dishId": 7, "dishName": "Утиная грудка", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 45, "revenue": 135000, "percentage": 16.3, "costPrice": 70000, "profit": 65000, "profitMargin": 48.1},
+            {"dishId": 8, "dishName": "Говядина Веллингтон", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 35, "revenue": 122500, "percentage": 14.8, "costPrice": 65000, "profit": 57500, "profitMargin": 46.9}
         ],
         "leastSellingDishes": [
-            {"dishId": 30, "dishName": "Салат Оливье", "salesCount": 15, "revenue": 18000, "percentage": 2.2},
-            {"dishId": 31, "dishName": "Окрошка", "salesCount": 12, "revenue": 14400, "percentage": 1.7},
-            {"dishId": 32, "dishName": "Рататуй", "salesCount": 10, "revenue": 15000, "percentage": 1.8},
-            {"dishId": 33, "dishName": "Суп-пюре из тыквы", "salesCount": 8, "revenue": 9600, "percentage": 1.2},
-            {"dishId": 34, "dishName": "Салат из морепродуктов", "salesCount": 5, "revenue": 7500, "percentage": 0.9}
+            {"dishId": 30, "dishName": "Салат Оливье", "categoryId": 3, "categoryName": "Салаты", "salesCount": 15, "revenue": 18000, "percentage": 2.2},
+            {"dishId": 31, "dishName": "Окрошка", "categoryId": 1, "categoryName": "Супы", "salesCount": 12, "revenue": 14400, "percentage": 1.7},
+            {"dishId": 32, "dishName": "Рататуй", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 10, "revenue": 15000, "percentage": 1.8},
+            {"dishId": 33, "dishName": "Суп-пюре из тыквы", "categoryId": 1, "categoryName": "Супы", "salesCount": 8, "revenue": 9600, "percentage": 1.2},
+            {"dishId": 34, "dishName": "Салат из морепродуктов", "categoryId": 3, "categoryName": "Салаты", "salesCount": 5, "revenue": 7500, "percentage": 0.9}
         ],
         "averageCookingTime": 18,
         "categoryPopularity": {
-            1: 30,
-            2: 40,
-            3: 15,
-            4: 10,
-            5: 5
+            "1": 15,
+            "2": 40,
+            "3": 25,
+            "4": 10,
+            "5": 10
         },
         "menuItemSalesTrend": {
-            1: [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 8 + (i % 3)} for i in range((end_date - start_date).days + 1)],
-            2: [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 6 + (i % 4)} for i in range((end_date - start_date).days + 1)],
-            3: [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 5 + (i % 3)} for i in range((end_date - start_date).days + 1)],
+            "1": [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 8 + (i % 3)} for i in range((end_date - start_date).days + 1)],
+            "2": [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 6 + (i % 4)} for i in range((end_date - start_date).days + 1)],
+            "3": [{"date": (start_date + timedelta(days=i)).strftime("%Y-%m-%d"), "value": 5 + (i % 3)} for i in range((end_date - start_date).days + 1)],
         },
+        "menuItemPerformance": [
+            {"dishId": 1, "dishName": "Стейк Рибай", "salesCount": 105, "revenue": 210000, "profitMargin": 52.4},
+            {"dishId": 2, "dishName": "Цезарь с курицей", "salesCount": 89, "revenue": 133500, "profitMargin": 49.8},
+            {"dishId": 3, "dishName": "Паста Карбонара", "salesCount": 76, "revenue": 95000, "profitMargin": 45.3},
+            {"dishId": 4, "dishName": "Борщ", "salesCount": 70, "revenue": 84000, "profitMargin": 55.7},
+            {"dishId": 5, "dishName": "Тирамису", "salesCount": 68, "revenue": 74800, "profitMargin": 60.2},
+            {"dishId": 6, "dishName": "Лосось на гриле", "salesCount": 60, "revenue": 120000, "profitMargin": 50.0},
+            {"dishId": 7, "dishName": "Утиная грудка", "salesCount": 45, "revenue": 135000, "profitMargin": 48.1},
+            {"dishId": 8, "dishName": "Говядина Веллингтон", "salesCount": 35, "revenue": 122500, "profitMargin": 46.9},
+            {"dishId": 30, "dishName": "Салат Оливье", "salesCount": 15, "revenue": 18000, "profitMargin": 42.5},
+            {"dishId": 31, "dishName": "Окрошка", "salesCount": 12, "revenue": 14400, "profitMargin": 48.3}
+        ],
         "categoryPerformance": {
-            "1": {"salesPercentage": 30, "averageOrderValue": 1200, "averageProfitMargin": 35},
-            "2": {"salesPercentage": 40, "averageOrderValue": 2000, "averageProfitMargin": 42},
-            "3": {"salesPercentage": 15, "averageOrderValue": 900, "averageProfitMargin": 38},
-            "4": {"salesPercentage": 10, "averageOrderValue": 600, "averageProfitMargin": 45},
-            "5": {"salesPercentage": 5, "averageOrderValue": 300, "averageProfitMargin": 60}
+            "1": {"salesPercentage": 15, "averageOrderValue": 1200, "averageProfitMargin": 52},
+            "2": {"salesPercentage": 40, "averageOrderValue": 2000, "averageProfitMargin": 48},
+            "3": {"salesPercentage": 25, "averageOrderValue": 900, "averageProfitMargin": 45},
+            "4": {"salesPercentage": 10, "averageOrderValue": 600, "averageProfitMargin": 60},
+            "5": {"salesPercentage": 10, "averageOrderValue": 800, "averageProfitMargin": 40}
         },
         "period": {
             "startDate": start_date.strftime("%Y-%m-%d"),
@@ -737,8 +787,14 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
         "newCustomers": 72,
         "returningCustomers": 320,
         "returnRate": 62.5,
+        "customerRetentionRate": 78.3,
         "averageVisitsPerCustomer": 2.8,
         "customerSatisfaction": 4.6,
+        "foodRating": 4.7,
+        "serviceRating": 4.5,
+        "newCustomersChange": 8.2,
+        "returnRateChange": 3.5,
+        "averageOrderValueChange": 5.8,
         "customerSegmentation": {
             "Новые": 12.4,
             "Случайные": 44.8,
@@ -758,6 +814,20 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
                 "Женский": 48
             },
             "total_customers": 580
+        },
+        "visitTimes": {
+            "12-14": 25,
+            "14-16": 15,
+            "16-18": 10,
+            "18-20": 35,
+            "20-22": 15
+        },
+        "visitFrequency": {
+            "Еженедельно": 22,
+            "2-3 раза в месяц": 38,
+            "Ежемесячно": 25,
+            "Раз в квартал": 10,
+            "Реже": 5
         },
         "topCustomers": [
             {"userId": 1, "fullName": "Иван Петров", "email": "ivan@example.com", "totalSpent": 58000, "ordersCount": 12, "averageRating": 4.8, "lastVisit": "2023-04-25"},
@@ -781,21 +851,21 @@ def get_mock_operational_metrics(start_date: datetime, end_date: datetime) -> Di
         "averageTableUtilization": 72,
         "averageOrdersPerTable": 24,
         "tableUtilization": {
-            1: 85,
-            2: 90,
-            3: 75,
-            4: 80,
-            5: 95,
-            6: 70,
-            7: 65,
-            8: 75,
-            9: 80,
-            10: 85,
-            11: 55,
-            12: 60,
-            13: 45,
-            14: 50,
-            15: 65
+            "1": 85,
+            "2": 90,
+            "3": 75,
+            "4": 80,
+            "5": 95,
+            "6": 70,
+            "7": 65,
+            "8": 75,
+            "9": 80,
+            "10": 85,
+            "11": 55,
+            "12": 60,
+            "13": 45,
+            "14": 50,
+            "15": 65
         },
         "peakHours": {
             '12-14': 100,
@@ -805,11 +875,11 @@ def get_mock_operational_metrics(start_date: datetime, end_date: datetime) -> Di
             '20-22': 80
         },
         "staffEfficiency": {
-            1: {"name": "Анна", "role": "Официант", "averageServiceTime": 12.5, "customersServed": 35, "rating": 4.8},
-            2: {"name": "Иван", "role": "Официант", "averageServiceTime": 14.8, "customersServed": 28, "rating": 4.5},
-            3: {"name": "Мария", "role": "Официант", "averageServiceTime": 11.2, "customersServed": 32, "rating": 4.9},
-            4: {"name": "Алексей", "role": "Официант", "averageServiceTime": 15.5, "customersServed": 25, "rating": 4.2},
-            5: {"name": "Елена", "role": "Официант", "averageServiceTime": 13.0, "customersServed": 30, "rating": 4.6}
+            "1": {"userId": 101, "userName": "Анна", "role": "Официант", "averageServiceTime": 12.5, "ordersServed": 35, "customerRating": 4.8, "averageOrderValue": 3200},
+            "2": {"userId": 102, "userName": "Иван", "role": "Официант", "averageServiceTime": 14.8, "ordersServed": 28, "customerRating": 4.5, "averageOrderValue": 2800},
+            "3": {"userId": 103, "userName": "Мария", "role": "Официант", "averageServiceTime": 11.2, "ordersServed": 32, "customerRating": 4.9, "averageOrderValue": 3500},
+            "4": {"userId": 104, "userName": "Алексей", "role": "Официант", "averageServiceTime": 15.5, "ordersServed": 25, "customerRating": 4.2, "averageOrderValue": 2500},
+            "5": {"userId": 105, "userName": "Елена", "role": "Официант", "averageServiceTime": 13.0, "ordersServed": 30, "customerRating": 4.6, "averageOrderValue": 3100}
         },
         "orderCompletionRates": {
             'В ожидании': 15.2,
@@ -834,45 +904,36 @@ def get_mock_predictive_metrics(start_date: datetime, end_date: datetime) -> Dic
             for i in range(14)
         ],
         "inventoryForecast": {
-            "Мясо": {"currentStock": 45, "recommendedStock": 60, "forecastUsage": 55},
-            "Рыба": {"currentStock": 25, "recommendedStock": 30, "forecastUsage": 28},
-            "Овощи": {"currentStock": 80, "recommendedStock": 100, "forecastUsage": 90},
-            "Молочные продукты": {"currentStock": 35, "recommendedStock": 40, "forecastUsage": 38},
-            "Напитки": {"currentStock": 65, "recommendedStock": 70, "forecastUsage": 68}
+            "1": 45,
+            "2": 60,
+            "3": 35,
+            "4": 25,
+            "5": 80
         },
         "staffingNeeds": {
-            'monday': {'10-14': 3, '14-18': 4, '18-22': 5},
-            'tuesday': {'10-14': 3, '14-18': 4, '18-22': 5},
-            'wednesday': {'10-14': 3, '14-18': 4, '18-22': 5},
-            'thursday': {'10-14': 4, '14-18': 5, '18-22': 6},
-            'friday': {'10-14': 5, '14-18': 6, '18-22': 7},
-            'saturday': {'10-14': 6, '14-18': 7, '18-22': 8},
-            'sunday': {'10-14': 5, '14-18': 6, '18-22': 6}
+            "Понедельник": {"12-14": 3, "14-16": 2, "16-18": 2, "18-20": 4, "20-22": 3},
+            "Вторник": {"12-14": 3, "14-16": 2, "16-18": 2, "18-20": 4, "20-22": 3},
+            "Среда": {"12-14": 3, "14-16": 2, "16-18": 2, "18-20": 4, "20-22": 3},
+            "Четверг": {"12-14": 3, "14-16": 2, "16-18": 3, "18-20": 5, "20-22": 4},
+            "Пятница": {"12-14": 4, "14-16": 3, "16-18": 3, "18-20": 6, "20-22": 5},
+            "Суббота": {"12-14": 5, "14-16": 4, "16-18": 4, "18-20": 6, "20-22": 5},
+            "Воскресенье": {"12-14": 5, "14-16": 4, "16-18": 3, "18-20": 5, "20-22": 4}
         },
         "peakTimePrediction": {
-            'monday': {'hour': 19, 'expectedOccupancy': 75},
-            'tuesday': {'hour': 19, 'expectedOccupancy': 70},
-            'wednesday': {'hour': 19, 'expectedOccupancy': 80},
-            'thursday': {'hour': 20, 'expectedOccupancy': 85},
-            'friday': {'hour': 20, 'expectedOccupancy': 95},
-            'saturday': {'hour': 21, 'expectedOccupancy': 100},
-            'sunday': {'hour': 14, 'expectedOccupancy': 90}
+            "Понедельник": ["18-20"],
+            "Вторник": ["18-20"],
+            "Среда": ["18-20"],
+            "Четверг": ["18-20", "20-22"],
+            "Пятница": ["18-20", "20-22"],
+            "Суббота": ["12-14", "18-20", "20-22"],
+            "Воскресенье": ["12-14", "18-20"]
         },
         "suggestedPromotions": [
-            {
-                "dishId": 5,
-                "dishName": "Фирменный стейк",
-                "reason": "Низкие продажи, высокая маржа",
-                "suggestedDiscount": 15,
-                "potentialRevenue": 45000
-            },
-            {
-                "dishId": 12,
-                "dishName": "Салат Греческий",
-                "reason": "Низкие продажи",
-                "suggestedDiscount": 10,
-                "potentialRevenue": 28000
-            }
+            {"dishId": 31, "dishName": "Окрошка", "reason": "Низкие продажи", "suggestedDiscount": 15, "potentialRevenue": 25000},
+            {"dishId": 32, "dishName": "Рататуй", "reason": "Низкие продажи", "suggestedDiscount": 20, "potentialRevenue": 30000},
+            {"dishId": 33, "dishName": "Суп-пюре из тыквы", "reason": "Низкие продажи", "suggestedDiscount": 25, "potentialRevenue": 22000},
+            {"dishId": 34, "dishName": "Салат из морепродуктов", "reason": "Низкие продажи", "suggestedDiscount": 15, "potentialRevenue": 18000},
+            {"dishId": 5, "dishName": "Тирамису", "reason": "Высокая маржинальность", "suggestedDiscount": 10, "potentialRevenue": 42000}
         ],
         "period": {
             "startDate": start_date.strftime("%Y-%m-%d"),
