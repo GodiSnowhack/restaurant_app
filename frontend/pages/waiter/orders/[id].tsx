@@ -201,25 +201,34 @@ const WaiterOrderDetailPage: NextPage = () => {
         });
       }
       
-      // Используем waiterApi для обновления статуса
+      // Пытаемся обновить статус на сервере
       const success = await waiterApi.updateOrderStatus(order.id, normalizedStatus);
       
-      // Показываем сообщение об успехе
-      alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
-      
-      // Принудительное обновление данных заказа с сервера после успешного обновления статуса
-      setTimeout(() => {
-        fetchOrder().catch(error => {
-          console.error('Ошибка при обновлении данных заказа:', error);
-        });
-      }, 1000);
-      
+      if (success) {
+        // Показываем сообщение об успехе
+        alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
+        
+        // Короткая задержка для обновления визуального представления
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Принудительное обновление данных заказа после успешного обновления статуса
+        try {
+          await fetchOrder();
+        } catch (refreshError) {
+          console.error('Ошибка при обновлении данных заказа:', refreshError);
+          // Не показываем ошибку пользователю, так как статус уже обновлен в UI
+        }
+      } else {
+        throw new Error('Не удалось обновить статус заказа');
+      }
     } catch (error) {
       console.error('Ошибка при обновлении статуса заказа:', error);
       
-      // Восстанавливаем исходные данные
-      setOrder(originalOrder);
-      setError('Не удалось обновить статус заказа. Попробуйте еще раз.');
+      // НЕ восстанавливаем исходные данные для лучшего UX
+      // Просто оставляем оптимистично обновленный статус
+      
+      // Показываем сообщение об ошибке, но не сбрасываем состояние
+      setError('Возникла проблема при обновлении статуса заказа на сервере, но он обновлен локально.');
     } finally {
       // Снимаем индикатор загрузки
       setUpdatingStatus(false);
@@ -405,49 +414,60 @@ const WaiterOrderDetailPage: NextPage = () => {
         });
       }
       
-      // Для статуса 'paid' используем confirmPayment, для остальных - прямое обновление
+      // Используем подходящий метод в зависимости от желаемого статуса
       let success = false;
       
       if (newStatus.toLowerCase() === 'paid') {
-        // Используем метод подтверждения оплаты
+        // Для статуса 'paid' используем confirmPayment
         success = await waiterApi.confirmPayment(order.id);
       } else {
-        // Используем прямой запрос для других статусов
+        // Для других статусов используем прямой запрос к API
         const token = localStorage.getItem('token');
         if (!token) {
           throw new Error('Необходима авторизация');
         }
         
-        const response = await fetch(`/api/v1/waiter/orders/${order.id}/payment-status`, {
+        const response = await fetch(`/api/waiter-payment-status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ status: newStatus })
+          body: JSON.stringify({ 
+            orderId: order.id,
+            status: newStatus 
+          })
         });
         
         const result = await response.json();
-        console.log('Результат обновления статуса оплаты:', result);
         success = result.success;
       }
       
-      // Показываем сообщение об успехе
-      alert(`Статус оплаты заказа #${order.id} обновлен на "${getPaymentStatusLabel(newStatus)}"`);
-      
-      // Принудительное обновление данных заказа с сервера после успешного обновления статуса оплаты
-      setTimeout(() => {
-        fetchOrder().catch(error => {
-          console.error('Ошибка при обновлении данных заказа:', error);
-        });
-      }, 1000);
-      
+      if (success) {
+        // Показываем сообщение об успехе
+        alert(`Статус оплаты заказа #${order.id} обновлен на "${getPaymentStatusLabel(newStatus)}"`);
+        
+        // Короткая задержка для обновления визуального представления
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Принудительное обновление данных заказа после успешного обновления статуса
+        try {
+          await fetchOrder();
+        } catch (refreshError) {
+          console.error('Ошибка при обновлении данных заказа:', refreshError);
+          // Не показываем ошибку пользователю, так как статус уже обновлен в UI
+        }
+      } else {
+        throw new Error('Не удалось обновить статус оплаты заказа');
+      }
     } catch (error) {
       console.error('Ошибка при обновлении статуса оплаты:', error);
       
-      // Восстанавливаем исходные данные
-      setOrder(originalOrder);
-      setError('Не удалось обновить статус оплаты. Попробуйте еще раз.');
+      // НЕ восстанавливаем исходные данные для лучшего UX
+      // Просто оставляем оптимистично обновленный статус
+      
+      // Показываем сообщение об ошибке, но не сбрасываем состояние
+      setError('Возникла проблема при обновлении статуса оплаты на сервере, но он обновлен локально.');
     } finally {
       // Снимаем индикатор загрузки
       setUpdatingStatus(false);

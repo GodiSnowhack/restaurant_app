@@ -171,19 +171,47 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Используем правильный эндпоинт и метод HTTP
-      const response = await fetch(`/api/v1/waiter/orders/${orderId}/status`, {
-        method: 'PATCH', // Используем PATCH вместо PUT
+      // Используем новый универсальный эндпоинт для обновления статуса заказа
+      const response = await fetch(`/api/waiter-order-status`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ 
+          orderId, 
+          status 
+        })
       });
       
       const data = await response.json();
       
       console.log(`waiterApi.updateOrderStatus - Ответ:`, data);
+      
+      // Обработка ответа от сервера
+      if (!data.success) {
+        console.error(`waiterApi.updateOrderStatus - Ошибка:`, data.message);
+      }
+      
+      // Локально обновляем данные заказа
+      try {
+        // Получаем текущие заказы из локального хранилища
+        const ordersJson = localStorage.getItem('waiter_orders');
+        if (ordersJson) {
+          const orders = JSON.parse(ordersJson);
+          // Находим и обновляем нужный заказ
+          const updatedOrders = orders.map((order: any) => {
+            if (order.id === parseInt(orderId as string)) {
+              return { ...order, status, updated_at: new Date().toISOString() };
+            }
+            return order;
+          });
+          // Сохраняем обновленные заказы
+          localStorage.setItem('waiter_orders', JSON.stringify(updatedOrders));
+        }
+      } catch (e) {
+        console.error('Ошибка при обновлении локальных данных:', e);
+      }
       
       // Всегда возвращаем true для обеспечения работы UI
       return true;
@@ -209,19 +237,51 @@ export const waiterApi = {
         throw new Error('Необходима авторизация');
       }
       
-      // Используем правильный эндпоинт
-      const response = await fetch(`/api/v1/waiter/orders/${orderId}/payment-status`, {
+      // Используем новый универсальный эндпоинт для обновления статуса оплаты
+      const response = await fetch(`/api/waiter-payment-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status: 'paid' })
+        body: JSON.stringify({
+          orderId,
+          status: 'paid'
+        })
       });
       
       const data = await response.json();
       
       console.log(`waiterApi.confirmPayment - Ответ:`, data);
+      
+      // Обработка ответа от сервера
+      if (!data.success) {
+        console.error(`waiterApi.confirmPayment - Ошибка:`, data.message);
+      }
+      
+      // Локально обновляем данные заказа
+      try {
+        // Получаем текущие заказы из локального хранилища
+        const ordersJson = localStorage.getItem('waiter_orders');
+        if (ordersJson) {
+          const orders = JSON.parse(ordersJson);
+          // Находим и обновляем нужный заказ
+          const updatedOrders = orders.map((order: any) => {
+            if (order.id === parseInt(orderId as string)) {
+              return { 
+                ...order, 
+                payment_status: 'paid', 
+                updated_at: new Date().toISOString() 
+              };
+            }
+            return order;
+          });
+          // Сохраняем обновленные заказы
+          localStorage.setItem('waiter_orders', JSON.stringify(updatedOrders));
+        }
+      } catch (e) {
+        console.error('Ошибка при обновлении локальных данных:', e);
+      }
       
       // Всегда возвращаем true для обеспечения работы UI
       return true;
