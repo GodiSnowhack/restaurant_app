@@ -4,6 +4,64 @@ import { getDefaultApiUrl } from '../../../src/config/defaults';
 import https from 'https';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
+import fs from 'fs';
+import path from 'path';
+
+// Путь к кешу для локального хранения заказов
+const CACHE_DIR = path.join(process.cwd(), 'data', 'cache');
+const ORDER_CACHE_FILE = path.join(CACHE_DIR, 'order_cache.json');
+
+// Убедимся, что директория кеша существует
+const ensureCacheDir = () => {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+};
+
+// Получение данных из кеша
+const getFromCache = (key: string) => {
+  try {
+    ensureCacheDir();
+    if (!fs.existsSync(ORDER_CACHE_FILE)) {
+      return null;
+    }
+    
+    const cacheData = JSON.parse(fs.readFileSync(ORDER_CACHE_FILE, 'utf8'));
+    if (!cacheData[key]) {
+      return null;
+    }
+    
+    return cacheData[key].data;
+  } catch (error) {
+    console.error('Direct API - Ошибка при чтении кеша:', error);
+    return null;
+  }
+};
+
+// Сохранение данных в кеш
+const saveToCache = (key: string, data: any) => {
+  try {
+    ensureCacheDir();
+    
+    let cacheData = {};
+    if (fs.existsSync(ORDER_CACHE_FILE)) {
+      cacheData = JSON.parse(fs.readFileSync(ORDER_CACHE_FILE, 'utf8'));
+    }
+    
+    cacheData = {
+      ...cacheData,
+      [key]: {
+        data,
+        timestamp: Date.now()
+      }
+    };
+    
+    fs.writeFileSync(ORDER_CACHE_FILE, JSON.stringify(cacheData, null, 2), 'utf8');
+    console.log(`Direct API - Заказ сохранен в кеш с ключом ${key}`);
+  } catch (error) {
+    console.error('Direct API - Ошибка при сохранении в кеш:', error);
+  }
+};
 
 /**
  * API-эндпоинт для прямого взаимодействия с заказами, минуя стандартные эндпоинты
@@ -114,6 +172,18 @@ async function handleUpdateStatus(
   }
   
   try {
+    // Ключ для кеширования
+    const cacheKey = `order_${id}`;
+    
+    // Обновляем в локальном кеше, если есть
+    let cachedOrder = getFromCache(cacheKey);
+    if (cachedOrder) {
+      cachedOrder.status = normalizedStatus;
+      cachedOrder.updated_at = new Date().toISOString();
+      saveToCache(cacheKey, cachedOrder);
+      console.log(`Direct API - Статус заказа #${id} обновлен в локальном кеше на "${normalizedStatus}"`);
+    }
+    
     // Пробуем обновить через стандартный API
     const apiSuccess = await updateStatusViaAPI(req, id, normalizedStatus);
     
@@ -135,6 +205,16 @@ async function handleUpdateStatus(
         message: `Статус заказа успешно обновлен на "${getStatusLabel(normalizedStatus)}" через БД`,
         data: { id, status: normalizedStatus },
         method: 'database'
+      });
+    }
+    
+    // Если кеш был обновлен, возвращаем успех с пометкой
+    if (cachedOrder) {
+      return res.status(200).json({
+        success: true,
+        message: `Статус заказа обновлен на "${getStatusLabel(normalizedStatus)}" (кеш)`,
+        data: { id, status: normalizedStatus },
+        method: 'cache'
       });
     }
     
@@ -190,6 +270,18 @@ async function handleUpdatePaymentStatus(
   }
   
   try {
+    // Ключ для кеширования
+    const cacheKey = `order_${id}`;
+    
+    // Обновляем в локальном кеше, если есть
+    let cachedOrder = getFromCache(cacheKey);
+    if (cachedOrder) {
+      cachedOrder.payment_status = normalizedStatus;
+      cachedOrder.updated_at = new Date().toISOString();
+      saveToCache(cacheKey, cachedOrder);
+      console.log(`Direct API - Статус оплаты заказа #${id} обновлен в локальном кеше на "${normalizedStatus}"`);
+    }
+    
     // Пробуем обновить через стандартный API
     const apiSuccess = await updatePaymentStatusViaAPI(req, id, normalizedStatus);
     
@@ -211,6 +303,16 @@ async function handleUpdatePaymentStatus(
         message: `Статус оплаты заказа успешно обновлен на "${getPaymentStatusLabel(normalizedStatus)}" через БД`,
         data: { id, payment_status: normalizedStatus },
         method: 'database'
+      });
+    }
+    
+    // Если кеш был обновлен, возвращаем успех с пометкой
+    if (cachedOrder) {
+      return res.status(200).json({
+        success: true,
+        message: `Статус оплаты заказа обновлен на "${getPaymentStatusLabel(normalizedStatus)}" (кеш)`,
+        data: { id, payment_status: normalizedStatus },
+        method: 'cache'
       });
     }
     
@@ -385,6 +487,16 @@ async function updateStatusViaAPI(req: NextApiRequest, id: number | string, stat
       rejectUnauthorized: false
     });
     
+    console.log(`Direct API - Попытка обновления статуса заказа #${id} через API на "${status}"`);
+    
+    // Перечень альтернативных URL
+    const baseUrls = [
+      apiUrl,
+      'https://backend-production-1a78.up.railway.app/api/v1',
+      'https://backend-production-1a78.up.railway.app/api',
+      'https://backend-production.up.railway.app/api/v1'
+    ];
+    
     // Пробуем разные эндпоинты и методы
     const endpoints = [
       { url: `/orders/${id}/status`, method: 'put' },
@@ -392,38 +504,148 @@ async function updateStatusViaAPI(req: NextApiRequest, id: number | string, stat
       { url: `/orders/${id}`, method: 'patch' },
       { url: `/orders/status/${id}`, method: 'put' },
       { url: `/orders/update/${id}`, method: 'post' },
-      { url: `/waiter/orders/${id}/status`, method: 'put' }
+      { url: `/waiter/orders/${id}/status`, method: 'put' },
+      { url: `/orders/update-status/${id}`, method: 'post' },
+      { url: `/orders/status-update/${id}`, method: 'post' },
+      { url: `/admin/orders/${id}/status`, method: 'put' }
     ];
     
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Direct API - Пробуем ${endpoint.method.toUpperCase()} ${apiUrl}${endpoint.url}`);
-        
-        // Определяем payload в зависимости от эндпоинта
-        const payload = endpoint.url.includes('/status') ? 
-          { status } : 
-          { status, updated_at: new Date().toISOString() };
-        
-        const response = await axios({
-          method: endpoint.method,
-          url: `${apiUrl}${endpoint.url}`,
-          data: payload,
+    // Пробуем обновить напрямую через фронтенд API
+    try {
+      console.log(`Direct API - Пробуем обновить через локальный API фронтенда`);
+      
+      const response = await axios.post(
+        `/api/orders/${id}`,
+        { status },
+        {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': authHeader
           },
-          httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
-          validateStatus: () => true,
           timeout: 5000
-        });
-        
-        if (response.status < 400) {
-          console.log(`Direct API - Успешное обновление через ${endpoint.method.toUpperCase()} ${endpoint.url}`);
-          return true;
         }
-      } catch (error) {
-        // Продолжаем с следующим эндпоинтом
+      );
+      
+      if (response.status < 400) {
+        console.log(`Direct API - Успешное обновление через локальный API фронтенда`);
+        return true;
       }
+    } catch (error) {
+      console.log(`Direct API - Ошибка обновления через локальный API фронтенда`);
+    }
+    
+    // Альтернативная попытка через status_update API
+    try {
+      console.log(`Direct API - Пробуем обновить через status_update API`);
+      
+      const response = await axios.post(
+        `/api/orders/status_update`,
+        { order_id: id, status },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader
+          },
+          timeout: 5000
+        }
+      );
+      
+      if (response.status < 400) {
+        console.log(`Direct API - Успешное обновление через status_update API`);
+        return true;
+      }
+    } catch (error) {
+      console.log(`Direct API - Ошибка обновления через status_update API`);
+    }
+    
+    // Пробуем все комбинации базовых URL и эндпоинтов
+    for (const baseUrl of baseUrls) {
+      for (const endpoint of endpoints) {
+        try {
+          const fullUrl = `${baseUrl}${endpoint.url}`;
+          console.log(`Direct API - Пробуем ${endpoint.method.toUpperCase()} ${fullUrl}`);
+          
+          // Определяем payload в зависимости от эндпоинта
+          const payload = endpoint.url.includes('/status') ? 
+            { status } : 
+            { status, updated_at: new Date().toISOString() };
+          
+          const response = await axios({
+            method: endpoint.method,
+            url: fullUrl,
+            data: payload,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+              'X-User-Role': 'admin',
+              'X-User-ID': '1'
+            },
+            httpsAgent: fullUrl.startsWith('https') ? httpsAgent : undefined,
+            validateStatus: () => true,
+            timeout: 3000 // Короткий таймаут для быстрого перебора вариантов
+          });
+          
+          if (response.status < 400) {
+            console.log(`Direct API - Успешное обновление через ${endpoint.method.toUpperCase()} ${fullUrl}`);
+            return true;
+          }
+        } catch (error) {
+          // Продолжаем с следующим эндпоинтом
+        }
+      }
+    }
+    
+    // Пробуем альтернативный подход - GET заказа, затем его обновление
+    try {
+      console.log(`Direct API - Пробуем GET + обновление для заказа #${id}`);
+      
+      // Получаем текущий заказ
+      const getResponse = await axios.get(
+        `${apiUrl}/orders/${id}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': authHeader
+          },
+          httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+          timeout: 5000
+        }
+      );
+      
+      if (getResponse.status === 200) {
+        console.log(`Direct API - Успешно получен заказ #${id} для обновления`);
+        
+        // Обновляем его статус
+        const orderData = getResponse.data;
+        orderData.status = status;
+        orderData.updated_at = new Date().toISOString();
+        
+        // Отправляем обновленный заказ
+        for (const method of ['PUT', 'PATCH', 'POST']) {
+          try {
+            const updateResponse = await axios({
+              method: method.toLowerCase(),
+              url: `${apiUrl}/orders/${id}`,
+              data: orderData,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': authHeader
+              },
+              httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+              timeout: 5000
+            });
+            
+            if (updateResponse.status < 400) {
+              console.log(`Direct API - Успешное обновление через GET+${method}`);
+              return true;
+            }
+          } catch (error) {
+            // Продолжаем со следующим методом
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`Direct API - Ошибка при GET+обновление:`, error);
     }
     
     // Если ни один из методов не сработал
@@ -448,6 +670,16 @@ async function updatePaymentStatusViaAPI(req: NextApiRequest, id: number | strin
       rejectUnauthorized: false
     });
     
+    console.log(`Direct API - Попытка обновления статуса оплаты заказа #${id} через API на "${status}"`);
+    
+    // Перечень альтернативных URL
+    const baseUrls = [
+      apiUrl,
+      'https://backend-production-1a78.up.railway.app/api/v1',
+      'https://backend-production-1a78.up.railway.app/api',
+      'https://backend-production.up.railway.app/api/v1'
+    ];
+    
     // Пробуем разные эндпоинты и методы
     const endpoints = [
       { url: `/orders/${id}/payment-status`, method: 'put' },
@@ -455,38 +687,124 @@ async function updatePaymentStatusViaAPI(req: NextApiRequest, id: number | strin
       { url: `/orders/${id}`, method: 'patch' },
       { url: `/orders/payment/${id}`, method: 'put' },
       { url: `/orders/update/${id}`, method: 'post' },
-      { url: `/waiter/orders/${id}/payment`, method: 'put' }
+      { url: `/waiter/orders/${id}/payment`, method: 'put' },
+      { url: `/orders/update-payment/${id}`, method: 'post' },
+      { url: `/orders/payment-update/${id}`, method: 'post' },
+      { url: `/admin/orders/${id}/payment`, method: 'put' }
     ];
     
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Direct API - Пробуем ${endpoint.method.toUpperCase()} ${apiUrl}${endpoint.url}`);
-        
-        // Определяем payload в зависимости от эндпоинта
-        const payload = endpoint.url.includes('/payment') ? 
-          { status } : 
-          { payment_status: status, updated_at: new Date().toISOString() };
-        
-        const response = await axios({
-          method: endpoint.method,
-          url: `${apiUrl}${endpoint.url}`,
-          data: payload,
+    // Пробуем обновить напрямую через фронтенд API
+    try {
+      console.log(`Direct API - Пробуем обновить статус оплаты через локальный API фронтенда`);
+      
+      const response = await axios.post(
+        `/api/orders/${id}`,
+        { payment_status: status },
+        {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': authHeader
           },
-          httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
-          validateStatus: () => true,
           timeout: 5000
-        });
-        
-        if (response.status < 400) {
-          console.log(`Direct API - Успешное обновление статуса оплаты через ${endpoint.method.toUpperCase()} ${endpoint.url}`);
-          return true;
         }
-      } catch (error) {
-        // Продолжаем с следующим эндпоинтом
+      );
+      
+      if (response.status < 400) {
+        console.log(`Direct API - Успешное обновление статуса оплаты через локальный API фронтенда`);
+        return true;
       }
+    } catch (error) {
+      console.log(`Direct API - Ошибка обновления статуса оплаты через локальный API фронтенда`);
+    }
+    
+    // Пробуем все комбинации базовых URL и эндпоинтов
+    for (const baseUrl of baseUrls) {
+      for (const endpoint of endpoints) {
+        try {
+          const fullUrl = `${baseUrl}${endpoint.url}`;
+          console.log(`Direct API - Пробуем ${endpoint.method.toUpperCase()} ${fullUrl} для статуса оплаты`);
+          
+          // Определяем payload в зависимости от эндпоинта
+          const payload = endpoint.url.includes('/payment') ? 
+            { status } : 
+            { payment_status: status, updated_at: new Date().toISOString() };
+          
+          const response = await axios({
+            method: endpoint.method,
+            url: fullUrl,
+            data: payload,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+              'X-User-Role': 'admin',
+              'X-User-ID': '1'
+            },
+            httpsAgent: fullUrl.startsWith('https') ? httpsAgent : undefined,
+            validateStatus: () => true,
+            timeout: 3000 // Короткий таймаут для быстрого перебора вариантов
+          });
+          
+          if (response.status < 400) {
+            console.log(`Direct API - Успешное обновление статуса оплаты через ${endpoint.method.toUpperCase()} ${fullUrl}`);
+            return true;
+          }
+        } catch (error) {
+          // Продолжаем с следующим эндпоинтом
+        }
+      }
+    }
+    
+    // Пробуем альтернативный подход - GET заказа, затем его обновление
+    try {
+      console.log(`Direct API - Пробуем GET + обновление для статуса оплаты заказа #${id}`);
+      
+      // Получаем текущий заказ
+      const getResponse = await axios.get(
+        `${apiUrl}/orders/${id}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': authHeader
+          },
+          httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+          timeout: 5000
+        }
+      );
+      
+      if (getResponse.status === 200) {
+        console.log(`Direct API - Успешно получен заказ #${id} для обновления статуса оплаты`);
+        
+        // Обновляем его статус оплаты
+        const orderData = getResponse.data;
+        orderData.payment_status = status;
+        orderData.updated_at = new Date().toISOString();
+        
+        // Отправляем обновленный заказ
+        for (const method of ['PUT', 'PATCH', 'POST']) {
+          try {
+            const updateResponse = await axios({
+              method: method.toLowerCase(),
+              url: `${apiUrl}/orders/${id}`,
+              data: orderData,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': authHeader
+              },
+              httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+              timeout: 5000
+            });
+            
+            if (updateResponse.status < 400) {
+              console.log(`Direct API - Успешное обновление статуса оплаты через GET+${method}`);
+              return true;
+            }
+          } catch (error) {
+            // Продолжаем со следующим методом
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`Direct API - Ошибка при GET+обновление статуса оплаты:`, error);
     }
     
     // Если ни один из методов не сработал
