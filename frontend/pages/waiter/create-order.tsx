@@ -276,9 +276,12 @@ const CreateOrderPage: NextPage = () => {
       // Форматируем элементы заказа
       const formattedItems = orderItems.map(item => ({
         dish_id: Number(item.id),
+        id: Number(item.id),
         quantity: Number(item.quantity),
         special_instructions: item.special_instructions || ''
       }));
+      
+      console.log('Форматированные блюда:', formattedItems);
       
       // Создаем данные заказа по схеме OrderCreate
       const orderData = {
@@ -291,6 +294,8 @@ const CreateOrderPage: NextPage = () => {
         
         // Блюда заказа
         items: formattedItems,
+        // Простой список ID блюд для совместимости
+        dishes: formattedItems.map(item => item.dish_id),
         
         // Статус - всегда pending для новых заказов
         status: "pending",

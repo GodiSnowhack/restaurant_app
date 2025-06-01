@@ -83,12 +83,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       customer_name: orderData.customer_name,
       customer_phone: orderData.customer_phone,
       customer_age_group: orderData.customer_age_group,
-      // Блюда заказа как массив объектов OrderDishItem
+      
+      // Отправляем блюда в двух форматах для совместимости
+      // 1. Формат items - массив объектов с детальной информацией
       items: orderData.items.map((item: any) => ({
-        dish_id: Number(item.dish_id),
+        dish_id: Number(item.dish_id || item.id), // Поддерживаем оба формата dish_id и id
         quantity: Number(item.quantity),
         special_instructions: item.special_instructions || ""
       })),
+      
+      // 2. Формат dishes - простой массив ID блюд
+      dishes: orderData.items.map((item: any) => Number(item.dish_id || item.id)),
+      
       // Дополнительные данные
       comment: orderData.comment,
       is_urgent: orderData.is_urgent || false,
@@ -97,6 +103,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     console.log(`API Orders: Отправляем данные:`, requestPayload);
+    console.log(`API Orders: Блюда в заказе:`, 
+      requestPayload.items.map((i: {dish_id: number, quantity: number}) => 
+        `ID: ${i.dish_id}, Кол-во: ${i.quantity}`));
 
     // Настраиваем заголовки для запроса
     const headers: Record<string, string> = {
