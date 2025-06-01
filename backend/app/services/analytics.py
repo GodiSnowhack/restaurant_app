@@ -380,66 +380,31 @@ def get_financial_metrics(
     """
     Получение комплексных финансовых метрик для аналитики
     """
-    # Если не указаны даты, устанавливаем их на последний месяц
-    if not start_date:
-        start_date = datetime.now() - timedelta(days=30)
-    elif isinstance(start_date, str):
+    print("===== ЗАПРОС ФИНАНСОВЫХ МЕТРИК =====")
+    
+    # Обработка входных дат
+    if isinstance(start_date, str):
         try:
             start_date = datetime.strptime(start_date, "%Y-%m-%d")
         except Exception as e:
-            print(f"Ошибка парсинга start_date: {e}, используем дату по умолчанию")
-            start_date = datetime.now() - timedelta(days=30)
+            print(f"Ошибка парсинга start_date: {e}")
+            start_date = None
             
-    if not end_date:
-        end_date = datetime.now()
-    elif isinstance(end_date, str):
+    if isinstance(end_date, str):
         try:
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
         except Exception as e:
-            print(f"Ошибка парсинга end_date: {e}, используем дату по умолчанию")
-            end_date = datetime.now()
+            print(f"Ошибка парсинга end_date: {e}")
+            end_date = None
     
-    print(f"Запрос финансовой аналитики за период: с {start_date} по {end_date}")
+    # Для отображения запрашиваемого периода
+    display_start_date = start_date
+    display_end_date = end_date
     
-    # Проверяем, относятся ли даты к будущему
-    future_dates = False
-    if end_date > datetime.now():
-        print(f"Обнаружена дата в будущем: {end_date}. Коррекция дат.")
-        future_dates = True
-        # Если запрошены будущие даты и не запрошены мок-данные, используем имеющиеся данные за прошлый период
-        # но возвращаем их как данные за запрошенный период
-        if not use_mock_data:
-            original_start = start_date
-            original_end = end_date
-            # Смещаем даты на год назад для получения реальных данных
-            start_date = datetime.now() - timedelta(days=30)
-            end_date = datetime.now()
-            print(f"Скорректированные даты для запроса к БД: {start_date} - {end_date}")
-    
-    # Если явно запрошены мок-данные, возвращаем их
-    if use_mock_data:
-        print("Запрошены мок-данные для финансовой аналитики")
-        return get_mock_financial_metrics(start_date, end_date)
+    print(f"Запрошенный период: {display_start_date} - {display_end_date}")
     
     try:
-        # Проверяем наличие каких-либо заказов в БД
-        total_orders = db.query(func.count(Order.id)).scalar() or 0
-        print(f"Всего заказов в БД: {total_orders}")
-        
-        if total_orders == 0:
-            print("В БД нет заказов, возвращаем мок-данные")
-            return get_mock_financial_metrics(start_date, end_date)
-            
-        # Получаем хотя бы 10 заказов для анализа, независимо от дат
-        sample_orders = db.query(Order).order_by(Order.created_at.desc()).limit(10).all()
-        if not sample_orders:
-            print("Не удалось получить образцы заказов, возвращаем мок-данные")
-            return get_mock_financial_metrics(start_date, end_date)
-            
-        print(f"Получено {len(sample_orders)} заказов для анализа")
-        
-        # Запрос на получение данных по заказам и позициям за указанный период
-        # Отключаем фильтрацию по датам для обхода проблемы с отсутствием данных
+        # Запрос на получение ВСЕХ данных по заказам и позициям
         query = (
             db.query(
                 Order.id,
@@ -456,10 +421,7 @@ def get_financial_metrics(
             .join(OrderItem, Order.id == OrderItem.order_id)
             .join(Dish, OrderItem.dish_id == Dish.id)
             .join(Category, Dish.category_id == Category.id)
-            # Временно отключаем фильтр по датам для получения хоть каких-то данных
-            # .filter(Order.created_at.between(start_date, end_date))
             .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
-            .limit(100)  # Ограничиваем количество результатов
         )
         
         # Добавляем фильтр по категории, если указан
@@ -467,12 +429,37 @@ def get_financial_metrics(
             query = query.filter(Category.id == category_id)
             
         orders_data = query.all()
-        print(f"Получено {len(orders_data)} позиций заказов")
+        print(f"Получено {len(orders_data)} записей о позициях заказов из БД")
         
-        # Если данные не найдены и запрошены будущие даты, используем мок-данные
+        # Если данные не найдены, возвращаем пустые структуры
         if not orders_data:
-            print("Нет данных по заказам за указанный период, возвращаем мок-данные")
-            return get_mock_financial_metrics(start_date, end_date)
+            print("В БД нет данных о заказах.")
+            return {
+                "totalRevenue": 0,
+                "totalCost": 0,
+                "grossProfit": 0,
+                "profitMargin": 0,
+                "averageOrderValue": 0,
+                "orderCount": 0,
+                "revenueByCategory": {},
+                "revenueByTimeOfDay": {},
+                "revenueByDayOfWeek": {},
+                "revenueTrend": [],
+                "revenueChange": 0,
+                "profitChange": 0,
+                "averageOrderValueChange": 0,
+                "orderCountChange": 0,
+                "previousRevenue": 0,
+                "previousProfit": 0,
+                "previousAverageOrderValue": 0,
+                "previousOrderCount": 0,
+                "revenueByMonth": {},
+                "expensesByMonth": {},
+                "period": {
+                    "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                    "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+                }
+            }
             
         # Структуры для агрегации данных
         orders_by_id = {}
@@ -499,10 +486,21 @@ def get_financial_metrics(
         revenue_by_month = {}
         expenses_by_month = {}
         
+        # Отслеживаем минимальную и максимальную даты для определения периода
+        min_date = None
+        max_date = None
+        
         # Обработка данных заказов
         for order in orders_data:
             order_id = order.id
             created_at = order.created_at
+            
+            # Отслеживаем диапазон дат
+            if min_date is None or created_at < min_date:
+                min_date = created_at
+            if max_date is None or created_at > max_date:
+                max_date = created_at
+                
             order_total = float(order.total_amount) if order.total_amount else 0
             item_price = float(order.price) if order.price else 0
             item_quantity = int(order.quantity) if order.quantity else 0
@@ -557,6 +555,12 @@ def get_financial_metrics(
             if created_at.strftime("%m") in expenses_by_month:
                 expenses_by_month[created_at.strftime("%m")] += item_cost
         
+        # Используем реальный диапазон дат из БД
+        if min_date and max_date:
+            display_start_date = min_date
+            display_end_date = max_date
+            print(f"Фактический период данных: {display_start_date} - {display_end_date}")
+        
         # Расчет дополнительных метрик
         order_count = len(orders_by_id)
         average_order_value = total_revenue / order_count if order_count > 0 else 0
@@ -564,60 +568,66 @@ def get_financial_metrics(
         profit_margin = (gross_profit / total_revenue) * 100 if total_revenue > 0 else 0
         
         # Формирование тренда выручки по дням
-        # Если мы использовали скорректированные даты, но запрос был на будущие даты,
-        # формируем тренд на основе запрошенного периода
-        if future_dates and 'original_start' in locals() and 'original_end' in locals():
-            trend_data = []
-            days = (original_end - original_start).days + 1
-            
-            for i in range(days):
-                # Генерируем даты для будущего периода
-                date_obj = original_start + timedelta(days=i)
-                date_str = date_obj.strftime("%Y-%m-%d")
-                
-                # Используем реальные данные или генерируем случайные
-                value = 0
-                for real_date, real_value in revenue_trend.items():
-                    # Берем значение с тем же днем недели
-                    real_date_obj = datetime.strptime(real_date, "%Y-%m-%d")
-                    if real_date_obj.weekday() == date_obj.weekday():
-                        value = real_value
-                        break
-                
-                if value == 0 and revenue_trend:
-                    # Если нет совпадающего дня недели, берем среднее значение
-                    value = sum(revenue_trend.values()) / len(revenue_trend)
-                
-                trend_data.append({
-                    "date": date_str,
-                    "value": round(value * (0.9 + 0.2 * random.random()))  # Небольшая случайность
-                })
-                
-            # Используем оригинальные даты для периода
-            period_start = original_start
-            period_end = original_end
-        else:
-            # Используем реальные данные для тренда
-            trend_data = []
-            
-            # Убедимся, что в тренде есть данные для всех дней периода
-            current_date = start_date
-            while current_date <= end_date:
-                date_str = current_date.strftime("%Y-%m-%d")
-                trend_data.append({
-                    "date": date_str,
-                    "value": round(revenue_trend.get(date_str, 0))
-                })
-                current_date += timedelta(days=1)
-                
-            period_start = start_date
-            period_end = end_date
+        trend_data = []
+        for date_str, value in sorted(revenue_trend.items()):
+            trend_data.append({
+                "date": date_str,
+                "value": round(value)
+            })
         
-        # Сгенерируем изменения относительно предыдущего периода
-        revenue_change = random.uniform(5.0, 15.0)
-        profit_change = random.uniform(6.0, 16.0)
-        avg_order_change = random.uniform(2.0, 8.0)
-        order_count_change = random.uniform(3.0, 10.0)
+        # Подсчет статистики за предыдущий период не требуется, т.к. используем реальные данные
+        # Используем фактические изменения, если данных достаточно для их расчета
+        previous_revenue = 0
+        previous_profit = 0
+        previous_avg_order = 0
+        previous_order_count = 0
+        
+        # Если есть данные хотя бы за две недели, можем рассчитать изменения
+        if min_date and max_date and (max_date - min_date).days > 14:
+            mid_date = min_date + (max_date - min_date) / 2
+            
+            current_period_revenue = sum(
+                orders_by_id[order_id]['total'] 
+                for order_id, order_data in orders_by_id.items() 
+                if order_data['created_at'] > mid_date
+            )
+            
+            previous_period_revenue = sum(
+                orders_by_id[order_id]['total'] 
+                for order_id, order_data in orders_by_id.items() 
+                if order_data['created_at'] <= mid_date
+            )
+            
+            current_period_orders = sum(
+                1 for order_id, order_data in orders_by_id.items() 
+                if order_data['created_at'] > mid_date
+            )
+            
+            previous_period_orders = sum(
+                1 for order_id, order_data in orders_by_id.items() 
+                if order_data['created_at'] <= mid_date
+            )
+            
+            previous_revenue = previous_period_revenue
+            previous_order_count = previous_period_orders
+            previous_avg_order = previous_period_revenue / previous_period_orders if previous_period_orders > 0 else 0
+            
+            # Предполагаем, что соотношение выручки и прибыли одинаковое
+            previous_profit = previous_period_revenue * (gross_profit / total_revenue) if total_revenue > 0 else 0
+            
+            revenue_change = ((current_period_revenue - previous_period_revenue) / previous_period_revenue * 100) if previous_period_revenue > 0 else 0
+            profit_change = revenue_change  # Упрощенный расчет
+            
+            order_count_change = ((current_period_orders - previous_period_orders) / previous_period_orders * 100) if previous_period_orders > 0 else 0
+            
+            current_period_avg_order = current_period_revenue / current_period_orders if current_period_orders > 0 else 0
+            avg_order_change = ((current_period_avg_order - previous_avg_order) / previous_avg_order * 100) if previous_avg_order > 0 else 0
+        else:
+            # Если данных недостаточно, используем нулевые изменения
+            revenue_change = 0
+            profit_change = 0
+            avg_order_change = 0
+            order_count_change = 0
         
         # Округление значений для более читаемого вывода
         metrics = {
@@ -635,23 +645,43 @@ def get_financial_metrics(
             "profitChange": round(profit_change, 1),
             "averageOrderValueChange": round(avg_order_change, 1),
             "orderCountChange": round(order_count_change, 1),
-            "previousRevenue": round(total_revenue * (1 - revenue_change/100)),
-            "previousProfit": round(gross_profit * (1 - profit_change/100)),
-            "previousAverageOrderValue": round(average_order_value * (1 - avg_order_change/100)),
-            "previousOrderCount": round(order_count * (1 - order_count_change/100)),
+            "previousRevenue": round(previous_revenue),
+            "previousProfit": round(previous_profit),
+            "previousAverageOrderValue": round(previous_avg_order),
+            "previousOrderCount": previous_order_count,
             "revenueByMonth": {k: round(v) for k, v in revenue_by_month.items()},
             "expensesByMonth": {k: round(v) for k, v in expenses_by_month.items()},
             "period": {
-                "startDate": period_start.strftime("%Y-%m-%d"),
-                "endDate": period_end.strftime("%Y-%m-%d")
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
             }
         }
         
+        print("Успешно сформированы финансовые метрики на основе реальных данных.")
         return metrics
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
-        print(f"Ошибка при получении финансовых метрик: {e}")
-        return get_mock_financial_metrics(start_date, end_date)
+        # В случае ошибки логируем её и возвращаем пустую структуру
+        print(f"КРИТИЧЕСКАЯ ОШИБКА при получении финансовых метрик: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "totalRevenue": 0,
+            "totalCost": 0,
+            "grossProfit": 0,
+            "profitMargin": 0,
+            "averageOrderValue": 0,
+            "orderCount": 0,
+            "revenueByCategory": {},
+            "revenueByTimeOfDay": {},
+            "revenueByDayOfWeek": {},
+            "revenueTrend": [],
+            "error": str(e),
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
 
 
 def get_menu_metrics(
@@ -665,69 +695,31 @@ def get_menu_metrics(
     """
     Получение комплексных метрик по меню для аналитики
     """
-    # Корректная обработка входных дат
-    if not start_date:
-        start_date = datetime.now() - timedelta(days=30)
-    elif isinstance(start_date, str):
+    print("===== ЗАПРОС МЕТРИК МЕНЮ =====")
+    
+    # Обработка входных дат
+    if isinstance(start_date, str):
         try:
             start_date = datetime.strptime(start_date, "%Y-%m-%d")
         except Exception as e:
-            print(f"Ошибка парсинга start_date: {e}, используем дату по умолчанию")
-            start_date = datetime.now() - timedelta(days=30)
+            print(f"Ошибка парсинга start_date: {e}")
+            start_date = None
             
-    if not end_date:
-        end_date = datetime.now()
-    elif isinstance(end_date, str):
+    if isinstance(end_date, str):
         try:
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
         except Exception as e:
-            print(f"Ошибка парсинга end_date: {e}, используем дату по умолчанию")
-            end_date = datetime.now()
+            print(f"Ошибка парсинга end_date: {e}")
+            end_date = None
     
-    print(f"Запрос аналитики меню за период: с {start_date} по {end_date}")
+    # Для отображения запрашиваемого периода
+    display_start_date = start_date
+    display_end_date = end_date
     
-    # Если запрошены мок-данные или дата относится к будущему, возвращаем мок-данные
-    future_dates = False
-    if end_date > datetime.now():
-        print(f"Обнаружена дата в будущем: {end_date}. Коррекция дат.")
-        future_dates = True
-        original_start = start_date
-        original_end = end_date
-        # Смещаем даты для получения реальных данных
-        start_date = datetime.now() - timedelta(days=30)
-        end_date = datetime.now()
-        print(f"Скорректированные даты для запроса к БД: {start_date} - {end_date}")
-
-    if use_mock_data:
-        print(f"Используем мок-данные для меню: use_mock={use_mock_data}")
-        return get_mock_menu_metrics(start_date, end_date)
+    print(f"Запрошенный период для метрик меню: {display_start_date} - {display_end_date}")
     
     try:
-        # Проверка наличия данных в БД
-        dishes_count = db.query(func.count(Dish.id)).scalar() or 0
-        print(f"Всего блюд в БД: {dishes_count}")
-        
-        if dishes_count == 0:
-            print("В БД нет блюд, возвращаем мок-данные")
-            return get_mock_menu_metrics(start_date, end_date)
-        
-        # Проверка наличия заказов в БД
-        orders_count = db.query(func.count(Order.id)).scalar() or 0
-        print(f"Всего заказов в БД: {orders_count}")
-        
-        if orders_count == 0:
-            print("В БД нет заказов, возвращаем мок-данные")
-            return get_mock_menu_metrics(start_date, end_date)
-        
-        # Получение данных о позициях заказов
-        order_items_count = db.query(func.count(OrderItem.id)).scalar() or 0
-        print(f"Всего позиций заказов в БД: {order_items_count}")
-        
-        if order_items_count == 0:
-            print("В БД нет позиций заказов, возвращаем мок-данные")
-            return get_mock_menu_metrics(start_date, end_date)
-        
-        # Запрос на получение данных по топ продаваемым блюдам
+        # Запрос на получение данных по топ продаваемым блюдам (без фильтрации по датам)
         top_selling_query = (
             db.query(
                 Dish.id.label("dishId"),
@@ -740,8 +732,6 @@ def get_menu_metrics(
             .join(OrderItem, OrderItem.dish_id == Dish.id)
             .join(Order, Order.id == OrderItem.order_id)
             .join(Category, Category.id == Dish.category_id)
-            # Убираем фильтр по датам для получения хоть каких-то данных
-            # .filter(Order.created_at.between(start_date, end_date))
             .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
         )
         
@@ -781,36 +771,270 @@ def get_menu_metrics(
                 "percentage": round(percentage, 1)
             })
         
-        # Если нет данных о продажах, возвращаем мок-данные
+        # Если нет данных о продажах, возвращаем пустую структуру
         if not top_selling_dishes:
-            print("Нет данных о продажах блюд, возвращаем мок-данные")
-            return get_mock_menu_metrics(start_date, end_date)
+            print("В БД нет данных о продажах блюд")
+            return {
+                "topSellingDishes": [],
+                "mostProfitableDishes": [],
+                "leastSellingDishes": [],
+                "averageCookingTime": 0,
+                "categoryPopularity": {},
+                "menuItemSalesTrend": {},
+                "menuItemPerformance": [],
+                "categoryPerformance": {},
+                "period": {
+                    "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                    "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+                }
+            }
+            
+        # Запрос на получение данных о прибыльности блюд
+        profitable_query = (
+            db.query(
+                Dish.id.label("dishId"),
+                Dish.name.label("dishName"),
+                Category.id.label("categoryId"),
+                Category.name.label("categoryName"),
+                func.sum(OrderItem.quantity).label("salesCount"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+                Dish.cost_price,
+            )
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .join(Category, Category.id == Dish.category_id)
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+        )
         
-        # Для остальных метрик используем заглушки или мок-данные
-        mock_menu_data = get_mock_menu_metrics(start_date, end_date)
+        # Применяем те же фильтры
+        if category_id:
+            profitable_query = profitable_query.filter(Category.id == category_id)
+        if dish_id:
+            profitable_query = profitable_query.filter(Dish.id == dish_id)
         
-        # Возвращаем гибридный результат - реальные данные о топ-продажах и мок-данные для остальных метрик
+        # Группировка и сортировка по продажам
+        profitable_results = (
+            profitable_query.group_by(Dish.id, Category.id)
+            .all()
+        )
+        
+        # Обработка результатов по прибыльности
+        most_profitable_dishes = []
+        for result in profitable_results:
+            # Используем значение cost_price по умолчанию, если оно не задано
+            cost_price_value = float(result.cost_price) if result.cost_price else (float(result.revenue) * 0.6 if result.revenue else 0)
+            cost_price = cost_price_value * result.salesCount
+            profit = float(result.revenue) - cost_price if result.revenue else 0
+            profit_margin = (profit / float(result.revenue) * 100) if result.revenue and float(result.revenue) > 0 else 0
+            percentage = (result.salesCount / total_sales * 100) if total_sales > 0 else 0
+            
+            most_profitable_dishes.append({
+                "dishId": result.dishId,
+                "dishName": result.dishName,
+                "categoryId": result.categoryId,
+                "categoryName": result.categoryName,
+                "salesCount": result.salesCount,
+                "revenue": float(result.revenue) if result.revenue else 0,
+                "percentage": round(percentage, 1),
+                "costPrice": round(cost_price),
+                "profit": round(profit),
+                "profitMargin": round(profit_margin, 1)
+            })
+        
+        # Сортируем по прибыльности
+        most_profitable_dishes.sort(key=lambda x: x["profitMargin"], reverse=True)
+        most_profitable_dishes = most_profitable_dishes[:10]  # Берем только топ-10
+        
+        # Наименее продаваемые блюда - запрос похож на top_selling_query, но сортировка другая
+        least_selling_query = (
+            db.query(
+                Dish.id.label("dishId"),
+                Dish.name.label("dishName"),
+                Category.id.label("categoryId"),
+                Category.name.label("categoryName"),
+                func.sum(OrderItem.quantity).label("salesCount"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+            )
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .join(Category, Category.id == Dish.category_id)
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+        )
+        
+        # Применяем те же фильтры
+        if category_id:
+            least_selling_query = least_selling_query.filter(Category.id == category_id)
+        if dish_id:
+            least_selling_query = least_selling_query.filter(Dish.id == dish_id)
+        
+        # Группировка и сортировка по возрастанию продаж
+        least_selling_results = (
+            least_selling_query.group_by(Dish.id, Category.id)
+            .order_by(func.sum(OrderItem.quantity).asc())
+            .limit(10)
+            .all()
+        )
+        
+        # Форматирование результатов наименее продаваемых блюд
+        least_selling_dishes = []
+        for result in least_selling_results:
+            percentage = (result.salesCount / total_sales * 100) if total_sales > 0 else 0
+            least_selling_dishes.append({
+                "dishId": result.dishId,
+                "dishName": result.dishName,
+                "categoryId": result.categoryId,
+                "categoryName": result.categoryName,
+                "salesCount": result.salesCount,
+                "revenue": float(result.revenue) if result.revenue else 0,
+                "percentage": round(percentage, 1)
+            })
+        
+        # Получение среднего времени приготовления
+        avg_cooking_time = db.query(func.avg(Dish.cooking_time)).scalar() or 0
+        
+        # Получение популярности категорий
+        category_popularity_results = (
+            db.query(
+                Category.id,
+                func.sum(OrderItem.quantity).label("salesCount")
+            )
+            .join(Dish, Dish.category_id == Category.id)
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            .group_by(Category.id)
+            .all()
+        )
+        
+        # Форматирование результатов популярности категорий
+        category_popularity = {}
+        for result in category_popularity_results:
+            percentage = (result.salesCount / total_sales * 100) if total_sales > 0 else 0
+            category_popularity[str(result.id)] = round(percentage)
+        
+        # Получение трендов продаж по блюдам
+        dish_trends = {}
+        
+        # Получаем тренды только для топ-3 блюд
+        for dish in top_selling_dishes[:3]:
+            dish_id = dish["dishId"]
+            trend_query = (
+                db.query(
+                    func.date(Order.created_at).label("date"),
+                    func.sum(OrderItem.quantity).label("value")
+                )
+                .join(OrderItem, Order.id == OrderItem.order_id)
+                .filter(OrderItem.dish_id == dish_id)
+                .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+                .group_by(func.date(Order.created_at))
+                .order_by(func.date(Order.created_at))
+                .all()
+            )
+            
+            # Форматирование тренда
+            dish_trend = []
+            for result in trend_query:
+                date_str = result.date.strftime("%Y-%m-%d") if hasattr(result.date, 'strftime') else str(result.date)
+                dish_trend.append({
+                    "date": date_str,
+                    "value": result.value
+                })
+            
+            if dish_trend:
+                dish_trends[str(dish_id)] = dish_trend
+        
+        # Получение данных о производительности категорий
+        category_performance = {}
+        for category_id, percentage in category_popularity.items():
+            category_query = (
+                db.query(
+                    func.avg(Order.total_amount).label("avgOrderValue")
+                )
+                .join(OrderItem, Order.id == OrderItem.order_id)
+                .join(Dish, OrderItem.dish_id == Dish.id)
+                .filter(Dish.category_id == int(category_id))
+                .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+                .filter(Order.total_amount > 0)
+                .first()
+            )
+            
+            avg_order_value = float(category_query.avgOrderValue) if category_query and category_query.avgOrderValue else 0
+            
+            # Для расчета маржинальности используем среднее значение из most_profitable_dishes для этой категории
+            category_dishes = [dish for dish in most_profitable_dishes if dish["categoryId"] == int(category_id)]
+            avg_profit_margin = sum(dish["profitMargin"] for dish in category_dishes) / len(category_dishes) if category_dishes else 40  # По умолчанию 40%
+            
+            category_performance[category_id] = {
+                "salesPercentage": percentage,
+                "averageOrderValue": round(avg_order_value),
+                "averageProfitMargin": round(avg_profit_margin)
+            }
+        
+        # Данные о производительности блюд для матрицы BCG
+        menu_item_performance = []
+        for dish in most_profitable_dishes[:10]:
+            menu_item_performance.append({
+                "dishId": dish["dishId"],
+                "dishName": dish["dishName"],
+                "salesCount": dish["salesCount"],
+                "revenue": dish["revenue"],
+                "profitMargin": dish["profitMargin"]
+            })
+        
+        # Определяем реальный период данных
+        dates = []
+        for dish_id, trend in dish_trends.items():
+            for point in trend:
+                try:
+                    dates.append(datetime.strptime(point["date"], "%Y-%m-%d"))
+                except:
+                    pass
+        
+        if dates:
+            display_start_date = min(dates)
+            display_end_date = max(dates)
+            print(f"Фактический период данных меню: {display_start_date} - {display_end_date}")
+        
+        # Формирование итогового результата
         result = {
             "topSellingDishes": top_selling_dishes,
-            "mostProfitableDishes": mock_menu_data["mostProfitableDishes"],
-            "leastSellingDishes": mock_menu_data["leastSellingDishes"],
-            "averageCookingTime": db.query(func.avg(Dish.cooking_time)).scalar() or 18,
-            "categoryPopularity": mock_menu_data["categoryPopularity"],
-            "menuItemSalesTrend": mock_menu_data["menuItemSalesTrend"],
-            "menuItemPerformance": mock_menu_data["menuItemPerformance"],
-            "categoryPerformance": mock_menu_data["categoryPerformance"],
+            "mostProfitableDishes": most_profitable_dishes,
+            "leastSellingDishes": least_selling_dishes,
+            "averageCookingTime": round(avg_cooking_time),
+            "categoryPopularity": category_popularity,
+            "menuItemSalesTrend": dish_trends,
+            "menuItemPerformance": menu_item_performance,
+            "categoryPerformance": category_performance,
             "period": {
-                "startDate": (original_start if future_dates else start_date).strftime("%Y-%m-%d"),
-                "endDate": (original_end if future_dates else end_date).strftime("%Y-%m-%d")
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
             }
         }
         
+        print("Успешно сформированы метрики меню на основе реальных данных.")
         return result
         
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные как запасной вариант
-        print(f"Ошибка при получении метрик меню: {e}")
-        return get_mock_menu_metrics(start_date, end_date)
+        # В случае ошибки логируем её и возвращаем пустую структуру
+        print(f"КРИТИЧЕСКАЯ ОШИБКА при получении метрик меню: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "topSellingDishes": [],
+            "mostProfitableDishes": [],
+            "leastSellingDishes": [],
+            "averageCookingTime": 0,
+            "categoryPopularity": {},
+            "menuItemSalesTrend": {},
+            "menuItemPerformance": [],
+            "categoryPerformance": {},
+            "error": str(e),
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
 
 
 def get_customer_metrics(
@@ -823,82 +1047,131 @@ def get_customer_metrics(
     """
     Получение комплексных метрик по клиентам
     """
-    # Если не указаны даты, устанавливаем их на последний месяц
-    if not start_date:
-        start_date = datetime.now() - timedelta(days=30)
-    if not end_date:
-        end_date = datetime.now()
+    print("===== ЗАПРОС МЕТРИК КЛИЕНТОВ =====")
     
-    # Проверяем, относятся ли даты к будущему
-    future_dates = False
-    if end_date > datetime.now():
-        print(f"Обнаружена дата в будущем: {end_date}. Коррекция дат для customer_metrics.")
-        future_dates = True
-        # Если запрошены будущие даты, смещаем интервал на прошлый месяц
-        if not use_mock_data:
-            time_delta = end_date - start_date
-            end_date = datetime.now()
-            start_date = end_date - time_delta
-            print(f"Скорректированные даты: {start_date} - {end_date}")
+    # Обработка входных дат
+    if isinstance(start_date, str):
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга start_date: {e}")
+            start_date = None
+            
+    if isinstance(end_date, str):
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга end_date: {e}")
+            end_date = None
     
-    # Если запрошены мок-данные или пользователь настаивает на будущих датах
-    if use_mock_data:
-        print("Запрошены мок-данные для клиентской аналитики")
-        return get_mock_customer_metrics(start_date, end_date)
+    # Для отображения запрашиваемого периода
+    display_start_date = start_date
+    display_end_date = end_date
+    
+    print(f"Запрошенный период для метрик клиентов: {display_start_date} - {display_end_date}")
     
     try:
         # Получение общего количества клиентов (пользователей, сделавших заказы)
         total_customers_query = (
             db.query(func.count(func.distinct(Order.user_id)))
-            .filter(
-                Order.created_at <= end_date,
-                Order.user_id.isnot(None)
-            )
+            .filter(Order.user_id.isnot(None))
         )
         
         if user_id:
             total_customers_query = total_customers_query.filter(Order.user_id == user_id)
             
         total_customers = total_customers_query.scalar() or 0
+        print(f"Всего клиентов в БД: {total_customers}")
         
-        # Проверим, есть ли данные, и если нет, вернем мок-данные
-        if total_customers == 0 and future_dates:
-            print("Нет данных о клиентах, возвращаем мок-данные")
-            return get_mock_customer_metrics(start_date, end_date)
+        # Если нет данных, возвращаем пустую структуру
+        if total_customers == 0:
+            print("В БД нет данных о клиентах")
+            return {
+                "totalCustomers": 0,
+                "newCustomers": 0,
+                "returningCustomers": 0,
+                "returnRate": 0,
+                "customerRetentionRate": 0,
+                "averageVisitsPerCustomer": 0,
+                "customerSatisfaction": 0,
+                "foodRating": 0,
+                "serviceRating": 0,
+                "newCustomersChange": 0,
+                "returnRateChange": 0,
+                "averageOrderValueChange": 0,
+                "customerSegmentation": {},
+                "customerDemographics": {},
+                "visitTimes": {},
+                "visitFrequency": {},
+                "topCustomers": [],
+                "period": {
+                    "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                    "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+                }
+            }
         
-        # Получение новых клиентов за период
-        new_customers_query = (
-            db.query(func.count(func.distinct(Order.user_id)))
-            .filter(
-                Order.created_at.between(start_date, end_date),
-                ~Order.user_id.in_(
-                    db.query(Order.user_id)
-                    .filter(
-                        Order.created_at < start_date,
-                        Order.user_id.isnot(None)
-                    )
-                    .subquery()
-                )
+        # Получение первых заказов каждого пользователя
+        first_orders_subquery = (
+            db.query(
+                Order.user_id, 
+                func.min(Order.created_at).label('first_order_date')
             )
+            .filter(Order.user_id.isnot(None))
+            .group_by(Order.user_id)
+            .subquery()
         )
         
+        # Определение минимальной и максимальной даты для анализа
+        min_date_query = db.query(func.min(Order.created_at)).filter(Order.user_id.isnot(None))
+        max_date_query = db.query(func.max(Order.created_at)).filter(Order.user_id.isnot(None))
+        
+        if start_date:
+            min_date = start_date
+        else:
+            min_date = min_date_query.scalar()
+            
+        if end_date:
+            max_date = end_date
+        else:
+            max_date = max_date_query.scalar()
+            
+        # Для аналитики используем реальный диапазон дат из БД
+        real_min_date = min_date_query.scalar() or datetime.now()
+        real_max_date = max_date_query.scalar() or datetime.now()
+        
+        print(f"Реальный диапазон дат в БД: {real_min_date} - {real_max_date}")
+        
+        # Определение даты, разделяющей текущий и предыдущий периоды
+        if min_date and max_date:
+            mid_date = min_date + (max_date - min_date) / 2
+        else:
+            mid_date = real_min_date + (real_max_date - real_min_date) / 2
+            
+        # Получение новых клиентов за период
+        # Новые клиенты - те, чей первый заказ был в текущем периоде
+        new_customers_query = (
+            db.query(func.count(func.distinct(first_orders_subquery.c.user_id)))
+            .select_from(first_orders_subquery)
+            .filter(first_orders_subquery.c.first_order_date >= mid_date)
+        )
+            
         if user_id:
-            new_customers_query = new_customers_query.filter(Order.user_id == user_id)
+            new_customers_query = new_customers_query.filter(first_orders_subquery.c.user_id == user_id)
             
         new_customers = new_customers_query.scalar() or 0
         
         # Получение возвращающихся клиентов
+        # Возвращающиеся клиенты - те, кто сделал заказ и в текущем и в предыдущем периоде
         returning_customers_query = (
             db.query(func.count(func.distinct(Order.user_id)))
             .filter(
-                Order.created_at.between(start_date, end_date),
+                Order.created_at >= mid_date,
                 Order.user_id.in_(
                     db.query(Order.user_id)
                     .filter(
-                        Order.created_at < start_date,
+                        Order.created_at < mid_date,
                         Order.user_id.isnot(None)
                     )
-                    .subquery()
                 )
             )
         )
@@ -908,70 +1181,375 @@ def get_customer_metrics(
             
         returning_customers = returning_customers_query.scalar() or 0
         
-        # Расчет процента возврата
-        return_rate = (returning_customers / total_customers * 100) if total_customers > 0 else 0
+        # Расчет процента возврата клиентов
+        previous_period_customers = (
+            db.query(func.count(func.distinct(Order.user_id)))
+            .filter(
+                Order.created_at < mid_date,
+                Order.user_id.isnot(None)
+            )
+        ).scalar() or 0
         
-        # Если нет данных, вернем мок-данные
-        if total_customers == 0 or (new_customers == 0 and returning_customers == 0):
-            print("Недостаточно данных о клиентах, возвращаем мок-данные")
-            return get_mock_customer_metrics(start_date, end_date)
+        # Расчет показателей
+        return_rate = (returning_customers / previous_period_customers * 100) if previous_period_customers > 0 else 0
+        retention_rate = return_rate * 1.1  # Приблизительно
         
-        # Формирование итогового результата с базовыми метриками
-        # Оставшиеся метрики можно добавить позже
-        return {
+        # Получение среднего количества визитов на клиента
+        total_orders = db.query(func.count(Order.id)).filter(Order.user_id.isnot(None)).scalar() or 0
+        avg_visits = total_orders / total_customers if total_customers > 0 else 0
+        
+        # Получение данных о рейтингах
+        avg_food_rating = db.query(func.avg(Review.food_rating)).scalar() or 0
+        avg_service_rating = db.query(func.avg(Review.service_rating)).scalar() or 0
+        avg_satisfaction = (avg_food_rating + avg_service_rating) / 2 if (avg_food_rating and avg_service_rating) else 0
+        
+        # Получение изменений показателей относительно предыдущего периода
+        # Здесь мы сравниваем текущий период с предыдущим
+        previous_period_orders = (
+            db.query(func.count(Order.id))
+            .filter(
+                Order.created_at < mid_date,
+                Order.user_id.isnot(None)
+            )
+        ).scalar() or 0
+        
+        current_period_orders = (
+            db.query(func.count(Order.id))
+            .filter(
+                Order.created_at >= mid_date,
+                Order.user_id.isnot(None)
+            )
+        ).scalar() or 0
+        
+        # Получение данных о среднем чеке в разные периоды
+        prev_avg_order_value = (
+            db.query(func.avg(Order.total_amount))
+            .filter(
+                Order.created_at < mid_date,
+                Order.user_id.isnot(None),
+                Order.total_amount > 0
+            )
+        ).scalar() or 0
+        
+        current_avg_order_value = (
+            db.query(func.avg(Order.total_amount))
+            .filter(
+                Order.created_at >= mid_date,
+                Order.user_id.isnot(None),
+                Order.total_amount > 0
+            )
+        ).scalar() or 0
+        
+        # Расчет изменений
+        new_customers_prev = (
+            db.query(func.count(func.distinct(first_orders_subquery.c.user_id)))
+            .select_from(first_orders_subquery)
+            .filter(
+                first_orders_subquery.c.first_order_date < mid_date,
+                first_orders_subquery.c.first_order_date >= real_min_date
+            )
+        ).scalar() or 0
+        
+        new_customers_change = ((new_customers - new_customers_prev) / new_customers_prev * 100) if new_customers_prev > 0 else 0
+        
+        # Расчет изменения возвратности клиентов
+        if real_min_date + (mid_date - real_min_date) / 2 != real_min_date:
+            mid_date_prev = real_min_date + (mid_date - real_min_date) / 2
+            
+            returning_customers_prev = (
+                db.query(func.count(func.distinct(Order.user_id)))
+                .filter(
+                    Order.created_at >= mid_date_prev,
+                    Order.created_at < mid_date,
+                    Order.user_id.in_(
+                        db.query(Order.user_id)
+                        .filter(
+                            Order.created_at < mid_date_prev,
+                            Order.user_id.isnot(None)
+                        )
+                    )
+                )
+            ).scalar() or 0
+            
+            prev_period_customers = (
+                db.query(func.count(func.distinct(Order.user_id)))
+                .filter(
+                    Order.created_at < mid_date_prev,
+                    Order.user_id.isnot(None)
+                )
+            ).scalar() or 0
+            
+            prev_return_rate = (returning_customers_prev / prev_period_customers * 100) if prev_period_customers > 0 else 0
+            return_rate_change = (return_rate - prev_return_rate) if prev_return_rate > 0 else 0
+        else:
+            return_rate_change = 0
+            
+        # Расчет изменения среднего чека
+        avg_order_value_change = ((current_avg_order_value - prev_avg_order_value) / prev_avg_order_value * 100) if prev_avg_order_value > 0 else 0
+        
+        # Получение сегментации клиентов
+        # Подсчитываем количество заказов для каждого клиента
+        customer_orders = (
+            db.query(
+                Order.user_id,
+                func.count(Order.id).label('orders_count')
+            )
+            .filter(Order.user_id.isnot(None))
+            .group_by(Order.user_id)
+            .all()
+        )
+        
+        # Определяем сегменты
+        new_segment = 0
+        occasional_segment = 0
+        regular_segment = 0
+        loyal_segment = 0
+        
+        for customer in customer_orders:
+            if customer.orders_count == 1:
+                new_segment += 1
+            elif customer.orders_count <= 3:
+                occasional_segment += 1
+            elif customer.orders_count <= 7:
+                regular_segment += 1
+            else:
+                loyal_segment += 1
+                
+        # Расчет процентов сегментации
+        segmentation = {
+            "Новые": round(new_segment / total_customers * 100, 1) if total_customers > 0 else 0,
+            "Случайные": round(occasional_segment / total_customers * 100, 1) if total_customers > 0 else 0,
+            "Регулярные": round(regular_segment / total_customers * 100, 1) if total_customers > 0 else 0,
+            "Лояльные": round(loyal_segment / total_customers * 100, 1) if total_customers > 0 else 0
+        }
+        
+        # Получение демографических данных (возрастные группы)
+        age_groups_query = (
+            db.query(
+                User.age_group,
+                func.count(func.distinct(User.id)).label('count')
+            )
+            .join(Order, Order.user_id == User.id)
+            .filter(User.age_group.isnot(None))
+            .group_by(User.age_group)
+            .all()
+        )
+        
+        age_groups = {}
+        for group in age_groups_query:
+            age_groups[group.age_group] = group.count
+            
+        # Получение данных о времени посещения
+        visit_times_query = (
+            db.query(
+                func.strftime('%H', Order.created_at).label('hour'),
+                func.count(Order.id).label('count')
+            )
+            .filter(Order.user_id.isnot(None))
+            .group_by('hour')
+            .all()
+        )
+        
+        # Агрегируем данные по временным интервалам
+        visit_times = {
+            '12-14': 0,
+            '14-16': 0,
+            '16-18': 0,
+            '18-20': 0,
+            '20-22': 0
+        }
+        
+        for time in visit_times_query:
+            try:
+                hour = int(time.hour)
+                if 12 <= hour < 14:
+                    visit_times['12-14'] += time.count
+                elif 14 <= hour < 16:
+                    visit_times['14-16'] += time.count
+                elif 16 <= hour < 18:
+                    visit_times['16-18'] += time.count
+                elif 18 <= hour < 20:
+                    visit_times['18-20'] += time.count
+                elif 20 <= hour < 22:
+                    visit_times['20-22'] += time.count
+            except:
+                pass
+                
+        # Конвертируем абсолютные значения в проценты
+        total_visits = sum(visit_times.values())
+        if total_visits > 0:
+            for key in visit_times:
+                visit_times[key] = round(visit_times[key] / total_visits * 100)
+        
+        # Получение данных о частоте посещений
+        # Определяем среднее количество дней между заказами для каждого клиента
+        frequency_data = []
+        user_orders = (
+            db.query(
+                Order.user_id,
+                func.strftime('%Y-%m-%d', Order.created_at).label('order_date')
+            )
+            .filter(Order.user_id.isnot(None))
+            .order_by(Order.user_id, Order.created_at)
+            .all()
+        )
+        
+        # Группируем заказы по пользователям
+        user_orders_dict = {}
+        for order in user_orders:
+            if order.user_id not in user_orders_dict:
+                user_orders_dict[order.user_id] = []
+            user_orders_dict[order.user_id].append(order.order_date)
+        
+        # Считаем среднее количество дней между заказами
+        for user_id, dates in user_orders_dict.items():
+            if len(dates) >= 2:
+                total_days = 0
+                date_objects = []
+                for date_str in dates:
+                    try:
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                        date_objects.append(date_obj)
+                    except:
+                        pass
+                
+                date_objects.sort()
+                
+                for i in range(1, len(date_objects)):
+                    days = (date_objects[i] - date_objects[i-1]).days
+                    total_days += days
+                
+                avg_days = total_days / (len(date_objects) - 1)
+                frequency_data.append(avg_days)
+        
+        # Определяем категории частоты
+        visit_frequency = {
+            "Еженедельно": 0,
+            "2-3 раза в месяц": 0,
+            "Ежемесячно": 0,
+            "Раз в квартал": 0,
+            "Реже": 0
+        }
+        
+        for days in frequency_data:
+            if days <= 7:
+                visit_frequency["Еженедельно"] += 1
+            elif days <= 14:
+                visit_frequency["2-3 раза в месяц"] += 1
+            elif days <= 30:
+                visit_frequency["Ежемесячно"] += 1
+            elif days <= 90:
+                visit_frequency["Раз в квартал"] += 1
+            else:
+                visit_frequency["Реже"] += 1
+                
+        # Конвертируем абсолютные значения в проценты
+        total_freq = sum(visit_frequency.values())
+        if total_freq > 0:
+            for key in visit_frequency:
+                visit_frequency[key] = round(visit_frequency[key] / total_freq * 100)
+        
+        # Получение данных о топ-клиентах
+        top_customers_query = (
+            db.query(
+                User.id.label('userId'),
+                User.full_name.label('fullName'),
+                User.email,
+                func.sum(Order.total_amount).label('totalSpent'),
+                func.count(Order.id).label('ordersCount'),
+                func.avg(Review.service_rating).label('avgRating'),
+                func.max(Order.created_at).label('lastVisit')
+            )
+            .join(Order, Order.user_id == User.id)
+            .outerjoin(Review, Review.user_id == User.id)
+            .filter(User.id.isnot(None))
+            .group_by(User.id)
+            .order_by(func.sum(Order.total_amount).desc())
+            .limit(5)
+            .all()
+        )
+        
+        # Формирование данных о топ-клиентах
+        top_customers = []
+        for customer in top_customers_query:
+            last_visit = customer.lastVisit.strftime('%Y-%m-%d') if hasattr(customer.lastVisit, 'strftime') else str(customer.lastVisit)
+            top_customers.append({
+                'userId': customer.userId,
+                'fullName': customer.fullName or "Н/Д",
+                'email': customer.email or "Н/Д",
+                'totalSpent': round(float(customer.totalSpent)) if customer.totalSpent else 0,
+                'ordersCount': customer.ordersCount or 0,
+                'averageRating': round(float(customer.avgRating), 1) if customer.avgRating else 0,
+                'lastVisit': last_visit
+            })
+            
+        # Обновляем диапазон дат для отображения
+        if not display_start_date:
+            display_start_date = real_min_date
+        if not display_end_date:
+            display_end_date = real_max_date
+        
+        # Формирование итогового результата
+        result = {
             "totalCustomers": total_customers,
             "newCustomers": new_customers,
             "returningCustomers": returning_customers,
             "returnRate": round(return_rate, 1),
-            "customerRetentionRate": round(return_rate * 1.25, 1),  # Примерная оценка
-            "averageVisitsPerCustomer": 2.8,  # Заглушка
-            "customerSatisfaction": 4.6,  # Заглушка
-            "foodRating": 4.7,  # Заглушка
-            "serviceRating": 4.5,  # Заглушка
-            "newCustomersChange": 8.2,  # Заглушка
-            "returnRateChange": 3.5,  # Заглушка
-            "averageOrderValueChange": 5.8,  # Заглушка
-            "customerSegmentation": {
-                "Новые": round(new_customers / total_customers * 100, 1) if total_customers > 0 else 0,
-                "Случайные": 44.8,  # Заглушка
-                "Регулярные": 31.9,  # Заглушка
-                "Лояльные": 10.9,  # Заглушка
-            },
+            "customerRetentionRate": round(retention_rate, 1),
+            "averageVisitsPerCustomer": round(avg_visits, 1),
+            "customerSatisfaction": round(avg_satisfaction, 1),
+            "foodRating": round(avg_food_rating, 1),
+            "serviceRating": round(avg_service_rating, 1),
+            "newCustomersChange": round(new_customers_change, 1),
+            "returnRateChange": round(return_rate_change, 1),
+            "averageOrderValueChange": round(avg_order_value_change, 1),
+            "customerSegmentation": segmentation,
             "customerDemographics": {
-                "age_groups": {
-                    "18-24": 15,  # Заглушка
-                    "25-34": 32,  # Заглушка
-                    "35-44": 28,  # Заглушка
-                    "45-54": 18,  # Заглушка
-                    "55+": 7,  # Заглушка
-                },
+                "age_groups": age_groups,
                 "total_customers": total_customers
             },
-            "visitTimes": {
-                "12-14": 25,  # Заглушка
-                "14-16": 15,  # Заглушка
-                "16-18": 10,  # Заглушка
-                "18-20": 35,  # Заглушка
-                "20-22": 15,  # Заглушка
-            },
-            "visitFrequency": {
-                "Еженедельно": 22,  # Заглушка
-                "2-3 раза в месяц": 38,  # Заглушка
-                "Ежемесячно": 25,  # Заглушка
-                "Раз в квартал": 10,  # Заглушка
-                "Реже": 5,  # Заглушка
-            },
-            "topCustomers": [],  # Заглушка
+            "visitTimes": visit_times,
+            "visitFrequency": visit_frequency,
+            "topCustomers": top_customers,
             "period": {
-                "startDate": start_date.strftime("%Y-%m-%d"),
-                "endDate": end_date.strftime("%Y-%m-%d")
+                "startDate": display_start_date.strftime("%Y-%m-%d"),
+                "endDate": display_end_date.strftime("%Y-%m-%d")
             }
         }
         
+        print("Успешно сформированы метрики клиентов на основе реальных данных.")
+        return result
+        
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные
-        print(f"Ошибка при получении метрик клиентов: {e}")
-        return get_mock_customer_metrics(start_date, end_date)
+        # В случае ошибки логируем её и возвращаем пустую структуру
+        print(f"КРИТИЧЕСКАЯ ОШИБКА при получении метрик клиентов: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "totalCustomers": 0,
+            "newCustomers": 0,
+            "returningCustomers": 0,
+            "returnRate": 0,
+            "customerRetentionRate": 0,
+            "averageVisitsPerCustomer": 0,
+            "customerSatisfaction": 0,
+            "foodRating": 0,
+            "serviceRating": 0,
+            "newCustomersChange": 0,
+            "returnRateChange": 0,
+            "averageOrderValueChange": 0,
+            "customerSegmentation": {},
+            "customerDemographics": {},
+            "visitTimes": {},
+            "visitFrequency": {},
+            "topCustomers": [],
+            "error": str(e),
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
 
 
 def get_operational_metrics(
@@ -983,48 +1561,243 @@ def get_operational_metrics(
     """
     Получение операционных метрик ресторана
     """
-    # Если не указаны даты, устанавливаем их на последний месяц
-    if not start_date:
-        start_date = datetime.now() - timedelta(days=30)
-    if not end_date:
-        end_date = datetime.now()
+    print("===== ЗАПРОС ОПЕРАЦИОННЫХ МЕТРИК =====")
     
-    # Проверяем, относятся ли даты к будущему
-    future_dates = False
-    if end_date > datetime.now():
-        print(f"Обнаружена дата в будущем: {end_date}. Коррекция дат для operational_metrics.")
-        future_dates = True
-        # Если запрошены будущие даты, смещаем интервал на прошлый месяц
-        if not use_mock_data:
-            time_delta = end_date - start_date
-            end_date = datetime.now()
-            start_date = end_date - time_delta
-            print(f"Скорректированные даты: {start_date} - {end_date}")
+    # Обработка входных дат
+    if isinstance(start_date, str):
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга start_date: {e}")
+            start_date = None
+            
+    if isinstance(end_date, str):
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга end_date: {e}")
+            end_date = None
     
-    # Если запрошены мок-данные, возвращаем их
-    if use_mock_data:
-        print("Запрошены мок-данные для операционной аналитики")
-        return get_mock_operational_metrics(start_date, end_date)
+    # Для отображения запрашиваемого периода
+    display_start_date = start_date
+    display_end_date = end_date
+    
+    print(f"Запрошенный период для операционных метрик: {display_start_date} - {display_end_date}")
     
     try:
-        # Проверяем наличие данных
-        orders_count = db.query(func.count(Order.id)).filter(
-            Order.created_at.between(start_date, end_date)
+        # Определение реального диапазона дат в БД
+        min_date = db.query(func.min(Order.created_at)).scalar()
+        max_date = db.query(func.max(Order.created_at)).scalar()
+        
+        if min_date and max_date:
+            if not display_start_date:
+                display_start_date = min_date
+            if not display_end_date:
+                display_end_date = max_date
+                
+            print(f"Реальный диапазон дат в БД: {min_date} - {max_date}")
+        
+        # Получение данных о среднем времени приготовления заказов
+        avg_preparation_time_query = (
+            db.query(func.avg(func.julianday(Order.completed_at) - func.julianday(Order.created_at)) * 24 * 60)
+            .filter(
+                Order.completed_at.isnot(None),
+                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
+            )
+        )
+        
+        avg_preparation_time = avg_preparation_time_query.scalar() or 0
+        
+        # Получение данных о среднем времени оборота столиков
+        # (время между созданием и завершением заказа для столиков)
+        avg_table_turnover_query = (
+            db.query(func.avg(func.julianday(Order.completed_at) - func.julianday(Order.created_at)) * 24 * 60)
+            .filter(
+                Order.completed_at.isnot(None),
+                Order.table_number.isnot(None),
+                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
+            )
+        )
+        
+        avg_table_turnover = avg_table_turnover_query.scalar() or 0
+        
+        # Получение количества столиков
+        tables_count = (
+            db.query(func.count(func.distinct(Order.table_number)))
+            .filter(Order.table_number.isnot(None))
         ).scalar() or 0
         
-        # Если нет данных и запрошены будущие даты, используем мок-данные
-        if orders_count == 0 and future_dates:
-            print("Нет данных о заказах за указанный период, возвращаем мок-данные")
-            return get_mock_operational_metrics(start_date, end_date)
+        # Получение данных о заказах по столикам
+        table_utilization_query = (
+            db.query(
+                Order.table_number,
+                func.count(Order.id).label('usage_count')
+            )
+            .filter(Order.table_number.isnot(None))
+            .group_by(Order.table_number)
+            .order_by(Order.table_number)
+            .all()
+        )
         
-        # Основная логика получения операционных метрик
-        # В простой реализации возвращаем мок-данные
-        # Это можно заменить на полную реализацию позже
-        return get_mock_operational_metrics(start_date, end_date)
+        # Формирование данных о загрузке столиков
+        table_utilization = {}
+        total_orders = 0
+        
+        for item in table_utilization_query:
+            table_utilization[str(item.table_number)] = item.usage_count
+            total_orders += item.usage_count
+            
+        # Расчет среднего количества заказов на столик
+        avg_orders_per_table = total_orders / tables_count if tables_count > 0 else 0
+        
+        # Определение загрузки столиков в процентах относительно самого загруженного
+        if table_utilization:
+            max_usage = max(table_utilization.values())
+            for table, count in table_utilization.items():
+                table_utilization[table] = round(count / max_usage * 100) if max_usage > 0 else 0
+                
+        # Получение данных о пиковых часах
+        peak_hours_query = (
+            db.query(
+                func.strftime('%H', Order.created_at).label('hour'),
+                func.count(Order.id).label('orders_count')
+            )
+            .group_by('hour')
+            .order_by(func.count(Order.id).desc())
+            .all()
+        )
+        
+        # Формирование данных о пиковых часах
+        peak_hours = {
+            '12-14': 0,
+            '14-16': 0,
+            '16-18': 0,
+            '18-20': 0,
+            '20-22': 0
+        }
+        
+        for item in peak_hours_query:
+            try:
+                hour = int(item.hour)
+                if 12 <= hour < 14:
+                    peak_hours['12-14'] += item.orders_count
+                elif 14 <= hour < 16:
+                    peak_hours['14-16'] += item.orders_count
+                elif 16 <= hour < 18:
+                    peak_hours['16-18'] += item.orders_count
+                elif 18 <= hour < 20:
+                    peak_hours['18-20'] += item.orders_count
+                elif 20 <= hour < 22:
+                    peak_hours['20-22'] += item.orders_count
+            except:
+                pass
+                
+        # Нормализация данных о пиковых часах до 100
+        if peak_hours:
+            max_peak = max(peak_hours.values())
+            for time, count in peak_hours.items():
+                peak_hours[time] = round(count / max_peak * 100) if max_peak > 0 else 0
+                
+        # Получение данных об эффективности персонала
+        staff_efficiency_query = (
+            db.query(
+                User.id.label('userId'),
+                User.full_name.label('userName'),
+                User.role,
+                func.count(Order.id).label('ordersServed'),
+                func.avg(func.julianday(Order.completed_at) - func.julianday(Order.created_at)).label('avgServiceTime'),
+                func.avg(Review.service_rating).label('customerRating'),
+                func.avg(Order.total_amount).label('avgOrderValue')
+            )
+            .join(Order, Order.waiter_id == User.id)
+            .outerjoin(Review, Review.order_id == Order.id)
+            .filter(
+                User.role == 'waiter',
+                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"])
+            )
+            .group_by(User.id)
+            .order_by(func.count(Order.id).desc())
+            .limit(5)
+            .all()
+        )
+        
+        # Формирование данных об эффективности персонала
+        staff_efficiency = {}
+        for i, item in enumerate(staff_efficiency_query, 1):
+            staff_efficiency[str(i)] = {
+                "userId": item.userId,
+                "userName": item.userName or "Официант " + str(i),
+                "role": "Официант",
+                "averageServiceTime": round(item.avgServiceTime * 24 * 60, 1) if item.avgServiceTime else 0,
+                "ordersServed": item.ordersServed or 0,
+                "customerRating": round(item.customerRating, 1) if item.customerRating else 0,
+                "averageOrderValue": round(float(item.avgOrderValue)) if item.avgOrderValue else 0
+            }
+            
+        # Получение данных о статусах заказов
+        order_status_query = (
+            db.query(
+                Order.status,
+                func.count(Order.id).label('count')
+            )
+            .group_by(Order.status)
+            .all()
+        )
+        
+        # Формирование данных о статусах заказов
+        order_completion_rates = {}
+        total_orders_status = sum(item.count for item in order_status_query) or 1
+        
+        for item in order_status_query:
+            status = item.status or "Неизвестно"
+            percentage = item.count / total_orders_status * 100
+            order_completion_rates[status] = round(percentage, 1)
+            
+        # Расчет средней загрузки столиков
+        avg_table_utilization = sum(table_utilization.values()) / len(table_utilization) if table_utilization else 0
+        
+        # Формирование итогового результата
+        result = {
+            "averageOrderPreparationTime": round(avg_preparation_time, 1),
+            "averageTableTurnoverTime": round(avg_table_turnover, 1),
+            "tablesCount": tables_count,
+            "averageTableUtilization": round(avg_table_utilization),
+            "averageOrdersPerTable": round(avg_orders_per_table, 1),
+            "tableUtilization": table_utilization,
+            "peakHours": peak_hours,
+            "staffEfficiency": staff_efficiency,
+            "orderCompletionRates": order_completion_rates,
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
+        
+        print("Успешно сформированы операционные метрики на основе реальных данных")
+        return result
+    
     except Exception as e:
-        # В случае ошибки логируем её и возвращаем мок-данные
-        print(f"Ошибка при получении операционных метрик: {e}")
-        return get_mock_operational_metrics(start_date, end_date)
+        # В случае ошибки логируем её и возвращаем пустую структуру
+        print(f"КРИТИЧЕСКАЯ ОШИБКА при получении операционных метрик: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "averageOrderPreparationTime": 0,
+            "averageTableTurnoverTime": 0,
+            "tablesCount": 0,
+            "averageTableUtilization": 0,
+            "averageOrdersPerTable": 0,
+            "tableUtilization": {},
+            "peakHours": {},
+            "staffEfficiency": {},
+            "orderCompletionRates": {},
+            "error": str(e),
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
 
 
 def get_predictive_metrics(
@@ -1034,10 +1807,323 @@ def get_predictive_metrics(
     use_mock_data: bool = False
 ) -> Dict[str, Any]:
     """
-    Получение предиктивных метрик ресторана
+    Получение предиктивных метрик ресторана на основе реальных данных
     """
-    # Предиктивные метрики всегда возвращают мок-данные, так как это прогнозы
-    return get_mock_predictive_metrics(start_date, end_date)
+    print("===== ЗАПРОС ПРЕДИКТИВНЫХ МЕТРИК =====")
+    
+    # Обработка входных дат
+    if isinstance(start_date, str):
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга start_date: {e}")
+            start_date = None
+            
+    if isinstance(end_date, str):
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except Exception as e:
+            print(f"Ошибка парсинга end_date: {e}")
+            end_date = None
+    
+    # Для отображения запрашиваемого периода
+    if not start_date:
+        start_date = datetime.now()
+    if not end_date:
+        end_date = start_date + timedelta(days=14)  # Прогноз на 14 дней вперед
+        
+    display_start_date = start_date
+    display_end_date = end_date
+    
+    print(f"Период прогноза: {display_start_date} - {display_end_date}")
+    
+    try:
+        # Получение последних реальных данных о продажах для обучения прогноза
+        past_sales_query = (
+            db.query(
+                func.date(Order.created_at).label("date"),
+                func.count(Order.id).label("orders_count"),
+                func.sum(Order.total_amount).label("total_amount")
+            )
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            .group_by(func.date(Order.created_at))
+            .order_by(func.date(Order.created_at).desc())
+            .limit(30)  # Берем данные за последние 30 дней
+            .all()
+        )
+        
+        if not past_sales_query:
+            print("В БД нет данных о продажах для создания прогноза")
+            return {
+                "salesForecast": [],
+                "inventoryForecast": {},
+                "staffingNeeds": {},
+                "peakTimePrediction": {},
+                "suggestedPromotions": [],
+                "period": {
+                    "startDate": display_start_date.strftime("%Y-%m-%d"),
+                    "endDate": display_end_date.strftime("%Y-%m-%d")
+                }
+            }
+            
+        # Построение простой модели прогноза на основе средних значений по дням недели
+        # Собираем данные по дням недели
+        daily_data = {}  # {день_недели: [сумма_продаж1, сумма_продаж2, ...]}
+        
+        for record in past_sales_query:
+            try:
+                date_obj = datetime.strptime(str(record.date), "%Y-%m-%d")
+                day_of_week = date_obj.weekday()
+                
+                if day_of_week not in daily_data:
+                    daily_data[day_of_week] = []
+                    
+                daily_data[day_of_week].append(float(record.total_amount) if record.total_amount else 0)
+            except Exception as e:
+                print(f"Ошибка при обработке записи: {e}")
+                
+        # Расчет средних значений по дням недели
+        daily_averages = {}
+        for day, amounts in daily_data.items():
+            if amounts:
+                daily_averages[day] = sum(amounts) / len(amounts)
+            else:
+                daily_averages[day] = 0
+        
+        # Заполняем пропущенные дни недели средним значением
+        all_days_avg = sum(daily_averages.values()) / len(daily_averages) if daily_averages else 1000
+        for day in range(7):
+            if day not in daily_averages:
+                daily_averages[day] = all_days_avg
+        
+        # Генерация прогноза продаж
+        sales_forecast = []
+        days = (display_end_date - display_start_date).days + 1
+        
+        for i in range(days):
+            forecast_date = display_start_date + timedelta(days=i)
+            day_of_week = forecast_date.weekday()
+            
+            # Базовое прогнозируемое значение
+            predicted_value = daily_averages.get(day_of_week, all_days_avg)
+            
+            # Добавляем случайную вариацию для реалистичности (+/- 10%)
+            variation = 0.9 + (random.random() * 0.2)
+            predicted_value *= variation
+            
+            # Увеличиваем прогноз для выходных дней
+            if day_of_week >= 5:  # Суббота и воскресенье
+                predicted_value *= 1.3
+                
+            sales_forecast.append({
+                "date": forecast_date.strftime("%Y-%m-%d"),
+                "value": round(predicted_value)
+            })
+            
+        # Расчет прогнозируемых потребностей в запасах
+        # Берем данные о 5 самых популярных блюдах
+        top_dishes_query = (
+            db.query(
+                Dish.id,
+                Dish.name,
+                Category.id.label("category_id"),
+                Category.name.label("category_name"),
+                func.sum(OrderItem.quantity).label("total_ordered")
+            )
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .join(Category, Category.id == Dish.category_id)
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            .group_by(Dish.id, Category.id)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5)
+            .all()
+        )
+        
+        # Прогноз потребностей в запасах
+        inventory_forecast = {}
+        for dish in top_dishes_query:
+            # Простой прогноз: среднее количество заказов * прогнозируемый период
+            avg_daily_orders = dish.total_ordered / len(past_sales_query) if past_sales_query else 0
+            predicted_quantity = avg_daily_orders * days * 1.2  # Добавляем 20% запаса
+            inventory_forecast[str(dish.id)] = round(predicted_quantity)
+            
+        # Прогноз потребностей в персонале по дням недели и времени суток
+        # Анализ пиковых часов по дням недели
+        peak_hours_query = (
+            db.query(
+                func.strftime('%w', Order.created_at).label('day'),
+                func.strftime('%H', Order.created_at).label('hour'),
+                func.count(Order.id).label('orders_count')
+            )
+            .group_by('day', 'hour')
+            .all()
+        )
+        
+        # Агрегация данных по дням недели и временным интервалам
+        time_slots = {
+            '12-14': (12, 14),
+            '14-16': (14, 16),
+            '16-18': (16, 18),
+            '18-20': (18, 20),
+            '20-22': (20, 22)
+        }
+        
+        # Структура для хранения данных о заказах
+        day_hour_data = {}
+        for day in range(7):
+            day_hour_data[str(day)] = {slot: 0 for slot in time_slots}
+            
+        # Заполнение данных
+        for record in peak_hours_query:
+            try:
+                day = int(record.day)
+                hour = int(record.hour)
+                
+                for slot, (start, end) in time_slots.items():
+                    if start <= hour < end:
+                        day_hour_data[str(day)][slot] += record.orders_count
+                        break
+            except:
+                pass
+                
+        # Преобразование дней недели в текстовые названия
+        day_names = {
+            '0': 'Воскресенье',
+            '1': 'Понедельник',
+            '2': 'Вторник',
+            '3': 'Среда',
+            '4': 'Четверг',
+            '5': 'Пятница',
+            '6': 'Суббота'
+        }
+        
+        # Формирование прогноза персонала
+        staffing_needs = {}
+        peak_time_prediction = {}
+        
+        for day_num, hours in day_hour_data.items():
+            day_name = day_names.get(day_num, f'День {day_num}')
+            staffing_needs[day_name] = {}
+            peak_time_prediction[day_name] = []
+            
+            # Нахождение пикового времени
+            max_orders = max(hours.values()) if hours.values() else 0
+            
+            for slot, count in hours.items():
+                # Базовая потребность в персонале: 1 человек на 5 заказов
+                staff_needed = max(2, round(count / 5))
+                staffing_needs[day_name][slot] = staff_needed
+                
+                # Определение пикового времени (более 80% от максимума)
+                if max_orders > 0 and count >= 0.8 * max_orders:
+                    peak_time_prediction[day_name].append(slot)
+                    
+        # Прогноз рекомендуемых акций для увеличения продаж
+        # Находим наименее продаваемые блюда
+        least_selling_query = (
+            db.query(
+                Dish.id,
+                Dish.name,
+                Dish.price,
+                func.sum(OrderItem.quantity).label("total_ordered")
+            )
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]))
+            .group_by(Dish.id)
+            .order_by(func.sum(OrderItem.quantity).asc())
+            .limit(5)
+            .all()
+        )
+        
+        # Находим самые прибыльные блюда для кросс-продаж
+        profitable_query = (
+            db.query(
+                Dish.id,
+                Dish.name,
+                Dish.price,
+                Dish.cost_price,
+                func.sum(OrderItem.quantity).label("total_ordered")
+            )
+            .join(OrderItem, OrderItem.dish_id == Dish.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(
+                Order.status.in_(["Завершён", "Оплачен", "Готов", "Доставлен"]),
+                Dish.cost_price.isnot(None),
+                Dish.cost_price > 0
+            )
+            .group_by(Dish.id)
+            .order_by((Dish.price - Dish.cost_price).desc())
+            .limit(2)
+            .all()
+        )
+        
+        # Формирование предложений по акциям
+        suggested_promotions = []
+        
+        # Акции для наименее продаваемых блюд
+        for dish in least_selling_query:
+            # Размер скидки и потенциальный доход
+            discount = 15 + random.randint(0, 10)  # Скидка 15-25%
+            potential_revenue = round(dish.price * (1 - discount/100) * 20)  # Предполагаем продажу 20 единиц
+            
+            suggested_promotions.append({
+                "dishId": dish.id,
+                "dishName": dish.name,
+                "reason": "Низкие продажи",
+                "suggestedDiscount": discount,
+                "potentialRevenue": potential_revenue
+            })
+            
+        # Акции для прибыльных блюд
+        for dish in profitable_query:
+            # Меньшая скидка для прибыльных блюд
+            discount = 5 + random.randint(0, 5)  # Скидка 5-10%
+            potential_revenue = round(dish.price * (1 - discount/100) * 30)  # Предполагаем продажу 30 единиц
+            
+            suggested_promotions.append({
+                "dishId": dish.id,
+                "dishName": dish.name,
+                "reason": "Высокая маржинальность",
+                "suggestedDiscount": discount,
+                "potentialRevenue": potential_revenue
+            })
+            
+        # Формирование итогового результата
+        result = {
+            "salesForecast": sales_forecast,
+            "inventoryForecast": inventory_forecast,
+            "staffingNeeds": staffing_needs,
+            "peakTimePrediction": peak_time_prediction,
+            "suggestedPromotions": suggested_promotions,
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d"),
+                "endDate": display_end_date.strftime("%Y-%m-%d")
+            }
+        }
+        
+        print("Успешно сформированы предиктивные метрики на основе реальных данных")
+        return result
+        
+    except Exception as e:
+        # В случае ошибки логируем её и возвращаем пустую структуру
+        print(f"КРИТИЧЕСКАЯ ОШИБКА при получении предиктивных метрик: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "salesForecast": [],
+            "inventoryForecast": {},
+            "staffingNeeds": {},
+            "peakTimePrediction": {},
+            "suggestedPromotions": [],
+            "error": str(e),
+            "period": {
+                "startDate": display_start_date.strftime("%Y-%m-%d") if display_start_date else "",
+                "endDate": display_end_date.strftime("%Y-%m-%d") if display_end_date else ""
+            }
+        }
 
 
 # Мок-данные для финансовой аналитики
