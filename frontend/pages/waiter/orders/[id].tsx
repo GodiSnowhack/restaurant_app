@@ -204,7 +204,7 @@ const WaiterOrderDetailPage: NextPage = () => {
       // РЕШЕНИЕ 1: Используем локальный API Next.js для обхода CORS
       try {
         console.log("DEBUG: Пробуем запрос через Next.js API прокси");
-        const response = await fetch(`/api/orders/${order.id}/status`, {
+        const response = await fetch(`/api/v1/orders/${order.id}/status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -233,7 +233,7 @@ const WaiterOrderDetailPage: NextPage = () => {
       // РЕШЕНИЕ 2: Используем второй тип прокси для обхода CORS
       try {
         console.log("DEBUG: Пробуем альтернативный прокси через status_update");
-        const response = await fetch(`/api/orders/status_update`, {
+        const response = await fetch(`/api/v1/orders/status_update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

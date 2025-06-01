@@ -589,7 +589,7 @@ export const ordersApi = {
 
       // Первая попытка через обычный прокси
       try {
-        const response = await fetch(`/api/orders/${id}/payment-status`, {
+        const response = await fetch(`/api/v1/orders/${id}/payment-status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -614,7 +614,7 @@ export const ordersApi = {
       // Пробуем альтернативный прокси
       console.log(`DEBUG: Пробуем альтернативный прокси через status_update`);
       try {
-        const altResponse = await fetch(`/api/orders/payment_update`, {
+        const altResponse = await fetch(`/api/v1/orders/payment_update`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
