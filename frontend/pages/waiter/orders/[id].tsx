@@ -240,6 +240,13 @@ const WaiterOrderDetailPage: NextPage = () => {
       // Показываем сообщение об успехе
       alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
       
+      // Принудительное обновление данных заказа с сервера после успешного обновления статуса
+      setTimeout(() => {
+        fetchOrder().catch(error => {
+          console.error('Ошибка при обновлении данных заказа:', error);
+        });
+      }, 1000);
+      
     } catch (error) {
       console.error('Ошибка при обновлении статуса заказа:', error);
       
@@ -487,6 +494,13 @@ const WaiterOrderDetailPage: NextPage = () => {
       
       // Показываем сообщение об успехе
       alert(`Статус оплаты заказа #${order.id} обновлен на "${getPaymentStatusLabel(newStatus)}"`);
+      
+      // Принудительное обновление данных заказа с сервера после успешного обновления статуса оплаты
+      setTimeout(() => {
+        fetchOrder().catch(error => {
+          console.error('Ошибка при обновлении данных заказа:', error);
+        });
+      }, 1000);
       
     } catch (error) {
       console.error('Ошибка при обновлении статуса оплаты:', error);
