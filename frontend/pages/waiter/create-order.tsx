@@ -280,21 +280,34 @@ const CreateOrderPage: NextPage = () => {
         special_instructions: item.special_instructions || ''
       }));
       
-      // Создаем данные заказа
+      // Создаем данные заказа по схеме OrderCreate
       const orderData = {
+        // Связанные пользователи
         user_id: user?.id,
         waiter_id: user?.id,
+        
+        // Данные о столе
         table_number: tableNumberToSend,
+        
+        // Блюда заказа
         items: formattedItems,
-        status: "PENDING",
-        payment_status: "PENDING",
-        payment_method: "cash",
-        total_amount: Number(totalAmount.toFixed(2)),
+        
+        // Статус - всегда pending для новых заказов
+        status: "pending",
+        
+        // Информация о клиенте
         customer_name: customerName.trim(),
         customer_phone: customerPhone ? customerPhone.trim() : undefined,
         customer_age_group: customerAgeGroup,
+        
+        // Дополнительные данные
+        comment: "",
         is_urgent: false,
-        is_group_order: false
+        is_group_order: false,
+        
+        // Технические данные для отображения
+        total_amount: Number(totalAmount.toFixed(2)),
+        payment_method: "cash"
       };
       
       // Получаем токен авторизации
@@ -303,8 +316,7 @@ const CreateOrderPage: NextPage = () => {
       // Формируем заголовки с токеном авторизации
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
+        'Accept': 'application/json'
       };
       
       if (token) {

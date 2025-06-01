@@ -70,19 +70,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`API Orders: Используем API URL: ${baseApiUrl}`);
 
-    // Настраиваем payload напрямую для FastAPI
-    // НЕ преобразуем поля, а отправляем как есть, только переводим статусы в верхний регистр
+    // Создаем структуру запроса в соответствии со схемой OrderCreate
     const requestPayload = {
-      ...orderData,
-      // Преобразуем статусы в верхний регистр
-      status: orderData.status ? orderData.status.toUpperCase() : 'PENDING',
-      payment_status: orderData.payment_status ? orderData.payment_status.toUpperCase() : 'PENDING',
-      // Остальные данные отправляем как есть
+      // Пользователь, от имени которого создается заказ
+      user_id: orderData.user_id,
+      // Статус заказа - всегда в виде строки, нижний регистр
+      status: "pending",
+      // Данные для определения стола
+      table_number: orderData.table_number,
+      reservation_code: orderData.reservation_code,
+      // Информация о клиенте
+      customer_name: orderData.customer_name,
+      customer_phone: orderData.customer_phone,
+      customer_age_group: orderData.customer_age_group,
+      // Блюда заказа как массив объектов OrderDishItem
       items: orderData.items.map((item: any) => ({
-        dish_id: item.dish_id, // Не преобразуем в число, FastAPI сделает это сам
-        quantity: item.quantity,
-        special_instructions: item.special_instructions || ''
-      }))
+        dish_id: Number(item.dish_id),
+        quantity: Number(item.quantity),
+        special_instructions: item.special_instructions || ""
+      })),
+      // Дополнительные данные
+      comment: orderData.comment,
+      is_urgent: orderData.is_urgent || false,
+      is_group_order: orderData.is_group_order || false,
+      waiter_id: orderData.waiter_id
     };
 
     console.log(`API Orders: Отправляем данные:`, requestPayload);
@@ -104,16 +115,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     try {
-      // Пробуем выполнить запрос к API
-      console.log(`API Orders: Отправляем запрос на ${baseApiUrl}/orders`);
+      // Используем полный URL с правильным слэшем в конце
+      const apiUrl = `${baseApiUrl}/orders/`;
+      console.log(`API Orders: Отправляем запрос на ${apiUrl}`);
       
       const response = await axios.post(
-        `${baseApiUrl}/orders`, 
+        apiUrl, 
         requestPayload, 
         {
           headers,
           httpsAgent: baseApiUrl.startsWith('https') ? httpsAgent : undefined,
-          timeout: 30000
+          timeout: 30000,
+          maxRedirects: 5 // Разрешаем редиректы
         }
       );
       
