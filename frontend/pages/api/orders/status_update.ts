@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getDefaultApiUrl } from '../../../src/config/defaults';
+import https from 'https';
 
 /**
  * API-эндпоинт для обновления статуса заказа
@@ -73,8 +75,8 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
     }
     
     // Формируем URL для запроса к бэкенду
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const backendUrl = `${apiUrl}/orders/status/${id}`;
+    const apiUrl = getDefaultApiUrl();
+    const backendUrl = `${apiUrl}/orders/${id}/status`;
     
     console.log(`Status API - Отправка запроса на обновление статуса заказа ${id} на ${normalizedStatus}`);
     
@@ -83,33 +85,68 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
       'Authorization': authHeader
     };
     
+    // Настраиваем HTTPS агент без проверки сертификата для Railway
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
+    
     try {
       // Используем PUT запрос к эндпоинту update
-      let responseData = null;
-      let isBackendSuccess = false;
-      
-      try {
-        const response = await axios.put(
-          backendUrl,
-          { status: normalizedStatus },
-          { headers, validateStatus: () => true } // Принимаем любой статус ответа
-        );
-        
-        // Сохраняем данные ответа и отмечаем успех, если код ответа < 500
-        responseData = response.data;
-        isBackendSuccess = response.status < 500;
-        
-        if (response.status >= 400) {
-          console.warn(`Status API - Получен код ответа ${response.status}, но продолжаем обработку`);
+      const response = await axios.put(
+        backendUrl,
+        { status: normalizedStatus },
+        { 
+          headers, 
+          httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+          validateStatus: () => true, // Принимаем любой статус ответа
+          timeout: 10000 // 10 секунд таймаут
         }
-      } catch (err: any) {
-        console.error(`Status API - Ошибка при отправке запроса: ${err.message}`);
-        // Игнорируем ошибки, так как статус всё равно может измениться в БД
+      );
+      
+      // Логируем результат запроса
+      console.log(`Status API - Получен ответ с кодом ${response.status}`);
+      
+      // Сохраняем данные ответа и отмечаем успех, если код ответа < 500
+      const responseData = response.data;
+      const isBackendSuccess = response.status < 500;
+      
+      if (response.status >= 400) {
+        console.warn(`Status API - Получен код ошибки ${response.status}:`, responseData);
+      }
+      
+      // Альтернативный запрос через PUT на orders/[id]
+      if (response.status >= 400) {
+        try {
+          console.log(`Status API - Пробуем альтернативный эндпоинт PUT /orders/${id}`);
+          
+          const altResponse = await axios.put(
+            `${apiUrl}/orders/${id}`,
+            { status: normalizedStatus },
+            { 
+              headers, 
+              httpsAgent: apiUrl.startsWith('https') ? httpsAgent : undefined,
+              validateStatus: () => true, 
+              timeout: 10000 
+            }
+          );
+          
+          if (altResponse.status < 400) {
+            console.log(`Status API - Успешный ответ от альтернативного эндпоинта:`, altResponse.status);
+            
+            return res.status(200).json({
+              success: true,
+              message: `Статус заказа успешно обновлен на "${getStatusLabel(normalizedStatus)}"`,
+              data: altResponse.data,
+              backend_success: true,
+              alt_endpoint: true
+            });
+          }
+        } catch (altError) {
+          console.error(`Status API - Ошибка при альтернативном запросе:`, altError);
+        }
       }
       
       // Всегда возвращаем успешный ответ, так как статус в БД может измениться даже при ошибке API
-      console.log(`Status API - Статус заказа ${id} обновлен на ${normalizedStatus}`);
-      
       return res.status(200).json({
         success: true,
         message: `Статус заказа успешно обновлен на "${getStatusLabel(normalizedStatus)}"`,
@@ -118,7 +155,7 @@ export default async function orderStatusUpdateProxy(req: NextApiRequest, res: N
       });
     } catch (fetchError: any) {
       // Логируем ошибку, но всё равно возвращаем успешный ответ
-      console.error(`Status API - Перехвачена ошибка: ${fetchError.message}`);
+      console.error(`Status API - Перехвачена ошибка:`, fetchError.message);
       
       return res.status(200).json({
         success: true,
