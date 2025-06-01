@@ -173,148 +173,81 @@ const WaiterOrderDetailPage: NextPage = () => {
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
-    console.log("DEBUG: handleUpdateStatus вызван с статусом:", newStatus);
+    console.log(`Обновление статуса заказа на: ${newStatus}`);
     
     if (!order || updatingStatus) {
-      console.log("DEBUG: Выход из функции - заказ не найден или уже идет обновление");
+      console.log("Невозможно обновить статус: заказ не найден или уже идет обновление");
       return;
     }
     
-    // Показываем индикатор загрузки
-    setUpdatingStatus(true);
-    setError('');
-
-    // Преобразуем статус в нижний регистр для бэкенда
-    const normalizedStatus = newStatus.toLowerCase();
-    
-    // Сохраняем копию оригинальных данных заказа перед обновлением
+    // Сохраняем исходные данные заказа
     const originalOrder = { ...order };
     
-    // НЕМЕДЛЕННО обновляем интерфейс (оптимистичное обновление)
-    setOrder(prevOrder => {
-      if (!prevOrder) return null;
-      return { ...prevOrder, status: normalizedStatus };
-    });
+    // Переводим статус в нижний регистр
+    const normalizedStatus = newStatus.toLowerCase();
+    
+    // Устанавливаем индикатор загрузки
+    setUpdatingStatus(true);
+    setError('');
     
     try {
+      // Сначала обновляем UI оптимистично
+      setOrder({
+        ...order,
+        status: normalizedStatus,
+        updated_at: new Date().toISOString()
+      });
+      
       // Получаем токен
       const token = localStorage.getItem('token');
-      
       if (!token) {
         throw new Error('Необходима авторизация');
       }
       
-      // РЕШЕНИЕ 1: Используем локальный API Next.js для обхода CORS
-      let updateSuccess = false;
+      // Делаем запрос к альтернативному прокси (более надежному)
+      const response = await fetch('/api/v1/orders/status_update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          order_id: order.id,
+          status: normalizedStatus
+        })
+      });
       
-      try {
-        console.log("DEBUG: Пробуем запрос через Next.js API прокси");
-        const response = await fetch(`/api/v1/orders/${order.id}/status`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ status: normalizedStatus })
-        });
-        
-        // Если запрос успешен
-        if (response.ok) {
-          const data = await response.json();
-          console.log('DEBUG: Обновление через API прокси успешно', data);
-          updateSuccess = true;
-          
-          // Обновляем данные заказа, сохраняя оригинальные поля при необходимости
-          if (data && data.data) {
-            setOrder(prevOrder => {
-              if (!prevOrder) return null;
-              return { 
-                ...prevOrder, 
-                ...data.data,
-                status: normalizedStatus,
-                // Сохраняем поля, которые могли не вернуться с сервера
-                items: prevOrder.items || [],
-                customer_name: data.data.customer_name || prevOrder.customer_name,
-                customer_phone: data.data.customer_phone || prevOrder.customer_phone,
-                total_amount: data.data.total_amount || prevOrder.total_amount
-              };
-            });
-          }
-          
-          setUpdatingStatus(false);
-          return;
-        } else {
-          const errorText = await response.text();
-          console.error('DEBUG: Ошибка API прокси:', response.status, errorText);
-        }
-      } catch (error) {
-        console.error('DEBUG: Ошибка при использовании API прокси:', error);
+      if (!response.ok) {
+        // Если ответ не успешный, восстанавливаем исходные данные
+        throw new Error(`Ошибка сервера: ${response.status}`);
       }
       
-      // РЕШЕНИЕ 2: Используем альтернативный прокси для обхода CORS
-      if (!updateSuccess) {
-        try {
-          console.log("DEBUG: Пробуем альтернативный прокси через status_update");
-          const response = await fetch(`/api/v1/orders/status_update`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ 
-              order_id: order.id,
-              status: normalizedStatus 
-            })
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('DEBUG: Обновление через альтернативный прокси успешно', data);
-            updateSuccess = true;
-            
-            // Восстанавливаем оригинальный заказ, только обновляя статус
-            setOrder(prevOrder => {
-              if (!prevOrder) return null;
-              return { 
-                ...originalOrder, 
-                status: normalizedStatus,
-                updated_at: new Date().toISOString()
-              };
-            });
-            
-            setUpdatingStatus(false);
-            alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
-            return;
-          }
-        } catch (error) {
-          console.error('DEBUG: Ошибка при использовании альтернативного прокси:', error);
-        }
+      // Получаем данные ответа
+      const result = await response.json();
+      console.log('Результат обновления статуса:', result);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Не удалось обновить статус заказа');
       }
       
-      // РЕШЕНИЕ 3: Всегда считаем, что обновление успешно (локальное обновление)
-      if (!updateSuccess) {
-        console.log('DEBUG: Используем локальное обновление без серверного подтверждения');
-        // Обновляем только статус, сохраняя все остальные данные
-        setOrder(prevOrder => {
-          if (!prevOrder) return null;
-          return { 
-            ...originalOrder,
-            status: normalizedStatus,
-            updated_at: new Date().toISOString()
-          };
-        });
-        
-        alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
-      }
+      // Обновляем заказ только с актуальным статусом, сохраняя остальные данные
+      setOrder({
+        ...originalOrder,
+        status: normalizedStatus,
+        updated_at: new Date().toISOString()
+      });
       
-      setUpdatingStatus(false);
+      // Показываем сообщение об успехе
+      alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
       
     } catch (error) {
-      console.error('Критическая ошибка при обновлении статуса заказа:', error);
+      console.error('Ошибка при обновлении статуса заказа:', error);
       
-      // В случае ошибки восстанавливаем исходное состояние
+      // Восстанавливаем исходные данные
       setOrder(originalOrder);
-      setError('Не удалось обновить статус заказа. Пожалуйста, попробуйте еще раз.');
+      setError('Не удалось обновить статус заказа. Попробуйте еще раз.');
+    } finally {
+      // Снимаем индикатор загрузки
       setUpdatingStatus(false);
     }
   };
@@ -467,86 +400,102 @@ const WaiterOrderDetailPage: NextPage = () => {
   };
 
   const handleUpdatePaymentStatus = async (newStatus: PaymentStatus) => {
-    // Если заказ не загружен или идет обновление, ничего не делаем
-    if (!order || updatingStatus) return;
+    console.log(`Обновление статуса оплаты на: ${newStatus}`);
     
-    // Если статус не изменился, ничего не делаем
-    const currentStatus = order.payment_status ? order.payment_status.toLowerCase() : '';
-    if (currentStatus === newStatus.toLowerCase()) {
+    if (!order || updatingStatus) {
+      console.log("Невозможно обновить статус оплаты: заказ не найден или уже идет обновление");
       return;
     }
     
-    // Сохраняем копию оригинальных данных заказа перед обновлением
+    // Проверяем, не тот же ли это статус
+    const currentStatus = order.payment_status?.toLowerCase() || '';
+    if (currentStatus === newStatus.toLowerCase()) {
+      console.log(`Статус оплаты уже установлен как ${newStatus}`);
+      return;
+    }
+    
+    // Сохраняем исходные данные заказа
     const originalOrder = { ...order };
     
+    // Устанавливаем индикатор загрузки
     setUpdatingStatus(true);
     setError('');
     
-    // Оптимистичное обновление UI
-    setOrder(prevOrder => {
-      if (!prevOrder) return null;
-      return { ...prevOrder, payment_status: newStatus };
-    });
-
     try {
-      // Исходный статус для отображения пользователю
-      const displayStatus = getPaymentStatusLabel(newStatus);
+      // Сначала обновляем UI оптимистично
+      setOrder({
+        ...order,
+        payment_status: newStatus,
+        updated_at: new Date().toISOString()
+      });
       
-      // Обновляем статус через API
-      const result = await ordersApi.updateOrderPaymentStatus(order.id, newStatus);
-      
-      if (result.success) {
-        // Обновляем данные заказа, сохраняя оригинальные поля
-        if (result.order) {
-          setOrder(prevOrder => {
-            if (!prevOrder) return null;
-            
-            // Проверяем, не вернулись ли демо-данные вместо реальных
-            const isDemoData = 
-              result.order.customer_name !== originalOrder.customer_name || 
-              result.order.total_amount !== originalOrder.total_amount;
-              
-            if (isDemoData) {
-              // Если пришли демо-данные, берем только статус оплаты из ответа
-              return { 
-                ...originalOrder, 
-                payment_status: newStatus,
-                updated_at: new Date().toISOString()
-              };
-            } else {
-              // Если пришли реальные данные, обновляем их
-              return result.order;
-            }
-          });
-        } else {
-          // Если заказ не вернулся, обновляем только статус
-          setOrder(prevOrder => {
-            if (!prevOrder) return null;
-            return { 
-              ...originalOrder, 
-              payment_status: newStatus,
-              updated_at: new Date().toISOString()
-            };
-          });
-        }
-        
-        alert(`Статус оплаты заказа #${order.id} обновлен на "${displayStatus}"`);
-      } else {
-        throw new Error('Не удалось обновить статус оплаты');
+      // Получаем токен
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Необходима авторизация');
       }
-    } catch (error: any) {
-      // В случае критической ошибки, показываем сообщение
+      
+      // Делаем запрос к альтернативному прокси (более надежному)
+      const response = await fetch('/api/v1/orders/payment_update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          payment_status: newStatus
+        })
+      });
+      
+      if (!response.ok) {
+        // Если ответ не успешный, восстанавливаем исходные данные
+        throw new Error(`Ошибка сервера: ${response.status}`);
+      }
+      
+      // Получаем данные ответа
+      const result = await response.json();
+      console.log('Результат обновления статуса оплаты:', result);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Не удалось обновить статус оплаты');
+      }
+      
+      // Получаем данные заказа из ответа
+      const returnedOrder = result.order;
+      
+      // Проверяем, не вернулись ли демо-данные
+      const isDemoData = 
+        returnedOrder?.customer_name !== originalOrder.customer_name || 
+        returnedOrder?.total_amount !== originalOrder.total_amount;
+      
+      // Если вернулись демо-данные или не вернулись данные вообще,
+      // обновляем только статус оплаты
+      if (isDemoData || !returnedOrder) {
+        setOrder({
+          ...originalOrder,
+          payment_status: newStatus,
+          updated_at: new Date().toISOString()
+        });
+      } else {
+        // Иначе используем данные из ответа
+        setOrder({
+          ...returnedOrder,
+          payment_status: newStatus
+        });
+      }
+      
+      // Показываем сообщение об успехе
+      alert(`Статус оплаты заказа #${order.id} обновлен на "${getPaymentStatusLabel(newStatus)}"`);
+      
+    } catch (error) {
       console.error('Ошибка при обновлении статуса оплаты:', error);
       
-      // Восстанавливаем исходное состояние
+      // Восстанавливаем исходные данные
       setOrder(originalOrder);
-      
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Произошла неизвестная ошибка при обновлении статуса оплаты';
-      
-      setError(errorMessage);
+      setError('Не удалось обновить статус оплаты. Попробуйте еще раз.');
     } finally {
+      // Снимаем индикатор загрузки
       setUpdatingStatus(false);
     }
   };
