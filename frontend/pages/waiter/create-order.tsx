@@ -284,8 +284,8 @@ const CreateOrderPage: NextPage = () => {
       const orderData = {
         table_number: tableNumberToSend,
         items: formattedItems,
-        status: "pending",
-        payment_status: "pending",
+        status: "PENDING",
+        payment_status: "PENDING",
         payment_method: "cash",
         total_amount: Number(totalAmount.toFixed(2)),
         customer_name: customerName.trim(),
@@ -300,6 +300,8 @@ const CreateOrderPage: NextPage = () => {
       // Формируем заголовки с токеном авторизации
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       };
       
       if (token) {
@@ -308,17 +310,28 @@ const CreateOrderPage: NextPage = () => {
       
       console.log('Отправка заказа:', orderData);
       
-      // Отправляем заказ на сервер с использованием fetch вместо axios
-      const response = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(orderData),
-        // Используем более длительный таймаут для стабильности
-        // и указываем обработку ошибок при неполадках сети
-        signal: AbortSignal.timeout(30000) // 30 секунд на выполнение запроса
-      });
+      // Отправляем заказ на сервер с использованием fetch
+      let response;
+      try {
+        response = await fetch('/api/orders/create', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(orderData),
+          // Используем более длительный таймаут для стабильности
+          signal: AbortSignal.timeout(30000) // 30 секунд на выполнение запроса
+        });
+      } catch (fetchError) {
+        console.error('Ошибка сети при отправке заказа:', fetchError);
+        throw new Error('Ошибка сети при отправке заказа. Проверьте подключение к интернету.');
+      }
       
-      const responseData = await response.json();
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (jsonError) {
+        console.error('Ошибка при разборе ответа сервера:', jsonError);
+        throw new Error('Получен некорректный ответ от сервера.');
+      }
       
       // Проверяем успешность запроса по полю success в ответе
       if (!responseData.success) {

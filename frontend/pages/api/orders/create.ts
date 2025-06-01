@@ -68,39 +68,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Получаем базовый URL API
     const baseApiUrl = getDefaultApiUrl();
     
-    // Настройка HTTPS агента с отключенной проверкой сертификата
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false
-    });
-
-    // Подготовка заголовков с правильным форматом для Railway
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log(`API Orders: Используем токен для авторизации`);
-    }
+    console.log(`API Orders: Используем API URL: ${baseApiUrl}`);
 
     // Форматируем данные заказа для соответствия API бэкенда
+    // ВАЖНО: Преобразуем статусы в ВЕРХНИЙ регистр, так как бэкенд ожидает их в таком формате
     const formattedOrderData = {
-      // Используем только обязательные поля из БД
       table_number: orderData.table_number ? Number(orderData.table_number) : undefined,
       waiter_id: orderData.waiter_id ? Number(orderData.waiter_id) : undefined,
       customer_name: orderData.customer_name,
       customer_phone: orderData.customer_phone,
-      status: orderData.status?.toLowerCase() || 'pending',
-      payment_status: orderData.payment_status?.toLowerCase() || 'pending',
+      status: orderData.status ? orderData.status.toUpperCase() : 'PENDING',
+      payment_status: orderData.payment_status ? orderData.payment_status.toUpperCase() : 'PENDING',
       payment_method: orderData.payment_method || 'cash',
       total_amount: Number(orderData.total_amount),
       customer_age_group: orderData.customer_age_group,
-      // Добавляем возможные дополнительные поля
       comment: orderData.comment,
       is_urgent: orderData.is_urgent || false,
       is_group_order: orderData.is_group_order || false,
-      // Форматируем элементы заказа
       items: orderData.items.map((item: any) => ({
         dish_id: Number(item.dish_id),
         quantity: Number(item.quantity),
@@ -110,48 +94,95 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`API Orders: Подготовленные данные для отправки:`, formattedOrderData);
 
-    // Отправляем запрос к бэкенду
+    // Настраиваем заголовки для запроса
+    const requestHeaders: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    };
+    
+    // Добавляем токен авторизации, если он есть
+    if (token) {
+      requestHeaders['Authorization'] = `Bearer ${token}`;
+      console.log(`API Orders: Используем токен для авторизации`);
+    }
+
     try {
-      // Сначала пробуем прямой запрос к API создания заказа
+      // Попытка 1: Прямой запрос через fetch (наиболее надежный способ из старой версии)
+      console.log(`API Orders: Пробуем создать заказ через прямой fetch запрос`);
+      
+      let fetchResponse = null;
+      let fetchError = null;
+      
       try {
-        console.log(`API Orders: Пробуем создать заказ через основной эндпоинт`);
+        fetchResponse = await fetch(`${baseApiUrl}/orders`, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify(formattedOrderData),
+          // @ts-ignore - Убираем проверку SSL для Railway
+          agent: baseApiUrl.startsWith('https') ? new https.Agent({ rejectUnauthorized: false }) : undefined
+        });
         
-        const directResponse = await axios({
+        console.log(`API Orders: Получен ответ от fetch с кодом ${fetchResponse.status}`);
+        
+        if (fetchResponse.status >= 200 && fetchResponse.status < 300) {
+          const data = await fetchResponse.json();
+          return res.status(200).json({
+            success: true,
+            message: 'Заказ успешно создан через fetch',
+            data: data
+          });
+        }
+      } catch (error: any) {
+        fetchError = error;
+        console.error(`API Orders: Ошибка fetch запроса:`, error.message);
+      }
+      
+      // Попытка 2: Используем axios (как в текущей версии)
+      console.log(`API Orders: Пробуем создать заказ через axios`);
+      
+      try {
+        // Настройка HTTPS агента с отключенной проверкой сертификата
+        const httpsAgent = new https.Agent({
+          rejectUnauthorized: false
+        });
+        
+        const axiosResponse = await axios({
           method: 'post',
           url: `${baseApiUrl}/orders`,
           data: formattedOrderData,
-          headers,
+          headers: requestHeaders,
           httpsAgent: baseApiUrl.startsWith('https') ? httpsAgent : undefined,
           timeout: 15000,
           maxRedirects: 5
         });
         
-        if (directResponse.status >= 200 && directResponse.status < 300) {
+        if (axiosResponse.status >= 200 && axiosResponse.status < 300) {
           return res.status(200).json({
             success: true,
-            message: 'Заказ успешно создан',
-            data: directResponse.data
+            message: 'Заказ успешно создан через axios',
+            data: axiosResponse.data
           });
         }
-        
-        console.log(`API Orders: Ответ от основного эндпоинта:`, directResponse.data);
-      } catch (directError: any) {
-        console.error(`API Orders: Ошибка при создании заказа через основной эндпоинт:`, 
-          directError.response?.status, directError.response?.data || directError.message);
+      } catch (axiosError: any) {
+        console.error(`API Orders: Ошибка axios запроса:`, 
+          axiosError.response?.status, axiosError.response?.data || axiosError.message);
       }
       
-      // Вторая попытка - Запрос к основному API как администратор
+      // Попытка 3: Запрос как администратор
+      console.log(`API Orders: Пробуем создать заказ от имени администратора`);
+      
       try {
-        // Попробуем отправить через администраторский доступ
-        console.log(`API Orders: Пробуем создать заказ от имени администратора`);
-        
-        // Попытка получить админский токен из локального хранилища
+        // Аутентификация под администратором
         const adminCredentials = {
           email: 'admin1@example.com',
           password: 'admin1'
         };
         
-        // Аутентификация под администратором
+        const httpsAgent = new https.Agent({
+          rejectUnauthorized: false
+        });
+        
         const authResponse = await axios.post(
           `${baseApiUrl}/auth/login`,
           adminCredentials,
@@ -165,7 +196,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (authResponse.status === 200 && authResponse.data.access_token) {
           const adminToken = authResponse.data.access_token;
           
-          // Отправляем запрос с токеном администратора
           const adminResponse = await axios.post(
             `${baseApiUrl}/orders`,
             formattedOrderData,
@@ -176,8 +206,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 'Authorization': `Bearer ${adminToken}`
               },
               httpsAgent,
-              timeout: 15000,
-              maxRedirects: 5
+              timeout: 15000
             }
           );
           
@@ -194,72 +223,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           adminError.response?.status, adminError.response?.data || adminError.message);
       }
       
-      // Третья попытка - запрос напрямую через таблицу
+      // Попытка 4: Обход через GET-запрос с параметрами (как в старой версии)
+      console.log(`API Orders: Пробуем создать заказ через GET с параметрами`);
+      
       try {
-        console.log(`API Orders: Пробуем создать заказ через API таблицы orders`);
+        // Формируем URL с параметрами
+        const queryParams = new URLSearchParams({
+          order: JSON.stringify(formattedOrderData)
+        });
         
-        // Создаем минимальный объект заказа
-        const simpleOrderData = {
-          table_number: formattedOrderData.table_number,
-          customer_name: formattedOrderData.customer_name,
-          customer_phone: formattedOrderData.customer_phone,
-          waiter_id: formattedOrderData.waiter_id,
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: 'cash',
-          total_amount: formattedOrderData.total_amount,
-          customer_age_group: formattedOrderData.customer_age_group
-        };
-        
-        const tableResponse = await axios.post(
-          `${baseApiUrl}/db/orders`,
-          simpleOrderData,
-          {
-            headers,
-            httpsAgent,
-            timeout: 15000,
-            maxRedirects: 5
+        const getResponse = await axios.get(
+          `${baseApiUrl}/orders/create?${queryParams.toString()}`,
+          { 
+            headers: requestHeaders,
+            httpsAgent: baseApiUrl.startsWith('https') ? new https.Agent({ rejectUnauthorized: false }) : undefined,
+            timeout: 15000
           }
         );
         
-        if (tableResponse.status >= 200 && tableResponse.status < 300) {
-          const newOrderId = tableResponse.data.id;
-          
-          // Добавляем блюда к заказу
-          if (newOrderId) {
-            // Создаем записи order_dish для каждого блюда
-            for (const item of formattedOrderData.items) {
-              try {
-                await axios.post(
-                  `${baseApiUrl}/db/order_dish`,
-                  {
-                    order_id: newOrderId,
-                    dish_id: item.dish_id,
-                    quantity: item.quantity,
-                    special_instructions: item.special_instructions,
-                    price: 0 // Цену определит бэкенд из блюда
-                  },
-                  {
-                    headers,
-                    httpsAgent,
-                    timeout: 5000
-                  }
-                );
-              } catch (dishError) {
-                console.error(`API Orders: Ошибка при добавлении блюда к заказу:`, dishError);
-              }
-            }
-            
-            return res.status(200).json({
-              success: true,
-              message: 'Заказ успешно создан через API таблицы',
-              data: { id: newOrderId, ...simpleOrderData }
-            });
-          }
+        if (getResponse.status >= 200 && getResponse.status < 300) {
+          return res.status(200).json({
+            success: true,
+            message: 'Заказ успешно создан через GET-запрос',
+            data: getResponse.data
+          });
         }
-      } catch (tableError: any) {
-        console.error(`API Orders: Ошибка при создании заказа через API таблицы:`, 
-          tableError.response?.status, tableError.response?.data || tableError.message);
+      } catch (getError: any) {
+        console.error(`API Orders: Ошибка при создании заказа через GET:`, 
+          getError.response?.status, getError.response?.data || getError.message);
       }
 
       // Если все запросы завершились с ошибкой, создаем локальный заказ
@@ -288,8 +279,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...orderData,
         id: mockOrderId,
         created_at: new Date().toISOString(),
-        status: 'pending',
-        payment_status: 'pending'
+        status: 'PENDING',
+        payment_status: 'PENDING'
       };
       
       return res.status(200).json({
