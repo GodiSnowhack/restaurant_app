@@ -282,6 +282,8 @@ const CreateOrderPage: NextPage = () => {
       
       // Создаем данные заказа
       const orderData = {
+        user_id: user?.id,
+        waiter_id: user?.id,
         table_number: tableNumberToSend,
         items: formattedItems,
         status: "PENDING",
@@ -291,7 +293,8 @@ const CreateOrderPage: NextPage = () => {
         customer_name: customerName.trim(),
         customer_phone: customerPhone ? customerPhone.trim() : undefined,
         customer_age_group: customerAgeGroup,
-        waiter_id: user?.id ? Number(user.id) : undefined
+        is_urgent: false,
+        is_group_order: false
       };
       
       // Получаем токен авторизации
