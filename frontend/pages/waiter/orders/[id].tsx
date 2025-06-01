@@ -208,9 +208,9 @@ const WaiterOrderDetailPage: NextPage = () => {
         throw new Error('Необходима авторизация');
       }
       
-      // РЕШЕНИЕ 1: Используем специальный API-маршрут status_update
+      // РЕШЕНИЕ 1: Используем специальный API-маршрут status_update через POST
       try {
-        console.log("Пробуем запрос через API status_update");
+        console.log("Пробуем запрос через API status_update (POST)");
         const response = await fetch('/api/orders/status_update', {
           method: 'POST',
           headers: {
@@ -226,7 +226,7 @@ const WaiterOrderDetailPage: NextPage = () => {
         // Если запрос успешен
         if (response.ok) {
           const data = await response.json();
-          console.log('Обновление через API status_update успешно', data);
+          console.log('Обновление через API status_update (POST) успешно', data);
           
           // Перезагружаем данные заказа
           await fetchOrder();
@@ -234,15 +234,47 @@ const WaiterOrderDetailPage: NextPage = () => {
           return;
         } else {
           const errorText = await response.text();
-          console.error('Ошибка API status_update:', response.status, errorText);
+          console.error('Ошибка API status_update (POST):', response.status, errorText);
         }
       } catch (error) {
-        console.error('Ошибка при использовании API status_update:', error);
+        console.error('Ошибка при использовании API status_update (POST):', error);
       }
       
-      // РЕШЕНИЕ 2: Используем стандартный API-маршрут
+      // РЕШЕНИЕ 1.5: Используем специальный API-маршрут status_update через GET
       try {
-        console.log("Пробуем запрос через стандартный API заказов");
+        console.log("Пробуем запрос через API status_update (GET)");
+        const queryParams = new URLSearchParams({
+          order_id: order.id.toString(),
+          status: normalizedStatus
+        });
+        
+        const response = await fetch(`/api/orders/status_update?${queryParams.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // Если запрос успешен
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Обновление через API status_update (GET) успешно', data);
+          
+          // Перезагружаем данные заказа
+          await fetchOrder();
+          setUpdatingStatus(false);
+          return;
+        } else {
+          const errorText = await response.text();
+          console.error('Ошибка API status_update (GET):', response.status, errorText);
+        }
+      } catch (error) {
+        console.error('Ошибка при использовании API status_update (GET):', error);
+      }
+      
+      // РЕШЕНИЕ 2: Используем стандартный API-маршрут через PUT
+      try {
+        console.log("Пробуем запрос через стандартный API заказов (PUT)");
         const response = await fetch(`/api/orders/${order.id}`, {
           method: 'PUT',
           headers: {
@@ -254,16 +286,43 @@ const WaiterOrderDetailPage: NextPage = () => {
         
         if (response.ok) {
           const data = await response.json();
-          console.log('Обновление через стандартный API успешно', data);
+          console.log('Обновление через стандартный API (PUT) успешно', data);
           await fetchOrder();
           setUpdatingStatus(false);
           return;
         }
       } catch (error) {
-        console.error('Ошибка при использовании стандартного API:', error);
+        console.error('Ошибка при использовании стандартного API (PUT):', error);
       }
       
-      // РЕШЕНИЕ 3: Используем клиентское API из lib/api/orders
+      // РЕШЕНИЕ 3: Используем direct API для прямого обновления в БД
+      try {
+        console.log("Пробуем прямое обновление через /api/orders/direct");
+        const response = await fetch(`/api/orders/direct`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: order.id,
+            status: normalizedStatus,
+            method: 'UPDATE_STATUS'
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Обновление через direct API успешно', data);
+          await fetchOrder();
+          setUpdatingStatus(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Ошибка при использовании direct API:', error);
+      }
+      
+      // РЕШЕНИЕ 4: Используем клиентское API из lib/api/orders
       try {
         console.log("Пробуем запрос через клиентское API");
         const result = await ordersApi.updateOrderStatus(order.id, normalizedStatus);
@@ -281,7 +340,7 @@ const WaiterOrderDetailPage: NextPage = () => {
       // Если все запросы не удались, но мы дошли сюда, 
       // считаем, что обновление успешно (локальное обновление)
       console.log('Используем локальное обновление без серверного подтверждения');
-      alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}"`);
+      alert(`Статус заказа #${order.id} обновлен на "${getStatusLabel(normalizedStatus)}" (только на этом устройстве)`);
       setUpdatingStatus(false);
       
     } catch (error) {
