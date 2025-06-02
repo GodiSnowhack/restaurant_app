@@ -5,8 +5,6 @@ import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
 import adminApi from '../../lib/api/admin-api';
-import { ordersApi } from '../../lib/api/orders';
-import { menuApi } from '../../lib/api/menu';
 import type { DashboardStats } from '../../lib/api/types';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
@@ -42,44 +40,20 @@ const AdminPage: NextPage = () => {
       try {
         setIsLoading(true);
         
-        // Проверяем доступ к adminApi и получаем статистику
+        // Получаем статистику
         if (adminApi && typeof adminApi.getDashboardStats === 'function') {
           try {
-        const data = await adminApi.getDashboardStats();
-        setStats(data);
-            console.log('AdminDashboard - Получена статистика:', data);
+            const data = await adminApi.getDashboardStats();
+            setStats(data);
           } catch (adminError) {
-            console.error('AdminDashboard - Ошибка при запросе статистики:', adminError);
-        setError('Ошибка при загрузке статистики');
+            console.error('Ошибка при запросе статистики:', adminError);
+            setError('Ошибка при загрузке статистики');
           }
         } else {
-          console.error('AdminDashboard - adminApi недоступен или метод getDashboardStats отсутствует');
           setError('API статистики недоступно');
         }
-        
-        // Проверка наличия заказов напрямую - для отладки
-        console.log('Проверка наличия заказов в базе данных...');
-        try {
-          if (ordersApi && typeof ordersApi.getAllOrders === 'function') {
-            // Получаем заказы за последние 30 дней
-            const endDate = new Date().toISOString().split('T')[0];
-            const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const orders = await ordersApi.getAllOrders({
-              start_date: startDate,
-              end_date: endDate
-            });
-            console.log('AdminDashboard - Заказы за последние 30 дней:', orders);
-            console.log('AdminDashboard - Количество заказов:', orders.length);
-            console.log('AdminDashboard - Структура первого заказа:', orders.length > 0 ? orders[0] : 'нет данных');
-          } else {
-            console.error('AdminDashboard - ordersApi или метод getAllOrders недоступен');
-          }
-        } catch (ordersError) {
-          console.error('AdminDashboard - Ошибка при запросе заказов:', ordersError);
-        }
-        
       } catch (error) {
-        console.error('Ошибка при загрузке статистики:', error);
+        console.error('Ошибка при загрузке данных:', error);
         setError('Ошибка при загрузке данных');
       } finally {
         setIsLoading(false);
@@ -163,7 +137,8 @@ const AdminPage: NextPage = () => {
         <p className="text-gray-600 dark:text-gray-300 mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
 
         {/* Карточки статистики */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+          {/* Дневная статистика */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="rounded-full bg-blue-100 dark:bg-blue-900 p-3 mr-4">
@@ -178,11 +153,23 @@ const AdminPage: NextPage = () => {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
+              <div className="rounded-full bg-purple-100 dark:bg-purple-900 p-3 mr-4">
+                <CalendarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Брони сегодня</h2>
+                <p className="text-2xl font-bold dark:text-white">{stats.reservationsToday}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="flex items-center">
               <div className="rounded-full bg-green-100 dark:bg-green-900 p-3 mr-4">
                 <CurrencyDollarIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка</h2>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка сегодня</h2>
                 <p className="text-2xl font-bold dark:text-white">{(stats.revenue || 0).toLocaleString()} ₸</p>
               </div>
             </div>
@@ -190,12 +177,12 @@ const AdminPage: NextPage = () => {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
-              <div className="rounded-full bg-purple-100 dark:bg-purple-900 p-3 mr-4">
-                <CalendarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="rounded-full bg-amber-100 dark:bg-amber-900 p-3 mr-4">
+                <UsersIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Брони сегодня</h2>
-                <p className="text-2xl font-bold dark:text-white">{stats.reservationsToday}</p>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Пользователи</h2>
+                <p className="text-2xl font-bold dark:text-white">{stats.users}</p>
               </div>
             </div>
           </div>

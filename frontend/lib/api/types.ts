@@ -39,10 +39,13 @@ export interface FileUploadResponse {
 }
 
 export interface DashboardStats {
+  // Дневная статистика
   ordersToday: number;
+  reservationsToday: number;
+  
+  // Общая статистика
   ordersTotal: number;
   revenue: number;
-  reservationsToday: number;
   users: number;
   dishes: number;
 }
