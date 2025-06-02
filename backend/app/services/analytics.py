@@ -561,158 +561,6 @@ def get_menu_metrics(
         top_dishes_results = top_dishes_query.all()
         print(f"Получено {len(top_dishes_results)} записей о топ блюдах")
         
-        # Получаем наименее продаваемые блюда
-        least_selling_dishes_query = (
-            db.query(
-                Dish.id.label("dishId"),
-                Dish.name.label("dishName"),
-                Category.id.label("categoryId"),
-                Category.name.label("categoryName"),
-                func.sum(OrderItem.quantity).label("salesCount"),
-                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
-                Dish.cost_price.label("costPrice")
-            )
-            .join(OrderItem, Dish.id == OrderItem.dish_id)
-            .join(Order, OrderItem.order_id == Order.id)
-            .join(Category, Dish.category_id == Category.id)
-            .filter(Order.created_at.between(start_date, end_date))
-            .group_by(Dish.id, Category.id)
-            .order_by(func.sum(OrderItem.quantity).asc())
-            .limit(5)
-        )
-        
-        if category_id:
-            least_selling_dishes_query = least_selling_dishes_query.filter(Category.id == category_id)
-        if dish_id:
-            least_selling_dishes_query = least_selling_dishes_query.filter(Dish.id == dish_id)
-            
-        least_selling_dishes_results = least_selling_dishes_query.all()
-        print(f"Получено {len(least_selling_dishes_results)} записей о наименее продаваемых блюдах")
-        
-        # Получаем самые прибыльные блюда (с учетом себестоимости)
-        profitable_dishes_query = (
-            db.query(
-                Dish.id.label("dishId"),
-                Dish.name.label("dishName"),
-                Category.id.label("categoryId"),
-                Category.name.label("categoryName"),
-                func.sum(OrderItem.quantity).label("salesCount"),
-                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
-                Dish.cost_price.label("costPrice")
-            )
-            .join(OrderItem, Dish.id == OrderItem.dish_id)
-            .join(Order, OrderItem.order_id == Order.id)
-            .join(Category, Dish.category_id == Category.id)
-            .filter(Order.created_at.between(start_date, end_date))
-            .group_by(Dish.id, Category.id)
-            .order_by(func.sum(OrderItem.quantity * (OrderItem.price - Dish.cost_price)).desc())
-            .limit(5)
-        )
-        
-        if category_id:
-            profitable_dishes_query = profitable_dishes_query.filter(Category.id == category_id)
-        if dish_id:
-            profitable_dishes_query = profitable_dishes_query.filter(Dish.id == dish_id)
-            
-        profitable_dishes_results = profitable_dishes_query.all()
-        print(f"Получено {len(profitable_dishes_results)} записей о прибыльных блюдах")
-        
-        # Получаем среднее время приготовления
-        avg_cooking_time_query = db.query(func.avg(Dish.cooking_time)).scalar() or 20
-        
-        # Получаем популярность категорий
-        category_popularity_query = (
-            db.query(
-                Category.id,
-                func.sum(OrderItem.quantity).label("ordered_count")
-            )
-            .join(Dish, Category.id == Dish.category_id)
-            .join(OrderItem, Dish.id == OrderItem.dish_id)
-            .join(Order, OrderItem.order_id == Order.id)
-            .filter(Order.created_at.between(start_date, end_date))
-            .group_by(Category.id)
-        )
-        
-        category_popularity_results = category_popularity_query.all()
-        
-        # Рассчитываем общее количество заказанных блюд
-        total_ordered = sum(item.ordered_count for item in category_popularity_results) if category_popularity_results else 0
-        
-        # Формируем данные о популярности категорий
-        category_popularity = {}
-        for item in category_popularity_results:
-            category_popularity[str(item.id)] = round((item.ordered_count / total_ordered) * 100) if total_ordered > 0 else 0
-        
-        # Получаем данные для графика продаж по блюдам
-        sales_trend_query = (
-            db.query(
-                Dish.id,
-                func.date(Order.created_at).label("order_date"),
-                func.sum(OrderItem.quantity).label("quantity")
-            )
-            .join(OrderItem, Dish.id == OrderItem.dish_id)
-            .join(Order, OrderItem.order_id == Order.id)
-            .filter(Order.created_at.between(start_date, end_date))
-            .group_by(Dish.id, func.date(Order.created_at))
-            .order_by(func.date(Order.created_at))
-        )
-        
-        if category_id:
-            sales_trend_query = sales_trend_query.filter(Dish.category_id == category_id)
-        if dish_id:
-            sales_trend_query = sales_trend_query.filter(Dish.id == dish_id)
-            
-        sales_trend_results = sales_trend_query.all()
-        
-        # Формируем данные для графика
-        menu_item_sales_trend = {}
-        for item in sales_trend_results:
-            dish_id = str(item.id)
-            if dish_id not in menu_item_sales_trend:
-                menu_item_sales_trend[dish_id] = []
-            
-            order_date = item.order_date
-            if isinstance(order_date, datetime):
-                date_str = order_date.strftime("%Y-%m-%d")
-            else:
-                date_str = str(order_date)
-                
-            menu_item_sales_trend[dish_id].append({
-                "date": date_str,
-                "value": item.quantity
-            })
-        
-        # Получаем данные о производительности категорий
-        category_performance_query = (
-            db.query(
-                Category.id,
-                func.sum(OrderItem.quantity).label("total_quantity"),
-                func.avg(OrderItem.price).label("avg_price"),
-                func.avg((OrderItem.price - Dish.cost_price) / OrderItem.price * 100).label("avg_margin")
-            )
-            .join(Dish, Category.id == Dish.category_id)
-            .join(OrderItem, Dish.id == OrderItem.dish_id)
-            .join(Order, OrderItem.order_id == Order.id)
-            .filter(Order.created_at.between(start_date, end_date))
-            .group_by(Category.id)
-        )
-        
-        category_performance_results = category_performance_query.all()
-        
-        # Рассчитываем общее количество для определения процентов продаж
-        total_quantity = sum(item.total_quantity for item in category_performance_results) if category_performance_results else 0
-        
-        # Формируем данные о производительности категорий
-        category_performance = {}
-        for item in category_performance_results:
-            category_id = str(item.id)
-            sales_percentage = (item.total_quantity / total_quantity * 100) if total_quantity > 0 else 0
-            category_performance[category_id] = {
-                "salesPercentage": round(sales_percentage, 1),
-                "averageOrderValue": round(item.avg_price),
-                "averageProfitMargin": round(item.avg_margin, 1) if item.avg_margin else 40
-            }
-        
         # Формируем топ продаваемых блюд
         top_selling_dishes = []
         if top_dishes_results:
@@ -740,27 +588,136 @@ def get_menu_metrics(
                     "percentage": round(percentage, 1),
                     "margin": round(margin)
                 })
-        else:
-            # Если нет данных, создаем демо-данные с добавлением маржи
-            print("Нет данных о топ блюдах, используем мок-данные")
-            mock_data = get_mock_menu_metrics(start_date, end_date)
-            top_selling_dishes = mock_data["topSellingDishes"]
+                
+        # Получаем наименее продаваемые блюда с такой же логикой
+        least_selling_dishes_query = (
+            db.query(
+                Dish.id.label("dishId"),
+                Dish.name.label("dishName"),
+                Category.id.label("categoryId"),
+                Category.name.label("categoryName"),
+                func.sum(OrderItem.quantity).label("salesCount"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+                Dish.cost_price.label("costPrice")
+            )
+            .join(OrderItem, Dish.id == OrderItem.dish_id)
+            .join(Order, OrderItem.order_id == Order.id)
+            .join(Category, Dish.category_id == Category.id)
+            .filter(Order.created_at.between(start_date, end_date))
+            .group_by(Dish.id, Category.id)
+            .order_by(func.sum(OrderItem.quantity).asc())
+            .limit(5)
+        )
         
-        # Аналогично для других метрик...
+        if category_id:
+            least_selling_dishes_query = least_selling_dishes_query.filter(Category.id == category_id)
+        if dish_id:
+            least_selling_dishes_query = least_selling_dishes_query.filter(Dish.id == dish_id)
+            
+        least_selling_dishes_results = least_selling_dishes_query.all()
         
-        # Собираем все метрики
+        # Формируем список наименее продаваемых блюд
+        least_selling_dishes = []
+        if least_selling_dishes_results:
+            total_sales = sum(item.salesCount for item in least_selling_dishes_results) if least_selling_dishes_results else 1
+            for item in least_selling_dishes_results:
+                total_revenue = float(item.revenue) if hasattr(item, "revenue") and item.revenue else 0
+                percentage = (item.salesCount / total_sales * 100) if item.salesCount and total_sales > 0 else 0
+                
+                least_selling_dishes.append({
+                    "dishId": item.dishId,
+                    "dishName": item.dishName,
+                    "categoryId": item.categoryId,
+                    "categoryName": item.categoryName,
+                    "salesCount": item.salesCount,
+                    "revenue": round(total_revenue),
+                    "percentage": round(percentage, 1)
+                })
+                
+        # Получаем самые прибыльные блюда
+        profitable_dishes_query = (
+            db.query(
+                Dish.id.label("dishId"),
+                Dish.name.label("dishName"),
+                Category.id.label("categoryId"),
+                Category.name.label("categoryName"),
+                func.sum(OrderItem.quantity).label("salesCount"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+                Dish.cost_price.label("costPrice")
+            )
+            .join(OrderItem, Dish.id == OrderItem.dish_id)
+            .join(Order, OrderItem.order_id == Order.id)
+            .join(Category, Dish.category_id == Category.id)
+            .filter(Order.created_at.between(start_date, end_date))
+            .filter(Dish.cost_price.isnot(None))
+            .group_by(Dish.id, Category.id)
+            .order_by(func.sum(OrderItem.quantity * (OrderItem.price - Dish.cost_price)).desc())
+            .limit(5)
+        )
+        
+        if category_id:
+            profitable_dishes_query = profitable_dishes_query.filter(Category.id == category_id)
+        if dish_id:
+            profitable_dishes_query = profitable_dishes_query.filter(Dish.id == dish_id)
+            
+        profitable_dishes_results = profitable_dishes_query.all()
+        
+        # Формируем список самых прибыльных блюд
+        most_profitable_dishes = []
+        if profitable_dishes_results:
+            for item in profitable_dishes_results:
+                total_revenue = float(item.revenue) if hasattr(item, "revenue") and item.revenue else 0
+                cost_price = float(item.costPrice) if hasattr(item, "costPrice") and item.costPrice else 0
+                profit = total_revenue - (cost_price * item.salesCount) if item.salesCount else 0
+                profit_margin = (profit / total_revenue * 100) if total_revenue > 0 else 0
+                
+                most_profitable_dishes.append({
+                    "dishId": item.dishId,
+                    "dishName": item.dishName,
+                    "categoryId": item.categoryId,
+                    "categoryName": item.categoryName,
+                    "salesCount": item.salesCount,
+                    "revenue": round(total_revenue),
+                    "costPrice": round(cost_price),
+                    "profit": round(profit),
+                    "profitMargin": round(profit_margin, 1)
+                })
+        
+        # Формируем общий ответ с метриками
         metrics = {
             "topSellingDishes": top_selling_dishes,
-            # Остальные метрики...
+            "leastSellingDishes": least_selling_dishes,
+            "mostProfitableDishes": most_profitable_dishes,
+            "period": {
+                "startDate": start_date.strftime("%Y-%m-%d"),
+                "endDate": end_date.strftime("%Y-%m-%d")
+            }
         }
         
-        print(f"Возвращаем метрики меню: {len(top_selling_dishes)} топ блюд")
+        # Если данных нет совсем, только тогда используем мок-данные
+        if (not top_selling_dishes and not least_selling_dishes and 
+            not most_profitable_dishes and is_future_period):
+            print("Нет данных о блюдах, используем мок-данные для будущего периода")
+            return get_mock_menu_metrics(start_date, end_date)
+        
+        print(f"Возвращаем реальные метрики меню: {len(top_selling_dishes)} топ блюд")
         return metrics
         
     except Exception as e:
         print(f"Ошибка при получении метрик меню: {e}")
-        # В случае ошибки возвращаем мок-данные с добавлением маржи
-        return get_mock_menu_metrics(start_date, end_date)
+        # В случае ошибки возвращаем мок-данные только для будущего периода
+        if is_future_period:
+            return get_mock_menu_metrics(start_date, end_date)
+        # Иначе возвращаем пустую структуру
+        return {
+            "topSellingDishes": [],
+            "leastSellingDishes": [],
+            "mostProfitableDishes": [],
+            "period": {
+                "startDate": start_date.strftime("%Y-%m-%d"),
+                "endDate": end_date.strftime("%Y-%m-%d")
+            }
+        }
 
 
 def get_customer_metrics(
@@ -816,14 +773,14 @@ def get_customer_metrics(
             User.age_group
         ).all()
         
-        # Маппинг возрастных групп на читаемые названия
+        # Маппинг возрастных групп на читаемые названия на русском
         age_group_labels = {
-            'child': '0-12',
-            'teenager': '13-17',
-            'young': '18-25',
-            'adult': '26-45',
-            'middle': '46-65',
-            'senior': '66+'
+            'child': 'Дети (0-12)',
+            'teenager': 'Подростки (13-17)',
+            'young': 'Молодежь (18-25)',
+            'adult': 'Взрослые (26-45)',
+            'middle': 'Средний возраст (46-65)',
+            'senior': 'Пожилые (66+)'
         }
         
         # Преобразуем результаты в словарь с названиями возрастных групп
@@ -832,22 +789,21 @@ def get_customer_metrics(
         
         if total_age_groups > 0:
             for age_group, count in age_groups_query:
-                # Получаем название возрастной группы или используем код группы
+                # Получаем название возрастной группы на русском или используем код группы
                 group_name = age_group_labels.get(age_group, age_group)
                 # Вычисляем процент от общего количества
                 percentage = (count / total_age_groups) * 100
-                # Добавляем в словарь с форматированием: "Название (код)": процент
-                label = f"{group_name} ({age_group})"
-                age_groups[label] = round(percentage, 1)
+                # Добавляем в словарь только русское название
+                age_groups[group_name] = round(percentage, 1)
         
-        # Если нет данных о возрастных группах, используем шаблон
+        # Если нет данных о возрастных группах, используем шаблон с русскими названиями
         if not age_groups:
             age_groups = {
-                "18-25 (young)": 15,
-                "26-45 (adult)": 32,
-                "46-65 (middle)": 28,
-                "13-17 (teenager)": 18,
-                "66+ (senior)": 7
+                "Молодежь (18-25)": 15,
+                "Взрослые (26-45)": 45.5,
+                "Средний возраст (46-65)": 29.5,
+                "Подростки (13-17)": 7,
+                "Пожилые (66+)": 7.5
             }
         
         # Форматируем результат с обновленными возрастными группами
@@ -1078,11 +1034,11 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
         },
         "customerDemographics": {
             "age_groups": {
-                "18-25 (young)": 15,
-                "26-45 (adult)": 32,
-                "46-65 (middle)": 28,
-                "13-17 (teenager)": 18,
-                "66+ (senior)": 7
+                "Молодежь (18-25)": 15,
+                "Взрослые (26-45)": 45.5,
+                "Средний возраст (46-65)": 29.5,
+                "Подростки (13-17)": 7,
+                "Пожилые (66+)": 3
             },
             "gender": {
                 "Мужской": 52,
