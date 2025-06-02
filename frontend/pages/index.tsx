@@ -8,7 +8,8 @@ import Footer from '../components/Footer';
 import Layout from '../components/Layout';
 import useAuthStore from '../lib/auth-store';
 import {UserIcon, ClipboardDocumentListIcon, Cog6ToothIcon as CogIcon} from '@heroicons/react/24/solid';
-import { ArrowRightIcon, StarIcon, MapIcon, PhoneIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, StarIcon as StarOutlineIcon, MapIcon, PhoneIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { StarIcon } from '@heroicons/react/24/solid';
 import { EnvelopeIcon as MailIcon, MapPinIcon as LocationMarkerIcon } from '@heroicons/react/24/outline';
 import { Spinner } from '@/components/ui/spinner';
 import useCartStore from '../lib/cart-store';
@@ -51,21 +52,21 @@ const testimonials = [
     text: 'Отличный ресторан! Очень вкусные блюда и отличный сервис.',
     rating: 5,
     date: '15.04.2023',
-    avatar: '/avatars/user1.jpg'
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces&auto=format&q=80'
   },
   {
     name: 'Анна Смирнова',
     text: 'Рекомендую всем любителям хорошей кухни! Если хотите попробовать что-то новое, то этот ресторан - идеальный выбор.',
     rating: 5,
     date: '23.03.2023',
-    avatar: '/avatars/user2.jpg'
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=faces&auto=format&q=80'
   },
   {
     name: 'Дмитрий Иванов',
     text: 'Обслуживание на высшем уровне! Я был в этом ресторане несколько раз и каждый раз был доволен. У них получается очень вкусный крем-суп.',
     rating: 5,
     date: '05.05.2023',
-    avatar: '/avatars/user3.jpg'
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=faces&auto=format&q=80'
   }
 ];
 
@@ -312,21 +313,15 @@ const HomePageContent = () => {
                 </div>
               </div>
               <div className="md:w-1/2 relative">
-                {settings?.logo_url ? (
-                  <div className="relative rounded-lg overflow-hidden shadow-2xl transform transition-transform hover:scale-105">
-                    <Image 
-                      src={settings.logo_url} 
-                      alt={settings?.restaurant_name || 'Ресторан'} 
-                      width={600} 
-                      height={400}
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-80 flex items-center justify-center">
-                    <p className="text-gray-500 dark:text-gray-400">Изображение ресторана</p>
-                  </div>
-                )}
+                <div className="relative rounded-lg overflow-hidden shadow-2xl transform transition-transform hover:scale-105">
+                  <Image 
+                    src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8cmVzdGF1cmFudHxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=80" 
+                    alt={settings?.restaurant_name || 'Ресторан'} 
+                    width={600} 
+                    height={400}
+                    className="object-cover w-full h-full"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -371,11 +366,7 @@ const HomePageContent = () => {
                             {[...Array(5)].map((_, i) => (
                               <StarIcon
                                 key={i}
-                                className={`h-5 w-5 ${
-                                  i < Math.floor(dish.rating || 0)
-                                    ? 'text-yellow-400'
-                                    : 'text-gray-300 dark:text-gray-600'
-                                }`}
+                                className={i < Math.floor(dish.rating || 0) ? 'h-5 w-5 text-yellow-400' : 'h-5 w-5 text-gray-300 dark:text-gray-600'}
                               />
                             ))}
                             <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">{dish.rating}</span>
@@ -464,19 +455,13 @@ const HomePageContent = () => {
                     <div className="flex items-center mb-4">
                       <div className="mr-4">
                         <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-600 overflow-hidden">
-                          {testimonial.avatar ? (
-                            <Image 
-                              src={testimonial.avatar} 
-                              alt={testimonial.name} 
-                              width={48} 
-                              height={48}
-                              className="object-cover w-full h-full"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-primary text-white text-sm font-bold">
-                              {testimonial.name.substring(0, 2).toUpperCase()}
-                            </div>
-                          )}
+                          <Image 
+                            src={testimonial.avatar} 
+                            alt={testimonial.name} 
+                            width={48} 
+                            height={48}
+                            className="object-cover w-full h-full"
+                          />
                         </div>
                       </div>
                       <div>
@@ -485,11 +470,7 @@ const HomePageContent = () => {
                           {[...Array(5)].map((_, i) => (
                             <StarIcon
                               key={i}
-                              className={`h-4 w-4 ${
-                                i < testimonial.rating
-                                  ? 'text-yellow-400'
-                                  : 'text-gray-300 dark:text-gray-600'
-                              }`}
+                              className={i < testimonial.rating ? 'h-4 w-4 text-yellow-400' : 'h-4 w-4 text-gray-300 dark:text-gray-600'}
                             />
                           ))}
                         </div>
