@@ -182,7 +182,6 @@ def get_dashboard_statistics(
 def get_financial_analytics(
     start_date: str = None,
     end_date: str = None,
-    category_id: int = None,
     use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -191,14 +190,18 @@ def get_financial_analytics(
     Возвращает финансовую аналитику ресторана
     """
     try:
+        logger.info(f"Запрос финансовых метрик: start_date={start_date}, end_date={end_date}, use_mock_data={use_mock_data}")
+        
         # Преобразуем строковые даты в объекты datetime
         start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
         end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Всегда используем мок-данные для будущих дат
-        use_mock = use_mock_data or end > datetime.now()
+        # Никогда не используем мок-данные для текущих дат
+        use_mock = use_mock_data and end > datetime.now()
         
-        return analytics.get_financial_metrics(db, start, end, category_id, use_mock)
+        logger.info(f"Пытаемся получить реальные данные за период {start} - {end}")
+        
+        return analytics.get_financial_metrics(db, start, end, use_mock)
     except Exception as e:
         # При ошибке возвращаем мок-данные
         logger.error(f"Ошибка при получении финансовой аналитики: {str(e)}")
@@ -226,8 +229,8 @@ def get_menu_analytics(
         start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
         end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Всегда используем мок-данные для будущих дат
-        use_mock = use_mock_data or end > datetime.now()
+        # Используем мок-данные только для будущих дат
+        use_mock = use_mock_data and end > datetime.now()
         
         return analytics.get_menu_metrics(db, start, end, category_id, dish_id, use_mock)
     except Exception as e:
@@ -256,8 +259,8 @@ def get_customers_analytics(
         start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
         end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Всегда используем мок-данные для будущих дат
-        use_mock = use_mock_data or end > datetime.now()
+        # Используем мок-данные только для будущих дат
+        use_mock = use_mock_data and end > datetime.now()
         
         return analytics.get_customer_metrics(db, start, end, user_id, use_mock)
     except Exception as e:
@@ -285,8 +288,8 @@ def get_operational_analytics(
         start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
         end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
         
-        # Всегда используем мок-данные для будущих дат
-        use_mock = use_mock_data or end > datetime.now()
+        # Используем мок-данные только для будущих дат
+        use_mock = use_mock_data and end > datetime.now()
         
         return analytics.get_operational_metrics(db, start, end, use_mock)
     except Exception as e:
@@ -302,7 +305,6 @@ def get_operational_analytics(
 def get_predictive_analytics(
     start_date: str = None,
     end_date: str = None,
-    use_mock_data: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -311,17 +313,17 @@ def get_predictive_analytics(
     """
     try:
         # Преобразуем строковые даты в объекты datetime
-        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now()
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now() + timedelta(days=14)
         
-        # Предиктивная аналитика всегда использует мок-данные
-        return analytics.get_predictive_metrics(db, start, end, True)
+        # Для предиктивной аналитики всегда используем реальные данные как основу
+        return analytics.get_predictive_metrics(db, start, end, False)
     except Exception as e:
         # При ошибке возвращаем мок-данные
         logger.error(f"Ошибка при получении предиктивной аналитики: {str(e)}")
         return analytics.get_mock_predictive_metrics(
-            datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30),
-            datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+            datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now(),
+            datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now() + timedelta(days=14)
         )
 
 
