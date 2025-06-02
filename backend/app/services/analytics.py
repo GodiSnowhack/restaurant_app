@@ -384,14 +384,13 @@ def get_financial_metrics(
     if not end_date:
         end_date = datetime.now()
     
-    # Проверяем, запрошен ли будущий период
-    is_future_period = end_date > datetime.now()
-    
-    # Никогда не используем мок-данные, если не запрошен будущий период
-    use_mock_data = False
+    # Используем мок-данные только если явно запрошено
+    if use_mock_data:
+        print(f"Используем мок-данные для финансовых метрик за период {start_date} - {end_date}")
+        return get_mock_financial_metrics(start_date, end_date)
     
     try:
-        print(f"Пытаемся получить реальные данные за период {start_date} - {end_date}")
+        print(f"Пытаемся получить реальные финансовые данные за период {start_date} - {end_date}")
         
         # Общая выручка за период
         total_revenue_query = db.query(
@@ -523,11 +522,10 @@ def get_menu_metrics(
     if not end_date:
         end_date = datetime.now()
     
-    # Проверяем, не запрошен ли будущий период
-    is_future_period = end_date > datetime.now()
-    
-    # Никогда не используем мок-данные, если не запрошен будущий период
-    use_mock_data = False
+    # Используем мок-данные только если явно запрошено
+    if use_mock_data:
+        print(f"Используем мок-данные для периода {start_date} - {end_date}")
+        return get_mock_menu_metrics(start_date, end_date)
     
     try:
         print(f"Пытаемся получить реальные данные о меню за период {start_date} - {end_date}")
@@ -696,8 +694,8 @@ def get_menu_metrics(
         
         # Если данных нет совсем, только тогда используем мок-данные
         if (not top_selling_dishes and not least_selling_dishes and 
-            not most_profitable_dishes and is_future_period):
-            print("Нет данных о блюдах, используем мок-данные для будущего периода")
+            not most_profitable_dishes):
+            print("Нет данных о блюдах, используем мок-данные")
             return get_mock_menu_metrics(start_date, end_date)
         
         print(f"Возвращаем реальные метрики меню: {len(top_selling_dishes)} топ блюд")
@@ -705,19 +703,8 @@ def get_menu_metrics(
         
     except Exception as e:
         print(f"Ошибка при получении метрик меню: {e}")
-        # В случае ошибки возвращаем мок-данные только для будущего периода
-        if is_future_period:
-            return get_mock_menu_metrics(start_date, end_date)
-        # Иначе возвращаем пустую структуру
-        return {
-            "topSellingDishes": [],
-            "leastSellingDishes": [],
-            "mostProfitableDishes": [],
-            "period": {
-                "startDate": start_date.strftime("%Y-%m-%d"),
-                "endDate": end_date.strftime("%Y-%m-%d")
-            }
-        }
+        # В случае ошибки возвращаем мок-данные
+        return get_mock_menu_metrics(start_date, end_date)
 
 
 def get_customer_metrics(
@@ -730,20 +717,18 @@ def get_customer_metrics(
     """
     Получение комплексных метрик по клиентам
     """
-    # Если запрошены мок-данные, возвращаем их
+    # Если даты не указаны, используем последний месяц
+    if not start_date:
+        start_date = datetime.now() - timedelta(days=30)
+    if not end_date:
+        end_date = datetime.now()
+            
+    # Используем мок-данные только если явно запрошено
     if use_mock_data:
+        print(f"Используем мок-данные для клиентской аналитики за период {start_date} - {end_date}")
         return get_mock_customer_metrics(start_date, end_date)
     
     try:
-        # Если даты не указаны, используем последний месяц
-        if not start_date:
-            start_date = datetime.now() - timedelta(days=30)
-        if not end_date:
-            end_date = datetime.now()
-            
-        # Никогда не используем мок-данные, если не запрошен будущий период
-        use_mock_data = False
-        
         print(f"Пытаемся получить реальные данные о клиентах за период {start_date} - {end_date}")
         
         # Общее количество пользователей (клиентов)
@@ -834,11 +819,19 @@ def get_operational_metrics(
     """
     Получение операционных метрик ресторана
     """
-    # Если запрошены мок-данные, возвращаем их
+    # Если даты не указаны, используем последний месяц
+    if not start_date:
+        start_date = datetime.now() - timedelta(days=30)
+    if not end_date:
+        end_date = datetime.now()
+    
+    # Используем мок-данные только если явно запрошено
     if use_mock_data:
+        print(f"Используем мок-данные для операционных метрик за период {start_date} - {end_date}")
         return get_mock_operational_metrics(start_date, end_date)
     
     try:
+        print(f"Пытаемся получить реальные операционные данные за период {start_date} - {end_date}")
         # Попытка получить реальные данные из БД
         # ... существующий код ...
         
@@ -994,7 +987,6 @@ def get_mock_menu_metrics(start_date: datetime, end_date: datetime) -> Dict[str,
             {"dishId": 5, "dishName": "Тирамису", "salesCount": 68, "revenue": 74800, "profitMargin": 60.2},
             {"dishId": 6, "dishName": "Лосось на гриле", "salesCount": 60, "revenue": 120000, "profitMargin": 50.0},
             {"dishId": 7, "dishName": "Утиная грудка", "salesCount": 45, "revenue": 135000, "profitMargin": 48.1},
-            {"dishId": 8, "dishName": "Говядина Веллингтон", "salesCount": 35, "revenue": 122500, "profitMargin": 46.9},
             {"dishId": 30, "dishName": "Салат Оливье", "salesCount": 15, "revenue": 18000, "profitMargin": 42.5},
             {"dishId": 31, "dishName": "Окрошка", "salesCount": 12, "revenue": 14400, "profitMargin": 48.3}
         ],
