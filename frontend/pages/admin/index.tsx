@@ -19,7 +19,6 @@ const AdminPage: NextPage = () => {
     ordersTotal: 0,
     revenue: 0,
     reservationsToday: 0,
-    users: 0,
     dishes: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -137,7 +136,7 @@ const AdminPage: NextPage = () => {
         <p className="text-gray-600 dark:text-gray-300 mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
 
         {/* Карточки статистики */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Дневная статистика */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex items-center">
@@ -171,18 +170,6 @@ const AdminPage: NextPage = () => {
               <div>
                 <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка сегодня</h2>
                 <p className="text-2xl font-bold dark:text-white">{(stats.revenue || 0).toLocaleString()} ₸</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <div className="flex items-center">
-              <div className="rounded-full bg-amber-100 dark:bg-amber-900 p-3 mr-4">
-                <UsersIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Пользователи</h2>
-                <p className="text-2xl font-bold dark:text-white">{stats.users}</p>
               </div>
             </div>
           </div>

@@ -46,7 +46,6 @@ export interface DashboardStats {
   // Общая статистика
   ordersTotal: number;
   revenue: number;
-  users: number;
   dishes: number;
 }
 

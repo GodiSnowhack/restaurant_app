@@ -55,7 +55,6 @@ const adminApi = {
         ordersTotal: 0,
         revenue: 0,
         reservationsToday: 0,
-        users: 0,
         dishes: 0
       };
     }

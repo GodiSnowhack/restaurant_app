@@ -45,28 +45,105 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`[Admin API] Запрос статистики от пользователя: ${userId}, роль: ${userRole}`);
     
-    // Определяем URL для бэкенда на основе окружения
+    // Получаем данные аналитики из разных API эндпоинтов
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-production-1a78.up.railway.app';
-    const apiUrl = `${backendUrl}/api/v1/admin/dashboard/stats`;
-    
-    console.log(`[Admin API] Отправка запроса на ${apiUrl}`);
     
     try {
-      // Отправляем запрос на бэкенд с авторизацией
-      const response = await axios.get(apiUrl, {
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-          'X-User-ID': userId as string,
-          'X-User-Role': userRole as string
-        },
-        timeout: 5000 // 5 секунд таймаут
-      });
+      // Создаем базовую статистику
+      const todayStats = {
+        ordersToday: 0,
+        ordersTotal: 0,
+        revenue: 0,
+        reservationsToday: 0,
+        dishes: 0
+      };
       
-      console.log('[Admin API] Успешно получены данные статистики с бэкенда');
+      // 1. Получаем статистику по заказам
+      try {
+        const ordersUrl = `${backendUrl}/api/v1/orders?limit=1`;
+        const ordersResponse = await axios.get(ordersUrl, {
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (ordersResponse.data && ordersResponse.data.total) {
+          todayStats.ordersTotal = ordersResponse.data.total;
+        }
+      } catch (error) {
+        console.error('[Admin API] Ошибка при получении данных заказов:', error);
+      }
+
+      // 2. Получаем статистику по меню
+      try {
+        const menuUrl = `${backendUrl}/api/v1/menu/dishes?limit=1`;
+        const menuResponse = await axios.get(menuUrl, {
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (menuResponse.data && menuResponse.data.total) {
+          todayStats.dishes = menuResponse.data.total;
+        }
+      } catch (error) {
+        console.error('[Admin API] Ошибка при получении данных меню:', error);
+      }
       
-      // Возвращаем данные клиенту
-      return res.status(200).json(response.data);
+      // 3. Получаем статистику по бронированиям
+      try {
+        const reservationsUrl = `${backendUrl}/api/v1/reservations?limit=1`;
+        const reservationsResponse = await axios.get(reservationsUrl, {
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (reservationsResponse.data && reservationsResponse.data.items) {
+          // Вычисляем бронирования на сегодня
+          const today = new Date().toISOString().split('T')[0];
+          const todayReservations = reservationsResponse.data.items.filter(
+            (r: any) => r.reservation_date?.startsWith(today)
+          );
+          
+          todayStats.reservationsToday = todayReservations.length;
+        }
+      } catch (error) {
+        console.error('[Admin API] Ошибка при получении данных бронирований:', error);
+      }
+      
+      // 4. Формируем данные о заказах на сегодня и выручке
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const todayOrdersUrl = `${backendUrl}/api/v1/orders?start_date=${today}&end_date=${today}`;
+        
+        const todayOrdersResponse = await axios.get(todayOrdersUrl, {
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (todayOrdersResponse.data && todayOrdersResponse.data.items) {
+          todayStats.ordersToday = todayOrdersResponse.data.items.length;
+          
+          // Суммируем выручку за сегодня
+          const revenue = todayOrdersResponse.data.items.reduce(
+            (sum: number, order: any) => sum + (order.total_amount || 0),
+            0
+          );
+          
+          todayStats.revenue = revenue;
+        }
+      } catch (error) {
+        console.error('[Admin API] Ошибка при получении данных заказов за сегодня:', error);
+      }
+      
+      console.log('[Admin API] Успешно собраны данные статистики');
+      return res.status(200).json(todayStats);
     } catch (backendError: any) {
       console.error('[Admin API] Ошибка при запросе к бэкенду:', backendError.message);
       
@@ -76,7 +153,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ordersTotal: 356,
         revenue: 78400,
         reservationsToday: 5,
-        users: 124,
         dishes: 42
       };
       
