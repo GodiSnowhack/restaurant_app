@@ -1073,8 +1073,47 @@ const AdminAnalyticsPage: NextPage = () => {
 
   // Добавляем заглушки для функций рендеринга представлений
   const renderDashboardView = () => {
-    // Контент для дашборда уже реализован в исходном компоненте
-    return null;
+    // Проверяем наличие данных
+    if (!financialMetrics && !operationalMetrics && !customerMetrics) {
+      return (
+        <div className="text-center p-6 text-gray-500 dark:text-gray-400">
+          Нет данных для отображения дашборда
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Финансовые метрики */}
+        <div className="p-6 rounded-lg shadow bg-white dark:bg-gray-800">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Выручка за период</div>
+          <div className="text-2xl font-bold text-primary mb-2">
+            {financialMetrics ? `${financialMetrics.totalRevenue?.toLocaleString() || 0} ₸` : '—'}
+          </div>
+        </div>
+        <div className="p-6 rounded-lg shadow bg-white dark:bg-gray-800">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Количество заказов</div>
+          <div className="text-2xl font-bold text-primary mb-2">
+            {financialMetrics ? financialMetrics.orderCount || 0 : '—'}
+          </div>
+        </div>
+        <div className="p-6 rounded-lg shadow bg-white dark:bg-gray-800">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Средний чек</div>
+          <div className="text-2xl font-bold text-primary mb-2">
+            {financialMetrics ? `${financialMetrics.averageOrderValue?.toLocaleString() || 0} ₸` : '—'}
+          </div>
+        </div>
+        {/* Клиенты */}
+        <div className="p-6 rounded-lg shadow bg-white dark:bg-gray-800">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Клиентов за период</div>
+          <div className="text-2xl font-bold text-primary mb-2">
+            {customerMetrics ? customerMetrics.totalCustomers || 0 : '—'}
+          </div>
+        </div>
+        {/* Бронирования */}
+        {/* Здесь можно добавить реальные бронирования, если появятся в operationalMetrics */}
+      </div>
+    );
   };
 
   const renderRecommendationsView = () => {
