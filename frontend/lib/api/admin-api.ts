@@ -38,7 +38,10 @@ const adminApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const url = `${getSecureApiUrl()}/admin/dashboard/stats`;
+      // Используем локальный API-прокси вместо прямого запроса к бэкенду
+      const url = '/api/admin/dashboard-stats';
+      console.log('Отправляем запрос статистики по URL:', url);
+      
       const response = await axios.get(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -49,10 +52,28 @@ const adminApi = {
         }
       });
       
+      console.log('Получен ответ от API статистики:', response.data);
       return response.data;
     } catch (error) {
       console.error('Ошибка при получении статистики:', error);
-      // Возвращаем демо-данные в случае ошибки
+      
+      // Проверяем, должны ли мы использовать демо-данные
+      const useDemoData = localStorage.getItem('force_demo_data') === 'true' || 
+                          localStorage.getItem('use_demo_for_errors') === 'true';
+                          
+      if (useDemoData) {
+        console.log('Возвращаем демо-данные статистики');
+        // Возвращаем демо-данные в случае ошибки
+        return {
+          ordersToday: 15,
+          ordersTotal: 1432,
+          revenue: 542500,
+          reservationsToday: 8,
+          dishes: 45
+        };
+      }
+      
+      // Если демо-данные не используются, возвращаем нули
       return {
         ordersToday: 0,
         ordersTotal: 0,
