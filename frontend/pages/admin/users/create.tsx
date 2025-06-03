@@ -190,17 +190,6 @@ const CreateUserPage: NextPage = () => {
     
     if (!validateForm()) return;
     
-    // Предупреждение если бэкенд недоступен
-    if (backendAvailable === false) {
-      const confirmContinue = window.confirm(
-        'Сервер, похоже, недоступен. Хотите все равно попробовать создать пользователя?'
-      );
-      
-      if (!confirmContinue) {
-        return;
-      }
-    }
-    
     try {
       setIsSubmitting(true);
       setError('');
@@ -314,7 +303,7 @@ const CreateUserPage: NextPage = () => {
         </div>
         
         {/* Сообщение о доступности бэкенда */}
-        {backendAvailable === false && (
+        {/* {backendAvailable === false && (
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-6" role="alert">
             <div className="flex items-center">
               <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
@@ -322,7 +311,7 @@ const CreateUserPage: NextPage = () => {
             </div>
             <span className="block sm:inline">Сервер недоступен. Создание пользователя может не сработать.</span>
           </div>
-        )}
+        )} */}
         
         {success ? (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
