@@ -2,99 +2,42 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 /**
- * API-прокси для обновления токена авторизации
+ * API-прокси для обновления токена.
+ * Этот эндпоинт перенаправляет запросы на обновление токена к бэкенду.
  */
-export default async function refreshTokenHandler(req: NextApiRequest, res: NextApiResponse) {
-  // Устанавливаем CORS заголовки
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
-
-  // Обрабатываем предварительные запросы CORS
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Проверяем метод запроса
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      message: 'Метод не поддерживается'
-    });
+    return res.status(405).json({ message: 'Method not allowed' });
   }
-
+  
+  // Получаем refresh token из тела запроса
+  const { refresh_token } = req.body;
+  
+  if (!refresh_token) {
+    return res.status(400).json({ message: 'Refresh token is required' });
+  }
+  
+  // Определяем базовый URL бэкенда
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+  
   try {
-    // Проверяем наличие refresh_token
-    const { refresh_token } = req.body;
-
-    if (!refresh_token) {
-      return res.status(400).json({
-        success: false,
-        message: 'Отсутствует refresh_token'
-      });
-    }
-
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    const endpoint = `${apiUrl}/token`;
-
-    console.log('Auth API - Отправка запроса на обновление токена');
-
-    try {
-      // Отправляем запрос на бэкенд, используя формат урленкода для обновления токена
-      const response = await axios.post(endpoint, 
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-
-      // Если получили успешный ответ
-      if (response.data.access_token) {
-        console.log('Auth API - Успешно получен новый токен');
-        return res.status(200).json(response.data);
-      } else {
-        console.log('Auth API - Получен ответ, но без токена:', response.data);
-        return res.status(401).json({
-          success: false,
-          message: 'Не удалось получить новый токен'
-        });
+    // Выполняем запрос к бэкенду
+    const response = await axios.post(`${apiUrl}/auth/refresh`, { refresh_token }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
-    } catch (apiError: any) {
-      console.error('Auth API - Ошибка при обновлении токена:', apiError.message);
-      
-      // Возвращаем ошибку клиенту
-      if (apiError.response) {
-        return res.status(apiError.response.status).json({
-          success: false,
-          message: 'Ошибка авторизации',
-          error: apiError.response.data
-        });
-      } else {
-        return res.status(500).json({
-          success: false,
-          message: 'Ошибка соединения с сервером авторизации',
-          error: apiError.message
-        });
-      }
-    }
+    });
+    
+    // Возвращаем ответ от бэкенда
+    return res.status(response.status).json(response.data);
   } catch (error: any) {
-    console.error('Auth API - Критическая ошибка:', error.message);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Внутренняя ошибка сервера',
+    console.error('Ошибка при обновлении токена:', error.message);
+    
+    // Возвращаем ответ с ошибкой
+    return res.status(error.response?.status || 500).json({
+      message: error.response?.data?.message || 'Ошибка при обновлении токена',
       error: error.message
     });
   }

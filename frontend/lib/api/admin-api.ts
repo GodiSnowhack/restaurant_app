@@ -2,6 +2,7 @@ import { api } from './core';
 import { getSecureApiUrl, createApiUrl } from '../utils/api';
 import axios from 'axios';
 import { handleApiResponse, getBaseApiOptions, ApiError } from '../api';
+import { getValidToken } from './auth-helpers';
 
 /**
  * API для взаимодействия с административными функциями
@@ -30,7 +31,9 @@ const adminApi = {
    */
   async getDashboardStats(): Promise<any> {
     try {
-      const token = localStorage.getItem('token');
+      // Получаем актуальный токен с проверкой срока действия
+      const token = await getValidToken();
+      
       if (!token) {
         throw new Error('Отсутствует токен авторизации');
       }

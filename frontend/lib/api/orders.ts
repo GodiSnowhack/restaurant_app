@@ -1,6 +1,7 @@
 import { api } from './core';
 import { Order, AssignOrderResponse, PaymentStatus, OrderCreateRequest } from './types';
 import axios from 'axios';
+import { getValidToken } from './auth-helpers';
 
 // Добавляем определение API_URL, если его нет
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
@@ -185,12 +186,12 @@ export const ordersApi = {
         return generateDemoOrders();
       }
 
-      // Получаем токен для авторизации
-      const token = localStorage.getItem('token');
+      // Получаем актуальный токен с проверкой срока действия
+      const token = await getValidToken();
       
       // Проверяем наличие токена
       if (!token) {
-        console.error('🔒 Токен авторизации отсутствует. Необходима авторизация для получения заказов');
+        console.error('🔒 Токен авторизации отсутствует или не может быть обновлен. Необходима авторизация для получения заказов');
         throw new Error('Требуется авторизация');
       }
       
@@ -201,16 +202,9 @@ export const ordersApi = {
       if (params?.start_date) queryParams.set('start_date', params.start_date);
       if (params?.end_date) queryParams.set('end_date', params.end_date);
       
-      // Формируем URL для запроса
-      const url = queryParams.toString() 
-        ? `/api/orders?${queryParams.toString()}` 
-        : '/api/orders';
-      
-      console.log(`📡 Отправка запроса к API-прокси: ${url}`);
-      
-      // Получаем данные из localStorage для отладки
-      const userId = localStorage.getItem('userId');
-      const userRole = localStorage.getItem('userRole');
+      // Получаем дополнительные данные для заголовков
+      const userId = localStorage.getItem('user_id');
+      const userRole = localStorage.getItem('user_role');
       
       console.log('📊 Данные пользователя:', {
         userId: userId || 'не найден',
@@ -218,60 +212,86 @@ export const ordersApi = {
         hasToken: !!token
       });
       
-      // Используем axios для запроса с полным контролем над заголовками
-      const response = await axios.get(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          ...(userId ? { 'X-User-ID': userId } : {}),
-          ...(userRole ? { 'X-User-Role': userRole } : {})
-        },
-        withCredentials: false,
-        timeout: 15000
-      });
+      // Формируем URL для запроса - используем прямой запрос к бэкенду вместо прокси
+      const baseUrl = API_URL;
+      const endpoint = '/orders';
+      const fullUrl = `${baseUrl}${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      // Проверяем ответ
-      if (response.status !== 200) {
-        throw new Error(`Ошибка при запросе: ${response.status}`);
-      }
+      console.log(`📡 Отправка запроса к API: ${fullUrl}`);
       
-      // Получаем данные
-      const data = response.data;
-      console.log(`✅ Получены данные заказов:`, data);
-      
-      // Проверяем, пустой ли массив
-      if (Array.isArray(data) && data.length === 0) {
-        console.log('📊 Получен пустой массив заказов');
+      try {
+        // Используем axios для запроса с полным контролем над заголовками
+        const response = await axios.get(fullUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...(userId ? { 'X-User-ID': userId } : {}),
+            ...(userRole ? { 'X-User-Role': userRole } : {})
+          },
+          withCredentials: true,
+          timeout: 15000
+        });
         
-        // Если указан флаг использования демо-данных при пустом ответе
-        const useDemoForEmpty = localStorage.getItem('use_demo_for_empty') === 'true';
-        if (useDemoForEmpty) {
-          console.log('📊 Возвращаем демо-данные вместо пустого массива');
-          return generateDemoOrders();
+        // Проверяем ответ
+        if (response.status !== 200) {
+          throw new Error(`Ошибка при запросе: ${response.status}`);
         }
         
-        return [];
-      }
-      
-      // Обрабатываем различные форматы ответа
-      if (Array.isArray(data)) {
-        console.log(`📊 Количество полученных заказов: ${data.length}`);
+        // Получаем данные
+        const data = response.data;
+        console.log(`✅ Получены данные заказов:`, data);
+        
+        // Проверяем, пустой ли массив
+        if (Array.isArray(data) && data.length === 0) {
+          console.log('📊 Получен пустой массив заказов');
+          
+          // Если указан флаг использования демо-данных при пустом ответе
+          const useDemoForEmpty = localStorage.getItem('use_demo_for_empty') === 'true';
+          if (useDemoForEmpty) {
+            console.log('📊 Возвращаем демо-данные вместо пустого массива');
+            return generateDemoOrders();
+          }
+        }
+        
         return data;
-      } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
-        console.log(`📊 Количество полученных заказов: ${data.items.length}`);
-        return data.items;
-      } else {
-        console.error('❌ Неверный формат данных:', data);
+      } catch (error: any) {
+        console.error('❌ Ошибка при запросе к API:', error);
         
-        // Если указан флаг использования демо-данных при ошибке
-        const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
-        if (useDemoForErrors) {
-          console.log('📊 Возвращаем демо-данные из-за ошибки формата');
-          return generateDemoOrders();
+        // Пробуем использовать локальный прокси при CORS или сетевых ошибках
+        if (error.message?.includes('Network Error') || error.message?.includes('CORS')) {
+          console.log('🔄 Попытка использовать локальный API-прокси');
+          
+          // Формируем URL для локального прокси
+          const proxyUrl = `/api/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+          
+          const proxyResponse = await axios.get(proxyUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              ...(userId ? { 'X-User-ID': userId } : {}),
+              ...(userRole ? { 'X-User-Role': userRole } : {})
+            },
+            withCredentials: true,
+            timeout: 15000
+          });
+          
+          return proxyResponse.data;
         }
         
-        return [];
+        // Проверяем на ошибку авторизации
+        if (error.response?.status === 401) {
+          console.error('🔒 Ошибка авторизации. Токен, возможно, устарел');
+          // Если указан флаг использования демо-данных при ошибке авторизации
+          const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
+          if (useDemoForErrors) {
+            console.log('📊 Возвращаем демо-данные из-за ошибки авторизации');
+            return generateDemoOrders();
+          }
+        }
+        
+        throw error;
       }
     } catch (error: any) {
       console.error('❌ Общая ошибка при получении заказов:', error);
