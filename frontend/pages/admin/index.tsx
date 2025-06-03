@@ -45,13 +45,26 @@ const AdminPage: NextPage = () => {
           const data = await analyticsApi.getDashboardStats();
           console.log('Получены данные дашборда:', data);
           // Проверяем, что данные не undefined и не null
-          if (data && data.summary) {
+          if (data && (data.daily_orders || data.reservation_stats || data.user_stats)) {
+            // Вычисляем заказы и выручку за сегодня
+            const today = new Date().toISOString().split('T')[0];
+            const todayOrder = Array.isArray(data.daily_orders)
+              ? data.daily_orders.find((d: any) => d.date === today)
+              : null;
+            setStats({
+              ordersToday: todayOrder?.orders_count || 0,
+              ordersTotal: Array.isArray(data.daily_orders) ? data.daily_orders.reduce((acc: number, d: any) => acc + (d.orders_count || 0), 0) : 0,
+              revenue: todayOrder?.total_revenue || 0,
+              reservationsToday: data.reservation_stats?.reservations_today || 0,
+              dishes: 0 // Можно добавить отдельный запрос, если нужно
+            });
+          } else if (data && data.summary) {
             setStats({
               ordersToday: data.summary.totalOrders || 0,
               ordersTotal: data.summary.totalOrders || 0,
               revenue: data.summary.totalRevenue || 0,
-              reservationsToday: 0, // analyticsApi не возвращает брони, если нужно — добавить отдельный запрос
-              dishes: 0 // analyticsApi не возвращает блюда, если нужно — добавить отдельный запрос
+              reservationsToday: 0,
+              dishes: 0
             });
           } else if (data) {
             setStats({
