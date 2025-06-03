@@ -289,21 +289,21 @@ def get_reservation_stats(db: Session) -> Dict[str, Any]:
     reservations_today = db.query(
         func.count(Reservation.id)
     ).filter(
-        func.date(Reservation.date) == today
+        func.date(Reservation.reservation_time) == today
     ).scalar()
     
     # Бронирования на завтра
     reservations_tomorrow = db.query(
         func.count(Reservation.id)
     ).filter(
-        func.date(Reservation.date) == tomorrow
+        func.date(Reservation.reservation_time) == tomorrow
     ).scalar()
     
     # Всего активных бронирований
     active_reservations = db.query(
         func.count(Reservation.id)
     ).filter(
-        func.date(Reservation.date) >= today
+        func.date(Reservation.reservation_time) >= today
     ).scalar()
     
     return {
