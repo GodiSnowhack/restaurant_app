@@ -23,7 +23,9 @@ interface MenuItem {
   price: number;
   description: string;
   image?: string;
-  category: string;
+  category: string | { id: string; name: string; category_id?: string } | null;
+  category_id?: string;
+  categories?: Array<string | { id: string; name: string; category_id?: string }>;
 }
 
 interface OrderItem {
@@ -135,6 +137,10 @@ const CreateOrderPage: NextPage = () => {
               fetchedMenu = menuData.items;
             }
             
+            // Вывести отладочную информацию о загруженных блюдах
+            console.log('Загруженные блюда:', fetchedMenu);
+            console.log('Пример структуры первого блюда:', fetchedMenu.length > 0 ? fetchedMenu[0] : 'Нет блюд');
+            
             // Получаем категории
             const categoriesResponse = await fetch('/api/menu?method=categories');
             if (categoriesResponse.ok) {
@@ -144,6 +150,9 @@ const CreateOrderPage: NextPage = () => {
                   id: category.id.toString(),
                   name: category.name
                 }));
+                
+                // Вывести отладочную информацию о загруженных категориях
+                console.log('Загруженные категории:', fetchedCategories);
               }
             } else {
               throw new Error(`Ошибка при получении категорий: ${categoriesResponse.status}`);
@@ -174,7 +183,41 @@ const CreateOrderPage: NextPage = () => {
   // Фильтруем меню по выбранной категории
   const filteredMenuItems = selectedCategory === 'all'
     ? menuItems
-    : menuItems.filter(item => item.category === selectedCategory);
+    : menuItems.filter(item => {
+        // Отладочная информация для проверки форматов данных
+        console.log(`Фильтрация блюда "${item.name}" с категорией:`, item.category, 
+                   `category_id:`, item.category_id, 
+                   `categories:`, item.categories, 
+                   `для выбранной категории:`, selectedCategory);
+        
+        // Функция для проверки совпадения строк или чисел
+        const matchValue = (val1: any, val2: string): boolean => {
+          if (val1 === val2) return true;
+          if (String(val1) === val2) return true;
+          if (val1 === Number(val2)) return true;
+          return false;
+        };
+        
+        // Проверяем разные возможные форматы category
+        if (typeof item.category === 'string') {
+          return matchValue(item.category, selectedCategory);
+        } else if (typeof item.category === 'object' && item.category !== null) {
+          // Если category - это объект, проверяем поле id
+          return matchValue(item.category.id, selectedCategory) || 
+                 (item.category.category_id !== undefined && matchValue(item.category.category_id, selectedCategory));
+        } else if (item.categories && Array.isArray(item.categories)) {
+          // Если есть массив categories, проверяем его
+          return item.categories.some(cat => 
+            (typeof cat === 'string' && matchValue(cat, selectedCategory)) || 
+            (typeof cat === 'object' && cat !== null && 
+             (matchValue((cat as any).id, selectedCategory) || matchValue((cat as any).category_id, selectedCategory)))
+          );
+        } else if (item.category_id) {
+          // Если есть поле category_id, используем его
+          return matchValue(item.category_id, selectedCategory);
+        }
+        return false;
+      });
   
   // Добавляем элемент в заказ
   const addItemToOrder = (item: MenuItem) => {
@@ -441,7 +484,10 @@ const CreateOrderPage: NextPage = () => {
               {categories.map(category => (
                 <button
                   key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
+                  onClick={() => {
+                    console.log(`Выбрана категория: ${category.name} с ID: ${category.id}`);
+                    setSelectedCategory(category.id);
+                  }}
                   className={`px-4 py-2 rounded-full text-sm ${
                     selectedCategory === category.id
                       ? 'bg-primary text-white'
