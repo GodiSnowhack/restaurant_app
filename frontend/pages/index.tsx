@@ -313,15 +313,15 @@ const HomePageContent = () => {
                 </div>
               </div>
               <div className="md:w-1/2 relative">
-                <div className="relative rounded-lg overflow-hidden shadow-2xl transform transition-transform hover:scale-105">
-                  <Image 
+                  <div className="relative rounded-lg overflow-hidden shadow-2xl transform transition-transform hover:scale-105">
+                    <Image 
                     src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8cmVzdGF1cmFudHxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=80" 
-                    alt={settings?.restaurant_name || 'Ресторан'} 
-                    width={600} 
-                    height={400}
+                      alt={settings?.restaurant_name || 'Ресторан'} 
+                      width={600} 
+                      height={400}
                     className="object-cover w-full h-full"
-                  />
-                </div>
+                    />
+                  </div>
               </div>
             </div>
           </section>
@@ -455,13 +455,13 @@ const HomePageContent = () => {
                     <div className="flex items-center mb-4">
                       <div className="mr-4">
                         <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-600 overflow-hidden">
-                          <Image 
-                            src={testimonial.avatar} 
-                            alt={testimonial.name} 
-                            width={48} 
-                            height={48}
-                            className="object-cover w-full h-full"
-                          />
+                            <Image 
+                              src={testimonial.avatar} 
+                              alt={testimonial.name} 
+                              width={48} 
+                              height={48}
+                              className="object-cover w-full h-full"
+                            />
                         </div>
                       </div>
                       <div>

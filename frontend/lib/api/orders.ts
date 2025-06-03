@@ -220,38 +220,38 @@ export const ordersApi = {
       console.log(`📡 Отправка запроса к API: ${fullUrl}`);
       
       try {
-        // Используем axios для запроса с полным контролем над заголовками
+      // Используем axios для запроса с полным контролем над заголовками
         const response = await axios.get(fullUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            ...(userId ? { 'X-User-ID': userId } : {}),
-            ...(userRole ? { 'X-User-Role': userRole } : {})
-          },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(userId ? { 'X-User-ID': userId } : {}),
+          ...(userRole ? { 'X-User-Role': userRole } : {})
+        },
           withCredentials: true,
-          timeout: 15000
-        });
+        timeout: 15000
+      });
+      
+      // Проверяем ответ
+      if (response.status !== 200) {
+        throw new Error(`Ошибка при запросе: ${response.status}`);
+      }
+      
+      // Получаем данные
+      const data = response.data;
+      console.log(`✅ Получены данные заказов:`, data);
+      
+      // Проверяем, пустой ли массив
+      if (Array.isArray(data) && data.length === 0) {
+        console.log('📊 Получен пустой массив заказов');
         
-        // Проверяем ответ
-        if (response.status !== 200) {
-          throw new Error(`Ошибка при запросе: ${response.status}`);
+        // Если указан флаг использования демо-данных при пустом ответе
+        const useDemoForEmpty = localStorage.getItem('use_demo_for_empty') === 'true';
+        if (useDemoForEmpty) {
+          console.log('📊 Возвращаем демо-данные вместо пустого массива');
+          return generateDemoOrders();
         }
-        
-        // Получаем данные
-        const data = response.data;
-        console.log(`✅ Получены данные заказов:`, data);
-        
-        // Проверяем, пустой ли массив
-        if (Array.isArray(data) && data.length === 0) {
-          console.log('📊 Получен пустой массив заказов');
-          
-          // Если указан флаг использования демо-данных при пустом ответе
-          const useDemoForEmpty = localStorage.getItem('use_demo_for_empty') === 'true';
-          if (useDemoForEmpty) {
-            console.log('📊 Возвращаем демо-данные вместо пустого массива');
-            return generateDemoOrders();
-          }
         }
         
         return data;
@@ -284,10 +284,10 @@ export const ordersApi = {
         if (error.response?.status === 401) {
           console.error('🔒 Ошибка авторизации. Токен, возможно, устарел');
           // Если указан флаг использования демо-данных при ошибке авторизации
-          const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
-          if (useDemoForErrors) {
+        const useDemoForErrors = localStorage.getItem('use_demo_for_errors') === 'true';
+        if (useDemoForErrors) {
             console.log('📊 Возвращаем демо-данные из-за ошибки авторизации');
-            return generateDemoOrders();
+          return generateDemoOrders();
           }
         }
         

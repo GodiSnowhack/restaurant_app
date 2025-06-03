@@ -4,7 +4,7 @@ import {useRouter} from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
 import useAuthStore from '../../lib/auth-store';
-import adminApi from '../../lib/api/admin-api';
+import analyticsApi from '../../lib/api/analytics-api';
 import type { DashboardStats } from '../../lib/api/types';
 import {UserIcon, ShoppingCartIcon, DocumentTextIcon, CalendarIcon, Cog6ToothIcon as CogIcon, ChartPieIcon, Bars3Icon as MenuIcon, PhotoIcon as PhotographIcon} from '@heroicons/react/24/outline';
 import {CurrencyDollarIcon, UsersIcon, ClipboardDocumentListIcon} from '@heroicons/react/24/outline';
@@ -40,40 +40,42 @@ const AdminPage: NextPage = () => {
         setIsLoading(true);
         
         // Получаем статистику
-        if (adminApi && typeof adminApi.getDashboardStats === 'function') {
-          try {
-            console.log('Запрос статистики дашборда...');
-            const data = await adminApi.getDashboardStats();
-            console.log('Получены данные дашборда:', data);
-            
-            // Проверяем, что данные не undefined и не null
-            if (data) {
-              setStats({
-                ordersToday: data.ordersToday || 0,
-                ordersTotal: data.ordersTotal || 0,
-                revenue: data.revenue || 0,
-                reservationsToday: data.reservationsToday || 0,
-                dishes: data.dishes || 0
-              });
-            } else {
-              console.error('Получены пустые данные статистики');
-              setError('Не удалось загрузить статистику: пустые данные');
-            }
-          } catch (adminError) {
-            console.error('Ошибка при запросе статистики:', adminError);
-            setError('Ошибка при загрузке статистики');
-            
-            // Установка демо-данных при ошибке, чтобы пользователь видел интерфейс
+        try {
+          console.log('Запрос статистики дашборда...');
+          const data = await analyticsApi.getDashboardStats();
+          console.log('Получены данные дашборда:', data);
+          // Проверяем, что данные не undefined и не null
+          if (data && data.summary) {
             setStats({
-              ordersToday: 5,
-              ordersTotal: 500,
-              revenue: 150000,
-              reservationsToday: 3,
-              dishes: 25
+              ordersToday: data.summary.totalOrders || 0,
+              ordersTotal: data.summary.totalOrders || 0,
+              revenue: data.summary.totalRevenue || 0,
+              reservationsToday: 0, // analyticsApi не возвращает брони, если нужно — добавить отдельный запрос
+              dishes: 0 // analyticsApi не возвращает блюда, если нужно — добавить отдельный запрос
             });
+          } else if (data) {
+            setStats({
+              ordersToday: data.ordersToday || 0,
+              ordersTotal: data.ordersTotal || 0,
+              revenue: data.revenue || 0,
+              reservationsToday: data.reservationsToday || 0,
+              dishes: data.dishes || 0
+            });
+          } else {
+            console.error('Получены пустые данные статистики');
+            setError('Не удалось загрузить статистику: пустые данные');
           }
-        } else {
-          setError('API статистики недоступно');
+        } catch (adminError) {
+          console.error('Ошибка при запросе статистики:', adminError);
+          setError('Ошибка при загрузке статистики');
+          // Установка демо-данных при ошибке, чтобы пользователь видел интерфейс
+          setStats({
+            ordersToday: 5,
+            ordersTotal: 500,
+            revenue: 150000,
+            reservationsToday: 3,
+            dishes: 25
+          });
         }
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
