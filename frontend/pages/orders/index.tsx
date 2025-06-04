@@ -436,7 +436,7 @@ const OrdersPage: NextPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/orders/${order.id}`} className="text-primary hover:text-primary-dark">
+                        <Link href={`/orders/${order.id}`} className="text-primary hover:text-primary-dark dark:text-white">
                           Подробнее
                         </Link>
                       </td>
