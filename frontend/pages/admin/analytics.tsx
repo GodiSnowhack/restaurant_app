@@ -1132,8 +1132,228 @@ const AdminAnalyticsPage: NextPage = () => {
   };
 
   const renderMenuView = () => {
-    // Контент для меню уже реализован в исходном компоненте
-    return null;
+    const isDark = false; // Убираем темную тему, так как она не используется
+
+    return (
+      <div className="space-y-6">
+        {/* ABC-матрица */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">ABC-матрица блюд</h3>
+          <div className="relative h-96">
+            {/* Оси координат */}
+            <div className="absolute left-0 top-0 h-full w-px bg-gray-400"></div>
+            <div className="absolute left-0 bottom-0 w-full h-px bg-gray-400"></div>
+            
+            {/* Подписи осей */}
+            <div className="absolute left-0 top-0 transform -translate-y-6 text-xs text-left pl-2">
+              <span className="text-gray-600">Популярность</span>
+            </div>
+            <div className="absolute right-0 bottom-0 transform translate-y-6 text-xs text-right pr-2">
+              <span className="text-gray-600">Маржинальность</span>
+            </div>
+            
+            {/* Квадранты */}
+            <div className="absolute left-1/2 top-0 right-0 h-1/2 bg-green-500/10 border-green-500/30 border"></div>
+            <div className="absolute left-0 top-0 right-1/2 h-1/2 bg-blue-500/10 border-blue-500/30 border"></div>
+            <div className="absolute left-1/2 top-1/2 right-0 bottom-0 bg-yellow-500/10 border-yellow-500/30 border"></div>
+            <div className="absolute left-0 top-1/2 right-1/2 bottom-0 bg-red-500/10 border-red-500/30 border"></div>
+            
+            {/* Названия квадрантов */}
+            <div className="absolute left-1/4 top-1/4 transform -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-blue-600">
+              Рабочие лошадки
+            </div>
+            <div className="absolute left-3/4 top-1/4 transform -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-green-600">
+              Звезды
+            </div>
+            <div className="absolute left-1/4 top-3/4 transform -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-red-600">
+              Проблемные
+            </div>
+            <div className="absolute left-3/4 top-3/4 transform -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-yellow-600">
+              Загадки
+            </div>
+
+            {/* Точки для блюд */}
+            {(() => {
+              if (!menuMetrics?.topSellingDishes?.length && 
+                  !menuMetrics?.mostProfitableDishes?.length && 
+                  !menuMetrics?.leastSellingDishes?.length) {
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                    Нет данных для матрицы
+                  </div>
+                );
+              }
+
+              const abcData: Array<{dishId: number, dishName: string, salesCount: number, profitMargin: number}> = [];
+              
+              // Собираем данные из всех источников
+              if (menuMetrics.topSellingDishes?.length) {
+                menuMetrics.topSellingDishes.forEach(dish => {
+                  if (!abcData.some(d => d.dishId === dish.dishId)) {
+                    abcData.push({
+                      dishId: dish.dishId,
+                      dishName: dish.dishName,
+                      salesCount: dish.salesCount,
+                      profitMargin: (dish as any).profitMargin || 0
+                    });
+                  }
+                });
+              }
+
+              if (menuMetrics.mostProfitableDishes?.length) {
+                menuMetrics.mostProfitableDishes.forEach(dish => {
+                  if (!abcData.some(d => d.dishId === dish.dishId)) {
+                    abcData.push({
+                      dishId: dish.dishId,
+                      dishName: dish.dishName,
+                      salesCount: dish.salesCount,
+                      profitMargin: dish.profitMargin
+                    });
+                  }
+                });
+              }
+
+              if (menuMetrics.leastSellingDishes?.length) {
+                menuMetrics.leastSellingDishes.forEach(dish => {
+                  if (!abcData.some(d => d.dishId === dish.dishId)) {
+                    abcData.push({
+                      dishId: dish.dishId,
+                      dishName: dish.dishName,
+                      salesCount: dish.salesCount,
+                      profitMargin: (dish as any).profitMargin || 0
+                    });
+                  }
+                });
+              }
+
+              if (abcData.length === 0) {
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                    Нет данных для матрицы
+                  </div>
+                );
+              }
+
+              const maxSales = Math.max(...abcData.map(d => d.salesCount));
+              return abcData.map(dish => {
+                const x = dish.profitMargin;
+                const y = (dish.salesCount / maxSales) * 100;
+                let color;
+                if (x >= 50 && y >= 50) color = 'bg-green-500';
+                else if (x >= 50 && y < 50) color = 'bg-yellow-500';
+                else if (x < 50 && y >= 50) color = 'bg-blue-500';
+                else color = 'bg-red-500';
+
+                return (
+                  <div 
+                    key={dish.dishId}
+                    className={`absolute w-4 h-4 rounded-full ${color} shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:ring-2 ring-white`}
+                    style={{
+                      left: `${x}%`,
+                      top: `${100 - y}%`,
+                    }}
+                    title={`${dish.dishName}: Маржа ${dish.profitMargin}%, Продажи ${dish.salesCount} шт.`}
+                  ></div>
+                );
+              });
+            })()}
+          </div>
+        </div>
+
+        {/* Топ-10 самых продаваемых блюд */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ-10 самых продаваемых блюд</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Блюдо</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Продажи</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выручка</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Маржа</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {menuMetrics?.topSellingDishes?.length ? (
+                  menuMetrics.topSellingDishes.slice(0, 10).map((dish, index) => (
+                    <tr key={dish.dishId} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{dish.dishName}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{dish.salesCount} шт.</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(dish.revenue)} ₸</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{(dish as any).profitMargin || 0}%</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="text-center text-gray-400 py-8">Нет данных по блюдам</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Популярность категорий */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Популярность категорий</h3>
+          <div className="space-y-4">
+            {menuMetrics?.categoryPerformance && Object.keys(menuMetrics.categoryPerformance).length > 0 ? (
+              Object.values(menuMetrics.categoryPerformance).map((category: any) => (
+                <div key={category.id} className="mb-4">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-700">{category.name}</span>
+                    <span className="text-sm text-gray-700">{category.salesPercentage?.toFixed(1) ?? 0}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
+                      style={{ width: `${category.salesPercentage ?? 0}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-gray-500">Ср. чек: {formatCurrency(category.averageOrderValue ?? 0)} ₸</span>
+                    <span className="text-gray-500">Маржа: {category.averageProfitMargin ?? 0}%</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center text-gray-400 py-8">Нет данных по категориям</div>
+            )}
+          </div>
+        </div>
+
+        {/* Наименее продаваемые блюда */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Наименее продаваемые блюда</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Блюдо</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Продажи</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выручка</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {menuMetrics?.leastSellingDishes?.length ? (
+                  menuMetrics.leastSellingDishes.slice(0, 5).map((dish, index) => (
+                    <tr key={dish.dishId} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{dish.dishName}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{dish.salesCount} шт.</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatCurrency(dish.revenue)} ₸</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="text-center text-gray-400 py-8">Нет данных по блюдам</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderCustomersView = () => {
@@ -2607,12 +2827,12 @@ const AdminAnalyticsPage: NextPage = () => {
                       </thead>
                       <tbody className={`divide-y ${isDark ? 'divide-gray-600' : 'divide-gray-200'}`}>
                         {menuMetrics?.topSellingDishes?.slice(0, 10).map((dish, index) => (
-                          <tr key={dish.dishId} className={index % 2 === 0 ? isDark ? 'bg-gray-800/30' : 'bg-gray-50' : ''}>
-                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{dish.dishName}</td>
-                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{dish.salesCount} шт.</td>
-                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(dish.revenue)} ₸</td>
-                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{(dish as any).profitMargin || 0}%</td>
-                          </tr>
+                            <tr key={dish.dishId} className={index % 2 === 0 ? isDark ? 'bg-gray-800/30' : 'bg-gray-50' : ''}>
+                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{dish.dishName}</td>
+                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{dish.salesCount} шт.</td>
+                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(dish.revenue)} ₸</td>
+                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{(dish as any).profitMargin || 0}%</td>
+                            </tr>
                         ))}
                       </tbody>
                     </table>
@@ -2640,8 +2860,8 @@ const AdminAnalyticsPage: NextPage = () => {
                             <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {category.averageProfitMargin ?? 0}%</span>
                           </div>
                         </div>
-                      ))
-                    ) : (
+                          ))
+                        ) : (
                       <div className="text-center text-gray-400 py-8">Нет данных по категориям</div>
                     )}
                   </div>

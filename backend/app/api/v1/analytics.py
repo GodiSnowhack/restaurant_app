@@ -237,12 +237,17 @@ def get_menu_analytics(
         
         return analytics.get_menu_metrics(db, start, end, category_id, dish_id, use_mock_data)
     except Exception as e:
-        # При ошибке возвращаем мок-данные
+        # При ошибке возвращаем пустой объект с правильной структурой
         logger.error(f"Ошибка при получении аналитики меню: {str(e)}")
-        return analytics.get_mock_menu_metrics(
-            datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30),
-            datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
-        )
+        return {
+            "topSellingDishes": [],
+            "mostProfitableDishes": [],
+            "leastSellingDishes": [],
+            "averageCookingTime": 0,
+            "categoryPopularity": {},
+            "menuItemSalesTrend": {},
+            "categoryPerformance": {}
+        }
 
 
 @router.get("/customers", response_model=Dict[str, Any])
