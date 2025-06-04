@@ -284,10 +284,10 @@ const UserEditPage: NextPage = () => {
             </div>
           )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 dark:bg-gray-800 dark:text-white">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 dark:bg-gray-900 dark:text-white">
             {/* Основная информация */}
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold border-b pb-2 dark:bg-gray-800 dark:text-white">Основная информация</h2>
+              <h2 className="text-xl font-semibold border-b pb-2 dark:bg-gray-900 dark:text-white">Основная информация</h2>
               
               {/* Статус пользователя */}
               <div className="flex items-center">
@@ -297,7 +297,7 @@ const UserEditPage: NextPage = () => {
                 <button 
                   type="button"
                   onClick={handleToggleStatus}
-                  className="dark:bg-gray-800 dark:text-white ml-4 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  className="dark:bg-gray-900 dark:text-white ml-4 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
                   <RefreshIcon className="h-4 w-4 mr-1" />
                   {formData.is_active ? 'Заблокировать' : 'Активировать'}
@@ -306,7 +306,7 @@ const UserEditPage: NextPage = () => {
               
               {/* ФИО */}
               <div>
-                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   ФИО <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -328,7 +328,7 @@ const UserEditPage: NextPage = () => {
               
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -350,7 +350,7 @@ const UserEditPage: NextPage = () => {
               
               {/* Телефон */}
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   Телефон
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -373,11 +373,11 @@ const UserEditPage: NextPage = () => {
             
             {/* Учетные данные */}
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold border-b pb-2 dark:bg-gray-800 dark:text-white">Учетные данные</h2>
+              <h2 className="text-xl font-semibold border-b pb-2 dark:bg-gray-900 dark:text-white">Учетные данные</h2>
               
               {/* Роль пользователя */}
               <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   Роль пользователя <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -409,7 +409,7 @@ const UserEditPage: NextPage = () => {
               
               {/* Пароль - опционально для редактирования */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   Новый пароль <span className="text-sm text-gray-500">(оставьте пустым, если не хотите менять)</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -431,7 +431,7 @@ const UserEditPage: NextPage = () => {
               
               {/* Подтверждение пароля */}
               <div>
-                <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
+                <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-900 dark:text-white">
                   Подтверждение нового пароля
                 </label>
                 <div className="relative rounded-md shadow-sm">
@@ -459,7 +459,7 @@ const UserEditPage: NextPage = () => {
               type="button"
               onClick={handleDelete}
               disabled={isDeleting || Number(id) === 1}
-              className={`dark:bg-gray-800 dark:text-white inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${Number(id) === 1 ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`dark:bg-gray-900 dark:text-white inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${Number(id) === 1 ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'} disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <TrashIcon className="h-5 w-5 mr-2 dark:bg-gray-800 dark:text-white" />
               {isDeleting ? 'Удаление...' : 'Удалить пользователя'}
