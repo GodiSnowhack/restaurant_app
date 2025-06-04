@@ -39,9 +39,9 @@ export default async function createCombinedReviewProxy(req: NextApiRequest, res
     }
 
     // Проверяем наличие необходимых данных в теле запроса
-    const { order_id, food_rating, service_rating, waiter_id, review_type } = req.body;
+    const { order_id, food_rating, service_rating } = req.body;
 
-    if (!order_id || !food_rating || (review_type === 'COMBINED' && (!service_rating || !waiter_id))) {
+    if (!order_id || !food_rating || !service_rating) {
       return res.status(400).json({
         success: false,
         message: 'Отсутствуют необходимые данные для создания отзыва'

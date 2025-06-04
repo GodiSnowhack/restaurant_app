@@ -1254,7 +1254,12 @@ export const createServiceReview = async (data: any): Promise<any> => {
   }
 };
 
-export const createCombinedReview = async (data: any): Promise<any> => {
+export const createCombinedReview = async (data: {
+  order_id: number;
+  food_rating: number;
+  service_rating: number;
+  comment?: string;
+}): Promise<any> => {
   try {
     const response = await api.post('/reviews/combined', data);
     return response.data;

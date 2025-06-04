@@ -18,7 +18,7 @@ from app.core.security import get_current_active_user, check_admin_permission, c
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
 @router.post("/dish", response_model=ReviewResponse)
