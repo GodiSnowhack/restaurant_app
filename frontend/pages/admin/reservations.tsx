@@ -458,7 +458,7 @@ const AdminReservationsPage: NextPage = () => {
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              <FilterIcon className="h-5 w-5 mr-1 text-gray-600 dark:text-white" />
+              <FilterIcon className="h-5 w-5 mr-1 text-gray-600 dark:text-white dark:bg-gray-800" />
               <span>Фильтры</span>
             </button>
             

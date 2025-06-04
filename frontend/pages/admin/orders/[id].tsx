@@ -260,11 +260,11 @@ const AdminOrderDetailPage: NextPage = () => {
 
   return (
     <Layout title={`Заказ #${order.id} | Админ-панель`}>
-      <div className="container mx-auto px-4 py-8 dark:bg-gray-800 dark:text-white">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 dark:text-white">
         {/* Навигация */}
         <div className="mb-6">
           <Link href="/admin/orders" className="text-primary hover:text-primary-dark inline-flex items-center">
-            <ArrowLeftIcon className="h-4 w-4 mr-1" />
+            <ArrowLeftIcon className="h-4 w-4 mr-1 dark:text-white" />
             Вернуться к списку заказов
           </Link>
         </div>
