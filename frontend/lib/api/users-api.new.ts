@@ -401,7 +401,10 @@ export const usersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const apiUrl = `${getDefaultApiUrl()}/users/${userId}/`;
+      // Убираем слеш в конце базового URL, если есть
+      let baseUrl = getDefaultApiUrl();
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+      const apiUrl = `${baseUrl}/users/${userId}`;
       console.log(`Запрос пользователя по ID ${userId}, URL: ${apiUrl}`);
       
       const response = await axios.get(apiUrl, {
@@ -445,7 +448,9 @@ export const usersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const apiUrl = `${getDefaultApiUrl()}/users/${userId}/`;
+      let baseUrl = getDefaultApiUrl();
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+      const apiUrl = `${baseUrl}/users/${userId}`;
       console.log(`Обновление пользователя #${userId}, URL: ${apiUrl}`);
       
       const response = await axios.put(apiUrl, userData, {
@@ -474,7 +479,9 @@ export const usersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const apiUrl = `${getDefaultApiUrl()}/users/${userId}/`;
+      let baseUrl = getDefaultApiUrl();
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+      const apiUrl = `${baseUrl}/users/${userId}`;
       console.log(`Удаление пользователя #${userId}, URL: ${apiUrl}`);
       
       await axios.delete(apiUrl, {
@@ -540,7 +547,9 @@ export const usersApi = {
         throw new Error('Отсутствует токен авторизации');
       }
 
-      const apiUrl = `${getDefaultApiUrl()}/users/${userId}/status/`;
+      let baseUrl = getDefaultApiUrl();
+      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+      const apiUrl = `${baseUrl}/users/${userId}/status`;
       console.log(`Обновление статуса пользователя ${userId} на ${isActive}, URL: ${apiUrl}`);
       
       const response = await axios.patch(apiUrl, { is_active: isActive }, {
