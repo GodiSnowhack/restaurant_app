@@ -193,26 +193,35 @@ def get_financial_analytics(
         logger.info(f"Запрос финансовых метрик: start_date={start_date}, end_date={end_date}, use_mock_data={use_mock_data}")
         
         # Преобразуем строковые даты в объекты datetime
-        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        start = parse_date(start_date) if start_date else datetime.now() - timedelta(days=30)
+        end = parse_date(end_date) if end_date else datetime.now()
         
-        logger.info(f"Запрос финансовой аналитики: period={start_date} - {end_date}")
+        # Проверяем, что даты не в будущем
+        now = datetime.now()
+        if start > now:
+            start = now - timedelta(days=30)
+        if end > now:
+            end = now
+        
+        logger.info(f"Запрос финансовой аналитики: period={start.strftime('%Y-%m-%d')} - {end.strftime('%Y-%m-%d')}")
         
         return analytics.get_financial_metrics(db, start, end, use_mock_data)
     except Exception as e:
-        # При ошибке возвращаем мок-данные
         logger.error(f"Ошибка при получении финансовой аналитики: {str(e)}")
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-            end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
-            return analytics.get_mock_financial_metrics(start, end)
-        except Exception as e2:
-            logger.error(f"Ошибка при получении мок-данных: {str(e2)}")
-            # Если не удалось создать даты, используем текущее время
-            return analytics.get_mock_financial_metrics(
-                datetime.now() - timedelta(days=30),
-                datetime.now()
-            )
+        return {
+            "totalRevenue": 0,
+            "orderCount": 0,
+            "averageOrderValue": 0,
+            "dailyRevenue": [],
+            "revenueByCategory": [],
+            "revenueByPaymentMethod": [],
+            "revenueByTimeOfDay": [],
+            "topSellingItems": [],
+            "period": {
+                "startDate": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "endDate": end_date or datetime.now().strftime("%Y-%m-%d")
+            }
+        }
 
 
 @router.get("/menu", response_model=Dict[str, Any])
@@ -230,10 +239,17 @@ def get_menu_analytics(
     """
     try:
         # Преобразуем строковые даты в объекты datetime
-        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        start = parse_date(start_date) if start_date else datetime.now() - timedelta(days=30)
+        end = parse_date(end_date) if end_date else datetime.now()
         
-        logger.info(f"Запрос аналитики меню: period={start_date} - {end_date}, использование мок-данных: {use_mock_data}")
+        # Проверяем, что даты не в будущем
+        now = datetime.now()
+        if start > now:
+            start = now - timedelta(days=30)
+        if end > now:
+            end = now
+        
+        logger.info(f"Запрос аналитики меню: period={start.strftime('%Y-%m-%d')} - {end.strftime('%Y-%m-%d')}, использование мок-данных: {use_mock_data}")
         
         return analytics.get_menu_metrics(db, start, end, category_id, dish_id, use_mock_data)
     except Exception as e:
@@ -264,25 +280,35 @@ def get_customers_analytics(
     """
     try:
         # Преобразуем строковые даты в объекты datetime
-        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        start = parse_date(start_date) if start_date else datetime.now() - timedelta(days=30)
+        end = parse_date(end_date) if end_date else datetime.now()
         
-        logger.info(f"Запрос аналитики клиентов: period={start_date} - {end_date}")
+        # Проверяем, что даты не в будущем
+        now = datetime.now()
+        if start > now:
+            start = now - timedelta(days=30)
+        if end > now:
+            end = now
+        
+        logger.info(f"Запрос аналитики клиентов: period={start.strftime('%Y-%m-%d')} - {end.strftime('%Y-%m-%d')}")
         
         return analytics.get_customer_metrics(db, start, end, user_id, use_mock_data)
     except Exception as e:
-        # При ошибке возвращаем мок-данные
         logger.error(f"Ошибка при получении аналитики клиентов: {str(e)}")
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-            end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
-            return analytics.get_mock_customer_metrics(start, end)
-        except Exception:
-            # Если не удалось создать даты, используем текущее время
-            return analytics.get_mock_customer_metrics(
-                datetime.now() - timedelta(days=30),
-                datetime.now()
-            )
+        return {
+            "totalCustomers": 0,
+            "newCustomers": 0,
+            "returningCustomers": 0,
+            "customerRetentionRate": 0,
+            "averageOrderFrequency": 0,
+            "averageOrderValue": 0,
+            "customerSegments": [],
+            "customerLifetimeValue": 0,
+            "period": {
+                "startDate": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "endDate": end_date or datetime.now().strftime("%Y-%m-%d")
+            }
+        }
 
 
 @router.get("/operational", response_model=Dict[str, Any])
@@ -298,25 +324,33 @@ def get_operational_analytics(
     """
     try:
         # Преобразуем строковые даты в объекты datetime
-        start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        start = parse_date(start_date) if start_date else datetime.now() - timedelta(days=30)
+        end = parse_date(end_date) if end_date else datetime.now()
         
-        logger.info(f"Запрос операционной аналитики: period={start_date} - {end_date}")
+        # Проверяем, что даты не в будущем
+        now = datetime.now()
+        if start > now:
+            start = now - timedelta(days=30)
+        if end > now:
+            end = now
+        
+        logger.info(f"Запрос операционной аналитики: period={start.strftime('%Y-%m-%d')} - {end.strftime('%Y-%m-%d')}")
         
         return analytics.get_operational_metrics(db, start, end, use_mock_data)
     except Exception as e:
-        # При ошибке возвращаем мок-данные
         logger.error(f"Ошибка при получении операционной аналитики: {str(e)}")
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime.now() - timedelta(days=30)
-            end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
-            return analytics.get_mock_operational_metrics(start, end)
-        except Exception:
-            # Если не удалось создать даты, используем текущее время
-            return analytics.get_mock_operational_metrics(
-                datetime.now() - timedelta(days=30),
-                datetime.now()
-            )
+        return {
+            "averageOrderTime": 0,
+            "averageCookingTime": 0,
+            "peakHours": [],
+            "busyDays": [],
+            "tableUtilization": 0,
+            "staffEfficiency": 0,
+            "period": {
+                "startDate": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "endDate": end_date or datetime.now().strftime("%Y-%m-%d")
+            }
+        }
 
 
 @router.get("/predictive", response_model=Dict[str, Any])

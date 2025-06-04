@@ -30,13 +30,19 @@ import {
   MenuMetrics, 
   CustomerMetrics, 
   OperationalMetrics,
-  PredictiveMetrics
+  PredictiveMetrics,
+  TimeRangeFilter
 } from '../../types/analytics';
 import { useTheme } from '@/lib/theme-context';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
-type TimeRange = 'today' | 'week' | 'month' | 'quarter' | 'custom';
-type AnalyticsView = 'dashboard' | 'predictions' | 'recommendations' | 'finance' | 'menu' | 'customers';
+// Типы для аналитики
+type TimeRange = {
+  startDate: string;
+  endDate: string;
+};
+
+type AnalyticsView = 'dashboard' | 'sales' | 'menu' | 'customers' | 'staff' | 'settings' | 'recommendations' | 'predictions' | 'finance';
 
 // Интерфейс для бизнес-рекомендаций
 interface BusinessRecommendation {
@@ -107,7 +113,7 @@ const AdminAnalyticsPage: NextPage = () => {
   const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>('month');
+  const [timeRange, setTimeRange] = useState<TimeRangeFilter>('month');
   const [currentView, setCurrentView] = useState<AnalyticsView>('dashboard');
   
   // Состояния для различных типов метрик
@@ -348,7 +354,7 @@ const AdminAnalyticsPage: NextPage = () => {
   };
 
   // Вспомогательная функция для получения диапазона дат на основе выбранного периода
-  const getDateRangeFromTimeRangeFixed = (range: TimeRange) => {
+  const getDateRangeFromTimeRangeFixed = (range: TimeRangeFilter) => {
     // Возвращаем строки в формате YYYY-MM-DD для API
     const formatDateForApi = (date: Date): string => {
       const year = date.getFullYear();
@@ -757,11 +763,9 @@ const AdminAnalyticsPage: NextPage = () => {
   };
 
   // Обработчик изменения временного диапазона
-  const handleChangeTimeRange = (newRange: TimeRange) => {
+  const handleChangeTimeRange = (newRange: TimeRangeFilter) => {
     setTimeRange(newRange);
-    
-    // Если выбран пользовательский диапазон и не открыт выбор дат - открываем его
-    if (newRange === 'custom' && !showDatePicker) {
+    if (newRange === 'custom') {
       setShowDatePicker(true);
     } else {
       setShowDatePicker(false);
@@ -1361,6 +1365,25 @@ const AdminAnalyticsPage: NextPage = () => {
     return null;
   };
 
+  const getTimeRangeText = (range: TimeRangeFilter): string => {
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0];
+    const monthAgo = new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    const quarterAgo = new Date(new Date().setMonth(new Date().getMonth() - 3)).toISOString().split('T')[0];
+
+    if (range === 'today') {
+      return 'Сегодня';
+    } else if (range === 'week') {
+      return 'За неделю';
+    } else if (range === 'month') {
+      return 'За месяц';
+    } else if (range === 'quarter') {
+      return 'За квартал';
+    } else {
+      return 'Произвольный период';
+    }
+  };
+
   return (
     <Layout title="Система поддержки принятия решений | Админ-панель">
       <div className="container mx-auto px-4 py-8">
@@ -1443,7 +1466,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('today')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'today' 
+                    timeRange === 'today'
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1453,7 +1476,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('week')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'week' 
+                    timeRange === 'week'
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1463,7 +1486,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('month')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'month' 
+                    timeRange === 'month'
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1473,7 +1496,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('quarter')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'quarter' 
+                    timeRange === 'quarter'
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1483,12 +1506,12 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('custom')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'custom' 
+                    timeRange === 'custom'
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
                 >
-                  Выбрать даты
+                  Произвольный период
                 </button>
               </div>
               
@@ -1576,7 +1599,7 @@ const AdminAnalyticsPage: NextPage = () => {
                   <ChartBarIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
               <div className="ml-4">
                     <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.totalRevenue)} ₸</p>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За квартал'}</p>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{getTimeRangeText(timeRange)}</p>
               </div>
             </div>
           </div>
@@ -1602,7 +1625,7 @@ const AdminAnalyticsPage: NextPage = () => {
                   <ShoppingBagIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
               <div className="ml-4">
                     <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(financialMetrics.averageOrderValue)} ₸</p>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{timeRange === 'today' ? 'Сегодня' : timeRange === 'week' ? 'За неделю' : timeRange === 'month' ? 'За месяц' : 'За квартал'}</p>
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{getTimeRangeText(timeRange)}</p>
               </div>
             </div>
           </div>
