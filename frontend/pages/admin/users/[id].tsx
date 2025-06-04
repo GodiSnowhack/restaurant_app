@@ -284,7 +284,7 @@ const UserEditPage: NextPage = () => {
             </div>
           )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 dark:bg-gray-800 dark:text-white">
             {/* Основная информация */}
             <div className="space-y-6">
               <h2 className="text-xl font-semibold border-b pb-2 dark:bg-gray-800 dark:text-white">Основная информация</h2>
