@@ -173,25 +173,25 @@ const WaiterPage: NextPage = () => {
           />
 
           {/* Блок быстрых действий */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold mb-4">Быстрые действия</h2>
+          <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6`}>
+            <h2 className="text-lg font-semibold mb-4 dark:text-white">Быстрые действия</h2>
             
             <div className="space-y-4">
-              <Link href="/waiter/bind" className="block w-full text-left py-3 px-4 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors cursor-pointer">
+              <Link href="/waiter/bind" className="block w-full text-left py-3 px-4 rounded-md bg-indigo-50 dark:bg-indigo-900 hover:bg-indigo-100 dark:hover:bg-indigo-800 text-indigo-700 dark:text-white transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <InformationCircleIcon className="h-5 w-5 mr-2" />
                   <span>Привязать заказ по коду</span>
                 </div>
               </Link>
               
-              <Link href="/waiter/create-order" className="block w-full text-left py-3 px-4 rounded-md bg-green-50 hover:bg-green-100 text-green-700 transition-colors cursor-pointer">
+              <Link href="/waiter/create-order" className="block w-full text-left py-3 px-4 rounded-md bg-green-50 dark:bg-green-900 hover:bg-green-100 dark:hover:bg-green-800 text-green-700 dark:text-white transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <PlusCircleIcon className="h-5 w-5 mr-2" />
                   <span>Создать новый заказ</span>
                 </div>
               </Link>
               
-              <Link href="/waiter/orders" className="block w-full text-left py-3 px-4 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors cursor-pointer">
+              <Link href="/waiter/orders" className="block w-full text-left py-3 px-4 rounded-md bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 text-blue-700 dark:text-white transition-colors cursor-pointer">
                 <div className="flex items-center">
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />

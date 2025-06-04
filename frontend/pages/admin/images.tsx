@@ -110,10 +110,10 @@ const AdminImagesPage: NextPage = () => {
     <Layout title="Управление изображениями | Админ-панель">
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-6">
-          <Link href="/admin" className="text-gray-600 hover:text-primary mr-4">
+          <Link href="/admin" className="text-gray-600 dark:text-white hover:text-primary mr-4">
             <ArrowLeftIcon className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold">Управление изображениями</h1>
+          <h1 className="text-3xl font-bold dark:text-white">Управление изображениями</h1>
         </div>
         
         {error && (
@@ -122,8 +122,8 @@ const AdminImagesPage: NextPage = () => {
           </div>
         )}
         
-        <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Загрузить новое изображение</h2>
+        <div className="bg-white dark:bg-gray-900 shadow-md rounded-lg p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 dark:text-white">Загрузить новое изображение</h2>
           <ImageUploader
             onImageUpload={handleImageUpload}
             deleteFromServer={false}
@@ -131,16 +131,16 @@ const AdminImagesPage: NextPage = () => {
           />
         </div>
         
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Список изображений</h2>
+        <div className="bg-white dark:bg-gray-900 shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 dark:text-white">Список изображений</h2>
           
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
             </div>
           ) : images.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <UploadIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <div className="text-center py-8 text-gray-500 dark:text-white">
+              <UploadIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
               <p>Нет загруженных изображений</p>
               <p className="text-sm mt-2">Загрузите изображения с помощью формы выше</p>
             </div>
@@ -156,7 +156,7 @@ const AdminImagesPage: NextPage = () => {
                     />
                   </div>
                   <div className="mt-2 flex justify-between items-center">
-                    <span className="text-sm text-gray-500 truncate">
+                    <span className="text-sm text-gray-500 dark:text-white truncate">
                       {image.filename}
                     </span>
                     <button

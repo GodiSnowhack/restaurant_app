@@ -104,19 +104,19 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
       <Header />
 
       {/* Основная навигация - только Главная и Заказы */}
-      <div className="bg-white shadow-md">
+      <div className="bg-white dark:bg-gray-900 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex space-x-8">
               <Link href="/waiter" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                currentTab === 'home' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                currentTab === 'home' ? 'border-primary text-primary dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-white'
               }`}>
                 <HomeIcon className="h-5 w-5 mr-1" />
                 <span>Главная</span>
               </Link>
               
               <Link href="/waiter/orders" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                currentTab === 'orders' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                currentTab === 'orders' ? 'border-primary text-primary dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-white'
               }`}>
                 <ListBulletIcon className="h-5 w-5 mr-1" />
                 <span>Заказы</span>
@@ -128,7 +128,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
               </Link>
               
               <Link href="/waiter/create-order" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                currentTab === 'create-order' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                currentTab === 'create-order' ? 'border-primary text-primary dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-white'
               }`}>
                 <PlusCircleIcon className="h-5 w-5 mr-1" />
                 <span>Создать заказ</span>
@@ -219,10 +219,10 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
       </main>
 
       {/* Футер */}
-      <footer className="bg-white mt-auto">
+      <footer className="bg-white dark:bg-gray-900 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-sm text-gray-500 text-center">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-sm text-gray-500 dark:text-white text-center">
               © {new Date().getFullYear()} Система управления рестораном
             </p>
           </div>

@@ -351,7 +351,7 @@ const AdminReservationsPage: NextPage = () => {
     const isUpdating = isStatusUpdating[id.toString()];
     
     return (
-      <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
         <div className="flex justify-between items-start">
           <div>
             <h3 className="text-lg font-bold">Стол #{table_number}</h3>
@@ -445,7 +445,7 @@ const AdminReservationsPage: NextPage = () => {
 
   return (
     <Layout title="Управление бронированиями">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
         <div className="flex items-center mb-6">
           <Link href="/admin" className="flex items-center text-blue-600 hover:text-blue-800">
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
@@ -475,7 +475,7 @@ const AdminReservationsPage: NextPage = () => {
         
         {/* Панель фильтров */}
         {showFilters && (
-          <div className="bg-white p-4 mb-6 rounded-lg shadow-md">
+          <div className="bg-white dark:bg-gray-800 p-4 mb-6 rounded-lg shadow-md">
             <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Дата бронирования</label>

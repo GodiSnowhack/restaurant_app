@@ -102,7 +102,7 @@ const DishModal: React.FC<DishModalProps> = ({
 
             {/* Информация о блюде */}
             <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">{dish.name}</h2>
+              <h2 className="text-2xl font-bold mb-4 dark:text-white">{dish.name}</h2>
               
               {dish.description && (
                 <p className="text-gray-600 dark:text-white text-sm mb-4">{dish.description}</p>

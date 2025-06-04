@@ -124,8 +124,8 @@ const ProfilePage: NextPage = () => {
 
   return (
     <Layout title="Профиль">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Личный кабинет</h1>
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
+        <h1 className="text-3xl font-bold mb-8 dark:text-white">Личный кабинет</h1>
 
         {showSuccess && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
@@ -137,14 +137,14 @@ const ProfilePage: NextPage = () => {
           {/* Боковое меню */}
           <div className="md:w-1/4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-              <div className="p-6 bg-gray-50 border-b">
+              <div className="p-6 bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
                 <div className="flex items-center space-x-4">
                   <div className="h-14 w-14 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
                     {user?.full_name?.charAt(0) || 'U'}
                   </div>
                   <div>
-                    <h2 className="font-medium">{user?.full_name || 'Пользователь'}</h2>
-                    <p className="text-sm text-gray-500">{user?.email}</p>
+                    <h2 className="font-medium dark:text-white">{user?.full_name || 'Пользователь'}</h2>
+                    <p className="text-sm text-gray-500 dark:text-white">{user?.email}</p>
                   </div>
                 </div>
               </div>
@@ -154,11 +154,7 @@ const ProfilePage: NextPage = () => {
                   <li>
                     <button
                       onClick={() => setActiveTab('profile')}
-                      className={`flex items-center w-full px-4 py-2 rounded-md ${
-                        activeTab === 'profile' 
-                          ? 'bg-primary text-white' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
+                      className={`flex items-center w-full px-4 py-2 rounded-md ${activeTab === 'profile' ? 'bg-primary text-white' : 'text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                     >
                       <UserIcon className="h-5 w-5 mr-3" />
                       Информация
@@ -167,11 +163,7 @@ const ProfilePage: NextPage = () => {
                   <li>
                     <button
                       onClick={() => setActiveTab('password')}
-                      className={`flex items-center w-full px-4 py-2 rounded-md ${
-                        activeTab === 'password' 
-                          ? 'bg-primary text-white' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
+                      className={`flex items-center w-full px-4 py-2 rounded-md ${activeTab === 'password' ? 'bg-primary text-white' : 'text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                     >
                       <KeyIcon className="h-5 w-5 mr-3" />
                       Сменить пароль
@@ -188,17 +180,17 @@ const ProfilePage: NextPage = () => {
                       </Link>
                       <Link 
                         href="/reservations" 
-                        className="inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md text-primary bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm border-primary"
+                        className="inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md text-primary dark:text-white bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm border-primary"
                       >
                         <CalendarIcon className="h-5 w-5 mr-2" />
                         Мои бронирования
                       </Link>
                     </div>
                   </li>
-                  <li className="pt-4 border-t mt-4">
+                  <li className="pt-4 border-t mt-4 dark:border-gray-700">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 rounded-md text-red-600 hover:bg-red-50"
+                      className="flex items-center w-full px-4 py-2 rounded-md text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
                     >
                       <LogoutIcon className="h-5 w-5 mr-3" />
                       Выйти

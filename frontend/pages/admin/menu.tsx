@@ -255,7 +255,7 @@ const AdminMenuPage: NextPage = () => {
 
   return (
     <Layout title="Управление меню | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link 
@@ -282,7 +282,7 @@ const AdminMenuPage: NextPage = () => {
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Добавить блюдо
-          </Link>
+            </Link>
           </div>
         </div>
 
@@ -373,36 +373,36 @@ const AdminMenuPage: NextPage = () => {
                   <Link
                     href="/admin/menu/add"
                     className={`inline-flex items-center px-4 py-2 ${isDark ? 'bg-primary-500 hover:bg-primary-400 text-white' : 'bg-primary hover:bg-primary-dark text-white'} border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary${isDark ? '-400' : ''}`}
-              >
+                  >
                     <PlusIcon className="h-4 w-4 mr-2" />
-                Добавить блюдо
+                    Добавить блюдо
                   </Link>
-            </div>
+                </div>
               ) : (
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className={`min-w-full divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
                     <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
-                    <tr>
+                      <tr>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Изображение
-                      </th>
+                          Изображение
+                        </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Название
-                      </th>
+                          Название
+                        </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Категория
-                      </th>
+                          Категория
+                        </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Цена
-                      </th>
+                          Цена
+                        </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Статус
-                      </th>
+                          Статус
+                        </th>
                         <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Действия
-                      </th>
-                    </tr>
-                  </thead>
+                          Действия
+                        </th>
+                      </tr>
+                    </thead>
                     <tbody className={`${isDark ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}`}>
                       {finalFilteredDishes.map((dish) => (
                         <tr key={dish.id} className={
@@ -464,26 +464,17 @@ const AdminMenuPage: NextPage = () => {
                           </td>
                         </tr>
                       ))}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
             {/* Форма добавления блюда (по клику на кнопку) */}
             {showDishForm && (
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Добавить блюдо</h2>
-                    <button
-                      onClick={() => setShowDishForm(false)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <span className="text-2xl">&times;</span>
-                    </button>
-                  </div>
-                  
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <h2 className="text-2xl font-bold mb-4 dark:text-white">Создать блюдо</h2>
                   <form className="space-y-4" onSubmit={handleAddDish}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

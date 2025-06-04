@@ -263,9 +263,9 @@ const OrdersPage: NextPage = () => {
   }
 
   return (
-    <Layout title="Мои заказы">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6" onClick={handleTripleClick}>Мои заказы</h1>
+    <Layout title="История заказов">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
+        <h1 className="text-3xl font-bold mb-8 dark:text-white">История заказов</h1>
 
         {showDemoDataControls && (
           <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
@@ -359,7 +359,8 @@ const OrdersPage: NextPage = () => {
         )}
 
         {orders.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Ваши заказы</h2>
             <div className="flex justify-center mb-4">
               <svg className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -375,13 +376,13 @@ const OrdersPage: NextPage = () => {
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="px-6 py-4 border-b">
-              <h2 className="text-xl font-semibold">История заказов</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">История заказов</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Номер заказа
@@ -409,32 +410,22 @@ const OrdersPage: NextPage = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200">
                   {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{order.id}</div>
+                    <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">#{order.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{formatDate(order.created_at)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{order.customer_name || "—"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{order.customer_phone || "—"}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
+                        {(order.total_amount !== undefined && order.total_amount !== null 
+                          ? Number(order.total_amount).toFixed(2) 
+                          : '0.00')} ₸
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(order.created_at)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.customer_name || "—"}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.customer_phone || "—"}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {(order.total_amount !== undefined && order.total_amount !== null 
-                            ? Number(order.total_amount).toFixed(2) 
-                            : '0.00')} ₸
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
                         {getStatusBadge(order.status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
                         <div className="flex items-center">
                           {order.payment_method === 'card' || order.payment_status === 'paid' ? (
                             <CreditCardIcon className="h-5 w-5 text-gray-400 mr-1" />

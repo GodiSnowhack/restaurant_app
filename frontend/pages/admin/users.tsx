@@ -85,6 +85,7 @@ const AdminUsersPage: NextPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showRoleFilter, setShowRoleFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   // Дебаунс для поисковых запросов
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -231,7 +232,7 @@ const AdminUsersPage: NextPage = () => {
 
   return (
     <Layout title="Пользователи | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link href="/admin" className={`inline-flex items-center px-3 py-2 border ${isDark ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-100'} rounded-md`}>
@@ -338,144 +339,160 @@ const AdminUsersPage: NextPage = () => {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col">
-            <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                <div className={`shadow overflow-hidden border-b sm:rounded-lg ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <table className={`min-w-full divide-y ${isDark ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'}`}>
-                    <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
-                      <tr>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          ID
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Пользователь
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Контакты
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Роль
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Возрастная группа
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Статус
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Создан
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Обновлен
-                        </th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                          Действия
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                      {filteredUsers.map((user) => (
-                        <tr 
-                          key={user.id} 
-                          className={isDark ? 'hover:bg-gray-750' : 'hover:bg-gray-50'} 
-                          onClick={() => router.push(`/admin/users/${user.id}`)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>{user.id}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`flex items-center`}>
-                              <div className={`flex-shrink-0 h-10 w-10 bg-gray-200 ${isDark ? 'bg-gray-700' : ''} rounded-full flex items-center justify-center`}>
-                                <UserIcon className="h-6 w-6 text-gray-400" />
-                              </div>
-                              <div className="ml-4">
-                                <div className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{user.full_name}</div>
-                                <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{user.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
-                              {user.phone || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="relative group">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${roleColors[user.role] || 'gray'}-${isDark ? '900/50' : '100'} text-${roleColors[user.role] || 'gray'}-${isDark ? '200' : '800'} cursor-pointer`}>
-                                  {roleIcons[user.role] || <UserIcon className="h-3 w-3 mr-1" />}
-                                  {roleDisplayNames[user.role] || user.role}
-                                </span>
-                                
-                                <div className={`absolute z-10 left-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none scale-0 group-hover:scale-100 transition-transform origin-top-left ${isDark ? 'bg-gray-800 text-white' : ''}`} role="menu" aria-orientation="vertical" aria-labelledby="role-menu">
-                                  {Object.entries(roleDisplayNames).map(([role, name]) => (
-                                    <button
-                                      key={role}
-                                      className={`block w-full text-left px-4 py-2 text-sm ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${role === user.role ? isDark ? 'bg-gray-700' : 'bg-gray-100' : ''}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        changeUserRole(user.id, role);
-                                      }}
-                                    >
-                                      <span className="flex items-center">
-                                        {roleIcons[role] || <UserIcon className="h-3 w-3 mr-1" />} {name}
-                                      </span>
-                                    </button>
-                                  ))}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 overflow-x-auto">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Список пользователей</h2>
+            <div className="flex flex-col">
+              <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                  <div className={`shadow overflow-hidden border-b sm:rounded-lg ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <table className={`min-w-full divide-y ${isDark ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'}`}>
+                      <thead className={isDark ? 'bg-gray-900/50' : 'bg-gray-50'}>
+                        <tr>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            ID
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Пользователь
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Контакты
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Роль
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Возрастная группа
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Статус
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Создан
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Обновлен
+                          </th>
+                          <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                            Действия
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                        {filteredUsers.map((user) => (
+                          <tr 
+                            key={user.id} 
+                            className={isDark ? 'hover:bg-gray-750' : 'hover:bg-gray-50'} 
+                            onClick={() => {
+                              setSelectedUser(user);
+                              router.push(`/admin/users/${user.id}`);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>{user.id}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`flex items-center`}>
+                                <div className={`flex-shrink-0 h-10 w-10 bg-gray-200 ${isDark ? 'bg-gray-700' : ''} rounded-full flex items-center justify-center`}>
+                                  <UserIcon className="h-6 w-6 text-gray-400" />
+                                </div>
+                                <div className="ml-4">
+                                  <div className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{user.full_name}</div>
+                                  <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{user.email}</div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
-                              {translateAgeGroup(user.age_group)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              user.is_active 
-                                ? isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-800'
-                                : isDark ? 'bg-red-900/50 text-red-200' : 'bg-red-100 text-red-800'
-                            }`}>
-                              {user.is_active ? 'Активен' : 'Неактивен'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{formatDate(user.created_at)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{formatDate(user.updated_at)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/admin/users/${user.id}/edit`);
-                                }}
-                                className={`text-indigo-600 hover:text-indigo-900 ${isDark ? 'text-indigo-400 hover:text-indigo-300' : ''}`}
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteUser(user.id);
-                                }}
-                                className={`text-red-600 hover:text-red-900 ${isDark ? 'text-red-400 hover:text-red-300' : ''}`}
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                                {user.phone || '-'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="relative group">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${roleColors[user.role] || 'gray'}-${isDark ? '900/50' : '100'} text-${roleColors[user.role] || 'gray'}-${isDark ? '200' : '800'} cursor-pointer`}>
+                                    {roleIcons[user.role] || <UserIcon className="h-3 w-3 mr-1" />}
+                                    {roleDisplayNames[user.role] || user.role}
+                                  </span>
+                                  
+                                  <div className={`absolute z-10 left-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none scale-0 group-hover:scale-100 transition-transform origin-top-left ${isDark ? 'bg-gray-800 text-white' : ''}`} role="menu" aria-orientation="vertical" aria-labelledby="role-menu">
+                                    {Object.entries(roleDisplayNames).map(([role, name]) => (
+                                      <button
+                                        key={role}
+                                        className={`block w-full text-left px-4 py-2 text-sm ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${role === user.role ? isDark ? 'bg-gray-700' : 'bg-gray-100' : ''}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          changeUserRole(user.id, role);
+                                        }}
+                                      >
+                                        <span className="flex items-center">
+                                          {roleIcons[role] || <UserIcon className="h-3 w-3 mr-1" />} {name}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                                {translateAgeGroup(user.age_group)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                user.is_active 
+                                  ? isDark ? 'bg-green-900/50 text-green-200' : 'bg-green-100 text-green-800'
+                                  : isDark ? 'bg-red-900/50 text-red-200' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {user.is_active ? 'Активен' : 'Неактивен'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{formatDate(user.created_at)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>{formatDate(user.updated_at)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/admin/users/${user.id}/edit`);
+                                  }}
+                                  className={`text-indigo-600 hover:text-indigo-900 ${isDark ? 'text-indigo-400 hover:text-indigo-300' : ''}`}
+                                >
+                                  <PencilIcon className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteUser(user.id);
+                                  }}
+                                  className={`text-red-600 hover:text-red-900 ${isDark ? 'text-red-400 hover:text-red-300' : ''}`}
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Подробности пользователя */}
+        {selectedUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4 dark:text-white">Детали пользователя</h2>
+              {/* ...детали... */}
             </div>
           </div>
         )}

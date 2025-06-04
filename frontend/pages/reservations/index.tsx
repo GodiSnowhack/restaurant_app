@@ -1028,7 +1028,7 @@ const ReservationsPage: NextPage = () => {
                           px-6 py-4 whitespace-nowrap text-sm font-medium
                           ${isDark ? 'text-gray-100' : 'text-gray-900'}
                         `}>
-                          <Link href={`/reservations/${reservation.id}`} className="text-primary hover:underline">
+                          <Link href={`/reservations/${reservation.id}`} className="text-primary hover:underline dark:text-white">
                             Подробнее
                           </Link>
                         </td>

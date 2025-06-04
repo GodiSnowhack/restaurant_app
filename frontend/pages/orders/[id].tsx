@@ -465,8 +465,9 @@ const OrderDetailPage: NextPage = () => {
   }
 
   return (
-    <Layout title={`Заказ ${order?.id || ''}`}>
-      <div className="container mx-auto px-4 py-8">
+    <Layout title={`Заказ №${id}`}>
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
+        <h1 className="text-3xl font-bold mb-8 dark:text-white">Детали заказа</h1>
         <div className="mb-6">
           <Link href="/orders" className="inline-flex items-center text-blue-500 hover:text-blue-700">
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -491,8 +492,8 @@ const OrderDetailPage: NextPage = () => {
             </div>
           </div>
         ) : order ? (
-          <div className="bg-white shadow-md rounded-lg overflow-hidden">
-            {/* Header с номером заказа и статусом */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Информация о заказе</h2>
             <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center">
                     <div>
                 <div className="flex items-center mb-2">
@@ -526,9 +527,7 @@ const OrderDetailPage: NextPage = () => {
               </div>
             </div>
             
-            {/* Информация о заказе */}
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Колонка с блюдами */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">Блюда в заказе</h2>
                 
@@ -559,14 +558,12 @@ const OrderDetailPage: NextPage = () => {
                   <p className="text-gray-500 italic">Нет данных о блюдах в заказе</p>
                 )}
 
-                {/* Отображаем код заказа */}
                 {order && order.order_code && (
                   <div className="mt-4">
                     <OrderCode code={order.order_code} />
                   </div>
                 )}
 
-                {/* Не показываем отдельный код официанта, если он совпадает с кодом заказа */}
                 {!order.order_code && waiterCode && (
                   <div className="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-200">
                     <h3 className="font-semibold text-blue-800 mb-2 flex items-center">
@@ -585,7 +582,6 @@ const OrderDetailPage: NextPage = () => {
                 )}
               </div>
               
-              {/* Колонка с деталями заказа */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">Детали заказа</h2>
                 
@@ -646,7 +642,6 @@ const OrderDetailPage: NextPage = () => {
                     </div>
                   )}
                   
-                  {/* Используем поле comment вместо special_instructions, так как его нет в Order из types/index.ts */}
                   {order?.comment && (
                     <div className="flex justify-between">
                       <p className="text-gray-600">Примечания:</p>
@@ -655,7 +650,6 @@ const OrderDetailPage: NextPage = () => {
                   )}
                 </div>
                 
-                {/* Кнопка оплаты заказа */}
                 {order.payment_status === 'pending' && order.status !== 'cancelled' && (
                   <div className="mt-6">
                     <button
@@ -678,7 +672,6 @@ const OrderDetailPage: NextPage = () => {
                   </div>
                 )}
 
-                {/* Особые инструкции - используем поле comment вместо special_instructions */}
                 {order?.comment && (
                   <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                     <h3 className="font-semibold text-yellow-800 mb-2 flex items-center">
@@ -691,7 +684,6 @@ const OrderDetailPage: NextPage = () => {
               </div>
             </div>
             
-            {/* Добавляем форму отзывов о заказе и обслуживании */}
             {order && order.id && (
               <div className="p-6 border-t border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Оценить заказ</h2>
@@ -703,7 +695,6 @@ const OrderDetailPage: NextPage = () => {
               </div>
             )}
             
-            {/* Отладочная информация для администратора */}
             {showDebug && debugData && (
               <div className="p-6 border-t border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Отладочная информация</h2>

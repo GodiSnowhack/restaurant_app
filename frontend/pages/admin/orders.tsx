@@ -50,6 +50,7 @@ const AdminOrdersPage: NextPage = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
   const [showDemoDataControls, setShowDemoDataControls] = useState(false);
   const [useDemoData, setUseDemoData] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Эффект для отслеживания и установки настроек демо-данных
   useEffect(() => {
@@ -425,7 +426,7 @@ const AdminOrdersPage: NextPage = () => {
   if (isLoading) {
     return (
       <Layout title="Управление заказами | Админ-панель">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
@@ -436,7 +437,7 @@ const AdminOrdersPage: NextPage = () => {
 
   return (
     <Layout title="Управление заказами | Админ-панель">
-      <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
+      <div className="max-w-[1400px] w-full mx-auto px-4 py-8 dark:bg-gray-900 min-h-screen">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold" onClick={handleTripleClick}>Управление заказами</h1>
           <button 
@@ -702,6 +703,16 @@ const AdminOrdersPage: NextPage = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Подробности заказа */}
+        {selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4 dark:text-white">Детали заказа</h2>
+              {/* ...детали... */}
             </div>
           </div>
         )}

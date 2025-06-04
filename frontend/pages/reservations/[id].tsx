@@ -170,18 +170,18 @@ const ReservationDetailPage: NextPage = () => {
           Вернуться к бронированиям
         </Link>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className={`bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden`}>
           <div className="px-6 py-4 bg-gradient-to-r from-primary to-primary-dark text-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <h1 className="text-xl font-bold">Бронирование #{reservation.id}</h1>
+              <h1 className="text-xl font-bold dark:text-white">Бронирование #{reservation.id}</h1>
               <div className="mt-2 md:mt-0">{getStatusBadge(reservation.status)}</div>
             </div>
           </div>
 
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h2 className="text-lg font-semibold mb-4 flex items-center">
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-lg font-semibold mb-4 flex items-center dark:text-white">
                   <CalendarIcon className="h-5 w-5 text-primary mr-2" />
                   Детали бронирования
                 </h2>
@@ -189,8 +189,8 @@ const ReservationDetailPage: NextPage = () => {
                   <li className="flex items-start">
                     <ClockIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                     <div>
-                      <span className="text-sm text-gray-500 block">Дата и время</span>
-                      <span className="font-medium">
+                      <span className="text-sm text-gray-500 dark:text-white block">Дата и время</span>
+                      <span className="font-medium dark:text-white">
                         {formatDateTime(reservation.reservation_date, reservation.reservation_time)}
                       </span>
                     </div>
@@ -198,15 +198,15 @@ const ReservationDetailPage: NextPage = () => {
                   <li className="flex items-start">
                     <UserGroupIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                     <div>
-                      <span className="text-sm text-gray-500 block">Количество гостей</span>
-                      <span className="font-medium">{reservation.guests_count} чел.</span>
+                      <span className="text-sm text-gray-500 dark:text-white block">Количество гостей</span>
+                      <span className="font-medium dark:text-white">{reservation.guests_count} чел.</span>
                     </div>
                   </li>
                   <li className="flex items-start">
                     <LocationMarkerIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                     <div>
-                      <span className="text-sm text-gray-500 block">Стол</span>
-                      <span className="font-medium">
+                      <span className="text-sm text-gray-500 dark:text-white block">Стол</span>
+                      <span className="font-medium dark:text-white">
                         {reservation.table ? reservation.table.name : (reservation.table_number ? `Столик №${reservation.table_number}` : 'Любой подходящий')}
                       </span>
                     </div>
@@ -214,8 +214,8 @@ const ReservationDetailPage: NextPage = () => {
                 </ul>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h2 className="text-lg font-semibold mb-4 flex items-center">
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-lg font-semibold mb-4 flex items-center dark:text-white">
                   <UserGroupIcon className="h-5 w-5 text-primary mr-2" />
                   Контактная информация
                 </h2>
@@ -223,23 +223,23 @@ const ReservationDetailPage: NextPage = () => {
                   <li className="flex items-start">
                     <UserGroupIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                     <div>
-                      <span className="text-sm text-gray-500 block">Имя</span>
-                      <span className="font-medium">{reservation.guest_name}</span>
+                      <span className="text-sm text-gray-500 dark:text-white block">Имя</span>
+                      <span className="font-medium dark:text-white">{reservation.guest_name}</span>
                     </div>
                   </li>
                   <li className="flex items-start">
                     <PhoneIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                     <div>
-                      <span className="text-sm text-gray-500 block">Телефон</span>
-                      <span className="font-medium">{reservation.guest_phone}</span>
+                      <span className="text-sm text-gray-500 dark:text-white block">Телефон</span>
+                      <span className="font-medium dark:text-white">{reservation.guest_phone}</span>
                     </div>
                   </li>
                   {reservation.guest_email && (
                     <li className="flex items-start">
                       <MailIcon className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                       <div>
-                        <span className="text-sm text-gray-500 block">Email</span>
-                        <span className="font-medium">{reservation.guest_email}</span>
+                        <span className="text-sm text-gray-500 dark:text-white block">Email</span>
+                        <span className="font-medium dark:text-white">{reservation.guest_email}</span>
                       </div>
                     </li>
                   )}
@@ -281,9 +281,9 @@ const ReservationDetailPage: NextPage = () => {
             )}
 
             {reservation.comments && (
-              <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                <h2 className="text-lg font-semibold mb-2">Комментарий</h2>
-                <p className="text-gray-700">{reservation.comments}</p>
+              <div className="mb-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-lg font-semibold mb-2 dark:text-white">Комментарий</h2>
+                <p className="text-gray-700 dark:text-white">{reservation.comments}</p>
               </div>
             )}
 
