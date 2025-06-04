@@ -2621,33 +2621,29 @@ const AdminAnalyticsPage: NextPage = () => {
                 
                 <div className={`p-6 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
                   <h4 className={`font-medium mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Популярность категорий</h4>
-                  
-                  {/* Добавляем демо-данные для отображения популярности категорий */}
                   <div className="space-y-4">
-                    {[
-                      { id: '1', name: 'Супы', salesPercentage: 18.5, averageOrderValue: 1200, averageProfitMargin: 35 },
-                      { id: '2', name: 'Основные блюда', salesPercentage: 32.7, averageOrderValue: 2500, averageProfitMargin: 42 },
-                      { id: '3', name: 'Салаты', salesPercentage: 15.3, averageOrderValue: 1100, averageProfitMargin: 52 },
-                      { id: '4', name: 'Десерты', salesPercentage: 20.8, averageOrderValue: 900, averageProfitMargin: 62 },
-                      { id: '5', name: 'Напитки', salesPercentage: 12.7, averageOrderValue: 500, averageProfitMargin: 75 }
-                    ].map((category) => (
-                      <div key={category.id} className="mb-4">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.name}</span>
-                          <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.salesPercentage.toFixed(1)}%</span>
+                    {menuMetrics && menuMetrics.categoryPerformance && Object.keys(menuMetrics.categoryPerformance).length > 0 ? (
+                      Object.values(menuMetrics.categoryPerformance).map((category: any) => (
+                        <div key={category.id} className="mb-4">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.name}</span>
+                            <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.salesPercentage?.toFixed(1) ?? 0}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
+                              style={{ width: `${category.salesPercentage ?? 0}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between text-xs mt-1">
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Ср. чек: {formatCurrency(category.averageOrderValue ?? 0)} ₸</span>
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {category.averageProfitMargin ?? 0}%</span>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
-                            style={{ width: `${category.salesPercentage}%` }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs mt-1">
-                          <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Ср. чек: {formatCurrency(category.averageOrderValue)} ₸</span>
-                          <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {category.averageProfitMargin}%</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="text-center text-gray-400 py-8">Нет данных по категориям</div>
+                    )}
                   </div>
                 </div>
               </div>
