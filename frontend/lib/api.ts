@@ -1254,17 +1254,45 @@ export const createServiceReview = async (data: any): Promise<any> => {
   }
 };
 
-export const createCombinedReview = async (data: {
+interface CombinedReviewCreate {
   order_id: number;
   food_rating: number;
   service_rating: number;
   comment?: string;
-}): Promise<any> => {
+}
+
+interface CombinedReview {
+  id: number;
+  order_id: number;
+  food_rating: number;
+  service_rating: number;
+  comment?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const createCombinedReview = async (data: CombinedReviewCreate): Promise<CombinedReview> => {
   try {
-    const response = await api.post('/reviews/combined', data);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+    const endpoint = `${apiUrl}/reviews/combined`;
+    
+    console.log('API Client - Отправка запроса:', {
+      url: endpoint,
+      data
+    });
+
+    const response = await axios.post(endpoint, data, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    console.log('API Client - Успешный ответ:', response.data);
     return response.data;
   } catch (error: any) {
-    console.error('Error creating combined review:', error);
+    console.error('API Client - Ошибка:', error.response?.data || error.message);
     throw error;
   }
 };

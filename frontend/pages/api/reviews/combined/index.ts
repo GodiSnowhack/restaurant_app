@@ -48,7 +48,8 @@ export default async function createCombinedReviewProxy(req: NextApiRequest, res
       });
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    // Получаем URL API из переменных окружения
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
     const endpoint = `${apiUrl}/reviews/combined`;
 
     console.log('Reviews API - Отправка запроса:', {
