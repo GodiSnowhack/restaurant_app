@@ -242,7 +242,7 @@ const AdminUsersPage: NextPage = () => {
             <h1 className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Управление пользователями</h1>
           </div>
           
-          <Link href="/admin/users/create" className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium ${isDark ? 'text-black bg-primary-400 hover:bg-primary-300' : 'text-white bg-primary hover:bg-primary-dark'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary`}>
+          <Link href="/admin/users/create" className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium ${isDark ? 'text-black bg-primary-400 hover:bg-primary-300 dark:bg-gray-800 dark:text-white' : 'text-white bg-primary hover:bg-primary-dark'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary`}>
             <UserAddIcon className="h-5 w-5 mr-2 dark:bg-gray-900 dark:text-white" />
             Добавить пользователя
           </Link>
