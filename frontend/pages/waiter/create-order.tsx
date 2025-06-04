@@ -464,58 +464,56 @@ const CreateOrderPage: NextPage = () => {
   
   return (
     <WaiterLayout title="Создать заказ" activeTab="create-order">
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Меню (левая часть) */}
-        <div className="w-full md:w-2/3">
-          {/* Фильтр по категориям */}
-          <div className="mb-4 bg-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold mb-2">Категории</h2>
-            <div className="flex flex-wrap gap-2">
+      <div className="container mx-auto px-4 py-8 bg-white dark:bg-gray-900 min-h-screen">
+        <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Создать заказ</h1>
+        {/* Категории */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Категории</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`px-4 py-2 rounded-full text-sm ${
+                selectedCategory === 'all'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Все
+            </button>
+            {categories.map(category => (
               <button
-                onClick={() => setSelectedCategory('all')}
+                key={category.id}
+                onClick={() => {
+                  console.log(`Выбрана категория: ${category.name} с ID: ${category.id}`);
+                  setSelectedCategory(category.id);
+                }}
                 className={`px-4 py-2 rounded-full text-sm ${
-                  selectedCategory === 'all'
+                  selectedCategory === category.id
                     ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Все
+                {category.name}
               </button>
-              {categories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => {
-                    console.log(`Выбрана категория: ${category.name} с ID: ${category.id}`);
-                    setSelectedCategory(category.id);
-                  }}
-                  className={`px-4 py-2 rounded-full text-sm ${
-                    selectedCategory === category.id
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-          
-          {/* Список блюд */}
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold">Меню</h2>
+        </div>
+        {/* Меню и заказ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Меню</h3>
+            {/* Список блюд */}
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
               </div>
+            ) : (
               <div className="divide-y">
                 {filteredMenuItems.length > 0 ? (
                   filteredMenuItems.map(item => (
                     <div key={item.id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
                       <div>
-                        <h3 className="font-medium">{item.name}</h3>
+                        <h4 className="font-medium">{item.name}</h4>
                         <p className="text-sm text-gray-600">{item.description}</p>
                         <p className="mt-1 font-medium text-primary">{item.price.toFixed(2)} ₸</p>
                       </div>
@@ -533,17 +531,10 @@ const CreateOrderPage: NextPage = () => {
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-        
-        {/* Заказ (правая часть) */}
-        <div className="w-full md:w-1/3">
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-lg font-semibold">Текущий заказ</h2>
-            </div>
-            
+            )}
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Текущий заказ</h3>
             {/* Данные о столе/клиенте */}
             <div className="p-4 border-b">
               <div className="mb-3">

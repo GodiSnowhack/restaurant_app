@@ -81,19 +81,19 @@ const CartPage: NextPage = () => {
     return (
       <Layout title="Корзина">
         <div className="container mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold mb-8">Корзина</h1>
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-gray-100">Корзина</h1>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
             <div className="flex justify-center mb-4">
-              <ShoppingCartIcon className="h-16 w-16 text-gray-400" />
+              <ShoppingCartIcon className="h-16 w-16 text-gray-400 dark:text-gray-500" />
             </div>
-            <h2 className="text-2xl font-medium mb-4">Ваша корзина пуста</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-medium mb-4 text-gray-900 dark:text-gray-100">Ваша корзина пуста</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               Добавьте блюда из меню, чтобы сделать заказ
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <Link 
                 href="/menu" 
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm"
+                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm"
               >
                 <ArrowLeftIcon className="h-5 w-5 mr-2" />
                 Продолжить покупки
