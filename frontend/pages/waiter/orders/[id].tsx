@@ -665,7 +665,7 @@ const WaiterOrderDetailPage: NextPage = () => {
           </div>
 
         {/* Заголовок и статус */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 dark:text-white">
           <h1 className="text-3xl font-bold mb-4 md:mb-0">Заказ #{order.id}</h1>
           <div className="flex flex-col sm:flex-row gap-2">
             <span className={`${getStatusColor(order.status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
@@ -680,7 +680,7 @@ const WaiterOrderDetailPage: NextPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Информация о заказе */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6 dark:text-white">
               <div className="px-6 py-4 border-b dark:text-white">
                 <h2 className="text-xl font-semibold">Информация о заказе</h2>
               </div>
@@ -726,12 +726,12 @@ const WaiterOrderDetailPage: NextPage = () => {
                 {order.comment && (
           <div className="mb-6">
                     <p className="text-sm text-gray-600 mb-1 dark:text-white">Комментарий к заказу</p>
-                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800 dark:text-white">{order.comment}</p>
+                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800 dark:text-white dark:bg-gray-800">{order.comment}</p>
                   </div>
                 )}
                 
                 {/* Информация о клиенте */}
-                <div className="border-t pt-4 mt-4">
+                <div className="border-t pt-4 mt-4 dark:text-white">
                   <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -768,16 +768,16 @@ const WaiterOrderDetailPage: NextPage = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Блюдо
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Количество
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Цена
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Сумма
                       </th>
                     </tr>
