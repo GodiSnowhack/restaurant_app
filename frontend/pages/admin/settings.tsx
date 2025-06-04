@@ -324,7 +324,7 @@ const AdminSettingsPage: NextPage = () => {
                           : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      <CogIcon className="h-5 w-5 mr-2" />
+                      <CogIcon className="h-5 w-5 mr-2 " />
                       Основные настройки
                     </button>
                     <button
@@ -391,11 +391,11 @@ const AdminSettingsPage: NextPage = () => {
                 {/* Основные настройки */}
                 {activeTab === 'general' && (
                   <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Основные настройки</h2>
+                    <h2 className="text-xl font-medium dark:text-white">Основные настройки</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label htmlFor="restaurant_name" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="restaurant_name" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Название ресторана
                         </label>
                         <input
@@ -409,7 +409,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Электронная почта
                         </label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -428,7 +428,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Телефон
                         </label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -447,7 +447,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="website" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Веб-сайт
                         </label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -466,7 +466,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div className="md:col-span-2">
-                        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Адрес
                         </label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -495,7 +495,7 @@ const AdminSettingsPage: NextPage = () => {
                           onChange={(e) => handleChange('table_reservation_enabled', e.target.checked)}
                           className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                         />
-                        <label htmlFor="table_reservation_enabled" className="ml-2 block text-sm text-gray-900">
+                        <label htmlFor="table_reservation_enabled" className="ml-2 block text-sm text-gray-900 dark:text-white">
                           Разрешить бронирование столиков
                         </label>
                       </div>
@@ -505,8 +505,8 @@ const AdminSettingsPage: NextPage = () => {
 
                 {/* Часы работы */}
                 {activeTab === 'hours' && (
-                  <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Часы работы</h2>
+                  <div className="space-y-6 dark:text-white">
+                    <h2 className="text-xl font-medium dark:text-white">Часы работы</h2>
 
                     <div className="space-y-4">
                       {[
@@ -542,7 +542,7 @@ const AdminSettingsPage: NextPage = () => {
                                 onChange={(e) => handleWorkingHoursChange(day, 'is_closed', e.target.checked)}
                                 className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                               />
-                              <label htmlFor={`${day}_closed`} className="ml-2 text-sm text-gray-900">
+                              <label htmlFor={`${day}_closed`} className="ml-2 text-sm text-gray-900 dark:text-white">
                                 Выходной
                               </label>
                             </div>
@@ -550,7 +550,7 @@ const AdminSettingsPage: NextPage = () => {
                             {!hours.is_closed && (
                               <>
                                 <div className="flex items-center">
-                                  <label htmlFor={`${day}_open`} className="mr-2 text-sm text-gray-700">
+                                  <label htmlFor={`${day}_open`} className="mr-2 text-sm text-gray-700 dark:text-white">
                                     Открытие:
                                   </label>
                                   <input
@@ -563,7 +563,7 @@ const AdminSettingsPage: NextPage = () => {
                                 </div>
                                 
                                 <div className="flex items-center">
-                                  <label htmlFor={`${day}_close`} className="mr-2 text-sm text-gray-700">
+                                  <label htmlFor={`${day}_close`} className="mr-2 text-sm text-gray-700 dark:text-white">
                                     Закрытие:
                                   </label>
                                   <input
@@ -586,11 +586,11 @@ const AdminSettingsPage: NextPage = () => {
                 {/* Оплата */}
                 {activeTab === 'payment' && (
                   <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Оплата</h2>
+                    <h2 className="text-xl font-medium dark:text-white">Оплата</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="currency" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Валюта
                         </label>
                         <select
@@ -607,7 +607,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="currency_symbol" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="currency_symbol" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Символ валюты
                         </label>
                         <input
@@ -621,7 +621,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="tax_percentage" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="tax_percentage" className="block text-sm font-medium text-gray-700 dark:text-white">
                           НДС (%)
                         </label>
                         <input
@@ -635,7 +635,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="min_order_amount" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="min_order_amount" className="block text-sm font-medium text-gray-700 dark:text-white">
                           Минимальная сумма заказа
                         </label>
                         <div className="mt-1 relative rounded-md shadow-sm">
@@ -654,7 +654,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
 
                       <div className="col-span-2">
-                        <h3 className="text-lg font-medium mb-4">Способы оплаты</h3>
+                        <h3 className="text-lg font-medium mb-4 dark:text-white">Способы оплаты</h3>
                         
                         <div className="space-y-2">
                           <div className="flex items-center">
@@ -681,7 +681,7 @@ const AdminSettingsPage: NextPage = () => {
                               }}
                               className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                             />
-                            <label htmlFor="payment_cash" className="ml-2 block text-sm text-gray-900">
+                            <label htmlFor="payment_cash" className="ml-2 block text-sm text-gray-900 dark:text-white">
                               Наличные
                             </label>
                           </div>
@@ -710,7 +710,7 @@ const AdminSettingsPage: NextPage = () => {
                               }}
                               className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                             />
-                            <label htmlFor="payment_card" className="ml-2 block text-sm text-gray-900">
+                            <label htmlFor="payment_card" className="ml-2 block text-sm text-gray-900 dark:text-white">
                               Банковские карты
                             </label>
                           </div>
@@ -723,10 +723,10 @@ const AdminSettingsPage: NextPage = () => {
                 {/* Уведомления */}
                 {activeTab === 'notifications' && (
                   <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Настройки уведомлений</h2>
+                    <h2 className="text-xl font-medium dark:text-white">Настройки уведомлений</h2>
 
                     <div>
-                      <h3 className="text-lg font-medium mb-4">Email уведомления (SMTP)</h3>
+                      <h3 className="text-lg font-medium mb-4 dark:text-white">Email уведомления (SMTP)</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label htmlFor="smtp_host" className="block text-sm font-medium text-gray-700">
@@ -743,7 +743,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="smtp_port" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="smtp_port" className="block text-sm font-medium text-gray-700 dark:text-white">
                             SMTP Порт
                           </label>
                           <input
@@ -757,7 +757,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="smtp_user" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="smtp_user" className="block text-sm font-medium text-gray-700 dark:text-white">
                             SMTP Пользователь
                           </label>
                           <input
@@ -771,7 +771,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="smtp_password" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="smtp_password" className="block text-sm font-medium text-gray-700 dark:text-white">
                             SMTP Пароль
                           </label>
                           <input
@@ -785,7 +785,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="smtp_from_email" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="smtp_from_email" className="block text-sm font-medium text-gray-700 dark:text-white">
                             Email отправителя
                           </label>
                           <input
@@ -799,7 +799,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="smtp_from_name" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="smtp_from_name" className="block text-sm font-medium text-gray-700 dark:text-white">
                             Имя отправителя
                           </label>
                           <input
@@ -815,7 +815,7 @@ const AdminSettingsPage: NextPage = () => {
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-medium mb-4">SMS уведомления</h3>
+                      <h3 className="text-lg font-medium mb-4 dark:text-white">SMS уведомления</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label htmlFor="sms_api_key" className="block text-sm font-medium text-gray-700">
@@ -832,7 +832,7 @@ const AdminSettingsPage: NextPage = () => {
                         </div>
 
                         <div>
-                          <label htmlFor="sms_sender" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="sms_sender" className="block text-sm font-medium text-gray-700 dark:text-white">
                             Отправитель SMS
                           </label>
                           <input
@@ -852,10 +852,10 @@ const AdminSettingsPage: NextPage = () => {
                 {/* Правовые документы */}
                 {activeTab === 'policies' && (
                   <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Правовые документы</h2>
+                    <h2 className="text-xl font-medium dark:text-white">Правовые документы</h2>
 
                     <div>
-                      <label htmlFor="privacy_policy" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="privacy_policy" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
                         Политика конфиденциальности
                       </label>
                       <textarea
@@ -869,7 +869,7 @@ const AdminSettingsPage: NextPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="terms_of_service" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="terms_of_service" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
                         Условия обслуживания
                       </label>
                       <textarea
@@ -887,10 +887,10 @@ const AdminSettingsPage: NextPage = () => {
                 {/* Управление столами */}
                 {activeTab === 'tables' && (
                   <div className="space-y-6">
-                    <h2 className="text-xl font-medium">Управление столами ресторана</h2>
+                    <h2 className="text-xl font-medium dark:text-white">Управление столами ресторана</h2>
                     
                     <div className="mb-6">
-                      <p className="text-gray-600 mb-4">
+                      <p className="text-gray-600 mb-4 dark:text-white">
                         Здесь вы можете управлять столами вашего ресторана для системы бронирования.
                       </p>
                       
@@ -932,7 +932,7 @@ const AdminSettingsPage: NextPage = () => {
                             
                             setFormData({...formData, tables: newTables});
                           }}
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:text-white dark:bg-gray-900"
                         >
                           <ViewGridIcon className="h-4 w-4 mr-2" />
                           Распределить равномерно
@@ -940,7 +940,7 @@ const AdminSettingsPage: NextPage = () => {
                       </div>
                     </div>
                     
-                    <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+                    <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg dark:text-white dark:bg-gray-900">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
