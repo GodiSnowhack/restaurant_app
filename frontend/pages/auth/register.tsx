@@ -80,8 +80,15 @@ export default function RegisterPage() {
         localStorage.setItem('user_profile', JSON.stringify(responseData.user));
         localStorage.setItem('auth_timestamp', Date.now().toString());
         
-        // Обновляем состояние авторизации
-        await login({ email: data.email, password: data.password });
+        // Обновляем состояние авторизации напрямую
+        useAuthStore.setState({
+          isAuthenticated: true,
+          token: responseData.access_token,
+          user: responseData.user,
+          error: null,
+          isLoading: false
+        });
+
         toast.success('Регистрация успешна! Вы вошли в систему');
         router.push('/');
       } else {
