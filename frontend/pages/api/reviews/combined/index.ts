@@ -21,6 +21,11 @@ export default async function createCombinedReviewProxy(req: NextApiRequest, res
   }
 
   // Проверяем метод запроса
+  if (req.method === 'GET') {
+    console.log('Reviews API - GET вызван');
+    return res.status(200).json({ ok: true, msg: 'GET /api/reviews/combined работает' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,

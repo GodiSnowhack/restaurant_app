@@ -124,7 +124,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ orderId, waiterId, onReviewSubm
           Оставить отзыв
         </h2>
         
-        {error && (
+        {error && false && (
           <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md">
             {error}
           </div>
