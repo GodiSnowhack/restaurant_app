@@ -1273,26 +1273,24 @@ interface CombinedReview {
 
 export const createCombinedReview = async (data: CombinedReviewCreate): Promise<CombinedReview> => {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-    const endpoint = `${apiUrl}/reviews/combined`;
-    
-    console.log('API Client - Отправка запроса:', {
-      url: endpoint,
-      data
-    });
-
-    const response = await axios.post(endpoint, data, {
+    const response = await fetch('/api/reviews/combined', {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
-      timeout: 10000
+      body: JSON.stringify(data)
     });
 
-    console.log('API Client - Успешный ответ:', response.data);
-    return response.data;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || errorData.message || 'Не удалось создать отзыв');
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('API Client - Ошибка:', error.response?.data || error.message);
+    console.error('API Client - Ошибка:', error.message);
     throw error;
   }
 };
