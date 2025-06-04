@@ -666,7 +666,7 @@ const WaiterOrderDetailPage: NextPage = () => {
 
         {/* Заголовок и статус */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 dark:text-white">
-          <h1 className="text-3xl font-bold mb-4 md:mb-0">Заказ #{order.id}</h1>
+          <h1 className="text-3xl font-bold mb-4 md:mb-0 dark:text-white">Заказ #{order.id}</h1>
           <div className="flex flex-col sm:flex-row gap-2">
             <span className={`${getStatusColor(order.status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
               {getStatusLabel(order.status)}
@@ -682,7 +682,7 @@ const WaiterOrderDetailPage: NextPage = () => {
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6 dark:text-white">
               <div className="px-6 py-4 border-b dark:text-white">
-                <h2 className="text-xl font-semibold">Информация о заказе</h2>
+                <h2 className="text-xl font-semibold dark:text-white">Информация о заказе</h2>
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -732,7 +732,7 @@ const WaiterOrderDetailPage: NextPage = () => {
                 
                 {/* Информация о клиенте */}
                 <div className="border-t pt-4 mt-4 dark:text-white">
-                  <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
+                  <h3 className="text-lg font-medium mb-3 dark:text-white">Информация о клиенте</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600 mb-1 dark:text-white">Имя клиента</p>
@@ -784,7 +784,7 @@ const WaiterOrderDetailPage: NextPage = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {order.items && order.items.map((item: OrderItem, index) => (
-                      <tr key={item.dish_id || index} className="hover:bg-gray-50">
+                      <tr key={item.dish_id || index} className="hover:bg-gray-50 dark:bg-gray-800">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{item.dish_name || item.name || `Блюдо #${item.dish_id}`}</div>
                           {item.special_instructions && (
