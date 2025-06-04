@@ -140,13 +140,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       
       console.log(`API Orders: Получен ответ с кодом ${response.status}`);
+      console.log('API Orders: Ответ от бэкенда:', response.data);
       
       // Проверяем успешность ответа
       if (response.status >= 200 && response.status < 300) {
+        // Проверяем структуру ответа
+        if (!response.data || typeof response.data !== 'object') {
+          console.error('API Orders: Некорректный формат ответа от бэкенда:', response.data);
+          throw new Error('Некорректный формат ответа от сервера');
+        }
+        
+        // Проверяем наличие ID заказа
+        if (!response.data.id && response.data.data && !response.data.data.id) {
+          console.error('API Orders: Отсутствует ID заказа в ответе:', response.data);
+          throw new Error('Отсутствует ID заказа в ответе сервера');
+        }
+        
         return res.status(200).json({
           success: true,
           message: 'Заказ успешно создан',
-          data: response.data
+          data: response.data.data || response.data
         });
       } else {
         throw new Error(`Неожиданный статус ответа: ${response.status}`);

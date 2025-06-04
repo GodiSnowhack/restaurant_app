@@ -391,6 +391,7 @@ const CreateOrderPage: NextPage = () => {
       let responseData;
       try {
         responseData = await response.json();
+        console.log('Ответ сервера при создании заказа:', responseData);
       } catch (jsonError) {
         console.error('Ошибка при разборе ответа сервера:', jsonError);
         throw new Error('Получен некорректный ответ от сервера.');
@@ -416,8 +417,12 @@ const CreateOrderPage: NextPage = () => {
       }
       
       // Получаем ID созданного заказа
-      const orderId = responseData.data?.id;
+      console.log('Данные заказа из ответа:', responseData.data);
+      const orderId = responseData.data.id;
+      console.log('ID созданного заказа:', orderId);
+      
       if (!orderId) {
+        console.error('ID заказа отсутствует в ответе:', responseData);
         throw new Error('Не удалось получить ID созданного заказа');
       }
       
@@ -439,6 +444,7 @@ const CreateOrderPage: NextPage = () => {
       });
       
       // Перенаправляем на страницу заказа
+      console.log('Перенаправление на страницу заказа:', `/orders/${orderId}?success=true`);
       router.push(`/orders/${orderId}?success=true`);
       
       // Через 5 секунд убираем уведомление об успехе
