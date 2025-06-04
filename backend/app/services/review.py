@@ -234,59 +234,39 @@ def create_combined_review(db: Session, user_id: int, review_data: CombinedRevie
     Returns:
         Созданный отзыв или None в случае ошибки
     """
-    # Максимальное количество попыток выполнения операции
-    max_retries = 3
-    retry_count = 0
-    
-    # Попытка создания отзыва с повторами при блокировке базы данных
-    while retry_count < max_retries:
-        try:
-            logger.info(f"Создание комбинированного отзыва: user_id={user_id}, data={review_data.dict()}")
-            
-            # Проверяем существование заказа
-            order = db.query(Order).filter(Order.id == review_data.order_id).first()
-            if not order:
-                logger.error(f"Заказ {review_data.order_id} не найден")
-                raise ValueError(f"Заказ {review_data.order_id} не найден")
-                    
-            # Создаем отзыв без поля review_type
-            review = Review(
-                user_id=user_id,
-                order_id=review_data.order_id,
-                food_rating=review_data.food_rating,
-                service_rating=review_data.service_rating,
-                comment=review_data.comment if hasattr(review_data, 'comment') else None
-            )
-            
-            # Открываем новую транзакцию для изоляции
-            db.begin_nested()
-            
-            db.add(review)
-            db.commit()
-            db.refresh(review)
-            
-            logger.info(f"Комбинированный отзыв успешно создан: {review.id}")
-            return review
-            
-        except Exception as e:
-            db.rollback()
-            retry_count += 1
-            
-            # Если это ошибка блокировки SQLite
-            if "database is locked" in str(e).lower():
-                logger.warning(f"База данных заблокирована при создании отзыва. Попытка {retry_count} из {max_retries}")
-                import time
-                # Ждем перед повторной попыткой
-                time.sleep(1)
-                continue
-            
-            logger.error(f"Ошибка при создании комбинированного отзыва: {str(e)}")
-            logger.exception(e)
-            raise
-    
-    # Если все попытки исчерпаны
-    logger.error(f"Не удалось создать отзыв после {max_retries} попыток")
-    raise ValueError(f"Не удалось создать отзыв из-за блокировки базы данных. Пожалуйста, попробуйте позже.")
+    try:
+        logger.info(f"Создание комбинированного отзыва: user_id={user_id}, data={review_data.dict()}")
+        
+        # Проверяем существование заказа
+        order = db.query(Order).filter(Order.id == review_data.order_id).first()
+        if not order:
+            logger.error(f"Заказ {review_data.order_id} не найден")
+            raise ValueError(f"Заказ {review_data.order_id} не найден")
+                
+        # Создаем отзыв
+        review = Review(
+            user_id=user_id,
+            order_id=review_data.order_id,
+            food_rating=review_data.food_rating,
+            service_rating=review_data.service_rating,
+            comment=review_data.comment
+        )
+        
+        # Открываем новую транзакцию для изоляции
+        db.begin_nested()
+        
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        
+        logger.info(f"Комбинированный отзыв успешно создан: {review.id}")
+        return review
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Ошибка при создании комбинированного отзыва: {str(e)}")
+        logger.exception(e)
+        raise
 
 
 def get_reviews_by_waiter(db: Session, waiter_id: int, skip: int = 0, limit: int = 20) -> List[Dict[str, Any]]:

@@ -1466,7 +1466,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('today')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'today'
+                    timeRange === 'today' 
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1476,7 +1476,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('week')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'week'
+                    timeRange === 'week' 
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1486,7 +1486,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('month')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'month'
+                    timeRange === 'month' 
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1496,7 +1496,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('quarter')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'quarter'
+                    timeRange === 'quarter' 
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -1506,7 +1506,7 @@ const AdminAnalyticsPage: NextPage = () => {
                 <button
                   onClick={() => handleChangeTimeRange('custom')}
                   className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    timeRange === 'custom'
+                    timeRange === 'custom' 
                       ? isDark ? 'bg-primary-700 text-white' : 'bg-primary text-white'
                       : isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
@@ -2850,12 +2850,12 @@ const AdminAnalyticsPage: NextPage = () => {
                       </thead>
                       <tbody className={`divide-y ${isDark ? 'divide-gray-600' : 'divide-gray-200'}`}>
                         {menuMetrics?.topSellingDishes?.slice(0, 10).map((dish, index) => (
-                            <tr key={dish.dishId} className={index % 2 === 0 ? isDark ? 'bg-gray-800/30' : 'bg-gray-50' : ''}>
-                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{dish.dishName}</td>
-                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{dish.salesCount} шт.</td>
-                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(dish.revenue)} ₸</td>
-                              <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{(dish as any).profitMargin || 0}%</td>
-                            </tr>
+                          <tr key={dish.dishId} className={index % 2 === 0 ? isDark ? 'bg-gray-800/30' : 'bg-gray-50' : ''}>
+                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{dish.dishName}</td>
+                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{dish.salesCount} шт.</td>
+                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(dish.revenue)} ₸</td>
+                            <td className={`px-4 py-2 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-500'}`}>{(dish as any).profitMargin || 0}%</td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
@@ -2867,22 +2867,22 @@ const AdminAnalyticsPage: NextPage = () => {
                   <div className="space-y-4">
                     {menuMetrics && menuMetrics.categoryPerformance && Object.keys(menuMetrics.categoryPerformance).length > 0 ? (
                       Object.values(menuMetrics.categoryPerformance).map((category: any) => (
-                        <div key={category.id} className="mb-4">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.name}</span>
+                      <div key={category.id} className="mb-4">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.name}</span>
                             <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{category.salesPercentage?.toFixed(1) ?? 0}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
                               style={{ width: `${category.salesPercentage ?? 0}%` }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between text-xs mt-1">
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs mt-1">
                             <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Ср. чек: {formatCurrency(category.averageOrderValue ?? 0)} ₸</span>
                             <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Маржа: {category.averageProfitMargin ?? 0}%</span>
-                          </div>
                         </div>
+                      </div>
                           ))
                         ) : (
                       <div className="text-center text-gray-400 py-8">Нет данных по категориям</div>

@@ -67,8 +67,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ orderId, waiterId, onReviewSubm
       const reviewData = {
         order_id: orderId,
         food_rating: orderRating,
-        service_rating: serviceRating,
-        comment: null
+        service_rating: serviceRating
       };
 
       console.log('Отправка отзыва:', reviewData);

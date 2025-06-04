@@ -1258,7 +1258,7 @@ interface CombinedReviewCreate {
   order_id: number;
   food_rating: number;
   service_rating: number;
-  comment?: string;
+  comment?: string | null;
 }
 
 interface CombinedReview {
@@ -1266,7 +1266,7 @@ interface CombinedReview {
   order_id: number;
   food_rating: number;
   service_rating: number;
-  comment?: string;
+  comment?: string | null;
   created_at: string;
   updated_at: string;
 }

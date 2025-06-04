@@ -44,8 +44,7 @@ class CombinedReviewCreate(ReviewBase):
     order_id: int
     food_rating: float = Field(..., ge=1.0, le=5.0, description="Оценка заказа от 1 до 5")
     service_rating: float = Field(..., ge=1.0, le=5.0, description="Оценка обслуживания от 1 до 5")
-    review_type: Optional[str] = Field(default=None, description="Тип отзыва (только для совместимости)")
-    comment: Optional[str] = Field(default=None, description="Комментарий к отзыву")
+    comment: Optional[str] = None
 
     def validate_review_type(self):
         """Метод сохранен для совместимости, но не выполняет валидацию"""

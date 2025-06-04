@@ -39,17 +39,31 @@ export default async function createCombinedReviewProxy(req: NextApiRequest, res
     }
 
     // Проверяем наличие необходимых данных в теле запроса
-    const { order_id, food_rating, service_rating } = req.body;
+    const { order_id, food_rating, service_rating, comment } = req.body;
+
+    console.log('Reviews API - Данные запроса:', {
+      order_id,
+      food_rating,
+      service_rating,
+      comment,
+      headers: req.headers
+    });
 
     if (!order_id || !food_rating || !service_rating) {
       return res.status(400).json({
         success: false,
-        message: 'Отсутствуют необходимые данные для создания отзыва'
+        message: 'Отсутствуют необходимые данные для создания отзыва',
+        received_data: {
+          order_id,
+          food_rating,
+          service_rating,
+          comment
+        }
       });
     }
 
     // Получаем URL API из переменных окружения
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app';
     const endpoint = `${apiUrl}/reviews/combined`;
 
     console.log('Reviews API - Отправка запроса:', {
