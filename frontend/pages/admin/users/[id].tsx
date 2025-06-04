@@ -269,7 +269,7 @@ const UserEditPage: NextPage = () => {
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 dark:bg-gray-800 dark:text-white">
+        <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 dark:bg-gray-9 00 dark:text-white">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
               <strong className="font-bold">Ошибка! </strong>
