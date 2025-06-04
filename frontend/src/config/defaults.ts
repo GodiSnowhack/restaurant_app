@@ -45,18 +45,22 @@ export const DEFAULT_URLS = {
 export function getDefaultApiUrl(): string {
   // Сначала пробуем получить URL из переменных окружения
   if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
-    const url = process.env.NEXT_PUBLIC_API_URL;
-    console.log(`Config: Используем API URL из переменной окружения: ${url}`);
-    
+    let url = process.env.NEXT_PUBLIC_API_URL;
+    // В production всегда https
+    if (process.env.NODE_ENV === 'production' && url.startsWith('http://')) {
+      url = url.replace('http://', 'https://');
+    }
     // Убираем слеш в конце, если он есть
     return url.endsWith('/') ? url.slice(0, -1) : url;
   }
   
   // Затем проверяем window (в браузере)
   if (typeof window !== 'undefined' && (window as any).API_URL) {
-    const url = (window as any).API_URL;
-    console.log(`Config: Используем API URL из window: ${url}`);
-    
+    let url = (window as any).API_URL;
+    // В production всегда https
+    if (process.env.NODE_ENV === 'production' && url.startsWith('http://')) {
+      url = url.replace('http://', 'https://');
+    }
     // Убираем слеш в конце, если он есть
     return url.endsWith('/') ? url.slice(0, -1) : url;
   }
@@ -66,8 +70,6 @@ export function getDefaultApiUrl(): string {
   const defaultUrl = isProduction 
     ? 'https://backend-production-1a78.up.railway.app/api/v1' 
     : 'http://localhost:8000/api/v1';
-  
-  console.log(`Config: Используем стандартный API URL для ${isProduction ? 'production' : 'development'}: ${defaultUrl}`);
   
   // Убираем слеш в конце, если он есть
   return defaultUrl.endsWith('/') ? defaultUrl.slice(0, -1) : defaultUrl;
