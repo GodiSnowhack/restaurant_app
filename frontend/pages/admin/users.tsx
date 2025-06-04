@@ -428,7 +428,7 @@ const AdminUsersPage: NextPage = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/admin/users/${user.id}/edit`);
+                              router.push(`/admin/users/${user.id}`);
                             }}
                             className={`text-indigo-600 hover:text-indigo-900 ${isDark ? 'text-indigo-400 hover:text-indigo-300' : ''}`}
                           >
