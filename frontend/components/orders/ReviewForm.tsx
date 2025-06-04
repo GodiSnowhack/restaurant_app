@@ -58,44 +58,37 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ orderId, waiterId, onReviewSubm
       setError(null);
       setSuccess(null);
 
-      // Проверяем наличие всех необходимых данных
       if (!orderId) {
         throw new Error('Отсутствует ID заказа');
       }
 
-      // Формируем данные для отзыва
-      const reviewData = {
+      let reviewData = {
         order_id: orderId,
         food_rating: orderRating,
         service_rating: serviceRating
       };
-
-      console.log('Отправка отзыва:', reviewData);
-
-      // Отправляем отзыв напрямую через fetch
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      const response = await fetch(`${apiUrl}/reviews/combined`, {
-        method: 'POST',
+      console.log("Отправка отзыва:", reviewData);
+      
+      let response = await fetch("/api/reviews/combined", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
         },
         body: JSON.stringify(reviewData)
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || 'Не удалось создать отзыв');
-      }
-
-      setSuccess('Отзыв успешно отправлен');
+      
+      let data = await response.json();
+      if (!response.ok)
+        throw Error(data.detail || data.message || "Не удалось создать отзыв");
+      
+      setSuccess("Отзыв успешно отправлен");
       if (onReviewSubmitted) {
         onReviewSubmitted();
       }
-    } catch (err: any) {
-      console.error('Ошибка при отправке отзыва:', err);
-      setError(err.message || 'Произошла ошибка при отправке отзыва');
+    } catch (error: any) {
+      console.error("Ошибка при отправке отзыва:", error);
+      setError(error.message || "Произошла ошибка при отправке отзыва");
     } finally {
       setSubmitting(false);
     }
