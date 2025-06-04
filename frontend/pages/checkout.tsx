@@ -282,12 +282,12 @@ const CheckoutPage: NextPage = () => {
     <Layout title="Оформление заказа">
       <div className="container mx-auto px-4 py-12 max-w-5xl">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800 mb-3">Оформление заказа</h1>
-          <p className="text-gray-600">Заполните данные для заказа в нашем ресторане</p>
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-3">Оформление заказа</h1>
+          <p className="text-gray-600 dark:text-gray-300">Заполните данные для заказа в нашем ресторане</p>
         </div>
         
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md mb-8">
+          <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 dark:border-red-400 text-red-700 dark:text-red-200 p-4 rounded-lg shadow-md mb-8">
             <div className="flex">
               <div className="py-1">
                 <svg className="h-6 w-6 text-red-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -304,29 +304,29 @@ const CheckoutPage: NextPage = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Форма оформления */}
           <div className="lg:w-2/3">
-            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700">
               <div className="px-8 py-6 border-b bg-gradient-to-r from-primary to-primary-dark">
                 <h2 className="text-2xl font-bold text-white">Детали заказа</h2>
               </div>
               
               <div className="p-8 space-y-8">
                 {/* Тип заказа */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h3 className="text-xl font-medium mb-4 text-gray-800">Вариант заказа</h3>
+                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+                  <h3 className="text-xl font-medium mb-4 text-gray-800 dark:text-white">Вариант заказа</h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div className="flex items-center">
                       <input
                         type="radio"
                         id="present-yes"
                         name="guest_present"
-                        className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+                        className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         checked={isGuestPresent}
                         onChange={() => {
                           setIsGuestPresent(true);
                           setOrderType('dine-in');
                         }}
                       />
-                      <label htmlFor="present-yes" className="ml-3 block text-sm text-gray-700">
+                      <label htmlFor="present-yes" className="ml-3 block text-sm text-gray-700 dark:text-gray-200">
                         Я уже в ресторане и хочу сделать заказ
                       </label>
                     </div>
@@ -335,64 +335,64 @@ const CheckoutPage: NextPage = () => {
                         type="radio"
                         id="present-no"
                         name="guest_present"
-                        className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+                        className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         checked={!isGuestPresent}
                         onChange={() => {
                           setIsGuestPresent(false);
                           setOrderType('dine-in');
                         }}
                       />
-                      <label htmlFor="present-no" className="ml-3 block text-sm text-gray-700">
+                      <label htmlFor="present-no" className="ml-3 block text-sm text-gray-700 dark:text-gray-200">
                         Я собираюсь посетить ресторан позже и хочу сделать заказ заранее
                       </label>
                     </div>
                   </div>
                   
                   {!isGuestPresent && (
-                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg">
                       <div className="flex items-center mb-4">
-                        <ExclamationCircleIcon className="h-5 w-5 text-yellow-500 mr-2" />
-                        <h4 className="text-sm font-semibold text-yellow-700">Для заказа заранее требуется код бронирования</h4>
+                        <ExclamationCircleIcon className="h-5 w-5 text-yellow-500 dark:text-yellow-300 mr-2" />
+                        <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-200">Для заказа заранее требуется код бронирования</h4>
                       </div>
-                      <p className="text-sm text-yellow-600 mb-4">
+                      <p className="text-sm text-yellow-600 dark:text-yellow-200 mb-4">
                         Чтобы сделать заказ заранее, необходимо сначала забронировать столик. После подтверждения бронирования вы получите код, который нужно ввести ниже.
                       </p>
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-grow">
-                          <label htmlFor="reservation-code" className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor="reservation-code" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             Код бронирования
                           </label>
                           <input
                             type="text"
                             id="reservation-code"
                             name="reservation_code"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                             placeholder="XXX-YYY"
                             value={reservationCodeInput}
                             onChange={handleReservationCodeChange}
                             maxLength={7}
                           />
                           {isReservationCodeValid === true && (
-                            <p className="mt-1 text-sm text-green-600 flex items-center">
+                            <p className="mt-1 text-sm text-green-600 dark:text-green-400 flex items-center">
                               <CheckCircleIcon className="h-4 w-4 mr-1" />
                               Код бронирования подтвержден
                             </p>
                           )}
                           {isReservationCodeValid === false && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
                               <ExclamationCircleIcon className="h-4 w-4 mr-1" />
                               Недействительный код бронирования
                             </p>
                           )}
                           {isVerifyingCode && (
-                            <p className="mt-1 text-sm text-gray-600">Проверка кода...</p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Проверка кода...</p>
                           )}
                         </div>
                         <div className="self-end">
                           <button
                             type="button"
                             onClick={() => validateReservationCode(reservationCodeInput)}
-                            className="px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 text-sm font-medium text-gray-700"
+                            className="px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200"
                             disabled={!reservationCodeInput || isVerifyingCode}
                           >
                             Проверить код
@@ -407,14 +407,14 @@ const CheckoutPage: NextPage = () => {
                 </div>
                 
                 {/* Контактная информация */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h3 className="text-xl font-medium mb-4 text-gray-800 flex items-center">
+                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+                  <h3 className="text-xl font-medium mb-4 text-gray-800 dark:text-white flex items-center">
                     <UserIcon className="h-5 w-5 mr-2 text-primary" />
                     Контактная информация
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Имя
                       </label>
                       <input
@@ -422,13 +422,13 @@ const CheckoutPage: NextPage = () => {
                         name="name"
                         type="text"
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         value={formData.name}
                         onChange={handleInputChange}
                       />
                     </div>
                     <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Телефон
                       </label>
                       <input
@@ -436,7 +436,7 @@ const CheckoutPage: NextPage = () => {
                         name="phone"
                         type="tel"
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         value={formData.phone}
                         onChange={handleInputChange}
                       />
@@ -446,14 +446,14 @@ const CheckoutPage: NextPage = () => {
                 
                 {/* Столик - только если гость в ресторане */}
                 {isGuestPresent && (
-                  <div className="bg-gray-50 p-6 rounded-lg">
-                    <h3 className="text-xl font-medium mb-4 text-gray-800 flex items-center">
+                  <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+                    <h3 className="text-xl font-medium mb-4 text-gray-800 dark:text-white flex items-center">
                       <ClockIcon className="h-5 w-5 mr-2 text-primary" />
                       Детали заказа в ресторане
                     </h3>
                     <div className="mb-4">
                       <div className="flex justify-between items-center mb-2">
-                        <label htmlFor="table" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="table" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                           Номер столика
                         </label>
                         <button 
@@ -467,7 +467,7 @@ const CheckoutPage: NextPage = () => {
                       </div>
                       <select
                         id="table"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         value={tableNumber || ''}
                         onChange={(e) => setTableNumber(e.target.value ? Number(e.target.value) : null)}
                         required={isGuestPresent}
@@ -484,12 +484,12 @@ const CheckoutPage: NextPage = () => {
                     {/* Схема расположения столов в ресторане */}
                     {showFloorPlan && (
                       <div className="my-4">
-                        <div className="border border-gray-300 rounded-lg shadow-md p-4 bg-white">
+                        <div className="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
                           <h4 className="text-sm font-medium mb-2 text-primary flex items-center">
                             <InformationCircleIcon className="h-4 w-4 mr-1" />
                             Интерактивная схема зала
                           </h4>
-                          <div className="relative w-full h-96 bg-gray-50 overflow-hidden rounded-md border border-dashed border-gray-300 bg-gradient-to-b from-gray-50 to-gray-100">
+                          <div className="relative w-full h-96 bg-gray-50 dark:bg-gray-900 overflow-hidden rounded-md border border-dashed border-gray-300 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-gray-100">
                             {/* Фон ресторана */}
                             <div className="absolute top-0 left-0 w-full h-full">
                               {/* Декоративные элементы */}
@@ -569,27 +569,27 @@ const CheckoutPage: NextPage = () => {
                     )}
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      <div className="flex items-center p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                         <input
                           id="urgent"
                           type="checkbox"
-                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded"
+                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700 rounded"
                           checked={urgent}
                           onChange={(e) => setUrgent(e.target.checked)}
                         />
-                        <label htmlFor="urgent" className="ml-3 block text-sm text-gray-700">
+                        <label htmlFor="urgent" className="ml-3 block text-sm text-gray-700 dark:text-gray-200">
                           Срочный заказ
                         </label>
                       </div>
-                      <div className="flex items-center p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                         <input
                           id="group"
                           type="checkbox"
-                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded"
+                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700 rounded"
                           checked={isGroupOrder}
                           onChange={(e) => setIsGroupOrder(e.target.checked)}
                         />
-                        <label htmlFor="group" className="ml-3 block text-sm text-gray-700">
+                        <label htmlFor="group" className="ml-3 block text-sm text-gray-700 dark:text-gray-200">
                           Групповой заказ
                         </label>
                       </div>
@@ -603,7 +603,7 @@ const CheckoutPage: NextPage = () => {
                   
                   {/* Тип заказа */}
                   <div>
-                    <span className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                       Тип заказа
                     </span>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -624,7 +624,7 @@ const CheckoutPage: NextPage = () => {
                   {/* Код заказа (только если заказ в ресторане и гость присутствует) */}
                   {orderType === 'dine-in' && isGuestPresent && (
                     <div>
-                      <label htmlFor="orderCode" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="orderCode" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Код заказа <span className="text-red-500">*</span>
                         <span className="text-sm text-gray-500 ml-1">(получите у официанта)</span>
                       </label>
@@ -682,7 +682,7 @@ const CheckoutPage: NextPage = () => {
                   
                   {/* Способ оплаты */}
                   <div>
-                    <span className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                       Способ оплаты
                     </span>
                     <div className="flex gap-3">
@@ -698,7 +698,7 @@ const CheckoutPage: NextPage = () => {
                           id="cash"
                           name="payment_method"
                           type="radio"
-                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700"
                           value="cash"
                           checked={paymentMethod === 'cash'}
                           onChange={handleInputChange}
@@ -720,7 +720,7 @@ const CheckoutPage: NextPage = () => {
                           id="card"
                           name="payment_method"
                           type="radio"
-                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
+                          className="h-5 w-5 text-primary focus:ring-primary border-gray-300 dark:border-gray-700"
                           value="card"
                           checked={paymentMethod === 'card'}
                           onChange={handleInputChange}
@@ -736,7 +736,7 @@ const CheckoutPage: NextPage = () => {
                   {/* Код официанта (для обслуживания в зале) */}
                   {orderType === 'dine-in' && (
                     <div className="mt-4">
-                      <label htmlFor="waiterCode" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="waiterCode" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Код официанта <span className="text-sm text-gray-500">(необязательно)</span>
                       </label>
                       <div className="mt-1">
@@ -747,7 +747,7 @@ const CheckoutPage: NextPage = () => {
                           value={waiterCode}
                           onChange={(e) => setWaiterCode(e.target.value.toUpperCase())}
                           disabled={waiterAssigned}
-                          className={`block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
+                          className={`block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
                             waiterAssigned ? 'bg-gray-100' : ''
                           }`}
                           placeholder="Введите код официанта"
@@ -767,11 +767,11 @@ const CheckoutPage: NextPage = () => {
                 </div>
                 
                 {/* Комментарий к заказу */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h3 className="text-xl font-medium mb-4 text-gray-800">Комментарий к заказу</h3>
+                <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+                  <h3 className="text-xl font-medium mb-4 text-gray-800 dark:text-white">Комментарий к заказу</h3>
                   <textarea
                     rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     placeholder="Дополнительные пожелания к заказу"
                     value={comments || comment}
                     onChange={(e) => {
@@ -806,7 +806,7 @@ const CheckoutPage: NextPage = () => {
           
           {/* Сводка по заказу */}
           <div className="lg:w-1/3">
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 sticky top-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-700 sticky top-4">
               <div className="px-6 py-4 border-b bg-gradient-to-r from-primary to-primary-dark">
                 <h2 className="text-xl font-bold text-white">Ваш заказ</h2>
               </div>

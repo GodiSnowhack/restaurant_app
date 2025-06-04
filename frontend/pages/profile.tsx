@@ -136,7 +136,7 @@ const ProfilePage: NextPage = () => {
         <div className="flex flex-col md:flex-row gap-6">
           {/* Боковое меню */}
           <div className="md:w-1/4">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="p-6 bg-gray-50 border-b">
                 <div className="flex items-center space-x-4">
                   <div className="h-14 w-14 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
@@ -211,15 +211,15 @@ const ProfilePage: NextPage = () => {
 
           {/* Основное содержимое */}
           <div className="md:w-3/4">
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               {activeTab === 'profile' ? (
                 <div>
-                  <h2 className="text-xl font-semibold mb-4">Личная информация</h2>
+                  <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Личная информация</h2>
                   
                   <form id="profile-form" onSubmit={handleSubmit}>
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                           ФИО
                         </label>
                         <input
@@ -228,13 +228,13 @@ const ProfilePage: NextPage = () => {
                           name="full_name"
                           value={formData.full_name}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                           required
                         />
                       </div>
                       
                       <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                           E-mail
                         </label>
                         <input
@@ -243,13 +243,13 @@ const ProfilePage: NextPage = () => {
                           name="email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                           required
                         />
                       </div>
                       
                       <div>
-                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                           Телефон
                         </label>
                         <input
@@ -258,12 +258,12 @@ const ProfilePage: NextPage = () => {
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                       
                       <div>
-                        <label htmlFor="birthday" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="birthday" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                           Дата рождения
                         </label>
                         <input
@@ -272,7 +272,7 @@ const ProfilePage: NextPage = () => {
                           name="birthday"
                           value={formData.birthday}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     </div>
@@ -290,39 +290,39 @@ const ProfilePage: NextPage = () => {
                 </div>
               ) : (
                 <div>
-                  <h2 className="text-xl font-semibold mb-4">Сменить пароль</h2>
+                  <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Сменить пароль</h2>
                   
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Текущий пароль
                       </label>
                       <input
                         id="current-password"
                         type="password"
-                        className="input"
+                        className="input bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700"
                       />
                     </div>
                     
                     <div>
-                      <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Новый пароль
                       </label>
                       <input
                         id="new-password"
                         type="password"
-                        className="input"
+                        className="input bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700"
                       />
                     </div>
                     
                     <div>
-                      <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Подтверждение пароля
                       </label>
                       <input
                         id="confirm-password"
                         type="password"
-                        className="input"
+                        className="input bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700"
                       />
                     </div>
                   </div>
