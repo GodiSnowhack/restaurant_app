@@ -466,7 +466,7 @@ const CreateOrderPage: NextPage = () => {
     <WaiterLayout title="Создать заказ" activeTab="create-order">
       <div className="flex flex-col md:flex-row gap-6">
         {/* Меню (левая часть) */}
-        <div className="w-full md:w-2/3">
+        <div className="w-full md:w-2/3 dark:text-white dark:bg-gray-800">
           {/* Фильтр по категориям */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Категории</h2>
@@ -503,7 +503,7 @@ const CreateOrderPage: NextPage = () => {
           {/* Список блюд */}
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary dark:text-white dark:bg-gray-800"></div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -511,7 +511,7 @@ const CreateOrderPage: NextPage = () => {
               <div className="divide-y">
                 {filteredMenuItems.length > 0 ? (
                   filteredMenuItems.map(item => (
-                    <div key={item.id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
+                    <div key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center">
                       <div>
                         <h3 className="font-medium dark:text-white dark:bg-gray-800">{item.name}</h3>
                         <p className="text-sm text-gray-600 dark:text-white dark:bg-gray-800">{item.description}</p>
@@ -521,7 +521,7 @@ const CreateOrderPage: NextPage = () => {
                         onClick={() => addItemToOrder(item)}
                         className="p-2 text-primary hover:bg-primary hover:text-white rounded-full transition-colors"
                       >
-                        <PlusIcon className="h-6 w-6" />
+                        <PlusIcon className="h-6 w-6 dark:text-white dark:bg-gray-800" />
                       </button>
                     </div>
                   ))
@@ -599,7 +599,7 @@ const CreateOrderPage: NextPage = () => {
               </div>
               
               <div className="mt-3">
-                <label htmlFor="customerAgeGroup" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="customerAgeGroup" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                   Возрастная группа *
                 </label>
                 <select

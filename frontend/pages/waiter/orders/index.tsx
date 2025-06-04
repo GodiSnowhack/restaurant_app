@@ -313,17 +313,17 @@ const WaiterOrdersPage: NextPage = () => {
         {!loading && orders.length > 0 && (
           <Grid container spacing={2}>
             {orders.map((order) => (
-              <div className="w-full mb-4" key={order.id}>
+              <div className="w-full mb-4 dark:text-white dark:bg-gray-800" key={order.id}>
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-4 dark:text-white">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className="text-lg font-medium">
+                      <h3 className="text-lg font-medium dark:text-white dark:bg-gray-800">
                         Заказ #{order.id}
-                        {order.table_number && <span className="ml-2">• Стол {order.table_number}</span>}
+                        {order.table_number && <span className="ml-2 dark:text-white dark:bg-gray-800">• Стол {order.table_number}</span>}
                       </h3>
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-gray-500 text-sm dark:text-white dark:bg-gray-800">
                         {new Date(order.created_at).toLocaleString('ru-RU')}
-                        {order.customer_name && <span className="ml-2">• {order.customer_name}</span>}
+                        {order.customer_name && <span className="ml-2 dark:text-white dark:bg-gray-800">• {order.customer_name}</span>}
                       </p>
                     </div>
                     
@@ -341,7 +341,7 @@ const WaiterOrdersPage: NextPage = () => {
                       {order.items && order.items.map((item, index) => (
                         <li key={index} className="text-sm flex justify-between">
                           <span>{item.quantity} × {item.name}</span>
-                          <span className="text-gray-600">{item.price.toFixed(2)} ₸</span>
+                          <span className="text-gray-600 dark:text-white dark:bg-gray-800">{item.price.toFixed(2)} ₸</span>
                         </li>
                       ))}
                     </ul>
