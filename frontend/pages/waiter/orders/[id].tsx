@@ -808,7 +808,7 @@ const WaiterOrderDetailPage: NextPage = () => {
                       <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white dark:bg-gray-800">
                         Итого:
                       </td>
-                      <td className="px-6 py-4 text-right text-base font-bold text-primary dark:text-white">
+                      <td className="px-6 py-4 text-right text-base font-bold text-primary dark:text-white dark:bg-gray-800">
                         {formatPrice(order.total_amount)}
                       </td>
                     </tr>

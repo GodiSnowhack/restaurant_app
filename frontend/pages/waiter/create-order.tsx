@@ -513,9 +513,9 @@ const CreateOrderPage: NextPage = () => {
                   filteredMenuItems.map(item => (
                     <div key={item.id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
                       <div>
-                        <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-sm text-gray-600">{item.description}</p>
-                        <p className="mt-1 font-medium text-primary">{item.price.toFixed(2)} ₸</p>
+                        <h3 className="font-medium dark:text-white dark:bg-gray-800">{item.name}</h3>
+                        <p className="text-sm text-gray-600 dark:text-white dark:bg-gray-800">{item.description}</p>
+                        <p className="mt-1 font-medium text-primary dark:text-white dark:bg-gray-800">{item.price.toFixed(2)} ₸</p>
                       </div>
                       <button
                         onClick={() => addItemToOrder(item)}
@@ -526,7 +526,7 @@ const CreateOrderPage: NextPage = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-gray-500 dark:text-white dark:bg-gray-800">
                     Нет доступных блюд в этой категории
                   </div>
                 )}
@@ -543,14 +543,14 @@ const CreateOrderPage: NextPage = () => {
             {/* Данные о столе/клиенте */}
             <div className="p-4 border-b">
               <div className="mb-3">
-                <label htmlFor="tableNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="tableNumber" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                   Номер стола *
                 </label>
                 <select
                   id="tableNumber"
                   value={tableNumber}
                   onChange={handleTableChange}
-                  className="w-full p-2 border rounded focus:ring-primary focus:border-primary"
+                  className="w-full p-2 border rounded focus:ring-primary focus:border-primary dark:text-white dark:bg-gray-800"
                   required
                 >
                   <option value="">Выберите стол</option>
@@ -570,7 +570,7 @@ const CreateOrderPage: NextPage = () => {
               </div>
               
               <div className="mb-3">
-                <label htmlFor="customerName" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="customerName" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                   Имя клиента *
                 </label>
                 <input
@@ -585,7 +585,7 @@ const CreateOrderPage: NextPage = () => {
               </div>
               
               <div>
-                <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                   Телефон клиента
                 </label>
                 <input
@@ -627,22 +627,22 @@ const CreateOrderPage: NextPage = () => {
                   {orderItems.map(item => (
                     <div key={item.id} className="p-4">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-primary font-medium">{(item.price * item.quantity).toFixed(2)} ₸</span>
+                        <span className="font-medium dark:text-white dark:bg-gray-800">{item.name}</span>
+                        <span className="text-primary font-medium dark:text-white dark:bg-gray-800">{(item.price * item.quantity).toFixed(2)} ₸</span>
                       </div>
                       
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => decrementItem(item.id)}
-                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:text-white dark:bg-gray-800"
                           >
                             <MinusIcon className="h-4 w-4" />
                           </button>
                           <span>{item.quantity}</span>
                           <button
                             onClick={() => incrementItem(item.id)}
-                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200"
+                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:text-white dark:bg-gray-800"
                           >
                             <PlusIcon className="h-4 w-4" />
                           </button>
@@ -650,7 +650,7 @@ const CreateOrderPage: NextPage = () => {
                         
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          className="p-1 text-red-500 hover:bg-red-50 rounded dark:text-white dark:bg-gray-800"
                         >
                           <TrashIcon className="h-5 w-5" />
                         </button>
@@ -669,7 +669,7 @@ const CreateOrderPage: NextPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center text-gray-500 dark:text-white dark:bg-gray-800">
                   Заказ пуст. Добавьте блюда из меню.
                 </div>
               )}
@@ -677,9 +677,9 @@ const CreateOrderPage: NextPage = () => {
             
             {/* Итого и кнопка отправки */}
             <div className="p-4 border-t">
-              <div className="flex justify-between items-center font-bold mb-4">
+              <div className="flex justify-between items-center font-bold mb-4 dark:text-white dark:bg-gray-800">
                 <span>Итого:</span>
-                <span className="text-primary">{totalAmount.toFixed(2)} ₸</span>
+                <span className="text-primary dark:text-white dark:bg-gray-800">{totalAmount.toFixed(2)} ₸</span>
               </div>
               
               {error && (
