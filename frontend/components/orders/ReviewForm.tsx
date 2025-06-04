@@ -140,18 +140,16 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ orderId, waiterId, onReviewSubm
             />
           </div>
           
-          {waiterId && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Оценка обслуживания
-              </label>
-              <RatingInput 
-                value={serviceRating} 
-                onChange={setServiceRating}
-                name="serviceRating" 
-              />
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Оценка обслуживания
+            </label>
+            <RatingInput 
+              value={serviceRating} 
+              onChange={setServiceRating}
+              name="serviceRating" 
+            />
+          </div>
           
           <button
             type="button"
