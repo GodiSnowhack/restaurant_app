@@ -254,7 +254,7 @@ const UserEditPage: NextPage = () => {
   
   return (
     <Layout title="Редактирование пользователя | Админ-панель">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-800 dark:text-white">
         <div className="flex items-center mb-6">
           <Link href="/admin/users" className="text-gray-600 hover:text-primary mr-4">
             <ArrowLeftIcon className="h-5 w-5" />
