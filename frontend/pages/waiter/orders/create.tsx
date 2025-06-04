@@ -38,7 +38,7 @@ const CreateOrderPage: React.FC = () => {
           name="table_number"
           value={formData.table_number}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         />
       </div>
 
@@ -52,7 +52,7 @@ const CreateOrderPage: React.FC = () => {
           name="customer_name"
           value={formData.customer_name}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         />
       </div>
 
@@ -66,7 +66,7 @@ const CreateOrderPage: React.FC = () => {
           name="customer_phone"
           value={formData.customer_phone}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         />
       </div>
 
@@ -79,7 +79,7 @@ const CreateOrderPage: React.FC = () => {
           name="customer_age_group"
           value={formData.customer_age_group}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         >
           <option value="">Выберите возрастную группу</option>
           <option value="teen">Подросток (13-17)</option>
@@ -98,7 +98,7 @@ const CreateOrderPage: React.FC = () => {
           name="payment_method"
           value={formData.payment_method}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         >
           <option value="">Выберите способ оплаты</option>
           <option value="CASH">Наличные</option>
@@ -116,7 +116,7 @@ const CreateOrderPage: React.FC = () => {
           value={formData.comment}
           onChange={handleChange}
           rows={3}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:text-white dark:bg-gray-800"
         />
       </div>
 
@@ -130,7 +130,7 @@ const CreateOrderPage: React.FC = () => {
             onChange={handleChange}
             className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
           />
-          <label htmlFor="is_urgent" className="ml-2 block text-sm text-gray-700">
+          <label htmlFor="is_urgent" className="ml-2 block text-sm text-gray-700 dark:text-white">
             Срочный заказ
           </label>
         </div>

@@ -665,8 +665,8 @@ const WaiterOrderDetailPage: NextPage = () => {
           </div>
 
         {/* Заголовок и статус */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 dark:text-white">
-          <h1 className="text-3xl font-bold mb-4 md:mb-0 dark:text-white">Заказ #{order.id}</h1>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 dark:text-white dark:bg-gray-800">
+          <h1 className="text-3xl font-bold mb-4 md:mb-0 dark:text-white dark:bg-gray-800">Заказ #{order.id}</h1>
           <div className="flex flex-col sm:flex-row gap-2">
             <span className={`${getStatusColor(order.status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
               {getStatusLabel(order.status)}
@@ -805,7 +805,7 @@ const WaiterOrderDetailPage: NextPage = () => {
                   </tbody>
                   <tfoot className="bg-gray-50">
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
+                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white dark:bg-gray-800">
                         Итого:
                       </td>
                       <td className="px-6 py-4 text-right text-base font-bold text-primary dark:text-white">
