@@ -994,7 +994,19 @@ const ReservationsPage: NextPage = () => {
                         `}>
                           <div className="flex items-center space-x-2">
                             <KeyIcon className="h-4 w-4 text-primary" />
-                            <span>{formatReservationCode(reservation.reservation_code)}</span>
+                            <span
+                              style={{ cursor: 'pointer' }}
+                              title="Скопировать код бронирования"
+                              onClick={() => {
+                                if (reservation.reservation_code) {
+                                  navigator.clipboard.writeText(reservation.reservation_code);
+                                  alert('Код бронирования скопирован в буфер обмена');
+                                }
+                              }}
+                              className="hover:underline hover:text-primary transition-colors"
+                            >
+                              {formatReservationCode(reservation.reservation_code)}
+                            </span>
                           </div>
                         </td>
                         <td className={`

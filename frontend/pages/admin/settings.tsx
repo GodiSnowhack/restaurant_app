@@ -964,7 +964,7 @@ const AdminSettingsPage: NextPage = () => {
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white divide-y divide-gray-200 dark:text-white dark:bg-gray-900">
                           {(formData.tables || []).map((table, index) => (
                             <tr key={table.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -1049,7 +1049,7 @@ const AdminSettingsPage: NextPage = () => {
                     </div>
                     
                     <div className="mt-4">
-                      <h3 className="text-lg font-medium mb-4">Предварительный просмотр</h3>
+                      <h3 className="text-lg font-medium mb-4 dark:text-white dark:bg-gray-800">Предварительный просмотр</h3>
                       <div className="flex justify-center">
                         {formData && formData.tables && formData.tables.length > 0 ? (
                           <FloorPlan 
