@@ -106,7 +106,7 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-md p-6 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-md p-6 ${className} dark:bg-gray-800 dark:text-white`}>
       <h2 className="text-lg font-semibold mb-4">Привязать заказ по коду</h2>
       
       <p className="text-sm text-gray-600 mb-4">

@@ -314,7 +314,7 @@ const WaiterOrdersPage: NextPage = () => {
           <Grid container spacing={2}>
             {orders.map((order) => (
               <div className="w-full mb-4" key={order.id}>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-4 dark:text-white">
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="text-lg font-medium">
@@ -335,7 +335,7 @@ const WaiterOrdersPage: NextPage = () => {
                     </div>
                   </div>
 
-                  <div className="mt-3 border-t border-gray-100 pt-3">
+                  <div className="mt-3 border-t border-gray-100 pt-3 dark:text-white dark:bg-gray-800">
                     <div className="text-sm font-medium mb-2">Блюда:</div>
                     <ul className="space-y-1">
                       {order.items && order.items.map((item, index) => (
@@ -347,7 +347,7 @@ const WaiterOrdersPage: NextPage = () => {
                     </ul>
                   </div>
 
-                  <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4">
+                  <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4 dark:text-white dark:bg-gray-800">
                     <div className="font-medium">Итого: {(order.total_amount || order.total_price || 0).toFixed(2)} ₸</div>
                     
                     <div className="flex space-x-2">

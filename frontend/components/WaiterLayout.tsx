@@ -182,7 +182,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
           // Показываем индикатор режима администратора
           if (isAdmin) {
             return (
-              <div className="bg-amber-50 text-amber-800 py-1 px-4 text-center text-sm border-b border-amber-200">
+              <div className="bg-amber-50 text-amber-800 py-1 px-4 text-center text-sm border-b border-amber-200 dark:bg-amber-900 dark:text-amber-50">
                 Вы находитесь в панели официанта в режиме администратора
               </div>
             );

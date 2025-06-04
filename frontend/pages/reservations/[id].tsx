@@ -165,8 +165,8 @@ const ReservationDetailPage: NextPage = () => {
   return (
     <Layout title={`Бронирование №${reservation.id}`}>
       <div className="container mx-auto px-4 py-8">
-        <Link href="/reservations" className="text-primary hover:underline flex items-center mb-6">
-          <ChevronLeftIcon className="h-5 w-5 mr-1" />
+        <Link href="/reservations" className="text-primary hover:underline flex items-center mb-6 dark:text-white">
+          <ChevronLeftIcon className="h-5 w-5 mr-1 dark:text-white" />
           Вернуться к бронированиям
         </Link>
 
@@ -309,8 +309,8 @@ const ReservationDetailPage: NextPage = () => {
             )}
 
             <div className="flex justify-between items-center">
-              <Link href="/reservations" className="text-primary hover:underline flex items-center">
-                <ChevronLeftIcon className="h-5 w-5 mr-1" />
+              <Link href="/reservations" className="text-primary hover:underline flex items-center dark:text-white">
+                <ChevronLeftIcon className="h-5 w-5 mr-1 dark:text-white" />
                 Вернуться к бронированиям
               </Link>
               
