@@ -78,9 +78,17 @@ const ReviewForm: React.FC<ReviewFormProps> = ({ orderId, waiterId, onReviewSubm
         body: JSON.stringify(reviewData)
       });
       
-      let data = await response.json();
-      if (!response.ok)
-        throw Error(data.detail || data.message || "Не удалось создать отзыв");
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = null;
+      }
+      if (!response.ok) {
+        let msg = (data && (data.detail || data.message || data.error)) || response.statusText || "Не удалось создать отзыв";
+        setError(`Ошибка: ${msg}\n${data ? JSON.stringify(data) : ''}`);
+        throw Error(msg);
+      }
       
       setSuccess("Отзыв успешно отправлен");
       if (onReviewSubmitted) {

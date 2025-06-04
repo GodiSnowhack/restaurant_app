@@ -32,11 +32,11 @@ export default async function handler(
       console.log('API /menu: Некорректный формат дат');
       return res.status(400).json({ message: 'Некорректный формат дат' });
     }
-
+    
     // SQL запрос для получения данных о продажах блюд
     const orderItemsSql = `
       SELECT 
-        d.id AS dish_id,
+        d.id AS dish_id, 
         d.name AS dish_name,
         d.category_id,
         c.name AS category_name,
@@ -91,7 +91,7 @@ export default async function handler(
     const totals = Array.isArray(totalsResult) && totalsResult.length > 0 
       ? totalsResult[0] 
       : { total_quantity: 0, total_revenue: 0 };
-
+    
     const totalQuantity = parseInt(totals.total_quantity || '0');
     const totalRevenue = parseFloat(totals.total_revenue || '0');
 
@@ -228,7 +228,7 @@ export default async function handler(
       GROUP BY c.id, c.name
       ORDER BY sales_count DESC
     `;
-
+    
     let categoriesData;
     try {
       console.log('API /menu: Выполнение запроса к базе данных (получение данных категорий)');
@@ -238,7 +238,7 @@ export default async function handler(
       console.error('API /menu: Ошибка при получении данных категорий:', error);
       categoriesData = []; // Для продолжения работы даже при ошибке
     }
-
+    
     // Формируем данные о популярности категорий
     const categoryPopularity: Record<number, number> = {};
     
@@ -334,13 +334,13 @@ export default async function handler(
         console.error('API /menu: trendData не является массивом');
       }
     }
-
+    
     // Формируем данные о производительности категорий
-    const categoryPerformance: Record<string, {
-      salesPercentage: number;
-      averageOrderValue: number;
-      averageProfitMargin: number;
-    }> = {};
+      const categoryPerformance: Record<string, {
+        salesPercentage: number;
+        averageOrderValue: number;
+        averageProfitMargin: number;
+      }> = {};
 
     if (Array.isArray(categoriesData) && categoriesData.length > 0) {
       console.log('API /menu: Формирование данных о категориях');
@@ -371,15 +371,15 @@ export default async function handler(
           totalRevenue += revenue;
           totalProfitMargin += profitMargin;
         });
-        
-        const averageOrderValue = salesCount > 0 ? totalRevenue / salesCount : 0;
+          
+          const averageOrderValue = salesCount > 0 ? totalRevenue / salesCount : 0;
         const averageProfitMargin = categoryDishes.length > 0 ? totalProfitMargin / categoryDishes.length : 0;
-        
+          
         categoryPerformance[category.name] = {
-          salesPercentage,
-          averageOrderValue,
-          averageProfitMargin
-        };
+            salesPercentage,
+            averageOrderValue,
+            averageProfitMargin
+          };
       }
     }
 
