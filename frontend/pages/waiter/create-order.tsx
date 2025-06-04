@@ -468,8 +468,8 @@ const CreateOrderPage: NextPage = () => {
         {/* Меню (левая часть) */}
         <div className="w-full md:w-2/3">
           {/* Фильтр по категориям */}
-          <div className="mb-4 bg-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold mb-2">Категории</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Категории</h2>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('all')}
@@ -506,10 +506,8 @@ const CreateOrderPage: NextPage = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold">Меню</h2>
-              </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Меню</h2>
               <div className="divide-y">
                 {filteredMenuItems.length > 0 ? (
                   filteredMenuItems.map(item => (
@@ -539,10 +537,8 @@ const CreateOrderPage: NextPage = () => {
         
         {/* Заказ (правая часть) */}
         <div className="w-full md:w-1/3">
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b">
-              <h2 className="text-lg font-semibold">Текущий заказ</h2>
-            </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Текущий заказ</h2>
             
             {/* Данные о столе/клиенте */}
             <div className="p-4 border-b">

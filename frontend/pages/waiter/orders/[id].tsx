@@ -680,7 +680,7 @@ const WaiterOrderDetailPage: NextPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Информация о заказе */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold">Информация о заказе</h2>
               </div>
@@ -760,7 +760,7 @@ const WaiterOrderDetailPage: NextPage = () => {
             </div>
 
             {/* Список позиций заказа */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold">Состав заказа</h2>
               </div>
@@ -821,7 +821,7 @@ const WaiterOrderDetailPage: NextPage = () => {
           {/* Сайдбар */}
           <div className="lg:col-span-1">
             {/* Управление статусом заказа */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold">Управление статусом</h2>
               </div>
@@ -953,12 +953,12 @@ const WaiterOrderDetailPage: NextPage = () => {
         </div>
 
             {/* Действия */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold">Действия</h2>
               </div>
               <div className="p-6 space-y-3">
-                <Link href={`/waiter/orders`} className="bg-gray-100 text-gray-800 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 transition flex items-center justify-center">
+                <Link href={`/waiter/orders`} className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition flex items-center justify-center">
                   <DocumentTextIcon className="h-5 w-5 mr-2" />
                   Вернуться к списку заказов
                 </Link>

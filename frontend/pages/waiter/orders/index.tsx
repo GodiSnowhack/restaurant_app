@@ -271,7 +271,7 @@ const WaiterOrdersPage: NextPage = () => {
       </Head>
       <MainContainer>
         <div className="flex justify-between items-center mb-6">
-          <PageTitle>Мои заказы</PageTitle>
+          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Мои заказы</h1>
           <Button 
             variant="contained" 
             startIcon={<RefreshIcon className="h-5 w-5" />}
@@ -314,7 +314,7 @@ const WaiterOrdersPage: NextPage = () => {
           <Grid container spacing={2}>
             {orders.map((order) => (
               <div className="w-full mb-4" key={order.id}>
-                <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="text-lg font-medium">

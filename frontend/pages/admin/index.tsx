@@ -40,11 +40,11 @@ const AdminPage: NextPage = () => {
         setIsLoading(true);
         
         // Получаем статистику
-        try {
-          console.log('Запрос статистики дашборда...');
+          try {
+            console.log('Запрос статистики дашборда...');
           const data = await analyticsApi.getDashboardStats();
-          console.log('Получены данные дашборда:', data);
-          // Проверяем, что данные не undefined и не null
+            console.log('Получены данные дашборда:', data);
+            // Проверяем, что данные не undefined и не null
           if (data && (data.daily_orders || data.reservation_stats || data.user_stats)) {
             // Вычисляем заказы и выручку за сегодня
             const today = new Date().toISOString().split('T')[0];
@@ -67,28 +67,28 @@ const AdminPage: NextPage = () => {
               dishes: 0
             });
           } else if (data) {
+              setStats({
+                ordersToday: data.ordersToday || 0,
+                ordersTotal: data.ordersTotal || 0,
+                revenue: data.revenue || 0,
+                reservationsToday: data.reservationsToday || 0,
+                dishes: data.dishes || 0
+              });
+            } else {
+              console.error('Получены пустые данные статистики');
+              setError('Не удалось загрузить статистику: пустые данные');
+            }
+          } catch (adminError) {
+            console.error('Ошибка при запросе статистики:', adminError);
+            setError('Ошибка при загрузке статистики');
+            // Установка демо-данных при ошибке, чтобы пользователь видел интерфейс
             setStats({
-              ordersToday: data.ordersToday || 0,
-              ordersTotal: data.ordersTotal || 0,
-              revenue: data.revenue || 0,
-              reservationsToday: data.reservationsToday || 0,
-              dishes: data.dishes || 0
+              ordersToday: 5,
+              ordersTotal: 500,
+              revenue: 150000,
+              reservationsToday: 3,
+              dishes: 25
             });
-          } else {
-            console.error('Получены пустые данные статистики');
-            setError('Не удалось загрузить статистику: пустые данные');
-          }
-        } catch (adminError) {
-          console.error('Ошибка при запросе статистики:', adminError);
-          setError('Ошибка при загрузке статистики');
-          // Установка демо-данных при ошибке, чтобы пользователь видел интерфейс
-          setStats({
-            ordersToday: 5,
-            ordersTotal: 500,
-            revenue: 150000,
-            reservationsToday: 3,
-            dishes: 25
-          });
         }
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);

@@ -346,7 +346,7 @@ const AdminMenuPage: NextPage = () => {
                   : 'border-transparent text-gray-600 hover:text-gray-800'
               }`}
             >
-              Блюда
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Блюда</h2>
             </button>
             <button
               onClick={() => setActiveTab('categories')}
@@ -356,7 +356,7 @@ const AdminMenuPage: NextPage = () => {
                   : 'border-transparent text-gray-600 hover:text-gray-800'
               }`}
             >
-              Категории
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Категории</h2>
             </button>
           </div>
         </div>
@@ -473,7 +473,7 @@ const AdminMenuPage: NextPage = () => {
             {/* Форма добавления блюда (по клику на кнопку) */}
             {showDishForm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto dark:text-white">
                   <h2 className="text-2xl font-bold mb-4 dark:text-white">Создать блюдо</h2>
                   <form className="space-y-4" onSubmit={handleAddDish}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

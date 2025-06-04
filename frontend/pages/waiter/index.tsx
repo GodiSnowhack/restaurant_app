@@ -147,7 +147,7 @@ const WaiterPage: NextPage = () => {
   return (
     <WaiterLayout title="Панель официанта" activeTab="dashboard">
       <div className="p-4">
-        <header className="mb-6">
+        <header className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
             Добрый день, {user.full_name}!
           </h1>
@@ -161,7 +161,7 @@ const WaiterPage: NextPage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Генератор кода официанта */}
-          <WaiterCodeGenerator className="mb-6" />
+          <WaiterCodeGenerator className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 dark:text-white" />
 
           {/* Компонент для привязки заказа по коду */}
           <WaiterAssignOrderByCode 
