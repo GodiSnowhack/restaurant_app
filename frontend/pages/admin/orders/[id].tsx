@@ -248,7 +248,7 @@ const AdminOrderDetailPage: NextPage = () => {
               Заказ не найден
             </p>
             <p className="mt-2">
-              <Link href="/admin/orders" className="text-yellow-700 underline">
+              <Link href="/admin/orders" className="text-yellow-700 underline dark:text-white">
                 Вернуться к списку заказов
               </Link>
             </p>
@@ -327,7 +327,7 @@ const AdminOrderDetailPage: NextPage = () => {
                 
                 {/* Информация о клиенте */}
                 <div className="border-t pt-4 mt-4">
-                  <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
+                  <h3 className="text-lg font-medium mb-3 dark:text-white">Информация о клиенте</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Имя клиента</p>
@@ -545,7 +545,7 @@ const AdminOrderDetailPage: NextPage = () => {
                 </div>
 
                 <div className="border-t mt-4 pt-4">
-                  <p className="text-sm text-gray-600 mb-4">История изменений статуса</p>
+                  <p className="text-sm text-gray-600 mb-4 dark:text-white">История изменений статуса</p>
                   <div className="space-y-2">
                     <div className="flex items-start">
                       <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-500 mt-1"></div>
