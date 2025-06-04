@@ -92,10 +92,10 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Дата
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Прогнозируемая выручка
                 </th>
               </tr>
@@ -106,7 +106,7 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {formatDate(forecast.date)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                     {formatCurrency(forecast.value)}
                   </td>
                 </tr>
@@ -125,7 +125,7 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Object.entries(data.inventoryForecast).map(([productId, quantity]) => (
             <div key={productId} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-500 dark:text-white">
                 {getProductName(parseInt(productId))}
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">
@@ -146,11 +146,11 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   День
                 </th>
                 {Object.keys(Object.values(data.staffingNeeds)[0] || {}).map((timeSlot) => (
-                  <th key={timeSlot} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th key={timeSlot} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                     {timeSlot}
                   </th>
                 ))}
@@ -163,7 +163,7 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
                     {day}
                   </td>
                   {Object.values(slots).map((count, index) => (
-                    <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                       {count} чел.
                     </td>
                   ))}
@@ -212,7 +212,7 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
                   <p className="text-lg font-medium text-gray-900 dark:text-white">
                     {promo.dishName}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-white mt-1">
                     {promo.reason}
                   </p>
                 </div>
@@ -220,7 +220,7 @@ const PredictiveMetricsView: React.FC<PredictiveMetricsViewProps> = ({
                   <div className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
                     {formatPercent(promo.suggestedDiscount)} скидка
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                  <p className="text-sm text-gray-500 dark:text-white mt-2">
                     Потенциальная выручка: {formatCurrency(promo.potentialRevenue)}
                   </p>
                 </div>

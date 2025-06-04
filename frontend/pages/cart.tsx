@@ -81,19 +81,19 @@ const CartPage: NextPage = () => {
     return (
       <Layout title="Корзина">
         <div className="container mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-gray-100">Корзина</h1>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+          <h1 className="text-3xl font-bold mb-8">Корзина</h1>
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <div className="flex justify-center mb-4">
-              <ShoppingCartIcon className="h-16 w-16 text-gray-400 dark:text-gray-500" />
+              <ShoppingCartIcon className="h-16 w-16 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-medium mb-4 text-gray-900 dark:text-gray-100">Ваша корзина пуста</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <h2 className="text-2xl font-medium mb-4">Ваша корзина пуста</h2>
+            <p className="text-gray-600 mb-6">
               Добавьте блюда из меню, чтобы сделать заказ
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <Link 
                 href="/menu" 
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm"
+                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm"
               >
                 <ArrowLeftIcon className="h-5 w-5 mr-2" />
                 Продолжить покупки
@@ -183,12 +183,12 @@ const CartPage: NextPage = () => {
                         </div>
                         
                         {item.comment && (
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          <p className="mt-1 text-sm text-gray-500 dark:text-white">
                             Комментарий: {item.comment}
                           </p>
                         )}
                         
-                        <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-200 text-right">
+                        <p className="mt-1 text-sm font-medium text-gray-700 dark:text-white text-right">
                           Итого: {formatPrice(item.price * item.quantity)}
                         </p>
                       </div>
@@ -213,13 +213,13 @@ const CartPage: NextPage = () => {
               <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Оформление заказа</h2>
               
               <div className="mb-4">
-                <label htmlFor="order-comment" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="order-comment" className="block text-sm font-medium text-gray-700 dark:text-white mb-1">
                   Комментарий к заказу
                 </label>
                 <textarea
                   id="order-comment"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   placeholder="Пожелания к заказу"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -246,7 +246,7 @@ const CartPage: NextPage = () => {
                         type="text"
                         placeholder="XXX-YYY"
                         maxLength={7}
-                        className="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                        className="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         value={reservationCode || ''}
                         onChange={handleReservationCodeChange}
                       />
@@ -273,7 +273,7 @@ const CartPage: NextPage = () => {
                         {reservationCodeError || 'Недействительный код'}
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-white font-medium">
                       Не имеете бронирования? <Link href="/reservations" className="underline">Забронируйте столик</Link>.
                     </p>
                   </div>

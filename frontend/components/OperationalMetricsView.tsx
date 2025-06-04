@@ -88,7 +88,7 @@ const OperationalMetricsView: React.FC<OperationalMetricsViewProps> = ({
                 <metric.icon className={`h-6 w-6 ${metric.iconClassName}`} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                <p className="text-sm font-medium text-gray-500 dark:text-white">
                   {metric.name}
                 </p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -108,7 +108,7 @@ const OperationalMetricsView: React.FC<OperationalMetricsViewProps> = ({
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Object.entries(data.peakHours).map(([hour, percentage]) => (
             <div key={hour} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-500 dark:text-white">
                 {hour}
               </p>
               <div className="mt-2 flex items-center">
@@ -142,19 +142,19 @@ const OperationalMetricsView: React.FC<OperationalMetricsViewProps> = ({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Сотрудник
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Обслужено заказов
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Средний чек
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Среднее время обслуживания
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                   Рейтинг клиентов
                 </th>
               </tr>
@@ -165,16 +165,16 @@ const OperationalMetricsView: React.FC<OperationalMetricsViewProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {staff.userName}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                     {staff.ordersServed}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                     {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(staff.averageOrderValue)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                     {formatMinutes(staff.averageServiceTime)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white">
                     <div className="flex items-center">
                       <span className={`mr-2 font-medium ${
                         staff.customerRating >= 4.5
@@ -214,7 +214,7 @@ const OperationalMetricsView: React.FC<OperationalMetricsViewProps> = ({
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
           {Object.entries(data.tableUtilization).map(([tableId, utilization]) => (
             <div key={tableId} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-center">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <p className="text-sm font-medium text-gray-700 dark:text-white">
                 Столик #{tableId}
               </p>
               <p className={`text-xl font-semibold mt-2 ${getUtilizationColor(utilization)}`}>

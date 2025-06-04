@@ -535,7 +535,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'all'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Все
@@ -545,7 +545,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'pending'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Новые
@@ -555,7 +555,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'confirmed'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Подтвержденные
@@ -565,7 +565,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'preparing'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               В процессе
@@ -575,7 +575,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'completed'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Завершенные
@@ -585,7 +585,7 @@ const AdminOrdersPage: NextPage = () => {
               className={`px-3 py-1.5 text-sm rounded-full ${
                 activeTab === 'cancelled'
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Отмененные
@@ -594,23 +594,23 @@ const AdminOrdersPage: NextPage = () => {
           
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">С:</span>
+              <span className="text-sm text-gray-600 dark:text-white mr-2">С:</span>
               <input
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => handleDateRangeChange(e)}
                 name="start"
-                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
+                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-white"
               />
             </div>
             <div className="flex items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">По:</span>
+              <span className="text-sm text-gray-600 dark:text-white mr-2">По:</span>
               <input
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => handleDateRangeChange(e)}
                 name="end"
-                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-gray-300"
+                className="border border-gray-300 dark:border-gray-600 rounded text-sm p-1 dark:bg-gray-700 dark:text-white"
               />
             </div>
             <button
@@ -631,7 +631,7 @@ const AdminOrdersPage: NextPage = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
             <ExclamationIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Ошибка загрузки данных</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
+            <p className="text-gray-500 dark:text-white mb-4">{error}</p>
             <button
               onClick={() => fetchOrders()}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark"
@@ -641,7 +641,7 @@ const AdminOrdersPage: NextPage = () => {
           </div>
         ) : orders.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">Заказы не найдены</p>
+            <p className="text-gray-500 dark:text-white mb-4">Заказы не найдены</p>
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
@@ -649,25 +649,25 @@ const AdminOrdersPage: NextPage = () => {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       ID
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Дата
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Клиент
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Сумма
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Статус заказа
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Статус оплаты
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-white uppercase tracking-wider">
                       Действия
                     </th>
                   </tr>
@@ -675,16 +675,16 @@ const AdminOrdersPage: NextPage = () => {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {orders.map((order) => (
                     <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {order.id}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {formatDate(order.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {order.customer_name || 'Гость'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {formatPrice(order.total_amount || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

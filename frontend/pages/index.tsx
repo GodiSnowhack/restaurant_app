@@ -293,7 +293,7 @@ const HomePageContent = () => {
                 <h1 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
                   {settings?.welcome_text || 'Добро пожаловать в наш ресторан!'}
                 </h1>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white mb-8">
                   {settings?.description || 'Насладитесь изысканными блюдами в атмосфере уюта и комфорта. Наше меню разработано лучшими шеф-поварами, чтобы предложить вам незабываемые вкусовые впечатления.'}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
@@ -346,7 +346,7 @@ const HomePageContent = () => {
                           />
                         ) : (
                           <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <p className="text-gray-500 dark:text-gray-400">Изображение недоступно</p>
+                            <p className="text-gray-500 dark:text-white">Изображение недоступно</p>
                           </div>
                         )}
                         {dish.featured && (
@@ -360,16 +360,16 @@ const HomePageContent = () => {
                           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{dish.name}</h3>
                           <p className="font-bold text-primary">{dish.price} ₽</p>
                         </div>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{dish.description}</p>
+                        <p className="text-gray-600 dark:text-white text-sm mb-4 line-clamp-2">{dish.description}</p>
                         {dish.rating && (
                           <div className="flex items-center mb-4">
                             {[...Array(5)].map((_, i) => (
                               <StarIcon
                                 key={i}
-                                className={i < Math.floor(dish.rating || 0) ? 'h-5 w-5 text-yellow-400' : 'h-5 w-5 text-gray-300 dark:text-gray-600'}
+                                className={i < Math.floor(dish.rating || 0) ? 'h-5 w-5 text-yellow-400' : 'h-5 w-5 text-gray-300 dark:text-white'}
                               />
                             ))}
-                            <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">{dish.rating}</span>
+                            <span className="ml-2 text-sm text-gray-600 dark:text-white">{dish.rating}</span>
                           </div>
                         )}
                         <button
@@ -409,7 +409,7 @@ const HomePageContent = () => {
                   <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
                     Местоположение
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300">
+                  <p className="text-gray-600 dark:text-white">
                     {settings?.address || 'Москва, ул. Тверская, 1'}
                   </p>
                 </div>
@@ -421,7 +421,7 @@ const HomePageContent = () => {
                   <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
                     Контакты
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300">
+                  <p className="text-gray-600 dark:text-white">
                     Тел: {settings?.phone || '+7 (XXX) XXX-XX-XX'}<br />
                     Email: {settings?.email || 'info@restaurant.com'}
                   </p>
@@ -434,7 +434,7 @@ const HomePageContent = () => {
                   <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
                     Часы работы
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300">
+                  <p className="text-gray-600 dark:text-white">
                     Пн-Пт: 12:00 - 23:00<br />
                     Сб-Вс: 12:00 - 00:00
                   </p>
@@ -470,14 +470,14 @@ const HomePageContent = () => {
                           {[...Array(5)].map((_, i) => (
                             <StarIcon
                               key={i}
-                              className={i < testimonial.rating ? 'h-4 w-4 text-yellow-400' : 'h-4 w-4 text-gray-300 dark:text-gray-600'}
+                              className={i < testimonial.rating ? 'h-4 w-4 text-yellow-400' : 'h-4 w-4 text-gray-300 dark:text-white'}
                             />
                           ))}
                         </div>
                       </div>
                     </div>
-                    <p className="text-gray-600 dark:text-gray-300 italic mb-2">"{testimonial.text}"</p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-4">{testimonial.date}</p>
+                    <p className="text-gray-600 dark:text-white italic mb-2">"{testimonial.text}"</p>
+                    <p className="text-gray-500 dark:text-white text-sm mt-4">{testimonial.date}</p>
                   </div>
                 ))}
               </div>

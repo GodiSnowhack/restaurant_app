@@ -254,24 +254,24 @@ const UserEditPage: NextPage = () => {
   
   return (
     <Layout title="Редактирование пользователя | Админ-панель">
-      <div className="container mx-auto px-4 py-8 bg-white dark:bg-gray-900 min-h-screen">
+      <div className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-6">
-          <Link href="/admin/users" className="text-gray-600 dark:text-gray-300 hover:text-primary mr-4">
+          <Link href="/admin/users" className="text-gray-600 hover:text-primary mr-4">
             <ArrowLeftIcon className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Редактирование пользователя</h1>
+          <h1 className="text-3xl font-bold">Редактирование пользователя</h1>
         </div>
         
         {success && (
-          <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-200 px-4 py-3 rounded relative mb-6" role="alert">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
             <strong className="font-bold">Успешно! </strong>
             <span className="block sm:inline">Данные пользователя обновлены.</span>
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+        <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6">
           {error && (
-            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-200 px-4 py-3 rounded relative mb-6" role="alert">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
               <strong className="font-bold">Ошибка! </strong>
               <span className="block sm:inline">{error}</span>
               <button 
@@ -287,17 +287,17 @@ const UserEditPage: NextPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Основная информация */}
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold border-b pb-2 text-gray-900 dark:text-white">Основная информация</h2>
+              <h2 className="text-xl font-semibold border-b pb-2">Основная информация</h2>
               
               {/* Статус пользователя */}
               <div className="flex items-center">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${formData.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}`}>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${formData.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {formData.is_active ? 'Активен' : 'Заблокирован'}
                 </span>
                 <button 
                   type="button"
                   onClick={handleToggleStatus}
-                  className="ml-4 inline-flex items-center px-3 py-1 border border-gray-300 dark:border-gray-700 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  className="ml-4 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
                   <RefreshIcon className="h-4 w-4 mr-1" />
                   {formData.is_active ? 'Заблокировать' : 'Активировать'}
@@ -306,12 +306,12 @@ const UserEditPage: NextPage = () => {
               
               {/* ФИО */}
               <div>
-                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-1">
                   ФИО <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <UserIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
@@ -319,21 +319,21 @@ const UserEditPage: NextPage = () => {
                     name="full_name"
                     value={formData.full_name}
                     onChange={handleChange}
-                    className={`pl-10 block w-full border ${formErrors.full_name ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+                    className={`pl-10 block w-full border ${formErrors.full_name ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary`}
                     placeholder="Иванов Иван Иванович"
                   />
                 </div>
-                {formErrors.full_name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.full_name}</p>}
+                {formErrors.full_name && <p className="mt-1 text-sm text-red-600">{formErrors.full_name}</p>}
               </div>
               
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <EnvelopeIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <EnvelopeIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="email"
@@ -341,21 +341,21 @@ const UserEditPage: NextPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`pl-10 block w-full border ${formErrors.email ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+                    className={`pl-10 block w-full border ${formErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary`}
                     placeholder="email@example.com"
                   />
                 </div>
-                {formErrors.email && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.email}</p>}
+                {formErrors.email && <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>}
               </div>
               
               {/* Телефон */}
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
                   Телефон
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <PhoneIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <PhoneIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="tel"
@@ -363,33 +363,33 @@ const UserEditPage: NextPage = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`pl-10 block w-full border ${formErrors.phone ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+                    className={`pl-10 block w-full border ${formErrors.phone ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary`}
                     placeholder="+7 (999) 123-45-67"
                   />
                 </div>
-                {formErrors.phone && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.phone}</p>}
+                {formErrors.phone && <p className="mt-1 text-sm text-red-600">{formErrors.phone}</p>}
               </div>
             </div>
             
             {/* Учетные данные */}
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold border-b pb-2 text-gray-900 dark:text-white">Учетные данные</h2>
+              <h2 className="text-xl font-semibold border-b pb-2">Учетные данные</h2>
               
               {/* Роль пользователя */}
               <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
                   Роль пользователя <span className="text-red-500">*</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserGroupIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <UserGroupIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <select
                     id="role"
                     name="role"
                     value={formData.role}
                     onChange={handleChange}
-                    className="pl-10 block w-full border border-gray-300 dark:border-gray-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                    className="pl-10 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
                     disabled={Number(id) === 1} // Запрещаем менять роль первого (главного) администратора
                   >
                     {roleOptions.map(role => (
@@ -397,7 +397,7 @@ const UserEditPage: NextPage = () => {
                     ))}
                   </select>
                 </div>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-sm text-gray-500">
                   {roleOptions.find(r => r.id === formData.role)?.description}
                 </p>
                 {Number(id) === 1 && (
@@ -409,12 +409,12 @@ const UserEditPage: NextPage = () => {
               
               {/* Пароль - опционально для редактирования */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Новый пароль <span className="text-sm text-gray-500">(оставьте пустым, если не хотите менять)</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <LockClosedIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <LockClosedIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="password"
@@ -422,21 +422,21 @@ const UserEditPage: NextPage = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`pl-10 block w-full border ${formErrors.password ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+                    className={`pl-10 block w-full border ${formErrors.password ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary`}
                     placeholder="Минимум 6 символов"
                   />
                 </div>
-                {formErrors.password && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.password}</p>}
+                {formErrors.password && <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>}
               </div>
               
               {/* Подтверждение пароля */}
               <div>
-                <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-1">
                   Подтверждение нового пароля
                 </label>
                 <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <LockClosedIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    <LockClosedIcon className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="password"
@@ -444,11 +444,11 @@ const UserEditPage: NextPage = () => {
                     name="confirm_password"
                     value={formData.confirm_password}
                     onChange={handleChange}
-                    className={`pl-10 block w-full border ${formErrors.confirm_password ? 'border-red-300 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+                    className={`pl-10 block w-full border ${formErrors.confirm_password ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary`}
                     placeholder="Повторите пароль"
                   />
                 </div>
-                {formErrors.confirm_password && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.confirm_password}</p>}
+                {formErrors.confirm_password && <p className="mt-1 text-sm text-red-600">{formErrors.confirm_password}</p>}
               </div>
             </div>
           </div>

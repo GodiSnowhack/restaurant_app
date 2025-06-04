@@ -172,7 +172,7 @@ const AdminPage: NextPage = () => {
     <Layout title="Админ-панель">
       <div className="max-w-[1400px] w-full mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2 dark:text-white">Панель управления</h1>
-        <p className="text-gray-600 dark:text-gray-300 mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
+        <p className="text-gray-600 dark:text-white mb-8">Добро пожаловать, {user?.full_name || 'Администратор'}</p>
 
         {/* Карточки статистики */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -183,7 +183,7 @@ const AdminPage: NextPage = () => {
                 <ShoppingCartIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Заказы сегодня</h2>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-white">Заказы сегодня</h2>
                 <p className="text-2xl font-bold dark:text-white">{stats.ordersToday}</p>
               </div>
             </div>
@@ -195,7 +195,7 @@ const AdminPage: NextPage = () => {
                 <CalendarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Брони сегодня</h2>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-white">Брони сегодня</h2>
                 <p className="text-2xl font-bold dark:text-white">{stats.reservationsToday}</p>
               </div>
             </div>
@@ -207,7 +207,7 @@ const AdminPage: NextPage = () => {
                 <CurrencyDollarIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Выручка сегодня</h2>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-white">Выручка сегодня</h2>
                 <p className="text-2xl font-bold dark:text-white">{(stats.revenue || 0).toLocaleString()} ₸</p>
               </div>
             </div>
@@ -227,7 +227,7 @@ const AdminPage: NextPage = () => {
                 <div className="mr-4">{item.icon}</div>
                 <div>
                   <h3 className="text-xl font-semibold mb-2 dark:text-white">{item.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-300">{item.description}</p>
+                  <p className="text-gray-600 dark:text-white">{item.description}</p>
                 </div>
               </div>
             </Link>

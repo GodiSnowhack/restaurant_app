@@ -114,7 +114,7 @@ const FinancialMetricsView: React.FC<FinancialMetricsViewProps> = ({
                 <metric.icon className={`h-6 w-6 ${metric.iconClassName}`} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                <p className="text-sm font-medium text-gray-500 dark:text-white">
                   {metric.name}
                 </p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -150,7 +150,7 @@ const FinancialMetricsView: React.FC<FinancialMetricsViewProps> = ({
         <div className="space-y-4">
           {Object.entries(data.revenueByCategory).map(([categoryId, revenue]) => (
             <div key={categoryId} className="flex items-center justify-between">
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-gray-700 dark:text-white">
                 {getCategoryName(parseInt(categoryId))}
               </span>
               <div className="flex items-center">
