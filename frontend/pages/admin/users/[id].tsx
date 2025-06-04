@@ -409,7 +409,7 @@ const UserEditPage: NextPage = () => {
               
               {/* Пароль - опционально для редактирования */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1" dark:bg-gray-800 dark:text-white>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1 dark:bg-gray-800 dark:text-white">
                   Новый пароль <span className="text-sm text-gray-500">(оставьте пустым, если не хотите менять)</span>
                 </label>
                 <div className="relative rounded-md shadow-sm">
