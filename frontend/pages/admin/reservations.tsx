@@ -354,7 +354,7 @@ const AdminReservationsPage: NextPage = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-4">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-bold">Стол #{table_number}</h3>
+            <h3 className="text-lg font-bold dark:text-white">Стол #{table_number}</h3>
             <p className="text-sm text-gray-500">ID: {id}</p>
           </div>
           <span className={`px-2 py-1 rounded-full text-xs ${statusInfo.className}`}>
@@ -451,20 +451,20 @@ const AdminReservationsPage: NextPage = () => {
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
             <span>Назад</span>
           </Link>
-          <h1 className="text-2xl font-bold ml-4">Управление бронированиями</h1>
+          <h1 className="text-2xl font-bold ml-4 dark:text-white">Управление бронированиями</h1>
           
           <div className="ml-auto flex space-x-2">
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              <FilterIcon className="h-5 w-5 mr-1 text-gray-600" />
+              <FilterIcon className="h-5 w-5 mr-1 text-gray-600 dark:text-white" />
               <span>Фильтры</span>
             </button>
             
             <button 
               onClick={refreshData} 
-              className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
               disabled={isLoading}
             >
               <ArrowPathIcon className={`h-5 w-5 mr-1 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />

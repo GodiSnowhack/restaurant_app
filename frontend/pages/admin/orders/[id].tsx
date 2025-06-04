@@ -260,7 +260,7 @@ const AdminOrderDetailPage: NextPage = () => {
 
   return (
     <Layout title={`Заказ #${order.id} | Админ-панель`}>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 dark:bg-gray-800 dark:text-white">
         {/* Навигация */}
         <div className="mb-6">
           <Link href="/admin/orders" className="text-primary hover:text-primary-dark inline-flex items-center">
@@ -271,7 +271,7 @@ const AdminOrderDetailPage: NextPage = () => {
 
         {/* Заголовок и статус */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <h1 className="text-3xl font-bold mb-4 md:mb-0">Заказ #{order.id}</h1>
+          <h1 className="text-3xl font-bold mb-4 md:mb-0 dark:text-white">Заказ #{order.id}</h1>
           <div className="flex flex-col sm:flex-row gap-2">
             <span className={`${getStatusColor(order.status)} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center`}>
               {getStatusLabel(order.status)}
@@ -285,7 +285,7 @@ const AdminOrderDetailPage: NextPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 dark:bg-gray-800 dark:text-white">
           {/* Информация о заказе */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 dark:bg-gray-800 dark:text-white">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Информация о заказе</h2>
               </div>
@@ -359,7 +359,7 @@ const AdminOrderDetailPage: NextPage = () => {
             </div>
 
             {/* Список позиций заказа */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden dark:bg-gray-800 dark:text-white">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Состав заказа</h2>
               </div>
@@ -422,7 +422,7 @@ const AdminOrderDetailPage: NextPage = () => {
           {/* Сайдбар */}
           <div className="lg:col-span-1">
             {/* Управление статусом заказа */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 dark:bg-gray-800 dark:text-white">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Управление статусом</h2>
               </div>
@@ -578,7 +578,7 @@ const AdminOrderDetailPage: NextPage = () => {
             </div>
 
             {/* Действия */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden dark:bg-gray-800 dark:text-white">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Действия</h2>
               </div>
