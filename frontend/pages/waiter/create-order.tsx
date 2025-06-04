@@ -513,15 +513,15 @@ const CreateOrderPage: NextPage = () => {
                   filteredMenuItems.map(item => (
                     <div key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center">
                       <div>
-                        <h3 className="font-medium dark:text-white dark:bg-gray-800">{item.name}</h3>
-                        <p className="text-sm text-gray-600 dark:text-white dark:bg-gray-800">{item.description}</p>
-                        <p className="mt-1 font-medium text-primary dark:text-white dark:bg-gray-800">{item.price.toFixed(2)} ₸</p>
+                        <h3 className="font-medium dark:text-white ">{item.name}</h3>
+                        <p className="text-sm text-gray-600 dark:text-white ">{item.description}</p>
+                        <p className="mt-1 font-medium text-primary dark:text-white ">{item.price.toFixed(2)} ₸</p>
                       </div>
                       <button
                         onClick={() => addItemToOrder(item)}
                         className="p-2 text-primary hover:bg-primary hover:text-white rounded-full transition-colors"
                       >
-                        <PlusIcon className="h-6 w-6 dark:text-white dark:bg-gray-800" />
+                        <PlusIcon className="h-6 w-6 dark:text-white" />
                       </button>
                     </div>
                   ))

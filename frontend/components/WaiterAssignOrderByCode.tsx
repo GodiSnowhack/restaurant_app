@@ -115,7 +115,7 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
       
       <form onSubmit={handleAssignOrder} className="space-y-4">
         <div>
-          <label htmlFor="orderCode" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="orderCode" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white">
             Код заказа
           </label>
           <div className="flex">

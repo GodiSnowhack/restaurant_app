@@ -197,7 +197,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
               <div className="flex items-center">
                 {showBackButton && (
                   <Link href={backUrl} className="text-gray-600 hover:text-gray-900 mr-4">
-                    <div className="flex items-center">
+                    <div className="flex items-center dark:text-white dark:bg-gray-800">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
@@ -206,7 +206,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
                   </Link>
                 )}
                 
-                <h1 className="text-xl font-semibold">{title}</h1>
+                <h1 className="text-xl font-semibold dark:text-white dark:bg-gray-800">{title}</h1>
               </div>
             </div>
           </div>

@@ -219,7 +219,7 @@ const EditDishPage: NextPage = () => {
             <Link href="/admin/menu" className="mr-4 hover:bg-gray-100 p-2 rounded-full transition-colors">
               <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Редактирование блюда</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Редактирование блюда</h1>
           </div>
         </div>
         
@@ -237,10 +237,10 @@ const EditDishPage: NextPage = () => {
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white shadow-sm rounded-lg p-6">
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white shadow-sm rounded-lg p-6 dark:bg-gray-800 dark:text-white">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Название блюда*
               </label>
               <input
@@ -255,7 +255,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Категория*
               </label>
               <select
@@ -274,7 +274,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Цена*
               </label>
               <input
@@ -291,7 +291,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="cost_price" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Себестоимость
               </label>
               <input
@@ -307,7 +307,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div className="md:col-span-2">
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Описание
               </label>
               <textarea
@@ -321,7 +321,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="calories" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="calories" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Калории
               </label>
               <input
@@ -336,8 +336,8 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">
-                Вес (г)
+              <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
+                Вес (гр)
               </label>
               <input
                 type="number"
@@ -351,7 +351,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div>
-              <label htmlFor="cooking_time" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="cooking_time" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
                 Время приготовления (мин)
               </label>
               <input
@@ -366,7 +366,7 @@ const EditDishPage: NextPage = () => {
             </div>
             
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-3 dark:text-white dark:bg-gray-800">
                 Изображение блюда
               </label>
               <ImageUploader
@@ -387,7 +387,7 @@ const EditDishPage: NextPage = () => {
                 onChange={handleCheckboxChange}
                 className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
               />
-              <label htmlFor="is_vegetarian" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="is_vegetarian" className="ml-2 block text-sm text-gray-700 dark:text-white dark:bg-gray-800">
                 Вегетарианское блюдо
               </label>
             </div>
@@ -401,7 +401,7 @@ const EditDishPage: NextPage = () => {
                 onChange={handleCheckboxChange}
                 className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
               />
-              <label htmlFor="is_vegan" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="is_vegan" className="ml-2 block text-sm text-gray-700 dark:text-white dark:bg-gray-800">
                 Веганское блюдо
               </label>
             </div>
@@ -415,12 +415,12 @@ const EditDishPage: NextPage = () => {
                 onChange={handleCheckboxChange}
                 className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
               />
-              <label htmlFor="is_spicy" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="is_spicy" className="ml-2 block text-sm text-gray-700 dark:text-white dark:bg-gray-800">
                 Острое блюдо
               </label>
             </div>
             
-            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
+            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200 dark:bg-gray-800 dark:text-white">
               <input
                 type="checkbox"
                 id="is_available"
@@ -429,7 +429,7 @@ const EditDishPage: NextPage = () => {
                 onChange={handleCheckboxChange}
                 className="h-5 w-5 text-primary focus:ring-primary border-gray-300 rounded-md"
               />
-              <label htmlFor="is_available" className="ml-2 block text-sm text-gray-700">
+              <label htmlFor="is_available" className="ml-2 block text-sm text-gray-700 dark:text-white dark:bg-gray-800">
                 Доступно для заказа
               </label>
             </div>
