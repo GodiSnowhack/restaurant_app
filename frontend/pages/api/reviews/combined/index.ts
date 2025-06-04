@@ -69,9 +69,8 @@ export default async function createCombinedReviewProxy(req: NextApiRequest, res
 
     // Получаем URL API из переменных окружения
     let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-1a78.up.railway.app/api/v1';
-    // Убираем /api/v1, если он уже есть в apiUrl
     apiUrl = apiUrl.replace(/\/api\/v1$/, '');
-    const endpoint = `${apiUrl}/reviews/combined`;
+    const endpoint = `${apiUrl}/api/v1/reviews/combined`;
 
     console.log('Reviews API - Отправка запроса:', {
       url: endpoint,
