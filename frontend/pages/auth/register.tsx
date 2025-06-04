@@ -63,7 +63,7 @@ export default function RegisterPage() {
           full_name: data.name,
           email: data.email,
           password: data.password,
-          role: 'client' // Изменил роль на client вместо waiter
+          role: 'client'
         }),
       });
 
@@ -73,10 +73,20 @@ export default function RegisterPage() {
         throw new Error(responseData.detail || 'Ошибка при регистрации');
       }
 
-      // Сразу авторизуем пользователя
-      await login({ email: data.email, password: data.password });
-      toast.success('Регистрация успешна! Вы вошли в систему');
-      router.push('/');
+      // Используем полученные данные для авторизации
+      if (responseData.access_token && responseData.user) {
+        // Сохраняем токен и данные пользователя
+        localStorage.setItem('token', responseData.access_token);
+        localStorage.setItem('user_profile', JSON.stringify(responseData.user));
+        localStorage.setItem('auth_timestamp', Date.now().toString());
+        
+        // Обновляем состояние авторизации
+        await login({ email: data.email, password: data.password });
+        toast.success('Регистрация успешна! Вы вошли в систему');
+        router.push('/');
+      } else {
+        throw new Error('Неполные данные в ответе сервера');
+      }
     } catch (error: any) {
       console.error('Ошибка при регистрации:', error);
       
