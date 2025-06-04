@@ -415,6 +415,12 @@ const CreateOrderPage: NextPage = () => {
         }
       }
       
+      // Получаем ID созданного заказа
+      const orderId = responseData.data?.id;
+      if (!orderId) {
+        throw new Error('Не удалось получить ID созданного заказа');
+      }
+      
       // Генерируем данные для создания пользователя
       const { email, password } = generateUserCredentials();
       setCreatedUserInfo({ email, password });
@@ -431,6 +437,9 @@ const CreateOrderPage: NextPage = () => {
         duration: 3000,
         position: 'top-center',
       });
+      
+      // Перенаправляем на страницу заказа
+      router.push(`/orders/${orderId}?success=true`);
       
       // Через 5 секунд убираем уведомление об успехе
       setTimeout(() => {

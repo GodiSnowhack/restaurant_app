@@ -28,6 +28,7 @@ import {
 } from '@heroicons/react/24/solid';
 import ReviewForm from '../../components/orders/ReviewForm';
 import { updateOrderPaymentStatus } from "../../lib/api/order-payment";
+import { toast } from 'react-hot-toast';
 
 // Расширяем тип Order с полем comment и special_instructions
 interface ExtendedOrder extends Omit<Order, 'waiter_id'> {
@@ -55,6 +56,42 @@ const OrderDetailPage: NextPage = () => {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Показываем уведомление об успешном создании заказа
+  useEffect(() => {
+    if (success === 'true' && isMounted) {
+      toast.success('Заказ успешно создан!', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      // Удаляем параметр success из URL
+      router.replace(`/orders/${id}`, undefined, { shallow: true });
+    }
+  }, [success, isMounted, id, router]);
+
+  // Загружаем данные заказа
+  useEffect(() => {
+    if (!id || typeof id !== 'string') return;
+    
+    const fetchOrder = async () => {
+      try {
+        setIsLoading(true);
+        setError('');
+        const fetchedOrder = await ordersApi.getOrderById(Number(id));
+        if (!fetchedOrder) {
+          throw new Error('Заказ не найден');
+        }
+        setOrder(fetchedOrder);
+      } catch (err: any) {
+        console.error('Ошибка при загрузке данных заказа:', err);
+        setError(err.message || 'Не удалось загрузить данные заказа. Пожалуйста, попробуйте позже.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [id]);
 
   // Определяем функцию загрузки заказа
   const fetchOrderData = async () => {
