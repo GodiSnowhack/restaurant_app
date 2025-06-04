@@ -282,21 +282,21 @@ const AdminOrderDetailPage: NextPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 dark:bg-gray-800 dark:text-white">
           {/* Информация о заказе */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Информация о заказе</h2>
+                <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Информация о заказе</h2>
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Дата заказа</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Дата заказа</p>
                     <p className="font-medium">{formatDate(order.created_at)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Способ оплаты</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Способ оплаты</p>
                     <p className="font-medium flex items-center">
                       {order.payment_status === 'paid' ? (
                         <CreditCardIcon className="h-5 w-5 text-gray-500 mr-1" />
@@ -308,20 +308,20 @@ const AdminOrderDetailPage: NextPage = () => {
                   </div>
                   {order.table_number && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Столик</p>
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Столик</p>
                       <p className="font-medium">№{order.table_number}</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Срочный заказ</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Срочный заказ</p>
                     <p className="font-medium">{order.is_urgent ? 'Да' : 'Нет'}</p>
                   </div>
                 </div>
 
                 {order.comment && (
                   <div className="mb-6">
-                    <p className="text-sm text-gray-600 mb-1">Комментарий к заказу</p>
-                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800">{order.comment}</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Комментарий к заказу</p>
+                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800 dark:bg-gray-800 dark:text-white">{order.comment}</p>
                   </div>
                 )}
                 
@@ -330,26 +330,26 @@ const AdminOrderDetailPage: NextPage = () => {
                   <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Имя клиента</p>
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Имя клиента</p>
                       <p className="font-medium">
                         {order.customer_name || order.user?.full_name || 'Не указано'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Телефон</p>
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Телефон</p>
                       <p className="font-medium">
                         {order.customer_phone || order.user?.phone || 'Не указано'}
                       </p>
                     </div>
                     {order.user && (
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Email</p>
+                        <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">Email</p>
                         <p className="font-medium">{order.user.email || 'Не указано'}</p>
                       </div>
                     )}
                     {order.user_id && (
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">ID пользователя</p>
+                        <p className="text-sm text-gray-600 mb-1 dark:text-white dark:bg-gray-800">ID пользователя</p>
                         <p className="font-medium">{order.user_id}</p>
                       </div>
                     )}
@@ -361,55 +361,55 @@ const AdminOrderDetailPage: NextPage = () => {
             {/* Список позиций заказа */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Состав заказа</h2>
+                <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Состав заказа</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Блюдо
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Количество
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Цена
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white dark:bg-gray-800">
                         Сумма
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:text-white">
                     {order.items && order.items.map((item: OrderItem, index) => (
-                      <tr key={item.dish_id || index} className="hover:bg-gray-50">
+                      <tr key={item.dish_id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {item.dish_name || item.name || `Блюдо #${item.dish_id}`}
                           </div>
                           {item.special_instructions && (
-                            <div className="text-xs text-gray-500 mt-1 italic">{item.special_instructions}</div>
+                            <div className="text-xs text-gray-500 mt-1 italic dark:text-white">{item.special_instructions}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="text-sm text-gray-900">{item.quantity}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{item.quantity}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm text-gray-900">{formatPrice(item.price)}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{formatPrice(item.price)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm font-medium text-gray-900">{formatPrice(item.price * item.quantity)}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{formatPrice(item.price * item.quantity)}</div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50">
+                  <tfoot className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
                         Итого:
                       </td>
-                      <td className="px-6 py-4 text-right text-base font-bold text-primary">
+                      <td className="px-6 py-4 text-right text-base font-bold text-primary dark:text-white">
                         {formatPrice(order.total_amount)}
                       </td>
                     </tr>
@@ -424,7 +424,7 @@ const AdminOrderDetailPage: NextPage = () => {
             {/* Управление статусом заказа */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Управление статусом</h2>
+                <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Управление статусом</h2>
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex flex-col space-y-2">
@@ -580,10 +580,10 @@ const AdminOrderDetailPage: NextPage = () => {
             {/* Действия */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Действия</h2>
+                <h2 className="text-xl font-semibold dark:text-white dark:bg-gray-800">Действия</h2>
               </div>
               <div className="p-6 space-y-3">
-                <Link href={`/admin/orders`} className="bg-gray-100 text-gray-800 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 transition flex items-center justify-center">
+                <Link href={`/admin/orders`} className="bg-gray-100 text-gray-800 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 transition flex items-center justify-center dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white">
                   <DocumentTextIcon className="h-5 w-5 mr-2" />
                   Вернуться к списку заказов
                 </Link>

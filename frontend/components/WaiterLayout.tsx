@@ -192,7 +192,7 @@ const WaiterLayout: React.FC<WaiterLayoutProps> = ({
         
         {/* Заголовок страницы и кнопка возврата */}
         {(showBackButton || title) && (
-          <div className="bg-white shadow-sm p-4 mb-4">
+          <div className="bg-white shadow-sm p-4 mb-4 dark:bg-gray-800 dark:text-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center">
                 {showBackButton && (

@@ -337,7 +337,7 @@ const EditDishPage: NextPage = () => {
             
             <div>
               <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-gray-800">
-                Вес (гр)
+                Вес (грамм)
               </label>
               <input
                 type="number"
@@ -378,7 +378,7 @@ const EditDishPage: NextPage = () => {
           </div>
           
           <div className="space-y-4">
-            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
+            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200 dark:bg-gray-800 dark:text-white">
               <input
                 type="checkbox"
                 id="is_vegetarian"
@@ -392,7 +392,7 @@ const EditDishPage: NextPage = () => {
               </label>
             </div>
             
-            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
+            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200 dark:bg-gray-800 dark:text-white">
               <input
                 type="checkbox"
                 id="is_vegan"
@@ -406,7 +406,7 @@ const EditDishPage: NextPage = () => {
               </label>
             </div>
             
-            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
+            <div className="flex items-center bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200 dark:bg-gray-800 dark:text-white">
               <input
                 type="checkbox"
                 id="is_spicy"
