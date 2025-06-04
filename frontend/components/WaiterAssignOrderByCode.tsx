@@ -107,9 +107,9 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
 
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 ${className} dark:bg-gray-800 dark:text-white`}>
-      <h2 className="text-lg font-semibold mb-4">Привязать заказ по коду</h2>
+      <h2 className="text-lg font-semibold mb-4 dark:text-white">Привязать заказ по коду</h2>
       
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 dark:text-white">
         Введите код заказа, чтобы привязать его к вам. Клиент может предоставить этот код со своего мобильного устройства.
       </p>
       
@@ -175,8 +175,8 @@ const WaiterAssignOrderByCode: React.FC<WaiterAssignOrderByCodeProps> = ({
       </form>
       
       <div className="mt-4 pt-4 border-t border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Как это работает:</h3>
-        <ol className="text-sm text-gray-600 list-decimal pl-5 space-y-1">
+        <h3 className="text-sm font-medium text-gray-700 mb-2 dark:text-white">Как это работает:</h3>
+        <ol className="text-sm text-gray-600 list-decimal pl-5 space-y-1 dark:text-white">
           <li>Попросите клиента показать код заказа с его устройства</li>
           <li>Введите код в поле выше и нажмите кнопку привязки</li>
           <li>После привязки заказ появится в вашем списке активных заказов</li>

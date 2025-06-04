@@ -623,7 +623,7 @@ const WaiterOrderDetailPage: NextPage = () => {
               {error}
             </p>
             <p className="mt-2">
-              <Link href="/waiter/orders" className="text-red-700 underline">
+              <Link href="/waiter/orders" className="text-red-700 underline dark:text-white">
                 Вернуться к списку заказов
               </Link>
             </p>
@@ -643,7 +643,7 @@ const WaiterOrderDetailPage: NextPage = () => {
               Заказ не найден
             </p>
             <p className="mt-2">
-              <Link href="/waiter/orders" className="text-yellow-700 underline">
+              <Link href="/waiter/orders" className="text-yellow-700 underline dark:text-white">
                 Вернуться к списку заказов
               </Link>
             </p>
@@ -658,7 +658,7 @@ const WaiterOrderDetailPage: NextPage = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Навигация */}
         <div className="mb-6">
-          <Link href="/waiter/orders" className="text-primary hover:text-primary-dark inline-flex items-center">
+          <Link href="/waiter/orders" className="text-primary hover:text-primary-dark inline-flex items-center dark:text-white">
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
             Вернуться к списку заказов
           </Link>
@@ -681,17 +681,17 @@ const WaiterOrderDetailPage: NextPage = () => {
           {/* Информация о заказе */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
-              <div className="px-6 py-4 border-b">
+              <div className="px-6 py-4 border-b dark:text-white">
                 <h2 className="text-xl font-semibold">Информация о заказе</h2>
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Дата заказа</p>
-                    <p className="font-medium">{formatDate(order.created_at)}</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white">Дата заказа</p>
+                    <p className="font-medium dark:text-white">{formatDate(order.created_at)}</p>
             </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Способ оплаты</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white">Способ оплаты</p>
                     <p className="font-medium flex items-center">
                       {order.payment_status === 'paid' ? (
                         <CreditCardIcon className="h-5 w-5 text-gray-500 mr-1" />
@@ -713,20 +713,20 @@ const WaiterOrderDetailPage: NextPage = () => {
                   </div>
                   {order.table_number && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Столик</p>
-                      <p className="font-medium">№{order.table_number}</p>
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white">Столик</p>
+                      <p className="font-medium dark:text-white">№{order.table_number}</p>
             </div>
           )}
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Срочный заказ</p>
-                    <p className="font-medium">{order.is_urgent ? 'Да' : 'Нет'}</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white">Срочный заказ</p>
+                    <p className="font-medium dark:text-white">{order.is_urgent ? 'Да' : 'Нет'}</p>
                   </div>
         </div>
 
                 {order.comment && (
           <div className="mb-6">
-                    <p className="text-sm text-gray-600 mb-1">Комментарий к заказу</p>
-                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800">{order.comment}</p>
+                    <p className="text-sm text-gray-600 mb-1 dark:text-white">Комментарий к заказу</p>
+                    <p className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800 dark:text-white">{order.comment}</p>
                   </div>
                 )}
                 
@@ -735,21 +735,21 @@ const WaiterOrderDetailPage: NextPage = () => {
                   <h3 className="text-lg font-medium mb-3">Информация о клиенте</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Имя клиента</p>
-                      <p className="font-medium">
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white">Имя клиента</p>
+                      <p className="font-medium dark:text-white">
                         {order.customer_name || 'Не указано'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Телефон</p>
-                      <p className="font-medium">
+                      <p className="text-sm text-gray-600 mb-1 dark:text-white">Телефон</p>
+                      <p className="font-medium dark:text-white">
                         {order.customer_phone || 'Не указано'}
                       </p>
                     </div>
                     {order.customer_age_group && (
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Возрастная группа</p>
-                        <p className="font-medium">
+                        <p className="text-sm text-gray-600 mb-1 dark:text-white">Возрастная группа</p>
+                        <p className="font-medium dark:text-white">
                           {getAgeGroupLabel(order.customer_age_group as AgeGroup)}
                         </p>
                       </div>
@@ -762,22 +762,22 @@ const WaiterOrderDetailPage: NextPage = () => {
             {/* Список позиций заказа */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Состав заказа</h2>
+                <h2 className="text-xl font-semibold dark:text-white">Состав заказа</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
                         Блюдо
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
                         Количество
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
                         Цена
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-white">
                         Сумма
                       </th>
                     </tr>
@@ -786,29 +786,29 @@ const WaiterOrderDetailPage: NextPage = () => {
                     {order.items && order.items.map((item: OrderItem, index) => (
                       <tr key={item.dish_id || index} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.dish_name || item.name || `Блюдо #${item.dish_id}`}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{item.dish_name || item.name || `Блюдо #${item.dish_id}`}</div>
                           {item.special_instructions && (
-                            <div className="text-xs text-gray-500 mt-1 italic">{item.special_instructions}</div>
+                            <div className="text-xs text-gray-500 mt-1 italic dark:text-white">{item.special_instructions}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="text-sm text-gray-900">{item.quantity}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{item.quantity}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm text-gray-900">{formatPrice(item.price)}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{formatPrice(item.price)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm font-medium text-gray-900">{formatPrice(item.price * item.quantity)}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{formatPrice(item.price * item.quantity)}</div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-gray-50">
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+                      <td colSpan={3} className="px-6 py-4 text-right text-sm font-medium text-gray-900 dark:text-white">
                         Итого:
                       </td>
-                      <td className="px-6 py-4 text-right text-base font-bold text-primary">
+                      <td className="px-6 py-4 text-right text-base font-bold text-primary dark:text-white">
                         {formatPrice(order.total_amount)}
                       </td>
                     </tr>
@@ -823,11 +823,11 @@ const WaiterOrderDetailPage: NextPage = () => {
             {/* Управление статусом заказа */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Управление статусом</h2>
+                <h2 className="text-xl font-semibold dark:text-white">Управление статусом</h2>
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex flex-col space-y-2">
-                  <label htmlFor="orderStatus" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="orderStatus" className="block text-sm font-medium text-gray-700 mb-1 dark:text-white">
                     Статус заказа
                   </label>
                   <div className="flex items-center">
@@ -866,14 +866,14 @@ const WaiterOrderDetailPage: NextPage = () => {
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-1 dark:text-white">
                     Текущий статус: <span className={`${getStatusColor(order.status)} px-2 py-0.5 rounded-full text-xs font-medium`}>{getStatusLabel(order.status)}</span>
                   </p>
                 </div>
 
                 {/* Управление статусом оплаты */}
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h3 className="text-lg font-medium mb-3">Статус оплаты</h3>
+                  <h3 className="text-lg font-medium mb-3 dark:text-white">Статус оплаты</h3>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       className={`px-3 py-2 text-sm text-center rounded-md font-medium transition ${order.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
@@ -915,21 +915,21 @@ const WaiterOrderDetailPage: NextPage = () => {
           </div>
 
                 <div className="border-t mt-4 pt-4">
-                  <p className="text-sm text-gray-600 mb-4">История изменений статуса</p>
+                  <p className="text-sm text-gray-600 mb-4 dark:text-white">История изменений статуса</p>
                   <div className="space-y-2">
                     <div className="flex items-start">
                       <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-500 mt-1"></div>
                       <div className="ml-3">
-                        <p className="text-sm font-medium">Создан</p>
-                        <p className="text-xs text-gray-500">{formatDate(order.created_at)}</p>
+                        <p className="text-sm font-medium dark:text-white">Создан</p>
+                        <p className="text-xs text-gray-500 dark:text-white">{formatDate(order.created_at)}</p>
                       </div>
                     </div>
                     {order.updated_at && order.updated_at !== order.created_at && (
                       <div className="flex items-start">
                         <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-500 mt-1"></div>
                         <div className="ml-3">
-                          <p className="text-sm font-medium">Обновлен</p>
-                          <p className="text-xs text-gray-500">{formatDate(order.updated_at)}</p>
+                          <p className="text-sm font-medium dark:text-white">Обновлен</p>
+                          <p className="text-xs text-gray-500 dark:text-white">{formatDate(order.updated_at)}</p>
                         </div>
                       </div>
                     )}
@@ -939,8 +939,8 @@ const WaiterOrderDetailPage: NextPage = () => {
                           <div className="flex items-start">
                             <div className="flex-shrink-0 h-4 w-4 rounded-full bg-green-600 mt-1"></div>
                             <div className="ml-3">
-                              <p className="text-sm font-medium">Завершен</p>
-                              <p className="text-xs text-gray-500">{formatDate(order.completed_at as string)}</p>
+                              <p className="text-sm font-medium dark:text-white">Завершен</p>
+                              <p className="text-xs text-gray-500 dark:text-white">{formatDate(order.completed_at as string)}</p>
                             </div>
                           </div>
                         );
@@ -955,7 +955,7 @@ const WaiterOrderDetailPage: NextPage = () => {
             {/* Действия */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Действия</h2>
+                <h2 className="text-xl font-semibold dark:text-white">Действия</h2>
               </div>
               <div className="p-6 space-y-3">
                 <Link href={`/waiter/orders`} className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-center py-3 px-4 rounded-md font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition flex items-center justify-center">

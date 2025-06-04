@@ -29,7 +29,7 @@ const CreateOrderPage: React.FC = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <label htmlFor="table_number" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="table_number" className="block text-sm font-medium text-gray-700 dark:text-white">
           Номер стола
         </label>
         <input
@@ -43,7 +43,7 @@ const CreateOrderPage: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700 dark:text-white">
           Имя клиента
         </label>
         <input
@@ -57,7 +57,7 @@ const CreateOrderPage: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="customer_phone" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="customer_phone" className="block text-sm font-medium text-gray-700 dark:text-white">
           Телефон клиента
         </label>
         <input
@@ -71,7 +71,7 @@ const CreateOrderPage: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="customer_age_group" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="customer_age_group" className="block text-sm font-medium text-gray-700 dark:text-white">
           Возрастная группа
         </label>
         <select
@@ -90,7 +90,7 @@ const CreateOrderPage: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700 dark:text-white">
           Способ оплаты
         </label>
         <select
@@ -107,7 +107,7 @@ const CreateOrderPage: React.FC = () => {
       </div>
 
       <div className="md:col-span-2">
-        <label htmlFor="comment" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-white">
           Комментарий к заказу
         </label>
         <textarea

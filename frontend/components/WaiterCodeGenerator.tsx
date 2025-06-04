@@ -90,9 +90,9 @@ const WaiterCodeGenerator: React.FC<WaiterCodeGeneratorProps> = ({ className = '
 
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 ${className} dark:bg-gray-800 dark:text-white`}>
-      <h2 className="text-lg font-semibold mb-4">Код официанта</h2>
+      <h2 className="text-lg font-semibold mb-4 dark:text-white">Код официанта</h2>
       
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 dark:text-white">
         Сгенерируйте код, который клиенты могут использовать при оформлении заказа для привязки к вам как к официанту.
       </p>
       
