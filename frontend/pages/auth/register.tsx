@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import useAuthStore from '@/lib/auth-store';
 
 // Валидационная схема для формы регистрации
 const registerSchema = z.object({
@@ -24,6 +25,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { login } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<any>(null);
@@ -71,11 +73,10 @@ export default function RegisterPage() {
         throw new Error(responseData.detail || 'Ошибка при регистрации');
       }
 
-      // Показываем сообщение об успешной регистрации
-      toast.success('Регистрация успешна! Выполните вход в систему');
-      
-      // Переход на страницу входа
-      router.push('/auth/login');
+      // Сразу авторизуем пользователя
+      await login({ email: data.email, password: data.password });
+      toast.success('Регистрация успешна! Вы вошли в систему');
+      router.push('/');
     } catch (error: any) {
       console.error('Ошибка при регистрации:', error);
       
