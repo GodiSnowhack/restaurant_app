@@ -890,6 +890,8 @@ def get_predictive_metrics(
 
 # Мок-данные для финансовой аналитики
 def get_mock_financial_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
     return {
         "totalRevenue": 1250000,
         "totalCost": 750000,
@@ -971,6 +973,8 @@ def get_mock_financial_metrics(start_date: datetime, end_date: datetime) -> Dict
 
 # Мок-данные для аналитики меню
 def get_mock_menu_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
     return {
         "topSellingDishes": [
             {"dishId": 1, "dishName": "Стейк Рибай", "categoryId": 2, "categoryName": "Основные блюда", "salesCount": 105, "revenue": 210000, "percentage": 25.2, "margin": 40},
@@ -1037,6 +1041,8 @@ def get_mock_menu_metrics(start_date: datetime, end_date: datetime) -> Dict[str,
 
 # Мок-данные для аналитики клиентов
 def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
     return {
         "totalCustomers": 580,
         "newCustomers": 72,
@@ -1099,6 +1105,8 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
 
 # Мок-данные для операционной аналитики
 def get_mock_operational_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
     return {
         "averageOrderPreparationTime": 20.5,
         "averageTableTurnoverTime": 62.0,
@@ -1152,6 +1160,8 @@ def get_mock_operational_metrics(start_date: datetime, end_date: datetime) -> Di
 
 # Мок-данные для предиктивной аналитики
 def get_mock_predictive_metrics(start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
     return {
         "salesForecast": [
             {"date": (end_date + timedelta(days=i)).strftime("%Y-%m-%d"), 
