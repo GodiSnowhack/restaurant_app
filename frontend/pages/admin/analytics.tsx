@@ -135,12 +135,14 @@ const AdminAnalyticsPage: NextPage = () => {
   const [dateRangeText, setDateRangeText] = useState<string>('');
 
   useEffect(() => {
-    // Проверка прав админа
-    checkAdmin();
-    
     // Загрузка данных аналитики
     loadAnalyticsData();
   }, [timeRange]);
+
+  // Проверка прав только при первом рендере
+  useEffect(() => {
+    checkAdmin();
+  }, [isLoading, isAuthenticated, user]);
 
   // Функция для проверки прав администратора
   const checkAdmin = async () => {
