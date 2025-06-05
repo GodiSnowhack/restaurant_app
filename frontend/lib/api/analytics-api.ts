@@ -669,23 +669,13 @@ function getMockData(endpoint: string): any {
 // API для аналитики
 const analyticsApi = {
   async getFinancialMetrics(filters?: AnalyticsFilters): Promise<FinancialMetrics> {
-    try {
-      console.log('Запрашиваем финансовые метрики с фильтрами:', filters);
-      return await fetchAnalytics<FinancialMetrics>('financial', filters);
-    } catch (error) {
-      console.error('Ошибка при получении финансовых метрик:', error);
-      throw new Error('Ошибка загрузки финансовых метрик');
-    }
+    console.log('Запрашиваем финансовые метрики с фильтрами:', filters);
+    return fetchAnalytics<FinancialMetrics>('financial', filters);
   },
   
   async getMenuMetrics(filters?: AnalyticsFilters): Promise<MenuMetrics> {
-    try {
-      console.log('Запрашиваем метрики меню с фильтрами:', filters);
-      return await fetchAnalytics<MenuMetrics>('menu', filters);
-    } catch (error) {
-      console.error('Ошибка при получении метрик меню:', error);
-      throw new Error('Ошибка загрузки метрик меню');
-    }
+    console.log('Запрашиваем метрики меню с фильтрами:', filters);
+    return fetchAnalytics<MenuMetrics>('menu', filters);
   },
   
   async getCustomerMetrics(filters?: AnalyticsFilters): Promise<CustomerMetrics> {
@@ -729,23 +719,13 @@ const analyticsApi = {
   },
   
   async getOperationalMetrics(filters?: AnalyticsFilters): Promise<OperationalMetrics> {
-    try {
-      console.log('Запрашиваем операционные метрики с фильтрами:', filters);
-      return await fetchAnalytics<OperationalMetrics>('operational', filters);
-    } catch (error) {
-      console.error('Ошибка при получении операционных метрик:', error);
-      throw new Error('Ошибка загрузки операционных метрик');
-    }
+    console.log('Запрашиваем операционные метрики с фильтрами:', filters);
+    return fetchAnalytics<OperationalMetrics>('operational', filters);
   },
   
   async getPredictiveMetrics(filters?: AnalyticsFilters): Promise<PredictiveMetrics> {
-    try {
-      console.log('Запрашиваем предиктивные метрики с фильтрами:', filters);
-      return await fetchAnalytics<PredictiveMetrics>('predictive', filters);
-    } catch (error) {
-      console.error('Ошибка при получении предиктивных метрик:', error);
-      throw new Error('Ошибка загрузки предиктивных метрик');
-    }
+    console.log('Запрашиваем предиктивные метрики с фильтрами:', filters);
+    return fetchAnalytics<PredictiveMetrics>('predictive', filters);
   },
   
   async getDashboardStats(): Promise<any> {

@@ -3,7 +3,7 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { useAuth } from '../../hooks/useAuth';
+import useAuthStore from '../../lib/auth-store';
 import { 
   ArrowLeftIcon,
   ChartBarIcon,
@@ -109,7 +109,7 @@ const getCategoryName = (categoryId: number): string => {
 
 const AdminAnalyticsPage: NextPage = () => {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, fetchUserProfile } = useAuthStore();
   const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,14 +135,12 @@ const AdminAnalyticsPage: NextPage = () => {
   const [dateRangeText, setDateRangeText] = useState<string>('');
 
   useEffect(() => {
+    // Проверка прав админа
+    checkAdmin();
+    
     // Загрузка данных аналитики
     loadAnalyticsData();
   }, [timeRange]);
-
-  // Проверка прав только при первом рендере
-  useEffect(() => {
-    checkAdmin();
-  }, [isLoading, isAuthenticated, user]);
 
   // Функция для проверки прав администратора
   const checkAdmin = async () => {
