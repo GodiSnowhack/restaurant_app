@@ -13,6 +13,18 @@ from app.database.session import Base
 from app.utils.date_utils import is_weekend, get_day_name
 
 
+def ensure_datetime(dt):
+    if isinstance(dt, str):
+        try:
+            return datetime.fromisoformat(dt)
+        except Exception:
+            try:
+                return datetime.strptime(dt, "%Y-%m-%d")
+            except Exception:
+                return datetime.now()
+    return dt
+
+
 def get_sales_by_period(
     db: Session, 
     start_date: datetime = None, 
@@ -383,7 +395,11 @@ def get_financial_metrics(
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-    
+
+    # Приведение к datetime
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
+
     # Используем мок-данные только если явно запрошено
     if use_mock_data:
         print(f"Используем мок-данные для финансовых метрик за период {start_date} - {end_date}")
@@ -521,7 +537,11 @@ def get_menu_metrics(
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-    
+
+    # Приведение к datetime
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
+
     # Используем мок-данные только если явно запрошено
     if use_mock_data:
         print(f"Используем мок-данные для периода {start_date} - {end_date}")
@@ -722,6 +742,10 @@ def get_customer_metrics(
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    # Приведение к datetime
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
             
     # Используем мок-данные только если явно запрошено
     if use_mock_data:
@@ -824,7 +848,11 @@ def get_operational_metrics(
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-    
+
+    # Приведение к datetime
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
+
     # Используем мок-данные только если явно запрошено
     if use_mock_data:
         print(f"Используем мок-данные для операционных метрик за период {start_date} - {end_date}")
@@ -852,6 +880,10 @@ def get_predictive_metrics(
     """
     Получение предиктивных метрик ресторана
     """
+    # Приведение к datetime
+    start_date = ensure_datetime(start_date)
+    end_date = ensure_datetime(end_date)
+
     # Предиктивные метрики всегда возвращают мок-данные, так как это прогнозы
     return get_mock_predictive_metrics(start_date, end_date)
 
