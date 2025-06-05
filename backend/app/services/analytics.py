@@ -1013,7 +1013,7 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
         "customerRetentionRate": 78.3,
         "averageVisitsPerCustomer": 2.8,
         "customerSatisfaction": 4.6,
-        "foodRating": 4.7,
+        "foodRating": 4.8,
         "serviceRating": 4.5,
         "newCustomersChange": 8.2,
         "returnRateChange": 3.5,
