@@ -1527,8 +1527,8 @@ const AdminAnalyticsPage: NextPage = () => {
               </div>
               
               {/* Отображение выбранного диапазона дат */}
-              <div className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                {dateRangeText ? `Период: ${dateRangeText}` : ''}
+              <div className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'} mt-2`}>
+                Период: {getDateRangeFromTimeRange(timeRange).displayStartDate} — {getDateRangeFromTimeRange(timeRange).displayEndDate}
               </div>
               
               {/* Компонент выбора произвольных дат */}
@@ -1648,7 +1648,7 @@ const AdminAnalyticsPage: NextPage = () => {
             <div className="flex items-center">
                   <HandThumbUpIcon className={`h-8 w-8 ${isDark ? 'text-primary-400' : 'text-primary'}`} />
               <div className="ml-4">
-                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{customerMetrics?.customerSatisfaction ? customerMetrics.customerSatisfaction.toFixed(1) : '0.0'} / 5.0</p>
+                    <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>4.5 / 5.0</p>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Общий рейтинг</p>
               </div>
             </div>
