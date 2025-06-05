@@ -151,9 +151,13 @@ const AdminAnalyticsPage: NextPage = () => {
       return;
     }
 
+    // Если не админ — показываем ошибку, но не редиректим
+    // if (!isLoading && isAuthenticated && user?.role !== 'admin') {
+    //   router.push('/');
+    //   return;
+    // }
     if (!isLoading && isAuthenticated && user?.role !== 'admin') {
-      router.push('/');
-      return;
+      setError('Доступ запрещён: только для администраторов');
     }
   };
 
