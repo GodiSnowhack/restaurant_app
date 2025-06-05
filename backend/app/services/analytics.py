@@ -390,21 +390,14 @@ def get_financial_metrics(
     """
     Получение финансовых метрик
     """
-    # Если даты не указаны, используем последний месяц
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-
-    # Приведение к datetime
     start_date = ensure_datetime(start_date)
     end_date = ensure_datetime(end_date)
-
-    # Используем мок-данные только если явно запрошено
     if use_mock_data:
-        print(f"Используем мок-данные для финансовых метрик за период {start_date} - {end_date}")
         return get_mock_financial_metrics(start_date, end_date)
-    
     try:
         print(f"Пытаемся получить реальные финансовые данные за период {start_date} - {end_date}")
         
@@ -532,21 +525,14 @@ def get_menu_metrics(
     """
     Получение комплексных метрик по меню для аналитики
     """
-    # Если даты не указаны, используем последний месяц
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-
-    # Приведение к datetime
     start_date = ensure_datetime(start_date)
     end_date = ensure_datetime(end_date)
-
-    # Используем мок-данные только если явно запрошено
     if use_mock_data:
-        print(f"Используем мок-данные для периода {start_date} - {end_date}")
         return get_mock_menu_metrics(start_date, end_date)
-    
     try:
         print(f"Пытаемся получить реальные данные о меню за период {start_date} - {end_date}")
         
@@ -737,21 +723,14 @@ def get_customer_metrics(
     """
     Получение комплексных метрик по клиентам
     """
-    # Если даты не указаны, используем последний месяц
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-
-    # Приведение к datetime
     start_date = ensure_datetime(start_date)
     end_date = ensure_datetime(end_date)
-            
-    # Используем мок-данные только если явно запрошено
     if use_mock_data:
-        print(f"Используем мок-данные для клиентской аналитики за период {start_date} - {end_date}")
         return get_mock_customer_metrics(start_date, end_date)
-    
     try:
         print(f"Пытаемся получить реальные данные о клиентах за период {start_date} - {end_date}")
         
@@ -843,21 +822,14 @@ def get_operational_metrics(
     """
     Получение операционных метрик ресторана
     """
-    # Если даты не указаны, используем последний месяц
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
-
-    # Приведение к datetime
     start_date = ensure_datetime(start_date)
     end_date = ensure_datetime(end_date)
-
-    # Используем мок-данные только если явно запрошено
     if use_mock_data:
-        print(f"Используем мок-данные для операционных метрик за период {start_date} - {end_date}")
         return get_mock_operational_metrics(start_date, end_date)
-    
     try:
         print(f"Пытаемся получить реальные операционные данные за период {start_date} - {end_date}")
         # Попытка получить реальные данные из БД
@@ -880,7 +852,6 @@ def get_predictive_metrics(
     """
     Получение предиктивных метрик ресторана
     """
-    # Приведение к datetime
     start_date = ensure_datetime(start_date)
     end_date = ensure_datetime(end_date)
 
