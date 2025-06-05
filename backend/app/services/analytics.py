@@ -439,7 +439,13 @@ def get_financial_metrics(
         estimated_expenses_percentage = 0.6  # 60% от выручки на расходы
         
         for day_data in daily_sales:
-            date_str = day_data.date.strftime('%Y-%m-%d')
+            date_val = day_data.date
+            if isinstance(date_val, str):
+                try:
+                    date_val = datetime.fromisoformat(date_val)
+                except Exception:
+                    date_val = datetime.strptime(date_val, "%Y-%m-%d")
+            date_str = date_val.strftime('%Y-%m-%d')
             revenue = float(day_data.revenue) if day_data.revenue else 0
             # Примерные расходы для демонстрации
             expenses = revenue * estimated_expenses_percentage
