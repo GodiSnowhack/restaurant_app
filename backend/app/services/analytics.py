@@ -440,14 +440,9 @@ def get_financial_metrics(
         
         for day_data in daily_sales:
             date_val = day_data.date
-            if isinstance(date_val, str):
-                try:
-                    date_val = datetime.fromisoformat(date_val)
-                except Exception:
-                    date_val = datetime.strptime(date_val, "%Y-%m-%d")
+            date_val = ensure_datetime(date_val)
             date_str = date_val.strftime('%Y-%m-%d')
             revenue = float(day_data.revenue) if day_data.revenue else 0
-            # Примерные расходы для демонстрации
             expenses = revenue * estimated_expenses_percentage
             
             revenue_by_day[date_str] = round(revenue)
@@ -457,6 +452,7 @@ def get_financial_metrics(
         if not revenue_by_day:
             current_date = start_date
             while current_date <= end_date:
+                current_date = ensure_datetime(current_date)
                 date_str = current_date.strftime('%Y-%m-%d')
                 revenue_by_day[date_str] = 0
                 expenses_by_day[date_str] = 0
@@ -501,8 +497,8 @@ def get_financial_metrics(
             "revenueByDay": revenue_by_day,
             "expensesByDay": expenses_by_day,
             "period": {
-                "startDate": start_date.strftime("%Y-%m-%d"),
-                "endDate": end_date.strftime("%Y-%m-%d")
+                "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+                "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
             }
         }
         
@@ -517,7 +513,7 @@ def get_financial_metrics(
     except Exception as e:
         print(f"Ошибка при получении финансовых метрик: {e}")
         # В случае ошибки возвращаем мок-данные
-        return get_mock_financial_metrics(start_date, end_date)
+        return get_mock_financial_metrics(ensure_datetime(start_date), ensure_datetime(end_date))
 
 
 def get_menu_metrics(
@@ -699,8 +695,8 @@ def get_menu_metrics(
             "leastSellingDishes": least_selling_dishes,
             "mostProfitableDishes": most_profitable_dishes,
             "period": {
-                "startDate": start_date.strftime("%Y-%m-%d"),
-                "endDate": end_date.strftime("%Y-%m-%d")
+                "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+                "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
             }
         }
         
@@ -943,8 +939,8 @@ def get_mock_financial_metrics(start_date: datetime, end_date: datetime) -> Dict
             for i in range((end_date - start_date).days + 1)
         ],
         "period": {
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d")
+            "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
         }
     }
 
@@ -1011,8 +1007,8 @@ def get_mock_menu_metrics(start_date: datetime, end_date: datetime) -> Dict[str,
             "5": {"salesPercentage": 10, "averageOrderValue": 800, "averageProfitMargin": 40}
         },
         "period": {
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d")
+            "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
         }
     }
 
@@ -1075,8 +1071,8 @@ def get_mock_customer_metrics(start_date: datetime, end_date: datetime) -> Dict[
             {"userId": 5, "fullName": "Николай Козлов", "email": "nikolay@example.com", "totalSpent": 40000, "ordersCount": 6, "averageRating": 4.7, "lastVisit": "2023-04-26"}
         ],
         "period": {
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d")
+            "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
         }
     }
 
@@ -1130,8 +1126,8 @@ def get_mock_operational_metrics(start_date: datetime, end_date: datetime) -> Di
             'Отменен': 5.2
         },
         "period": {
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d")
+            "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
         }
     }
 
@@ -1178,7 +1174,7 @@ def get_mock_predictive_metrics(start_date: datetime, end_date: datetime) -> Dic
             {"dishId": 5, "dishName": "Тирамису", "reason": "Высокая маржинальность", "suggestedDiscount": 10, "potentialRevenue": 42000}
         ],
         "period": {
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d")
+            "startDate": ensure_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": ensure_datetime(end_date).strftime("%Y-%m-%d")
         }
     } 
